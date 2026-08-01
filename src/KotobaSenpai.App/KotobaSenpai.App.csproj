@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- MVVMTK0045 针对 WinRT AOT (UWP/WinUI) 场景；本工程是 WPF 桌面 exe，不适用，故关闭。 -->
+    <NoWarn>MVVMTK0045</NoWarn>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
+    <ProjectReference Include="..\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
+  </ItemGroup>
+</Project>

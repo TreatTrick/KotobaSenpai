@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "KotobaSenpai.App (WPF)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/KotobaSenpai.App/bin/Debug/net10.0-windows10.0.19041.0/KotobaSenpai.App.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/KotobaSenpai.App",
+      "stopAtEntry": false,
+      "console": "internalConsole"
+    }
+  ]
+}

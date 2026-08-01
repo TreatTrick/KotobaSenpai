@@ -1,0 +1,37 @@
+<Window x:Class="KotobaSenpai.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KotobaSenpai · 第一阶段"
+        Width="720" Height="460"
+        WindowStartupLocation="CenterScreen">
+  <Grid Margin="18">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <DockPanel Grid.Row="0">
+      <TextBlock Text="目标窗口" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <Button Content="刷新窗口" Command="{Binding RefreshCommand}" DockPanel.Dock="Right" />
+    </DockPanel>
+
+    <ComboBox Grid.Row="1" Margin="0,12,0,12" ItemsSource="{Binding Windows}"
+              SelectedItem="{Binding SelectedWindow}" DisplayMemberPath="Title" />
+
+    <Border Grid.Row="2" BorderBrush="#DDD" BorderThickness="1" Padding="12">
+      <StackPanel>
+        <TextBlock Text="操作" FontWeight="SemiBold" />
+        <WrapPanel Margin="0,8,0,0">
+          <Button Content="识别并绘制下划线" Command="{Binding RecognizeCommand}" IsDefault="True" />
+          <Button Content="隐藏下划线" Command="{Binding HideCommand}" />
+        </WrapPanel>
+        <TextBlock Text="说明：选择一个窗口后，应用会抓取当前画面，识别日语词并在每个词下方绘制横线。"
+                   TextWrapping="Wrap" Margin="4,12,4,0" Foreground="#555" />
+      </StackPanel>
+    </Border>
+
+    <TextBlock Grid.Row="3" Text="{Binding Status}" Margin="0,14,0,0" Foreground="#333" />
+  </Grid>
+</Window>

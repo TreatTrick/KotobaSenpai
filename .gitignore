@@ -1,1 +1,12 @@
-/obj
+# Build output
+bin/
+obj/
+
+# IDE / tools
+.vs/
+.idea/
+*.user
+*.suo
+
+# OpenSpec local state
+openspec/.cache/
