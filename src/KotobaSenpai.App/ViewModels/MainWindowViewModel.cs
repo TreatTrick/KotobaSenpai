@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Services;
 
@@ -21,6 +22,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly WordOverlayApplicationService _workflow;
     private readonly IStringLocalizer _localizer;
     private readonly IUserMessageResolver _messageResolver;
+    private readonly ILogger _logger;
 
     /// <summary>按当前状态渲染本地化 Status 的委托；文化切换时重新调用以就地刷新。</summary>
     private Func<string> _renderStatus = () => string.Empty;
@@ -29,12 +31,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IWindowCatalog catalog,
         WordOverlayApplicationService workflow,
         IStringLocalizer localizer,
-        IUserMessageResolver messageResolver)
+        IUserMessageResolver messageResolver,
+        ILogger logger)
     {
         _catalog = catalog;
         _workflow = workflow;
         _localizer = localizer;
         _messageResolver = messageResolver;
+        _logger = logger;
 
         _localizer.CultureChanged += OnCultureChanged;
         SetStatus(ResourceKeys.Status_SelectTarget);
@@ -130,6 +134,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>记录错误状态（异常 + 回退码）并经解析器渲染；文化切换时按码重新翻译。</summary>
     private void SetError(Exception exception, string fallbackErrorCode)
     {
+        _logger.LogError(exception, "Error reported to user");
         _renderStatus = () => _messageResolver.Resolve(exception, fallbackErrorCode);
         Status = _renderStatus();
     }

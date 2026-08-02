@@ -28,4 +28,8 @@ public static class ResourceKeys
     public const string Status_NoWords = nameof(Status_NoWords);
     public const string Status_WordsRecognized = nameof(Status_WordsRecognized);
     public const string Status_Hidden = nameof(Status_Hidden);
+
+    // --- 意外错误提示（全局未处理异常兜底弹窗） ---
+    public const string UnexpectedError_Title = nameof(UnexpectedError_Title);
+    public const string UnexpectedError_Message = nameof(UnexpectedError_Message);
 }

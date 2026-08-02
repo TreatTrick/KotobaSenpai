@@ -3,6 +3,7 @@ using KotobaSenpai.App.Resources;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Services;
 
@@ -15,7 +16,7 @@ public sealed class MainWindowViewModelTests
     {
         var self = new WindowTarget((nint)1, "Self", new ScreenRect(0, 0, 100, 100));
         var other = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 100, 100));
-        var (vm, _, _) = CreateVm(new FakeWindowCatalog(self, other));
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(self, other));
         vm.ExcludeHandle = (nint)1;
 
         vm.RefreshCommand.Execute(null);
@@ -28,7 +29,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task Recognize_without_selection_warns_user()
     {
-        var (vm, overlay, _) = CreateVm(new FakeWindowCatalog());
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog());
 
         await vm.RecognizeCommand.ExecuteAsync(null);
 
@@ -40,7 +41,7 @@ public sealed class MainWindowViewModelTests
     public async Task Recognize_reports_count_and_shows_overlay()
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
-        var (vm, overlay, _) = CreateVm(new FakeWindowCatalog(target));
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog(target));
         vm.RefreshCommand.Execute(null);
         vm.SelectedWindow = vm.Windows[0];
 
@@ -54,7 +55,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void Hide_clears_overlay_and_updates_status()
     {
-        var (vm, overlay, _) = CreateVm(new FakeWindowCatalog());
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog());
 
         vm.HideCommand.Execute(null);
 
@@ -66,7 +67,7 @@ public sealed class MainWindowViewModelTests
     public void Culture_changed_re_derives_status_from_current_state()
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
-        var (vm, _, localizer) = CreateVm(new FakeWindowCatalog(target));
+        var (vm, _, localizer, _) = CreateVm(new FakeWindowCatalog(target));
         vm.SelectedWindow = target;
         Assert.Equal($"{ResourceKeys.Status_Selected}:Other", vm.Status);
 
@@ -77,13 +78,27 @@ public sealed class MainWindowViewModelTests
         Assert.Equal($"{ResourceKeys.Status_Selected}:Other!", vm.Status);
     }
 
-    private static (MainWindowViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer) CreateVm(IWindowCatalog catalog)
+    [Fact]
+    public void Refresh_failure_logs_once_and_reports_error_status()
+    {
+        var (vm, _, _, logger) = CreateVm(new ThrowingCatalog());
+        vm.ExcludeHandle = (nint)1;
+
+        vm.RefreshCommand.Execute(null);
+
+        // 所有错误路径汇集到 SetError，记一次日志；状态经解析器映射为回退错误码。
+        Assert.Equal(1, logger.ErrorCount);
+        Assert.Equal(ErrorCodes.WindowEnumerationFailed, vm.Status);
+    }
+
+    private static (MainWindowViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(IWindowCatalog catalog)
     {
         var overlay = new FakeOverlay();
         var workflow = new WordOverlayApplicationService(new FakeRecognizer(), overlay);
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
-        return (new MainWindowViewModel(catalog, workflow, localizer, resolver), overlay, localizer);
+        var logger = new FakeLogger();
+        return (new MainWindowViewModel(catalog, workflow, localizer, resolver, logger), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowCatalog : IWindowCatalog
@@ -91,6 +106,11 @@ public sealed class MainWindowViewModelTests
         private readonly IReadOnlyList<WindowTarget> _windows;
         public FakeWindowCatalog(params WindowTarget[] windows) => _windows = windows;
         public IReadOnlyList<WindowTarget> ListVisibleWindows() => _windows;
+    }
+
+    private sealed class ThrowingCatalog : IWindowCatalog
+    {
+        public IReadOnlyList<WindowTarget> ListVisibleWindows() => throw new InvalidOperationException("boom");
     }
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
@@ -125,5 +145,21 @@ public sealed class MainWindowViewModelTests
             => args.Length == 0 ? $"{key}{Suffix}" : $"{key}:{string.Join(",", args)}{Suffix}";
 
         public void RaiseCultureChanged() => CultureChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>日志 fake：捕获 Error 级调用次数与异常，验证错误路径恰好记一次。</summary>
+    private sealed class FakeLogger : ILogger
+    {
+        public int ErrorCount { get; private set; }
+        public Exception? LastError { get; private set; }
+
+        public void Log(LogLevel level, Exception? exception, string message, params object[] args)
+        {
+            if (level == LogLevel.Error)
+            {
+                ErrorCount++;
+                LastError = exception;
+            }
+        }
     }
 }

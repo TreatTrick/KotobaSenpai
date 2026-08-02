@@ -1,6 +1,8 @@
 using System.Reflection;
 using KotobaSenpai.App.Localization;
+using KotobaSenpai.App.Logging;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Logging;
 using NetArchTest.Rules;
 
 namespace KotobaSenpai.Architecture.Tests;
@@ -88,6 +90,30 @@ public sealed class DependencyDirectionTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, FormatFailure("ViewModels 不得依赖本地化实现 ResourceManagerStringLocalizer（应依赖 Core 端口）", result));
+    }
+
+    /// <summary>日志端口 ILogger/LogLevel 必须位于 Core，文件实现 FileLogger 必须位于 App。</summary>
+    [Fact]
+    public void Logging_Port_ResidesInCore_Implementation_ResidesInApp()
+    {
+        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
+
+        Assert.Same(coreAssembly, typeof(ILogger).Assembly);
+        Assert.Same(coreAssembly, typeof(LogLevel).Assembly);
+        Assert.Same(appAssembly, typeof(FileLogger).Assembly);
+    }
+
+    /// <summary>ViewModel 仅依赖 Core 的 ILogger 端口，不引用 App 实现 FileLogger。</summary>
+    [Fact]
+    public void ViewModels_DependOnCoreLoggingInterface_NotAppImplementation()
+    {
+        var result = Types.InAssemblies(Assemblies)
+            .That().ResideInNamespaceMatching(ViewModelsNamespace)
+            .ShouldNot().HaveDependencyOn(typeof(FileLogger).FullName!)
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, FormatFailure("ViewModels 不得依赖日志实现 FileLogger（应依赖 Core 端口）", result));
     }
 
     private static string FormatFailure(string rule, TestResult result) =>
