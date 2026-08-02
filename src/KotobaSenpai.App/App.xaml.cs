@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.Resources;
+using KotobaSenpai.App.Themes;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
@@ -50,10 +51,13 @@ public partial class App : Application
 
         ConfigureGlobalErrorHandling();
 
+        var themeService = _services.GetRequiredService<FluentThemeService>();
+
         var window = new MainWindow
         {
             DataContext = _services.GetRequiredService<MainWindowViewModel>(),
-            LanguageService = languageService
+            LanguageService = languageService,
+            ThemeService = themeService
         };
         window.Show();
     }
@@ -91,6 +95,10 @@ public partial class App : Application
             LogConfiguration.LoadMinimumLevel(),
             sp.GetRequiredService<LogRetentionPolicy>()));
         services.AddSingleton<ILogger>(sp => sp.GetRequiredService<FileLogger>());
+
+        // 主题：偏好存储端口与视图层 FluentThemeService 单例（持有窗口 OS 跟随订阅，须共享）。
+        services.AddSingleton<IThemePreferenceStore, LocalAppDataThemePreferenceStore>();
+        services.AddSingleton<FluentThemeService>();
 
         services.AddSingleton<MainWindowViewModel>();
     }

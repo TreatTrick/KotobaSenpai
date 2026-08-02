@@ -117,4 +117,20 @@
   <data name="UnexpectedError_Message" xml:space="preserve">
     <value>发生意外错误，应用需要关闭。详情请见日志文件。</value>
   </data>
+  <!-- 外观卡片（主题模式选择） -->
+  <data name="Label_Appearance" xml:space="preserve">
+    <value>外观</value>
+  </data>
+  <data name="Label_Theme" xml:space="preserve">
+    <value>主题</value>
+  </data>
+  <data name="ThemeMode_Auto" xml:space="preserve">
+    <value>自动（跟随系统）</value>
+  </data>
+  <data name="ThemeMode_Light" xml:space="preserve">
+    <value>浅色</value>
+  </data>
+  <data name="ThemeMode_Dark" xml:space="preserve">
+    <value>深色</value>
+  </data>
 </root>

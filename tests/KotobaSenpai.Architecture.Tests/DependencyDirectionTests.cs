@@ -116,6 +116,41 @@ public sealed class DependencyDirectionTests
         Assert.True(result.IsSuccessful, FormatFailure("ViewModels 不得依赖日志实现 FileLogger（应依赖 Core 端口）", result));
     }
 
+    /// <summary>Wpf.Ui 程序集仅被 App 引用（视图层依赖），Core 与 Platform.Windows 不得引用。</summary>
+    [Fact]
+    public void WpfUi_Assembly_Referenced_OnlyBy_App()
+    {
+        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Overlay.WpfOverlayRenderer).Assembly;
+        var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
+
+        static bool isWpfUi(string? name)
+            => name is not null && name.StartsWith("Wpf.Ui", StringComparison.Ordinal);
+
+        // App 引用了 Wpf.Ui（视图层 UI 库）。
+        var appRefs = appAssembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
+        Assert.Contains(appRefs, isWpfUi);
+
+        // Core 与 Platform.Windows 不得引用 Wpf.Ui。
+        foreach (var assembly in new[] { coreAssembly, platformAssembly })
+        {
+            var refs = assembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
+            Assert.DoesNotContain(refs, isWpfUi);
+        }
+    }
+
+    /// <summary>ViewModel 不得依赖主题服务 MaterialThemeService（主题为视图层关切，不入 ViewModel）。</summary>
+    [Fact]
+    public void ViewModels_ShouldNotDependOn_ThemeService()
+    {
+        var result = Types.InAssemblies(Assemblies)
+            .That().ResideInNamespaceMatching(ViewModelsNamespace)
+            .ShouldNot().HaveDependencyOn("KotobaSenpai.App.Themes")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels 不得依赖主题服务 MaterialThemeService（主题为视图层关切）", result));
+    }
+
     private static string FormatFailure(string rule, TestResult result) =>
         result.IsSuccessful
             ? rule

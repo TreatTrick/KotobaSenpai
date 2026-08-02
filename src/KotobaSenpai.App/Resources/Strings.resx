@@ -117,4 +117,20 @@
   <data name="UnexpectedError_Message" xml:space="preserve">
     <value>An unexpected error occurred and the application must close. See the log file for details.</value>
   </data>
+  <!-- Appearance card (theme mode selector) -->
+  <data name="Label_Appearance" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="Label_Theme" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="ThemeMode_Auto" xml:space="preserve">
+    <value>Auto (follow system)</value>
+  </data>
+  <data name="ThemeMode_Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="ThemeMode_Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
 </root>

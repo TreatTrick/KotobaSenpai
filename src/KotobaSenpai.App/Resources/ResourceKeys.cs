@@ -32,4 +32,11 @@ public static class ResourceKeys
     // --- 意外错误提示（全局未处理异常兜底弹窗） ---
     public const string UnexpectedError_Title = nameof(UnexpectedError_Title);
     public const string UnexpectedError_Message = nameof(UnexpectedError_Message);
+
+    // --- 主题模式（外观卡片主题选择） ---
+    public const string Label_Theme = nameof(Label_Theme);
+    public const string Label_Appearance = nameof(Label_Appearance);
+    public const string ThemeMode_Auto = nameof(ThemeMode_Auto);
+    public const string ThemeMode_Light = nameof(ThemeMode_Light);
+    public const string ThemeMode_Dark = nameof(ThemeMode_Dark);
 }
