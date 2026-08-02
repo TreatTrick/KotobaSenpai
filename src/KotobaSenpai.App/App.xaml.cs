@@ -4,12 +4,14 @@ using System.Windows.Threading;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.Resources;
+using KotobaSenpai.App.Settings;
 using KotobaSenpai.App.Themes;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Services;
+using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Capture;
 using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Overlay;
@@ -78,6 +80,9 @@ public partial class App : Application
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
         services.AddSingleton<WordOverlayApplicationService>();
 
+        // 设置：统一 settings.json 读写，为偏好存储与日志级别配置提供唯一归属（单例，持有内存视图）。
+        services.AddSingleton<ISettingsService, SettingsService>();
+
         // 本地化：具体实现与 Core 端口指向同一单例，使 LanguageService 与 ViewModel 共享文化状态。
         services.AddSingleton<ResourceManagerStringLocalizer>();
         services.AddSingleton<IStringLocalizer>(sp => sp.GetRequiredService<ResourceManagerStringLocalizer>());
@@ -92,7 +97,7 @@ public partial class App : Application
         services.AddSingleton(_ => new LogRetentionPolicy(logsDirectory));
         services.AddSingleton(sp => new FileLogger(
             logsDirectory,
-            LogConfiguration.LoadMinimumLevel(),
+            LogConfiguration.LoadMinimumLevel(sp.GetRequiredService<ISettingsService>()),
             sp.GetRequiredService<LogRetentionPolicy>()));
         services.AddSingleton<ILogger>(sp => sp.GetRequiredService<FileLogger>());
 

@@ -1,8 +1,10 @@
 using System.Reflection;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
+using KotobaSenpai.App.Settings;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
+using KotobaSenpai.Core.Settings;
 using NetArchTest.Rules;
 
 namespace KotobaSenpai.Architecture.Tests;
@@ -149,6 +151,46 @@ public sealed class DependencyDirectionTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels 不得依赖主题服务 MaterialThemeService（主题为视图层关切）", result));
+    }
+
+    /// <summary>设置端口 ISettingsService 必须位于 Core，文件实现 SettingsService 必须位于 App。</summary>
+    [Fact]
+    public void Settings_Port_ResidesInCore_Implementation_ResidesInApp()
+    {
+        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
+
+        Assert.Same(coreAssembly, typeof(ISettingsService).Assembly);
+        Assert.Same(appAssembly, typeof(SettingsService).Assembly);
+    }
+
+    /// <summary>偏好存储与日志级别配置须经 ISettingsService 端口存取设置，不直接读写文件。</summary>
+    [Fact]
+    public void Settings_Consumers_DependOnCoreSettingsPort()
+    {
+        // 偏好存储经构造函数注入 ISettingsService，不再经静态助手直接读写文件。
+        var languageStoreCtor = typeof(LocalAppDataLanguagePreferenceStore).GetConstructors().Single();
+        Assert.Contains(languageStoreCtor.GetParameters(), p => p.ParameterType == typeof(ISettingsService));
+
+        var themeStoreCtor = typeof(LocalAppDataThemePreferenceStore).GetConstructors().Single();
+        Assert.Contains(themeStoreCtor.GetParameters(), p => p.ParameterType == typeof(ISettingsService));
+
+        // LogConfiguration 经方法参数接收 ISettingsService（不再自带文件路径/读取逻辑）。
+        var loadMinLevel = typeof(LogConfiguration).GetMethod(nameof(LogConfiguration.LoadMinimumLevel));
+        Assert.NotNull(loadMinLevel);
+        Assert.Contains(loadMinLevel!.GetParameters(), p => p.ParameterType == typeof(ISettingsService));
+    }
+
+    /// <summary>ViewModel 不得依赖设置文件实现（设置实现位于 App 基础设施层，ViewModel 须经端口）。</summary>
+    [Fact]
+    public void ViewModels_ShouldNotDependOn_SettingsImplementation()
+    {
+        var result = Types.InAssemblies(Assemblies)
+            .That().ResideInNamespaceMatching(ViewModelsNamespace)
+            .ShouldNot().HaveDependencyOn("KotobaSenpai.App.Settings")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels 不得依赖设置实现 SettingsService（设置实现位于 App 基础设施层）", result));
     }
 
     private static string FormatFailure(string rule, TestResult result) =>
