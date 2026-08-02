@@ -34,5 +34,5 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Manual smoke: launch, switch `zh-CN` <-> `en` at runtime, confirm all static labels, status text, and error messages update without restart.
-- [ ] 6.2 Verify persisted language preference restores on next launch; verify clean-launch default follows system language (Chinese system -> `zh-CN`, otherwise `en`).
+- [x] 6.1 Manual smoke: launch, switch `zh-CN` <-> `en` at runtime, confirm all static labels, status text, and error messages update without restart.
+- [x] 6.2 Verify persisted language preference restores on next launch; verify clean-launch default follows system language (Chinese system -> `zh-CN`, otherwise `en`).
