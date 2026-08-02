@@ -1,4 +1,6 @@
 using System.Reflection;
+using KotobaSenpai.App.Localization;
+using KotobaSenpai.Core.Localization;
 using NetArchTest.Rules;
 
 namespace KotobaSenpai.Architecture.Tests;
@@ -63,6 +65,29 @@ public sealed class DependencyDirectionTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels 不得依赖 Platform.Windows / WPF", result));
+    }
+
+    /// <summary>本地化端口 IStringLocalizer 必须位于 Core，实现 ResourceManagerStringLocalizer 必须位于 App。</summary>
+    [Fact]
+    public void Localization_Port_ResidesInCore_Implementation_ResidesInApp()
+    {
+        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
+
+        Assert.Same(coreAssembly, typeof(IStringLocalizer).Assembly);
+        Assert.Same(appAssembly, typeof(ResourceManagerStringLocalizer).Assembly);
+    }
+
+    /// <summary>ViewModel 仅依赖 Core 的 IStringLocalizer 端口，不引用 App 实现 ResourceManagerStringLocalizer。</summary>
+    [Fact]
+    public void ViewModels_DependOnCoreLocalizationInterface_NotAppImplementation()
+    {
+        var result = Types.InAssemblies(Assemblies)
+            .That().ResideInNamespaceMatching(ViewModelsNamespace)
+            .ShouldNot().HaveDependencyOn(typeof(ResourceManagerStringLocalizer).FullName!)
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, FormatFailure("ViewModels 不得依赖本地化实现 ResourceManagerStringLocalizer（应依赖 Core 端口）", result));
     }
 
     private static string FormatFailure(string rule, TestResult result) =>

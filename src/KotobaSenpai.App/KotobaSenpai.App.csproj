@@ -19,4 +19,12 @@
     <ProjectReference Include="..\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
     <ProjectReference Include="..\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Resources\Strings.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Resources\Strings.zh-CN.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>

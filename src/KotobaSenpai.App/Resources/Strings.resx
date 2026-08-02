@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Error code messages (one per ErrorCodes key) -->
+  <data name="OcrLanguagePackMissing" xml:space="preserve">
+    <value>Japanese OCR language pack not found. Install the Japanese language pack in Windows Settings and try again.</value>
+  </data>
+  <data name="OverlayTargetNotSpecified" xml:space="preserve">
+    <value>An overlay session must specify a target window.</value>
+  </data>
+  <data name="FramePixelDataTooShort" xml:space="preserve">
+    <value>Frame pixel data is too short.</value>
+  </data>
+  <data name="WindowEnumerationFailed" xml:space="preserve">
+    <value>Window enumeration failed.</value>
+  </data>
+  <data name="RecognitionFailed" xml:space="preserve">
+    <value>Recognition failed.</value>
+  </data>
+  <!-- XAML labels -->
+  <data name="MainWindow_Title" xml:space="preserve">
+    <value>KotobaSenpai · Phase 1</value>
+  </data>
+  <data name="Label_TargetWindow" xml:space="preserve">
+    <value>Target window</value>
+  </data>
+  <data name="Label_Actions" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="Label_Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Button_RefreshWindows" xml:space="preserve">
+    <value>Refresh windows</value>
+  </data>
+  <data name="Button_Recognize" xml:space="preserve">
+    <value>Recognize &amp; underline</value>
+  </data>
+  <data name="Button_Hide" xml:space="preserve">
+    <value>Hide underline</value>
+  </data>
+  <data name="Label_Description" xml:space="preserve">
+    <value>Instructions: After selecting a window, the app captures the current screen, recognizes Japanese words, and draws a line beneath each word.</value>
+  </data>
+  <!-- ViewModel status messages ({0} placeholders) -->
+  <data name="Status_SelectTarget" xml:space="preserve">
+    <value>Please select a target window.</value>
+  </data>
+  <data name="Status_SelectTargetFirst" xml:space="preserve">
+    <value>Please select a target window first.</value>
+  </data>
+  <data name="Status_Selected" xml:space="preserve">
+    <value>Selected: {0}</value>
+  </data>
+  <data name="Status_NoWindows" xml:space="preserve">
+    <value>No available windows found.</value>
+  </data>
+  <data name="Status_WindowsFound" xml:space="preserve">
+    <value>Found {0} windows. Please select a target.</value>
+  </data>
+  <data name="Status_Recognizing" xml:space="preserve">
+    <value>Capturing and recognizing Japanese text…</value>
+  </data>
+  <data name="Status_NoWords" xml:space="preserve">
+    <value>No Japanese words recognized.</value>
+  </data>
+  <data name="Status_WordsRecognized" xml:space="preserve">
+    <value>Recognized {0} words and drew underlines.</value>
+  </data>
+  <data name="Status_Hidden" xml:space="preserve">
+    <value>Underline hidden.</value>
+  </data>
+</root>

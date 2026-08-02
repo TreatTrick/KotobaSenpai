@@ -1,4 +1,5 @@
 using KotobaSenpai.Core.Contracts;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Services;
 
@@ -9,7 +10,8 @@ public sealed class WindowWordOverlayTests
     [Fact]
     public void Captured_frame_rejects_short_pixel_buffer()
     {
-        Assert.Throws<ArgumentException>(() => new CapturedFrame(2, 2, new byte[3]));
+        var ex = Assert.Throws<InvalidFrameException>(() => new CapturedFrame(2, 2, new byte[3]));
+        Assert.Equal(ErrorCodes.FramePixelDataTooShort, ex.ErrorCode);
     }
 
     [Fact]

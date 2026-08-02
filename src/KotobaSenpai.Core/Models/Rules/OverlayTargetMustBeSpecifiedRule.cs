@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.SeedWork;
 
 namespace KotobaSenpai.Core.Models.Rules;
@@ -9,7 +10,9 @@ internal sealed class OverlayTargetMustBeSpecifiedRule : IBusinessRule
 
     public OverlayTargetMustBeSpecifiedRule(WindowTarget? target) => _target = target;
 
-    public string Message => "覆盖层会话必须指定目标窗口。";
+    public string Message => "Overlay session target must be specified.";
+
+    public string ErrorCode => ErrorCodes.OverlayTargetNotSpecified;
 
     public bool IsBroken() => _target is null;
 }

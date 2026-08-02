@@ -3,6 +3,7 @@ using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 using Windows.Storage.Streams;
 using KotobaSenpai.Core.Contracts;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using CoreOcrWord = KotobaSenpai.Core.Models.OcrWord;
 
@@ -10,7 +11,8 @@ namespace KotobaSenpai.Platform.Windows.Ocr;
 
 /// <summary>
 /// 按需捕获目标窗口并调用系统日语 OCR。GDI 捕获作为 Windows.Graphics.Capture 的兼容回退。
-/// 语言包缺失时不伪造坐标，抛出 <see cref="WindowsPlatformException"/> 并附带安装说明。
+/// 语言包缺失时不伪造坐标，抛出携带 <see cref="ErrorCodes.OcrLanguagePackMissing"/> 的
+/// <see cref="WindowsPlatformException"/>；具体安装说明由表现层按码本地化，不在异常内嵌文案。
 /// </summary>
 public sealed class WindowsOcrWordRecognizer : IWindowWordRecognizer
 {
@@ -28,7 +30,9 @@ public sealed class WindowsOcrWordRecognizer : IWindowWordRecognizer
         var language = new Language("ja-JP");
         var engine = OcrEngine.TryCreateFromLanguage(language);
         if (engine is null)
-            throw new WindowsPlatformException("未找到日语 OCR 语言包，请在 Windows 设置中安装日语语言包后重试。");
+            throw new WindowsPlatformException(
+                ErrorCodes.OcrLanguagePackMissing,
+                "Japanese OCR language pack not found.");
 
         using var writer = new DataWriter();
         var frame = await _capture.CaptureAsync(target, cancellationToken).ConfigureAwait(false);
