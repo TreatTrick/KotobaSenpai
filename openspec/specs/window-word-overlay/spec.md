@@ -15,19 +15,19 @@ TBD - created by archiving change phase1-window-word-overlay. Update Purpose aft
 - **THEN** 系统不把该窗口放入可选列表，并继续枚举其他窗口
 
 ### Requirement: OCR words with coordinates
-系统 SHALL 对当前目标窗口执行一次日语 OCR，并为每个非空识别词返回原文、词框和相对于捕获帧的坐标。词框坐标 SHALL 使用非负宽高的物理像素矩形。
+系统 SHALL 对当前目标窗口执行一次日语 OCR，并为每个非空识别字符返回原文、字符框和相对于捕获帧的坐标。字符框坐标 SHALL 使用非负宽高的物理像素矩形。识别字符 SHALL 按阅读顺序排列（第一阶段仅横排，自左向右；竖排属第二阶段）。
 
 #### Scenario: Recognize Japanese words
-- **WHEN** 目标窗口捕获成功且系统具备日语 OCR 语言包
-- **THEN** 系统返回按阅读顺序排列的 OCR 词列表，每个词包含非空文本和词框
+- **WHEN** 目标窗口捕获成功且系统具备 meikiocr 本地模型
+- **THEN** 系统返回按阅读顺序排列的字符列表，每个字符包含非空文本和字符框坐标
 
 #### Scenario: Japanese OCR language is unavailable
-- **WHEN** 日语 OCR 语言包不可用
-- **THEN** 系统不生成伪造词坐标，并返回可操作的语言包缺失错误
+- **WHEN** meikiocr 模型文件缺失或推理失败
+- **THEN** 系统不生成伪造字符坐标，并返回可操作、指明缺失模型或失败原因的错误
 
 #### Scenario: Empty or invalid OCR result
-- **WHEN** OCR 返回空文本、零面积或越界词框
-- **THEN** 系统过滤无效项；若没有剩余词则返回空识别结果而不是抛出未处理异常
+- **WHEN** OCR 返回空文本、零面积或越界字符框
+- **THEN** 系统过滤无效项；若没有剩余字符则返回空识别结果而不是抛出未处理异常
 
 ### Requirement: Screen coordinate mapping
 系统 SHALL 将捕获帧坐标映射为目标窗口在桌面上的屏幕物理像素坐标，并裁剪到窗口边界内。映射结果 SHALL 在 DPI 缩放为 100%、125% 和 150% 时保持比例正确。
