@@ -36,6 +36,9 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // 主窗口关闭即退出整个应用；否则下划线 overlay 作为独立窗口会残留（默认 OnLastWindowClose 等不到它关）。
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+
         var services = new ServiceCollection();
         ConfigureServices(services);
         _services = services.BuildServiceProvider();
@@ -76,7 +79,7 @@ public partial class App : Application
     {
         services.AddSingleton<IWindowCatalog, Win32WindowCatalog>();
         services.AddSingleton<IWindowFrameCapture, GdiWindowFrameCapture>();
-        services.AddSingleton<IWindowWordRecognizer, WindowsOcrWordRecognizer>();
+        services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
         services.AddSingleton<WordOverlayApplicationService>();
 

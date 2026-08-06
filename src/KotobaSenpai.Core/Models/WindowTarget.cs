@@ -6,7 +6,7 @@ public sealed record WindowTarget
     public WindowTarget(nint handle, string? title, ScreenRect bounds)
     {
         if (handle == nint.Zero)
-            throw new ArgumentException("窗口句柄无效。", nameof(handle));
+            throw new ArgumentException("Window handle is invalid.", nameof(handle));
 
         Handle = handle;
         Title = title?.Trim() ?? string.Empty;

@@ -10,3 +10,6 @@ obj/
 
 # OpenSpec local state
 openspec/.cache/
+
+# meikiocr ONNX 模型（仅随发布打包，不入 git）
+src/KotobaSenpai.Platform.Windows/Models/*.onnx

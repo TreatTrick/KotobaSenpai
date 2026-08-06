@@ -1,0 +1,29 @@
+# Third-Party Notices
+
+本项目包含以下第三方组件，按各自许可使用。
+
+## meikiocr（移植代码）
+
+- 来源：https://github.com/rtr46/meikiocr
+- 许可：Apache License 2.0
+- 说明：`MeikiOcrEngine` 是对该仓库 `meikiocr/ocr.py` 的忠实 C# 移植（文本检测 + 识别管线，含逐字符 NMS、标点因子、交换错对修正）。本文件以 Apache-2.0 许可再分发，保留原作者 rtr46 的版权声明。
+
+## meiki 模型权重
+
+- 来源：
+  - https://huggingface.co/rtr46/meiki.text.detect.v0
+  - https://huggingface.co/rtr46/meiki.txt.recognition.v0
+- 许可：GNU Lesser General Public License v3.0 (LGPL-3.0)
+- 说明：模型文件仅随发布打包，不纳入源码仓库。原权重、模型卡与修订历史见上述 URL。
+
+## ONNX Runtime
+
+- 来源：https://github.com/microsoft/onnxruntime
+- 许可：MIT License
+- 说明：通过 `Microsoft.ML.OnnxRuntime.DirectML` 包使用。
+
+## ImageSharp
+
+- 来源：https://github.com/SixLabors/ImageSharp
+- 许可：Apache License 2.0
+- 说明：用于 OCR 前处理的图像缩放（双线性插值）。

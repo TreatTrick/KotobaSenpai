@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
+    <ProjectReference Include="..\..\src\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

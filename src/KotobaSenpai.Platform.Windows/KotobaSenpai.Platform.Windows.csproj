@@ -11,4 +11,14 @@
     <ProjectReference Include="..\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
     <FrameworkReference Include="Microsoft.Windows.SDK.NET.Ref" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- meikiocr 本地 ONNX OCR：CPU 推理（实测 DirectML 拉低检测置信度致全灭，故不用 GPU 提供程序）。 -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+    <!-- 双线性缩放（对齐 OpenCV INTER_LINEAR），用于检测/识别前处理。 -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 模型仅随发布打包，不入 git；开发/测试用 KOTOBA_MEIKIOCR_MODEL_DIR 覆盖。 -->
+    <None Include="Models\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

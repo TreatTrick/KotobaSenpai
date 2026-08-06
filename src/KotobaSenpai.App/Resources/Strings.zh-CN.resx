@@ -42,8 +42,11 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <!-- Error code messages (one per ErrorCodes key) -->
-  <data name="OcrLanguagePackMissing" xml:space="preserve">
-    <value>未找到日语 OCR 语言包，请在 Windows 设置中安装日语语言包后重试。</value>
+  <data name="OcrModelMissing" xml:space="preserve">
+    <value>缺少日语 OCR 模型。请将 meikiocr 模型文件放入 Models 目录（或设置 KOTOBA_MEIKIOCR_MODEL_DIR）后重试。</value>
+  </data>
+  <data name="OcrInferenceFailed" xml:space="preserve">
+    <value>日语 OCR 推理失败，请查看日志了解详情。</value>
   </data>
   <data name="OverlayTargetNotSpecified" xml:space="preserve">
     <value>覆盖层会话必须指定目标窗口。</value>

@@ -12,11 +12,11 @@ public sealed class UserMessageResolverTests
     private readonly UserMessageResolver _resolver = new(LocalizerFactory.Create(new CultureInfo("zh-CN")));
 
     [Fact]
-    public void Maps_ocr_language_pack_missing_code_to_localized_message()
+    public void Maps_ocr_model_missing_code_to_localized_message()
     {
-        var ex = new WindowsPlatformException(ErrorCodes.OcrLanguagePackMissing, "dev detail");
+        var ex = new WindowsPlatformException(ErrorCodes.OcrModelMissing, "dev detail");
 
-        Assert.Equal("未找到日语 OCR 语言包，请在 Windows 设置中安装日语语言包后重试。", _resolver.Resolve(ex, ErrorCodes.RecognitionFailed));
+        Assert.Equal("缺少日语 OCR 模型。请将 meikiocr 模型文件放入 Models 目录（或设置 KOTOBA_MEIKIOCR_MODEL_DIR）后重试。", _resolver.Resolve(ex, ErrorCodes.RecognitionFailed));
     }
 
     [Fact]
@@ -48,11 +48,11 @@ public sealed class UserMessageResolverTests
     [Fact]
     public void User_facing_error_code_takes_precedence_over_fallback()
     {
-        var ex = new WindowsPlatformException(ErrorCodes.OcrLanguagePackMissing, "dev detail");
+        var ex = new WindowsPlatformException(ErrorCodes.OcrInferenceFailed, "dev detail");
 
         var message = _resolver.Resolve(ex, ErrorCodes.RecognitionFailed);
 
-        Assert.Equal("未找到日语 OCR 语言包，请在 Windows 设置中安装日语语言包后重试。", message);
+        Assert.Equal("日语 OCR 推理失败，请查看日志了解详情。", message);
     }
 
     private sealed class FakeRule : IBusinessRule
