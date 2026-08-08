@@ -27,3 +27,19 @@
 - 来源：https://github.com/SixLabors/ImageSharp
 - 许可：Apache License 2.0
 - 说明：用于 OCR 前处理的图像缩放（双线性插值）。
+
+## LibNMeCab
+
+- 来源：https://github.com/komutan/NMeCab；NuGet 包 `LibNMeCab` 0.10.2
+- 包 SHA-256：`46ef1e1dab007f8fb350fe730c1dfac8ede090ed7e812245cd271ccdb112a500`
+- 许可：`GPL-2.0-or-later OR LGPL-2.1-or-later`（双许可，MeCab 由 Taku Kudo / NTT 开发）
+- 说明：日语形态素分析库（MeCab 移植）。本项目作为 NuGet 二进制引用使用，选择 **LGPL-2.1-or-later** 合规路径：以独立程序集分发、不静态链接、保留用户替换/重新链接该程序集的能力。single-file 裁剪/AOT/程序集嵌入场景下的可替换性验证尚未完成，**在验证完成前不得宣称“可安全商用”**（见 `docs/research/decision-japanese-tokenizer.md`）。许可证文本随包分发（NuGet 包内 LICENSE）。
+
+## UniDic 词典数据
+
+- 来源：https://unidic.ninjal.ac.jp/ ；下载 `unidic-3.1.0.zip`（AWS cotonoha-dic S3，`ap-northeast-1`）
+  - https://cotonoha-dic.s3-ap-northeast-1.amazonaws.com/unidic-3.1.0.zip
+- 构建：Doki 兼容的 `unidic-py` 构建 `3.1.0+2021-08-31`（对齐参考实现 DokiDokiDict）
+- 压缩包 SHA-256：`638718c4c63625ab300de4c92c67925d54c0e9e3830009eaa992f29819d59c43`（与 `src/KotobaSenpai.Core/Japanese/UniDicAssets.cs` 的 `Sha256` 常量一致，单一事实来源）
+- 许可：BSD 3-Clause（NINJAL 多许可分发，BSD 是否可商用）
+- 说明：词典数据仅首次运行按需下载并按 SHA-256 校验后缓存到用户目录，不随发布打包。数据级复现约束见 `docs/research/decision-japanese-tokenizer.md`。

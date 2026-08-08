@@ -48,6 +48,15 @@
   <data name="OcrInferenceFailed" xml:space="preserve">
     <value>日语 OCR 推理失败，请查看日志了解详情。</value>
   </data>
+  <data name="UniDicDictionaryMissing" xml:space="preserve">
+    <value>日语词典尚未安装。首次运行会在后台自动下载，请稍后重试，或导入离线 UniDic 压缩包。</value>
+  </data>
+  <data name="UniDicDictionaryInvalid" xml:space="preserve">
+    <value>已安装的日语词典无效（版本、格式或完整性不匹配）。请重新安装或导入有效的 UniDic 3.1.0 压缩包。</value>
+  </data>
+  <data name="UniDicDownloadFailed" xml:space="preserve">
+    <value>日语词典下载失败。请检查网络后重试，或导入离线 UniDic 压缩包。</value>
+  </data>
   <data name="OverlayTargetNotSpecified" xml:space="preserve">
     <value>覆盖层会话必须指定目标窗口。</value>
   </data>

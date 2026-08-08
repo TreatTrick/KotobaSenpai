@@ -6,7 +6,7 @@ public readonly record struct ScreenRect
     public ScreenRect(int x, int y, int width, int height)
     {
         if (width <= 0 || height <= 0)
-            throw new ArgumentOutOfRangeException(nameof(width), "矩形宽高必须大于零。");
+            throw new ArgumentOutOfRangeException(nameof(width), "Rectangle width and height must be greater than zero.");
 
         X = x;
         Y = y;
@@ -29,7 +29,7 @@ public readonly record struct ScreenRect
         var right = Math.Min(Right, bounds.Right);
         var bottom = Math.Min(Bottom, bounds.Bottom);
         return right <= left || bottom <= top
-            ? throw new ArgumentException("矩形与边界没有有效交集。", nameof(bounds))
+            ? throw new ArgumentException("Rectangle has no valid intersection with bounds.", nameof(bounds))
             : new ScreenRect(left, top, right - left, bottom - top);
     }
 }

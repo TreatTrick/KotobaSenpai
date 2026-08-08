@@ -48,6 +48,15 @@
   <data name="OcrInferenceFailed" xml:space="preserve">
     <value>Japanese OCR inference failed. See the log for details.</value>
   </data>
+  <data name="UniDicDictionaryMissing" xml:space="preserve">
+    <value>The Japanese dictionary is not installed yet. It is downloading in the background on first run; retry in a moment, or import an offline UniDic archive.</value>
+  </data>
+  <data name="UniDicDictionaryInvalid" xml:space="preserve">
+    <value>The installed Japanese dictionary is invalid (wrong version, format, or integrity). Reinstall or import a valid UniDic 3.1.0 archive.</value>
+  </data>
+  <data name="UniDicDownloadFailed" xml:space="preserve">
+    <value>The Japanese dictionary download failed. Check your network and retry, or import an offline UniDic archive.</value>
+  </data>
   <data name="OverlayTargetNotSpecified" xml:space="preserve">
     <value>An overlay session must specify a target window.</value>
   </data>

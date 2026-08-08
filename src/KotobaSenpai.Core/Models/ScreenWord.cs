@@ -6,7 +6,7 @@ public sealed record ScreenWord
     public ScreenWord(string text, ScreenRect bounds)
     {
         if (string.IsNullOrWhiteSpace(text))
-            throw new ArgumentException("OCR 词不能为空。", nameof(text));
+            throw new ArgumentException("OCR word must not be empty.", nameof(text));
 
         Text = text.Trim();
         Bounds = bounds;

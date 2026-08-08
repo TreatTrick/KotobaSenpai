@@ -23,4 +23,13 @@ public static class ErrorCodes
 
     /// <summary>识别失败（ViewModel 识别时的回退码）。</summary>
     public const string RecognitionFailed = nameof(RecognitionFailed);
+
+    /// <summary>UniDic 词典缺失（UniDicTokenizer / UniDicDictionaryInstaller）。</summary>
+    public const string UniDicDictionaryMissing = nameof(UniDicDictionaryMissing);
+
+    /// <summary>UniDic 词典存在但版本/格式/完整性无效（UniDicTokenizer / UniDicDictionaryInstaller）。</summary>
+    public const string UniDicDictionaryInvalid = nameof(UniDicDictionaryInvalid);
+
+    /// <summary>UniDic 词典下载/解压失败（UniDicDictionaryInstaller）。</summary>
+    public const string UniDicDownloadFailed = nameof(UniDicDownloadFailed);
 }

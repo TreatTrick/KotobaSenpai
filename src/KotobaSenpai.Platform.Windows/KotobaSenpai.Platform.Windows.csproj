@@ -12,6 +12,8 @@
     <FrameworkReference Include="Microsoft.Windows.SDK.NET.Ref" />
   </ItemGroup>
   <ItemGroup>
+    <!-- 日语分词：冻结的 MeCab 移植库 0.10.2，加载 UniDic unidic22 词典（GPL/LGPL 双许可，见 THIRD-PARTY-NOTICES）。 -->
+    <PackageReference Include="LibNMeCab" Version="0.10.2" />
     <!-- meikiocr 本地 ONNX OCR：CPU 推理（实测 DirectML 拉低检测置信度致全灭，故不用 GPU 提供程序）。 -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
     <!-- 双线性缩放（对齐 OpenCV INTER_LINEAR），用于检测/识别前处理。 -->

@@ -1,6 +1,8 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
+using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.Resources;
@@ -13,6 +15,7 @@ using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Services;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Capture;
+using KotobaSenpai.Platform.Windows.Japanese;
 using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Overlay;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +61,10 @@ public partial class App : Application
 
         var themeService = _services.GetRequiredService<FluentThemeService>();
 
+        // M1 词典安装：后台可观察触发，不阻塞主窗；失败仅记录，不产生未观察异常。
+        // 分词器首次使用时若词典尚未就绪，由既有错误处理路径呈现 UniDicDictionaryMissing。
+        StartBackgroundDictionaryInstall();
+
         var window = new MainWindow
         {
             DataContext = _services.GetRequiredService<MainWindowViewModel>(),
@@ -67,11 +74,33 @@ public partial class App : Application
         window.Show();
     }
 
+    /// <summary>后台触发词典安装；观察并记录结果，绝不产生未观察的 fire-and-forget 异常。</summary>
+    private void StartBackgroundDictionaryInstall()
+    {
+        var installer = _services!.GetRequiredService<UniDicDictionaryInstaller>();
+        installer.EnsureInstalledAsync()
+            .ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                    Try(() => _logger?.LogError(t.Exception, "Background UniDic dictionary install failed"));
+                else if (t.IsCanceled)
+                    Try(() => _logger?.LogWarning("Background UniDic dictionary install cancelled"));
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         _logger?.Dispose();
         _services?.Dispose();
         base.OnExit(e);
+    }
+
+    /// <summary>供词典下载的 HttpClient：502MB 压缩包下载需长超时，避免默认 100s 中途失败。</summary>
+    private static HttpClient CreateDownloadHttpClient()
+    {
+        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("KotobaSenpai");
+        return client;
     }
 
     /// <summary>按端口注册领域端口与其平台适配器；本地化端口与语言服务由容器解析依赖。</summary>
@@ -82,6 +111,10 @@ public partial class App : Application
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
         services.AddSingleton<WordOverlayApplicationService>();
+
+        // 日语分词：平台适配器懒加载 UniDic 词典；安装器单例持有固定 URL 的 HttpClient（M1 首次运行下载）。
+        services.AddSingleton<ITokenizer>(sp => new UniDicTokenizer(sp.GetRequiredService<ILogger>()));
+        services.AddSingleton(sp => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
 
         // 设置：统一 settings.json 读写，为偏好存储与日志级别配置提供唯一归属（单例，持有内存视图）。
         services.AddSingleton<ISettingsService, SettingsService>();
