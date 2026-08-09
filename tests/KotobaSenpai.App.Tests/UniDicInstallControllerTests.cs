@@ -1,3 +1,5 @@
+using System.IO;
+using System.Net.Http;
 using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.Core.Contracts;
@@ -67,7 +69,9 @@ public sealed class UniDicInstallControllerTests
 
     private sealed class FakeLocalizer : IStringLocalizer
     {
+#pragma warning disable CS0067 // 接口要求的事件，测试未订阅
         public event EventHandler? CultureChanged;
+#pragma warning restore CS0067
         public string Get(string key, params object[] args) => key;
     }
 }

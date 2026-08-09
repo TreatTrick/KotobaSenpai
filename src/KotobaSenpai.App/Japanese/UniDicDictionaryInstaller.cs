@@ -261,13 +261,11 @@ public sealed class UniDicDictionaryInstaller : IDisposable
 
     private static bool VersionAndFormatValid(string dicDir)
     {
-        var versionOk = File.Exists(Path.Combine(dicDir, UniDicAssets.VersionFileName))
-            && File.ReadAllText(Path.Combine(dicDir, UniDicAssets.VersionFileName))
-                .Contains(UniDicAssets.Version, StringComparison.Ordinal);
-        var dicrcOk = File.Exists(Path.Combine(dicDir, UniDicAssets.DicrcFileName))
+        // 实测 cotonoha-dic 的 unidic-3.1.0.zip 不含 version 文件（仅 dicrc/README/licenses）；
+        // 版本与身份已由固定 URL + SHA-256 校验固定，此处仅校验 dicrc 携带的 unidic22 格式标识。
+        return File.Exists(Path.Combine(dicDir, UniDicAssets.DicrcFileName))
             && File.ReadAllText(Path.Combine(dicDir, UniDicAssets.DicrcFileName))
                 .Contains(UniDicAssets.Format, StringComparison.Ordinal);
-        return versionOk && dicrcOk;
     }
 
     private void WriteManifest(string dicDir)

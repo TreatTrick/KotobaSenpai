@@ -25,9 +25,6 @@ public static class UniDicAssets
     /// <summary>安装器写入的 manifest 文件名。</summary>
     public const string ManifestFileName = "manifest.json";
 
-    /// <summary>词典自带的版本文件（内容形如 "unidic-3.1.0+2021-08-31"）。</summary>
-    public const string VersionFileName = "version";
-
     /// <summary>词典自带的 MeCab 配置（须含 output-format-type = unidic22）。</summary>
     public const string DicrcFileName = "dicrc";
 }

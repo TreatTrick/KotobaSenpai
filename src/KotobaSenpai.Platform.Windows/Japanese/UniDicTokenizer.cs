@@ -120,16 +120,14 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
                 ErrorCodes.UniDicDictionaryMissing,
                 $"UniDic dictionary missing required runtime files at '{_dictionaryDirectory}': {string.Join(", ", missing)}");
 
-        var versionOk = File.Exists(Path.Combine(_dictionaryDirectory, UniDicAssets.VersionFileName))
-            && File.ReadAllText(Path.Combine(_dictionaryDirectory, UniDicAssets.VersionFileName))
-                .Contains(UniDicAssets.Version, StringComparison.Ordinal);
+        // 档案不含 version 文件（见 UniDicDictionaryInstaller）；版本由 SHA-256 固定，此处仅校验 dicrc 格式。
         var dicrcOk = File.Exists(Path.Combine(_dictionaryDirectory, UniDicAssets.DicrcFileName))
             && File.ReadAllText(Path.Combine(_dictionaryDirectory, UniDicAssets.DicrcFileName))
                 .Contains(UniDicAssets.Format, StringComparison.Ordinal);
-        if (!versionOk || !dicrcOk)
+        if (!dicrcOk)
             throw new WindowsPlatformException(
                 ErrorCodes.UniDicDictionaryInvalid,
-                $"UniDic dictionary version/format mismatch at '{_dictionaryDirectory}'.");
+                $"UniDic dictionary format mismatch at '{_dictionaryDirectory}'.");
 
         if (_requireInstalledManifest)
         {

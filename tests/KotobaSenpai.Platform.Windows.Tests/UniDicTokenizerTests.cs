@@ -36,17 +36,16 @@ public sealed class UniDicTokenizerTests
     }
 
     [Fact]
-    public void Invalid_version_throws_unicdic_dictionary_invalid()
+    public void Invalid_format_throws_unicdic_dictionary_invalid()
     {
         var dir = Path.Combine(Path.GetTempPath(), "unicdic-invalid-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
-            // 四个运行时文件齐，但 version 不含期望版本 → Invalid（而非 Missing）。
+            // 四个运行时文件齐，但 dicrc 不含 unidic22 格式 → Invalid（而非 Missing）。
             foreach (var f in UniDicAssets.RequiredRuntimeFiles)
                 File.WriteAllText(Path.Combine(dir, f), "x");
-            File.WriteAllText(Path.Combine(dir, UniDicAssets.VersionFileName), "unidic-9.9.9");
-            File.WriteAllText(Path.Combine(dir, UniDicAssets.DicrcFileName), "output-format-type = unidic22");
+            File.WriteAllText(Path.Combine(dir, UniDicAssets.DicrcFileName), "output-format-type = mecab-ipadic");
 
             var tokenizer = new UniDicTokenizer(Logger, dir);
             var ex = Assert.Throws<WindowsPlatformException>(() => tokenizer.Tokenize("日本語"));

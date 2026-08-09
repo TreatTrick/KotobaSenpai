@@ -132,7 +132,6 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
         {
             foreach (var f in UniDicAssets.RequiredRuntimeFiles)
                 File.WriteAllText(Path.Combine(dicDir, f), $"{f}-data");
-            File.WriteAllText(Path.Combine(dicDir, UniDicAssets.VersionFileName), $"unidic-{UniDicAssets.Version}");
             File.WriteAllText(Path.Combine(dicDir, UniDicAssets.DicrcFileName), $"output-format-type = {UniDicAssets.Format}");
         }
 
