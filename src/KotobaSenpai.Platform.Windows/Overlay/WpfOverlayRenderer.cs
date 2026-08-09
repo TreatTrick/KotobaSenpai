@@ -15,13 +15,19 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 /// </summary>
 public sealed class WpfOverlayRenderer : IOverlayRenderer
 {
+    private readonly IDictionaryLookup _lookup;
     private OverlayWindow? _window;
+
+    public WpfOverlayRenderer(IDictionaryLookup lookup)
+    {
+        _lookup = lookup ?? throw new ArgumentNullException(nameof(lookup));
+    }
 
     public void Show(WordOverlaySession session)
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            _window ??= new OverlayWindow();
+            _window ??= new OverlayWindow(_lookup);
             _window.Render(session);
         });
     }
@@ -42,14 +48,20 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         private const int HoverPollMs = 50;
 
+        private readonly IDictionaryLookup _lookup;
         private readonly Canvas _canvas = new();
         private readonly List<Border> _lineElements = new();
         private readonly DispatcherTimer _hoverTimer;
+        private readonly DictionaryPopup _popup;
+        private readonly Dictionary<string, IReadOnlyList<DictionaryEntry>> _lookupCache = new();
         private WordOverlaySession? _session;
         private int _hoverIndex = -1;
 
-        public OverlayWindow()
+        public OverlayWindow(IDictionaryLookup lookup)
         {
+            _lookup = lookup ?? throw new ArgumentNullException(nameof(lookup));
+            _popup = new DictionaryPopup();
+
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = Brushes.Transparent;
@@ -71,6 +83,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
             _session = session;
             _hoverIndex = -1;
+            _lookupCache.Clear();
 
             var handle = new WindowInteropHelper(this).Handle;
             var scale = NativeMethods.GetDpiForWindow(handle) / 96d;
@@ -107,6 +120,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         {
             _hoverTimer.Stop();
             _hoverIndex = -1;
+            _popup.HidePopup();
             foreach (var element in _lineElements)
                 element.Background = DefaultLineBrush;
         }
@@ -147,6 +161,26 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _hoverIndex = hit;
             if (hit >= 0 && hit < _lineElements.Count)
                 _lineElements[hit].Background = HoverLineBrush;
+            UpdatePopup(hit);
+        }
+
+        /// <summary>悬停词变化时查词并更新弹窗；移出词时隐藏。结果按 lemma 缓存，避免每 tick 重复查。</summary>
+        private void UpdatePopup(int hit)
+        {
+            var session = _session;
+            if (session is null || hit < 0 || hit >= session.Words.Count)
+            {
+                _popup.HidePopup();
+                return;
+            }
+
+            var word = session.Words[hit];
+            if (!_lookupCache.TryGetValue(word.Token.Lemma, out var entries))
+            {
+                entries = _lookup.Lookup(word.Token);
+                _lookupCache[word.Token.Lemma] = entries;
+            }
+            _popup.ShowResult(entries, word.Token.Reading, word.Bounds);
         }
 
         private void SetClickThrough()

@@ -18,6 +18,10 @@
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
     <!-- 双线性缩放（对齐 OpenCV INTER_LINEAR），用于检测/识别前处理。 -->
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <!-- 本地日英词典：JMdict 索引按需查询（数据待磁盘，不常驻内存）。 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <!-- 显式钉到已修复 e_sqlite3 漏洞（GHSA-2m69-gcr7-jv3q）的版本，覆盖传递依赖的 2.1.11。 -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
   </ItemGroup>
   <ItemGroup>
     <!-- 模型仅随发布打包，不入 git；开发/测试用 KOTOBA_MEIKIOCR_MODEL_DIR 覆盖。 -->

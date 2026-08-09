@@ -15,6 +15,7 @@ using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Services;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Capture;
+using KotobaSenpai.Platform.Windows.Dictionary;
 using KotobaSenpai.Platform.Windows.Japanese;
 using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Overlay;
@@ -99,6 +100,11 @@ public partial class App : Application
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
         services.AddSingleton<WordOverlayApplicationService>();
+
+        // 本地日英词典：JMdict .db 随发布捆绑在程序目录；repository 按需查库，lookup 按 lemma/reading 回退。
+        var jmdictDbPath = Path.Combine(AppContext.BaseDirectory, "jmdict.db");
+        services.AddSingleton<IJmdictRepository>(new JmdictSqliteRepository(jmdictDbPath));
+        services.AddSingleton<IDictionaryLookup, JmdictLookupService>();
 
         // 日语分词：平台适配器懒加载 UniDic 词典；安装器单例持有固定 URL 的 HttpClient（M1 首次运行下载）。
         services.AddSingleton<ITokenizer>(sp => new UniDicTokenizer(sp.GetRequiredService<ILogger>()));
