@@ -94,7 +94,10 @@ public sealed class MainWindowViewModelTests
     private static (MainWindowViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(IWindowCatalog catalog)
     {
         var overlay = new FakeOverlay();
-        var workflow = new WordOverlayApplicationService(new FakeRecognizer(), overlay);
+        var workflow = new WordOverlayApplicationService(
+            new FakeRecognizer(),
+            new WordGroupingService(new StubTokenizer()),
+            overlay);
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
@@ -116,7 +119,14 @@ public sealed class MainWindowViewModelTests
     private sealed class FakeRecognizer : IWindowWordRecognizer
     {
         public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new WordRecognitionResult(100, 50, [new OcrWord("日", new ScreenRect(10, 5, 10, 10))]));
+            Task.FromResult(new WordRecognitionResult(100, 50,
+                [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]));
+    }
+
+    private sealed class StubTokenizer : ITokenizer
+    {
+        public IReadOnlyList<Token> Tokenize(string? text)
+            => [new Token("日", "日", "日", "日", "日", "日", new PartsOfSpeech("", "", "", ""), "", "", "", 0)];
     }
 
     private sealed class FakeOverlay : IOverlayRenderer

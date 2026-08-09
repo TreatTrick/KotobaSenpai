@@ -10,11 +10,16 @@ namespace KotobaSenpai.Core.Services;
 public sealed class WordOverlayApplicationService
 {
     private readonly IWindowWordRecognizer _recognizer;
+    private readonly IOcrWordGroupingService _grouping;
     private readonly IOverlayRenderer _overlay;
 
-    public WordOverlayApplicationService(IWindowWordRecognizer recognizer, IOverlayRenderer overlay)
+    public WordOverlayApplicationService(
+        IWindowWordRecognizer recognizer,
+        IOcrWordGroupingService grouping,
+        IOverlayRenderer overlay)
     {
         _recognizer = recognizer;
+        _grouping = grouping;
         _overlay = overlay;
     }
 
@@ -23,10 +28,11 @@ public sealed class WordOverlayApplicationService
         CancellationToken cancellationToken = default)
     {
         var result = await _recognizer.RecognizeAsync(target, cancellationToken).ConfigureAwait(false);
-        var screenWords = result.Words
-            .Select(word => new ScreenWord(
-                word.Text,
-                CoordinateMapper.ToScreen(word, result.FrameWidth, result.FrameHeight, target.Bounds)))
+        // 先在帧坐标系内经分词器把字符重组成词（纯逻辑、坐标不变），再把每个词的并集框映射到屏幕。
+        var screenWords = _grouping.Group(result.Lines)
+            .Select(word => new GroupedWord(
+                word.Token,
+                CoordinateMapper.ToScreen(word.Bounds, result.FrameWidth, result.FrameHeight, target.Bounds)))
             .ToArray();
 
         _overlay.Show(WordOverlaySession.Start(target, screenWords));

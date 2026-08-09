@@ -9,12 +9,14 @@ namespace KotobaSenpai.Core.Services;
 public static class CoordinateMapper
 {
     public static ScreenRect ToScreen(OcrWord word, int frameWidth, int frameHeight, ScreenRect windowBounds)
+        => ToScreen(word.FrameBounds, frameWidth, frameHeight, windowBounds);
+
+    public static ScreenRect ToScreen(ScreenRect frameRect, int frameWidth, int frameHeight, ScreenRect windowBounds)
     {
-        ArgumentNullException.ThrowIfNull(word);
         if (frameWidth <= 0 || frameHeight <= 0)
             throw new ArgumentOutOfRangeException(nameof(frameWidth));
 
-        var frame = word.FrameBounds;
+        var frame = frameRect;
         static int Scale(double value) => (int)Math.Round(value, MidpointRounding.AwayFromZero);
 
         var left = windowBounds.X + Scale(frame.X * (double)windowBounds.Width / frameWidth);

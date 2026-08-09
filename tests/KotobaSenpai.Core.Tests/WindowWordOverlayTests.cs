@@ -31,13 +31,13 @@ public sealed class WindowWordOverlayTests
     }
 
     [Fact]
-    public void Session_creates_one_line_per_word()
+    public void Session_creates_one_line_per_grouped_word()
     {
         var target = new WindowTarget((nint)42, "VN", new ScreenRect(0, 0, 800, 600));
         var session = WordOverlaySession.Start(target,
         [
-            new ScreenWord("彼", new ScreenRect(10, 20, 30, 40)),
-            new ScreenWord("が", new ScreenRect(45, 20, 15, 40))
+            new GroupedWord(Token("彼"), new ScreenRect(10, 20, 30, 40)),
+            new GroupedWord(Token("が"), new ScreenRect(45, 20, 15, 40))
         ]);
 
         Assert.Equal(2, session.Lines.Count);
@@ -50,32 +50,40 @@ public sealed class WindowWordOverlayTests
     public void Session_handles_empty_word_list_without_throwing()
     {
         var target = new WindowTarget((nint)42, "VN", new ScreenRect(0, 0, 800, 600));
-        var session = WordOverlaySession.Start(target, Array.Empty<ScreenWord>());
+        var session = WordOverlaySession.Start(target, Array.Empty<GroupedWord>());
 
         Assert.Empty(session.Words);
         Assert.Empty(session.Lines);
     }
 
     [Fact]
-    public async Task Application_service_replaces_overlay_with_recognized_words()
+    public async Task Application_service_groups_and_maps_words_to_overlay()
     {
         var target = new WindowTarget((nint)42, "VN", new ScreenRect(0, 0, 200, 100));
         var overlay = new FakeOverlay();
-        var service = new WordOverlayApplicationService(new FakeRecognizer(), overlay);
+        var service = new WordOverlayApplicationService(
+            new FakeRecognizer(),
+            new WordGroupingService(new StubTokenizer(new TokenSpec("日", 0))),
+            overlay);
 
         var result = await service.RecognizeAndShowAsync(target);
 
-        Assert.Single(result.Words);
+        Assert.Single(result.Lines);
+        Assert.Single(result.Lines[0].Words);
         Assert.NotNull(overlay.Session);
-        Assert.Equal("日", overlay.Session!.Words[0].Text);
+        Assert.Equal("日", overlay.Session!.Words[0].Token.Surface);
         Assert.Equal(new ScreenRect(20, 10, 20, 20), overlay.Session.Words[0].Bounds);
     }
+
+    private static Token Token(string surface)
+        => new(surface, surface, surface, surface, surface, surface,
+            new PartsOfSpeech("", "", "", ""), "", "", "", 0);
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
     {
         public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default) =>
             Task.FromResult(new WordRecognitionResult(100, 50,
-                [new OcrWord("日", new ScreenRect(10, 5, 10, 10))]));
+                [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]));
     }
 
     private sealed class FakeOverlay : IOverlayRenderer

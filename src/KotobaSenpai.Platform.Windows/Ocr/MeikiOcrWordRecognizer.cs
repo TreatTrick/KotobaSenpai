@@ -52,16 +52,20 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
                 ex);
         }
 
-        var words = lines
-            .SelectMany(line => line.Chars)
-            // 模型可能为空白/blank 兜底输出非词字符；OcrWord 拒绝空文本，须在构造前过滤。
-            .Where(charBox => !char.IsWhiteSpace(charBox.Char) && charBox.Char != '\0')
-            .Select(charBox => new CoreOcrWord(
-                charBox.Char.ToString(),
-                ToValidRect(charBox, frame.Width, frame.Height)))
+        // 保留行结构：每行一个 OcrLine，供分词服务逐行重新组合成词。
+        var ocrLines = lines
+            .Select(meikiLine => new OcrLine(
+                meikiLine.Chars
+                    // 模型可能为空白/blank 兜底输出非词字符；OcrWord 拒绝空文本，须在构造前过滤。
+                    .Where(charBox => !char.IsWhiteSpace(charBox.Char) && charBox.Char != '\0')
+                    .Select(charBox => new CoreOcrWord(
+                        charBox.Char.ToString(),
+                        ToValidRect(charBox, frame.Width, frame.Height)))
+                    .ToArray()))
+            .Where(line => line.Words.Count > 0)
             .ToArray();
 
-        return new WordRecognitionResult(frame.Width, frame.Height, words);
+        return new WordRecognitionResult(frame.Width, frame.Height, ocrLines);
     }
 
     /// <summary>把字符框钳制为合法 <see cref="ScreenRect"/>（非负、不越界、至少 1px）。</summary>

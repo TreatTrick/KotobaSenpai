@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Threading;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Models;
 
@@ -9,8 +10,8 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
 /// 端口 <see cref="IOverlayRenderer"/> 的 WPF 实现：
-/// 透明、置顶、不激活、点击穿透的工具窗口，为每个有效词绘制一条下划线。
-/// 刷新时整体替换词列表，隐藏时清除所有横线。
+/// 透明、置顶、不激活、点击穿透的工具窗口，为每个分词词绘制一条下划线。
+/// 悬停词热区（词的包围盒）时该词整条线变色；点击始终穿透到下方窗口。
 /// </summary>
 public sealed class WpfOverlayRenderer : IOverlayRenderer
 {
@@ -27,12 +28,25 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
     public void Hide()
     {
-        Application.Current.Dispatcher.Invoke(() => _window?.Hide());
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            _window?.StopHover();
+            _window?.Hide();
+        });
     }
 
     private sealed class OverlayWindow : Window
     {
+        private static readonly Brush DefaultLineBrush = Brushes.DeepSkyBlue;
+        private static readonly Brush HoverLineBrush = Brushes.OrangeRed;
+
+        private const int HoverPollMs = 50;
+
         private readonly Canvas _canvas = new();
+        private readonly List<Border> _lineElements = new();
+        private readonly DispatcherTimer _hoverTimer;
+        private WordOverlaySession? _session;
+        private int _hoverIndex = -1;
 
         public OverlayWindow()
         {
@@ -45,12 +59,18 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             IsHitTestVisible = false;
             Content = _canvas;
             SourceInitialized += (_, _) => SetClickThrough();
+
+            _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(HoverPollMs) };
+            _hoverTimer.Tick += (_, _) => PollHover();
         }
 
         public void Render(WordOverlaySession session)
         {
             if (!IsVisible)
                 Show();
+
+            _session = session;
+            _hoverIndex = -1;
 
             var handle = new WindowInteropHelper(this).Handle;
             var scale = NativeMethods.GetDpiForWindow(handle) / 96d;
@@ -65,19 +85,68 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 0,
                 NativeMethods.SwpNoActivate | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
             _canvas.Children.Clear();
+            _lineElements.Clear();
             foreach (var line in session.Lines)
             {
                 var element = new Border
                 {
                     Width = line.Width / scale,
                     Height = line.Thickness / scale,
-                    Background = Brushes.DeepSkyBlue,
+                    Background = DefaultLineBrush,
                     Opacity = 0.95
                 };
                 Canvas.SetLeft(element, (line.X - session.Target.Bounds.X) / scale);
                 Canvas.SetTop(element, (line.Y - session.Target.Bounds.Y) / scale);
                 _canvas.Children.Add(element);
+                _lineElements.Add(element);
             }
+            _hoverTimer.Start();
+        }
+
+        public void StopHover()
+        {
+            _hoverTimer.Stop();
+            _hoverIndex = -1;
+            foreach (var element in _lineElements)
+                element.Background = DefaultLineBrush;
+        }
+
+        /// <summary>
+        /// 轮询光标位置做命中测试（窗口点击穿透、收不到自身鼠标事件）。
+        /// Bounds 与 Cursor.Position 均为物理像素；命中取包含光标的词，重叠时取中心最近者。
+        /// </summary>
+        private void PollHover()
+        {
+            var session = _session;
+            if (session is null || session.Words.Count == 0)
+                return;
+
+            if (!NativeMethods.GetCursorPos(out var cursor))
+                return;
+            int hit = -1;
+            double best = double.MaxValue;
+            for (int i = 0; i < session.Words.Count; i++)
+            {
+                var b = session.Words[i].Bounds;
+                if (cursor.X < b.X || cursor.X > b.Right || cursor.Y < b.Y || cursor.Y > b.Bottom)
+                    continue;
+                var cx = b.X + b.Width / 2d;
+                var cy = b.Y + b.Height / 2d;
+                var d = (cursor.X - cx) * (cursor.X - cx) + (cursor.Y - cy) * (cursor.Y - cy);
+                if (d < best)
+                {
+                    best = d;
+                    hit = i;
+                }
+            }
+
+            if (hit == _hoverIndex)
+                return;
+            if (_hoverIndex >= 0 && _hoverIndex < _lineElements.Count)
+                _lineElements[_hoverIndex].Background = DefaultLineBrush;
+            _hoverIndex = hit;
+            if (hit >= 0 && hit < _lineElements.Count)
+                _lineElements[hit].Background = HoverLineBrush;
         }
 
         private void SetClickThrough()
@@ -110,5 +179,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern bool SetWindowPos(nint hWnd, nint insertAfter, int x, int y, int width, int height, uint flags);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern bool GetCursorPos(out POINT point);
     }
 }

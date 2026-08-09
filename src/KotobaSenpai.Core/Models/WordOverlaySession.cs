@@ -8,9 +8,9 @@ namespace KotobaSenpai.Core.Models;
 /// </summary>
 public sealed class WordOverlaySession : Entity, IAggregateRoot
 {
-    private readonly List<ScreenWord> _words;
+    private readonly List<GroupedWord> _words;
 
-    private WordOverlaySession(Guid id, WindowTarget target, IReadOnlyList<ScreenWord> words)
+    private WordOverlaySession(Guid id, WindowTarget target, IReadOnlyList<GroupedWord> words)
     {
         Id = id;
         Target = target;
@@ -21,7 +21,7 @@ public sealed class WordOverlaySession : Entity, IAggregateRoot
 
     public WindowTarget Target { get; }
 
-    public IReadOnlyList<ScreenWord> Words => _words;
+    public IReadOnlyList<GroupedWord> Words => _words;
 
     /// <summary>每个词框底部内侧的一条下划线；刷新时整体替换，不留残留。</summary>
     public IReadOnlyList<OverlayLine> Lines => _words
@@ -32,7 +32,7 @@ public sealed class WordOverlaySession : Entity, IAggregateRoot
         .ToArray();
 
     /// <summary>启动一个新会话：过滤零宽词，并校验目标窗口不变量。</summary>
-    public static WordOverlaySession Start(WindowTarget target, IEnumerable<ScreenWord> words)
+    public static WordOverlaySession Start(WindowTarget target, IEnumerable<GroupedWord> words)
     {
         ArgumentNullException.ThrowIfNull(words);
 

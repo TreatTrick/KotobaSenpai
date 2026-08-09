@@ -104,10 +104,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             SetStatus(ResourceKeys.Status_Recognizing);
             var result = await _workflow.RecognizeAndShowAsync(SelectedWindow);
-            SetStatus(result.Words.Count == 0
+            var wordCount = result.Lines.Sum(line => line.Words.Count);
+            SetStatus(wordCount == 0
                 ? ResourceKeys.Status_NoWords
                 : ResourceKeys.Status_WordsRecognized,
-                result.Words.Count);
+                wordCount);
         }
         catch (Exception ex)
         {

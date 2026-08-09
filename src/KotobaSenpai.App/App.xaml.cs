@@ -115,6 +115,8 @@ public partial class App : Application
         // 日语分词：平台适配器懒加载 UniDic 词典；安装器单例持有固定 URL 的 HttpClient（M1 首次运行下载）。
         services.AddSingleton<ITokenizer>(sp => new UniDicTokenizer(sp.GetRequiredService<ILogger>()));
         services.AddSingleton(sp => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
+        // 词分组：把 OCR 字符经分词器重新组合成词，每词一条下划线。
+        services.AddSingleton<IOcrWordGroupingService, WordGroupingService>();
 
         // 设置：统一 settings.json 读写，为偏好存储与日志级别配置提供唯一归属（单例，持有内存视图）。
         services.AddSingleton<ISettingsService, SettingsService>();
