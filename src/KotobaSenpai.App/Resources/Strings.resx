@@ -57,6 +57,15 @@
   <data name="UniDicDownloadFailed" xml:space="preserve">
     <value>The Japanese dictionary download failed. Check your network and retry, or import an offline UniDic archive.</value>
   </data>
+  <data name="Install_Title" xml:space="preserve">
+    <value>Installing Japanese dictionary</value>
+  </data>
+  <data name="Install_Progress" xml:space="preserve">
+    <value>First run downloads the dictionary. Please wait…</value>
+  </data>
+  <data name="Install_Retry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
   <data name="OverlayTargetNotSpecified" xml:space="preserve">
     <value>An overlay session must specify a target window.</value>
   </data>

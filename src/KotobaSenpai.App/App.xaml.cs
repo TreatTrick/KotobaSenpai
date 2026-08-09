@@ -60,32 +60,20 @@ public partial class App : Application
         ConfigureGlobalErrorHandling();
 
         var themeService = _services.GetRequiredService<FluentThemeService>();
-
-        // M1 词典安装：后台可观察触发，不阻塞主窗；失败仅记录，不产生未观察异常。
-        // 分词器首次使用时若词典尚未就绪，由既有错误处理路径呈现 UniDicDictionaryMissing。
-        StartBackgroundDictionaryInstall();
+        var installController = _services.GetRequiredService<UniDicInstallController>();
 
         var window = new MainWindow
         {
             DataContext = _services.GetRequiredService<MainWindowViewModel>(),
             LanguageService = languageService,
-            ThemeService = themeService
+            ThemeService = themeService,
+            InstallController = installController
         };
         window.Show();
-    }
 
-    /// <summary>后台触发词典安装；观察并记录结果，绝不产生未观察的 fire-and-forget 异常。</summary>
-    private void StartBackgroundDictionaryInstall()
-    {
-        var installer = _services!.GetRequiredService<UniDicDictionaryInstaller>();
-        installer.EnsureInstalledAsync()
-            .ContinueWith(t =>
-            {
-                if (t.IsFaulted)
-                    Try(() => _logger?.LogError(t.Exception, "Background UniDic dictionary install failed"));
-                else if (t.IsCanceled)
-                    Try(() => _logger?.LogWarning("Background UniDic dictionary install cancelled"));
-            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        // 词典安装：主窗显示后触发，遮挡层阻断其余操作并显示进度/错误；失败可在层内重试。
+        if (!installController.IsInstalled)
+            installController.InstallCommand.Execute(null);
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -115,6 +103,8 @@ public partial class App : Application
         // 日语分词：平台适配器懒加载 UniDic 词典；安装器单例持有固定 URL 的 HttpClient（M1 首次运行下载）。
         services.AddSingleton<ITokenizer>(sp => new UniDicTokenizer(sp.GetRequiredService<ILogger>()));
         services.AddSingleton(sp => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
+        // 安装协调器：驱动启动遮挡层（进度/错误/重试）。
+        services.AddSingleton<UniDicInstallController>();
         // 词分组：把 OCR 字符经分词器重新组合成词，每词一条下划线。
         services.AddSingleton<IOcrWordGroupingService, WordGroupingService>();
 

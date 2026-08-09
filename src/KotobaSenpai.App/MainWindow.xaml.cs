@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.App.Themes;
@@ -46,6 +47,20 @@ public partial class MainWindow : FluentWindow
     {
         get => (FluentThemeService?)GetValue(ThemeServiceProperty);
         set => SetValue(ThemeServiceProperty, value);
+    }
+
+    public static readonly DependencyProperty InstallControllerProperty =
+        DependencyProperty.Register(
+            nameof(InstallController),
+            typeof(UniDicInstallController),
+            typeof(MainWindow),
+            new PropertyMetadata(null));
+
+    /// <summary>词典安装协调器：驱动启动时的遮挡层（进度/错误/重试）。属视图级服务，不入 ViewModel。</summary>
+    public UniDicInstallController? InstallController
+    {
+        get => (UniDicInstallController?)GetValue(InstallControllerProperty);
+        set => SetValue(InstallControllerProperty, value);
     }
 
     protected override void OnSourceInitialized(EventArgs e)

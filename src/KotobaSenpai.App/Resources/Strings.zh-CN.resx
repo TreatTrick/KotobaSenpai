@@ -57,6 +57,15 @@
   <data name="UniDicDownloadFailed" xml:space="preserve">
     <value>日语词典下载失败。请检查网络后重试，或导入离线 UniDic 压缩包。</value>
   </data>
+  <data name="Install_Title" xml:space="preserve">
+    <value>正在安装日语词典</value>
+  </data>
+  <data name="Install_Progress" xml:space="preserve">
+    <value>首次运行需下载词典，请稍候…</value>
+  </data>
+  <data name="Install_Retry" xml:space="preserve">
+    <value>重试</value>
+  </data>
   <data name="OverlayTargetNotSpecified" xml:space="preserve">
     <value>覆盖层会话必须指定目标窗口。</value>
   </data>
