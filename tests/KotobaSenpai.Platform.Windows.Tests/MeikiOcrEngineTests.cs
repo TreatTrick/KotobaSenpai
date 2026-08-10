@@ -71,6 +71,31 @@ public sealed class MeikiOcrEngineTests
         }
     }
 
+    [Fact]
+    public void Recognition_result_is_independent_of_batch_chunking()
+    {
+        var modelDir = Environment.GetEnvironmentVariable("KOTOBA_MEIKIOCR_MODEL_DIR");
+        var samplePath = Environment.GetEnvironmentVariable("KOTOBA_MEIKIOCR_GOLDEN_IMAGE");
+        if (string.IsNullOrWhiteSpace(modelDir) || string.IsNullOrWhiteSpace(samplePath) || !File.Exists(samplePath))
+            return; // 模型/样例未就绪，跳过（CI 无模型）。
+
+        var (bgra, width, height) = LoadBgra(samplePath);
+        using var singleItemEngine = new MeikiOcrEngine(modelDir, maxBatchSize: 1);
+        using var batchedEngine = new MeikiOcrEngine(modelDir, maxBatchSize: 8);
+
+        var singleItemResult = singleItemEngine.RunOcr(bgra, width, height);
+        var batchedResult = batchedEngine.RunOcr(bgra, width, height);
+
+        Assert.Equal(Snapshot(singleItemResult), Snapshot(batchedResult));
+    }
+
+    private static string[] Snapshot(IReadOnlyList<MeikiLine> lines)
+        => lines.Select(line => string.Join(
+            '|',
+            line.Text,
+            string.Join(';', line.Chars.Select(c => $"{c.Char}:{c.X1},{c.Y1},{c.X2},{c.Y2}"))))
+            .ToArray();
+
     private static (ReadOnlyMemory<byte> Bgra, int Width, int Height) LoadBgra(string path)
     {
         using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(path);

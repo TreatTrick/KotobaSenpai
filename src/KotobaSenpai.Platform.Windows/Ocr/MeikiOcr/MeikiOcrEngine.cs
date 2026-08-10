@@ -302,10 +302,13 @@ public sealed class MeikiOcrEngine : IDisposable
             NamedOnnxValue.CreateFromTensor(inputNames[1], origSizes),
         });
         // char_codes 输出为 Int32（见 rec 模型输出元数据）。
+        var labels = outputs[0].AsTensor<int>();
+        var boxes = outputs[1].AsTensor<float>();
+        var scores = outputs[2].AsTensor<float>();
         return (
-            outputs[0].AsTensor<int>(),
-            outputs[1].AsTensor<float>(),
-            outputs[2].AsTensor<float>());
+            new DenseTensor<int>(labels.ToArray(), labels.Dimensions.ToArray()),
+            new DenseTensor<float>(boxes.ToArray(), boxes.Dimensions.ToArray()),
+            new DenseTensor<float>(scores.ToArray(), scores.Dimensions.ToArray()));
     }
 
     private static void PostprocessRecognitionResults(
