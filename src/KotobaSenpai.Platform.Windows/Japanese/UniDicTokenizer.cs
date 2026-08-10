@@ -50,32 +50,49 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
         // Parse 与节点投影在同一同步保护内，保证单例适配器的并发调用结果不互相污染。
         lock (_gate)
         {
-            var nodes = _tagger.Value.Parse(text).ToArray();
-            var result = new List<Token>(nodes.Length);
-            foreach (var node in nodes)
+            try
             {
-                if (node.Stat == MeCabNodeStat.Bos || node.Stat == MeCabNodeStat.Eos)
-                    continue;
-                if (string.IsNullOrEmpty(node.Surface))
-                    continue;
+                var nodes = _tagger.Value.Parse(text).ToArray();
+                var result = new List<Token>(nodes.Length);
+                foreach (var node in nodes)
+                {
+                    if (node.Stat == MeCabNodeStat.Bos || node.Stat == MeCabNodeStat.Eos)
+                        continue;
+                    if (string.IsNullOrEmpty(node.Surface))
+                        continue;
 
-                result.Add(new Token(
-                    node.Surface,
-                    node.Lemma,
-                    node.OrthBase,
-                    node.Kana,
-                    node.KanaBase,
-                    node.Pron,
-                    new PartsOfSpeech(node.Pos1, node.Pos2, node.Pos3, node.Pos4),
-                    node.CType,
-                    node.CForm,
-                    node.AType,
-                    /* UTF-16 code-unit 起点：保留词前空格/换行，不用前序表面长度累加。 */
-                    node.BPos + (node.RLength - node.Length)));
+                    result.Add(new Token(
+                        node.Surface,
+                        node.Lemma,
+                        node.OrthBase,
+                        node.Kana,
+                        node.KanaBase,
+                        node.Pron,
+                        new PartsOfSpeech(node.Pos1, node.Pos2, node.Pos3, node.Pos4),
+                        node.CType,
+                        node.CForm,
+                        node.AType,
+                        /* UTF-16 code-unit 起点：保留词前空格/换行，不用前序表面长度累加。 */
+                        node.BPos + (node.RLength - node.Length)));
+                }
+                return result;
             }
-            return result;
+            catch (WindowsPlatformException)
+            {
+                throw; // 词典缺失/无效：按既有错误契约上抛，由上层呈现 UniDicDictionaryMissing/Invalid。
+            }
+            catch (Exception ex)
+            {
+                // OCR 文本是不可信输入，可能含 MeCab 原生解析无法处理的字符（孤立代理/控制符等），
+                // 导致 ParseToLattice 越界。防御：跳过该行，不因单行坏文本拖垮整次识别。
+                _logger.Log(LogLevel.Warning, ex, "UniDicTokenizer: MeCab failed to parse '{text}' (skipping line)", Truncate(text));
+                return Array.Empty<Token>();
+            }
         }
     }
+
+    /// <summary>截断日志文本，避免把整段 OCR 乱码写进日志。</summary>
+    private static string Truncate(string text) => text.Length <= 200 ? text : text[..200] + "…";
 
     public void Dispose()
     {

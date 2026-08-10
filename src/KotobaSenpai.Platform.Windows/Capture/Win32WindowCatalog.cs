@@ -22,13 +22,16 @@ public sealed class Win32WindowCatalog : IWindowCatalog
             var titleBuilder = new StringBuilder(GetWindowTextLength(handle) + 1);
             _ = GetWindowText(handle, titleBuilder, titleBuilder.Capacity);
             var title = titleBuilder.ToString().Trim();
-            if (string.IsNullOrWhiteSpace(title) || !GetWindowRect(handle, out var rect))
+            if (string.IsNullOrWhiteSpace(title) || !GetClientRect(handle, out var rect))
                 return true;
 
+            // 用客户区（不含标题栏/边框）作为捕获与坐标基准：避免标题栏文字干扰 OCR，
+            // 且与 DokiDokiDict 的 GetClientRect 捕获一致。ClientToScreen 把客户区原点转到屏幕坐标。
             var width = rect.Right - rect.Left;
             var height = rect.Bottom - rect.Top;
-            if (width > 0 && height > 0)
-                result.Add(new WindowTarget(handle, title, new ScreenRect(rect.Left, rect.Top, width, height)));
+            if (width <= 0 || height <= 0 || !ClientToScreen(handle, out var origin))
+                return true;
+            result.Add(new WindowTarget(handle, title, new ScreenRect(origin.X, origin.Y, width, height)));
             return true;
         }, nint.Zero);
 
@@ -38,6 +41,12 @@ public sealed class Win32WindowCatalog : IWindowCatalog
     private delegate bool EnumWindowsProc(nint hWnd, nint lParam);
 
     private readonly record struct Rect(int Left, int Top, int Right, int Bottom);
+
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
@@ -55,5 +64,8 @@ public sealed class Win32WindowCatalog : IWindowCatalog
     private static extern int GetWindowTextLength(nint hWnd);
 
     [DllImport("user32.dll")]
-    private static extern bool GetWindowRect(nint hWnd, out Rect rect);
+    private static extern bool GetClientRect(nint hWnd, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool ClientToScreen(nint hWnd, out POINT point);
 }

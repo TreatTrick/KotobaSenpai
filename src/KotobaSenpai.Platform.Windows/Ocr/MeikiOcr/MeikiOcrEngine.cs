@@ -118,6 +118,9 @@ public sealed class MeikiOcrEngine : IDisposable
 
         var lines = results.Where(r => r is not null).Cast<MeikiLine>().ToArray();
         _logger?.LogInformation("MeikiOcr: recognized {lines} lines, {chars} chars", lines.Length, lines.Sum(l => l.Chars.Count));
+        // 诊断：打印每行实际识别出的文本，便于判断"认错字"还是"映射错位"。
+        foreach (var line in lines.Where(l => l.Text.Length > 0))
+            _logger?.LogInformation("MeikiOcr: line '{text}' ({chars} chars)", line.Text, line.Chars.Count);
         return lines;
     }
 
