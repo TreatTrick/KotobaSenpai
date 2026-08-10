@@ -2,6 +2,7 @@ using System.IO;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
+using KotobaSenpai.App.Diagnostics;
 using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
@@ -100,6 +101,8 @@ public partial class App : Application
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
         services.AddSingleton<WordOverlayApplicationService>();
+        // 诊断记录：DiagEnabled=true 时把分词结果写盘，供离线分析。
+        services.AddSingleton<IDiagnosticReporter, FileDiagnosticReporter>();
 
         // 本地日英词典：JMdict .db 随发布捆绑在程序目录；repository 按需查库，lookup 按 lemma/reading 回退。
         var jmdictDbPath = Path.Combine(AppContext.BaseDirectory, "jmdict.db");

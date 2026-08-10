@@ -12,15 +12,18 @@ public sealed class WordOverlayApplicationService
     private readonly IWindowWordRecognizer _recognizer;
     private readonly IOcrWordGroupingService _grouping;
     private readonly IOverlayRenderer _overlay;
+    private readonly IDiagnosticReporter? _diagnostics;
 
     public WordOverlayApplicationService(
         IWindowWordRecognizer recognizer,
         IOcrWordGroupingService grouping,
-        IOverlayRenderer overlay)
+        IOverlayRenderer overlay,
+        IDiagnosticReporter? diagnostics = null)
     {
         _recognizer = recognizer;
         _grouping = grouping;
         _overlay = overlay;
+        _diagnostics = diagnostics;
     }
 
     public async Task<WordRecognitionResult> RecognizeAndShowAsync(
@@ -35,6 +38,7 @@ public sealed class WordOverlayApplicationService
                 CoordinateMapper.ToScreen(word.Bounds, result.FrameWidth, result.FrameHeight, target.Bounds)))
             .ToArray();
 
+        _diagnostics?.RecordTokens(target, screenWords);
         _overlay.Show(WordOverlaySession.Start(target, screenWords));
         return result;
     }

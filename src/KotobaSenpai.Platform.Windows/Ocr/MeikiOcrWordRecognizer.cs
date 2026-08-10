@@ -20,7 +20,7 @@ namespace KotobaSenpai.Platform.Windows.Ocr;
 /// </summary>
 public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
 {
-    private const string OcrDiagEnabledKey = "OcrDiagEnabled";
+    private const string DiagEnabledKey = "DiagEnabled";
 
     private readonly IWindowFrameCapture _capture;
     private readonly ISettingsService _settings;
@@ -79,9 +79,9 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         return new WordRecognitionResult(frame.Width, frame.Height, ocrLines);
     }
 
-    /// <summary>诊断落盘开关：设置项 <c>OcrDiagEnabled</c> 为 "true" 时开启（默认关）。</summary>
+    /// <summary>诊断落盘开关：设置项 <c>DiagEnabled</c> 为 "true" 时开启（默认关）。</summary>
     private bool IsDiagEnabled()
-        => string.Equals(_settings.GetValue(OcrDiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase);
+        => string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// 诊断落盘：把捕获帧 PNG 与 OCR 识别文本存到固定目录，便于核对"截了什么、识别出什么"。
