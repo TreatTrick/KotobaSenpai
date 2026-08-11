@@ -104,18 +104,24 @@ public partial class App : Application
         // 诊断记录：DiagEnabled=true 时把分词结果写盘，供离线分析。
         services.AddSingleton<IDiagnosticReporter, FileDiagnosticReporter>();
 
-        // 本地日英词典：JMdict .db 随发布捆绑在程序目录；repository 按需查库，lookup 按 lemma/reading 回退。
+        // 本地日英词典：JMdict .db 随发布捆绑在程序目录；同一个 lookup 实例同时提供单项与批量端口，
+        // 让一次识别只做一轮候选查询并共享其缓存。
         var jmdictDbPath = Path.Combine(AppContext.BaseDirectory, "jmdict.db");
         services.AddSingleton<IJmdictRepository>(new JmdictSqliteRepository(jmdictDbPath));
-        services.AddSingleton<IDictionaryLookup, JmdictLookupService>();
+        services.AddSingleton<JmdictLookupService>();
+        services.AddSingleton<IDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
+        services.AddSingleton<IBatchDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
+        services.AddSingleton<ITokenSpanResolver, TokenBoundarySpanResolver>();
 
         // 日语分词：平台适配器懒加载 UniDic 词典；安装器单例持有固定 URL 的 HttpClient（M1 首次运行下载）。
         services.AddSingleton<ITokenizer>(sp => new UniDicTokenizer(sp.GetRequiredService<ILogger>()));
         services.AddSingleton(sp => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
         // 安装协调器：驱动启动遮挡层（进度/错误/重试）。
         services.AddSingleton<UniDicInstallController>();
-        // 词分组：把 OCR 字符经分词器重新组合成词，每词一条下划线。
-        services.AddSingleton<IOcrWordGroupingService, WordGroupingService>();
+        // 词分组：先整次 OCR 批量解析 token-boundary span，再把同一结果用于下划线和悬停。
+        services.AddSingleton<IOcrWordGroupingService>(sp => new WordGroupingService(
+            sp.GetRequiredService<ITokenizer>(),
+            sp.GetRequiredService<ITokenSpanResolver>()));
 
         // 设置：统一 settings.json 读写，为偏好存储与日志级别配置提供唯一归属（单例，持有内存视图）。
         services.AddSingleton<ISettingsService, SettingsService>();

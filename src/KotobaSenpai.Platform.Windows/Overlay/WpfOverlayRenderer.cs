@@ -164,7 +164,10 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             UpdatePopup(hit);
         }
 
-        /// <summary>悬停词变化时查词并更新弹窗；移出词时隐藏。结果按 lemma 缓存，避免每 tick 重复查。</summary>
+        /// <summary>
+        /// 悬停词变化时更新弹窗。识别阶段已解析的 span 直接使用其结果；只有旧兼容词块
+        /// 才在这里按 token 查词，避免对“已解析但未命中”的词重复访问 SQLite。
+        /// </summary>
         private void UpdatePopup(int hit)
         {
             var session = _session;
@@ -175,12 +178,24 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             }
 
             var word = session.Words[hit];
-            if (!_lookupCache.TryGetValue(word.Token.Lemma, out var entries))
+            IReadOnlyList<DictionaryEntry> entries;
+            if (word.HasResolvedLookup)
             {
-                entries = _lookup.Lookup(word.Token);
-                _lookupCache[word.Token.Lemma] = entries;
+                entries = word.Entries;
             }
-            _popup.ShowResult(entries, word.Token.Reading, word.Bounds);
+            else
+            {
+                if (!_lookupCache.TryGetValue(word.Token.Lemma, out var cachedEntries))
+                {
+                    entries = _lookup.Lookup(word.Token);
+                    _lookupCache[word.Token.Lemma] = entries;
+                }
+                else
+                {
+                    entries = cachedEntries;
+                }
+            }
+            _popup.ShowResult(entries, word.Reading, word.Bounds);
         }
 
         private void SetClickThrough()

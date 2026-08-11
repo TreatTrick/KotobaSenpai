@@ -36,3 +36,25 @@ TBD - created by archiving change group-ocr-words-by-tokenizer. Update Purpose a
 - **WHEN** 一个词由多个字符构成
 - **THEN** 该词只产生一条横线，横线宽度等于词包围盒宽度，而不是每个字符一条线
 
+### Requirement: Token-boundary dictionary spans
+系统 SHALL 在 UniDic 输出的完整 token 边界上生成连续候选词块，不得从 token 中间开始或结束；候选 SHALL 在一次识别内批量查询词典，并按从左到右的最长覆盖选择非重叠 span。
+
+#### Scenario: Prevent a cross-token false match
+- **WHEN** token 序列为 `も`、`ちゃんと`，且词典存在 `もち` 但不存在 `もちゃんと`
+- **THEN** 系统不得生成 `もち` span；`も` 与 `ちゃんと` 各自保持为独立 span
+
+#### Scenario: Merge a dictionary word across UniDic tokens
+- **WHEN** token 序列为 `で`、`も`，且词典存在 `でも`
+- **THEN** 系统生成一个覆盖两个 token 的 `でも` span，不同时生成重叠的 `で` span
+
+#### Scenario: Share the resolved span with lookup and underline
+- **WHEN** 一个候选 span 在识别阶段已命中或确认未命中词典
+- **THEN** 下划线热区、悬停弹窗和诊断 SHALL 使用同一个 span 结果，不得在悬停时从单个字符重新猜词
+
+#### Scenario: Resolve inflection chains with UniDic lemma
+- **WHEN** UniDic 输出一个有词典 lemma 的动词/形容词，后面紧跟活用助动词（如 `なかっ` + `た`）
+- **THEN** 系统以基础 lemma 查词，同时让 span 覆盖完整出现形 `なかった`
+
+#### Scenario: Hard boundaries
+- **WHEN** 候选 token 之间存在标点、空白或非连续字符偏移
+- **THEN** 系统不得跨越该边界合并词块

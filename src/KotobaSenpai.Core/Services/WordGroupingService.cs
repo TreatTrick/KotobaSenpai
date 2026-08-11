@@ -11,10 +11,12 @@ namespace KotobaSenpai.Core.Services;
 public sealed class WordGroupingService : IOcrWordGroupingService
 {
     private readonly ITokenizer _tokenizer;
+    private readonly ITokenSpanResolver? _spanResolver;
 
-    public WordGroupingService(ITokenizer tokenizer)
+    public WordGroupingService(ITokenizer tokenizer, ITokenSpanResolver? spanResolver = null)
     {
         _tokenizer = tokenizer ?? throw new ArgumentNullException(nameof(tokenizer));
+        _spanResolver = spanResolver;
     }
 
     public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines)
@@ -22,18 +24,41 @@ public sealed class WordGroupingService : IOcrWordGroupingService
         ArgumentNullException.ThrowIfNull(lines);
 
         var result = new List<GroupedWord>();
-        foreach (var line in lines)
-        {
-            if (line.Words.Count == 0)
-                continue;
+        var tokenizedLines = lines
+            .Where(line => line.Words.Count > 0)
+            .Select(line => (Line: line, Tokens: _tokenizer.Tokenize(line.Text)))
+            .ToArray();
 
-            // 每行独立分词，token 只在行内映射 → 每条下划线始终是单个并集矩形（词不跨视觉行）。
-            var text = line.Text;
-            foreach (var token in _tokenizer.Tokenize(text))
+        if (_spanResolver is not null)
+        {
+            var resolvedLines = _spanResolver.ResolveMany(
+                tokenizedLines.Select(item => item.Tokens).ToArray());
+            if (resolvedLines.Count != tokenizedLines.Length)
+                throw new InvalidOperationException("Token span resolver returned an unexpected line count.");
+
+            for (int lineIndex = 0; lineIndex < tokenizedLines.Length; lineIndex++)
+            {
+                var line = tokenizedLines[lineIndex].Line;
+                foreach (var span in resolvedLines[lineIndex])
+                {
+                    var start = Math.Max(0, span.StartOffset);
+                    var end = Math.Min(line.Words.Count, span.EndOffset);
+                    if (start >= end)
+                        continue;
+
+                    result.Add(new GroupedWord(span, Union(line.Words, start, end)));
+                }
+            }
+            return result;
+        }
+
+        // 兼容未注入 span resolver 的旧调用：每个 UniDic token 独立生成一个词。
+        foreach (var (line, tokens) in tokenizedLines)
+        {
+            foreach (var token in tokens)
             {
                 if (IsSeparatorToken(token.Surface))
                     continue;
-
                 var start = Math.Max(0, token.StartOffset);
                 var end = Math.Min(line.Words.Count, start + token.Surface.Length);
                 if (start >= end)

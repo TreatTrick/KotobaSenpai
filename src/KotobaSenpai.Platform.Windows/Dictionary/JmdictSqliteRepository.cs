@@ -12,6 +12,7 @@ namespace KotobaSenpai.Platform.Windows.Dictionary;
 /// </summary>
 public sealed class JmdictSqliteRepository : IJmdictRepository
 {
+    private const int BatchParameterChunkSize = 400;
     private readonly string _dbPath;
 
     public JmdictSqliteRepository(string dbPath)
@@ -22,6 +23,73 @@ public sealed class JmdictSqliteRepository : IJmdictRepository
     public IReadOnlyList<DictionaryEntry> FindByKanji(string kanji) => Query("kanji", kanji);
 
     public IReadOnlyList<DictionaryEntry> FindByKana(string kana) => Query("reading", kana);
+
+    public IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> FindByForms(
+        IReadOnlyCollection<string> forms)
+    {
+        ArgumentNullException.ThrowIfNull(forms);
+        var requested = forms
+            .Where(form => !string.IsNullOrEmpty(form))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (requested.Length == 0 || !File.Exists(_dbPath))
+            return new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal);
+
+        try
+        {
+            using var connection = new SqliteConnection($"Data Source={_dbPath};Pooling=False");
+            connection.Open();
+            var buckets = new Dictionary<string, List<DictionaryEntry>>(StringComparer.Ordinal);
+
+            foreach (var chunk in requested.Chunk(BatchParameterChunkSize))
+            {
+                using var command = connection.CreateCommand();
+                var parameters = new List<string>(chunk.Length);
+                for (int i = 0; i < chunk.Length; i++)
+                {
+                    var name = $"@p{i}";
+                    parameters.Add(name);
+                    command.Parameters.AddWithValue(name, chunk[i]);
+                }
+
+                var inClause = string.Join(", ", parameters);
+                command.CommandText = $"""
+                    SELECT f.form, e.headword, e.reading, e.senses
+                    FROM (
+                        SELECT form, entry_id FROM kanji WHERE form IN ({inClause})
+                        UNION
+                        SELECT form, entry_id FROM reading WHERE form IN ({inClause})
+                    ) f
+                    JOIN entries e ON e.id = f.entry_id
+                    """;
+
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var form = reader.GetString(0);
+                    var entry = new DictionaryEntry(
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        JsonSerializer.Deserialize<DictionarySense[]>(reader.GetString(3)) ?? []);
+                    if (!buckets.TryGetValue(form, out var entries))
+                    {
+                        entries = [];
+                        buckets[form] = entries;
+                    }
+                    entries.Add(entry);
+                }
+            }
+
+            return buckets.ToDictionary(
+                pair => pair.Key,
+                pair => (IReadOnlyList<DictionaryEntry>)pair.Value.ToArray(),
+                StringComparer.Ordinal);
+        }
+        catch (SqliteException)
+        {
+            return new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal);
+        }
+    }
 
     private IReadOnlyList<DictionaryEntry> Query(string table, string form)
     {

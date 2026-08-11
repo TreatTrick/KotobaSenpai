@@ -63,6 +63,34 @@ public sealed class WordGroupingTests
         var service = new WordGroupingService(new StubTokenizer());
         Assert.Empty(service.Group([]));
     }
+
+    [Fact]
+    public void Uses_resolved_span_for_geometry_and_dictionary_entries()
+    {
+        var entry = new DictionaryEntry("でも", "でも", []);
+        var resolver = new StubSpanResolver(new LookupSpan(
+            [
+                Token("で", 0),
+                Token("も", 1),
+            ],
+            "でも",
+            [entry]));
+        var service = new WordGroupingService(
+            new StubTokenizer(new TokenSpec("で", 0), new TokenSpec("も", 1)),
+            resolver);
+
+        var grouped = service.Group([Line("でも")]);
+
+        var word = Assert.Single(grouped);
+        Assert.Equal("でも", word.Surface);
+        Assert.Equal(20, word.Bounds.Width);
+        Assert.Same(entry, Assert.Single(word.Entries));
+        Assert.True(word.HasResolvedLookup);
+    }
+
+    private static Token Token(string surface, int start)
+        => new(surface, surface, surface, surface, surface, surface,
+            new PartsOfSpeech("", "", "", ""), "", "", "", start);
 }
 
 internal sealed record TokenSpec(string Surface, int StartOffset);
@@ -77,4 +105,13 @@ internal sealed class StubTokenizer : ITokenizer
         => _specs.Select(s => new Token(
             s.Surface, s.Surface, s.Surface, s.Surface, s.Surface, s.Surface,
             new PartsOfSpeech("", "", "", ""), "", "", "", s.StartOffset)).ToArray();
+}
+
+internal sealed class StubSpanResolver : ITokenSpanResolver
+{
+    private readonly IReadOnlyList<LookupSpan> _spans;
+
+    public StubSpanResolver(params LookupSpan[] spans) => _spans = spans;
+
+    public IReadOnlyList<LookupSpan> Resolve(IReadOnlyList<Token> tokens) => _spans;
 }

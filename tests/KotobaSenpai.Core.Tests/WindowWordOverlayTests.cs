@@ -75,6 +75,28 @@ public sealed class WindowWordOverlayTests
         Assert.Equal(new ScreenRect(20, 10, 20, 20), overlay.Session.Words[0].Bounds);
     }
 
+    [Fact]
+    public async Task Application_service_preserves_precomputed_lookup_while_mapping_bounds()
+    {
+        var target = new WindowTarget((nint)42, "VN", new ScreenRect(0, 0, 200, 100));
+        var overlay = new FakeOverlay();
+        var entry = new DictionaryEntry("日", "にち", []);
+        var service = new WordOverlayApplicationService(
+            new FakeRecognizer(),
+            new WordGroupingService(
+                new StubTokenizer(new TokenSpec("日", 0)),
+                new StubSpanResolver(new LookupSpan([Token("日")], "日", [entry]))),
+            overlay);
+
+        await service.RecognizeAndShowAsync(target);
+
+        var word = Assert.Single(overlay.Session!.Words);
+        Assert.True(word.HasResolvedLookup);
+        Assert.Same(entry, Assert.Single(word.Entries));
+        Assert.Equal("日", word.LookupKey);
+        Assert.Equal(new ScreenRect(20, 10, 20, 20), word.Bounds);
+    }
+
     private static Token Token(string surface)
         => new(surface, surface, surface, surface, surface, surface,
             new PartsOfSpeech("", "", "", ""), "", "", "", 0);

@@ -6,7 +6,7 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.App.Diagnostics;
 
 /// <summary>
-/// 诊断记录：设置项 <c>DiagEnabled</c> 为 "true" 时，把分词结果（token 细节 + 包围盒）
+/// 诊断记录：设置项 <c>DiagEnabled</c> 为 "true" 时，把最终查词词块（source token 细节 + 包围盒）
 /// 写到 <c>%LocalAppData%/KotobaSenpai/diag/</c>，与识别器保存的截图/OCR 结构同目录，供离线分析。
 /// </summary>
 public sealed class FileDiagnosticReporter : IDiagnosticReporter
@@ -33,15 +33,16 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         var lines = new List<string>
         {
             $"target={target.Title} bounds={target.Bounds}",
-            $"tokens={groupedWords.Count}",
+            $"tokens={groupedWords.Count} spans={groupedWords.Count}",
             "",
-            "## 分词器结果",
+            "## 查词词块结果",
         };
         for (int i = 0; i < groupedWords.Count; i++)
         {
             var word = groupedWords[i];
             var token = word.Token;
-            lines.Add($"{i + 1}. surface={token.Surface} | lemma={token.Lemma} | reading={token.Reading} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | bounds={word.Bounds}");
+            var source = string.Join("+", word.SourceTokens.Select(sourceToken => sourceToken.Surface));
+            lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={token.Reading} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}");
         }
         File.WriteAllLines(Path.Combine(dir, $"tokens-{DateTime.Now:HHmmss-fff}.txt"), lines);
     }

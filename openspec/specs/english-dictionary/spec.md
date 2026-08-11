@@ -40,6 +40,17 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 - **WHEN** 悬停词无词典条目
 - **THEN** 系统展示该词的读音与"未收录"提示，而不是空白或崩溃
 
+### Requirement: Precomputed span lookup
+系统 SHALL 使用识别阶段生成的完整词块 span 和词典结果进行悬停查词。已确认未命中的 span 也 SHALL 直接显示未收录，不得再次按鼠标所在字符发起单字符最长匹配。
+
+#### Scenario: Hover a merged span
+- **WHEN** 光标位于 `で+も` 合并后的 `でも` span 内任意字符
+- **THEN** 弹窗 SHALL 显示 `でも` 的结果，且不以 `も` 为新的查词起点
+
+#### Scenario: Hover a resolved miss
+- **WHEN** 识别阶段已查询某个 span 且没有词典条目
+- **THEN** 弹窗显示未收录提示，不重复访问词典或改变 span 边界
+
 ### Requirement: Popup lifecycle and hit-through
 弹窗 SHALL 保持非点击穿透（不拦截鼠标点击），在鼠标移出悬停词后（带短延迟防抖动）隐藏；悬停词切换时弹窗内容随之更新。
 
@@ -50,4 +61,3 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 #### Scenario: Update on word switch
 - **WHEN** 悬停切换到另一个词
 - **THEN** 弹窗内容更新为新词的释义，不残留旧词内容
-

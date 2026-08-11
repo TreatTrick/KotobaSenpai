@@ -15,7 +15,7 @@
 **Files:**
 - Create: `src/KotobaSenpai.Core/Models/LookupSpan.cs`
 - Create: `src/KotobaSenpai.Core/Contracts/ITokenSpanResolver.cs`
-- Modify: `src/KotobaSenpai.Core/Contracts/IDictionaryLookup.cs`
+- Create: `src/KotobaSenpai.Core/Contracts/IBatchDictionaryLookup.cs`
 - Modify: `src/KotobaSenpai.Core/Models/GroupedWord.cs`
 - Test: `tests/KotobaSenpai.Core.Tests/TokenSpanResolverTests.cs`
 
@@ -31,7 +31,7 @@ Expected: compile failure because `LookupSpan`, the resolver contract, and the b
 
 **Step 3: Implement the minimal contracts**
 
-Define `LookupSpan` with immutable source tokens, surface, reading, lookup key, entries, UTF-16 start/end offsets. Add `LookupForms(IReadOnlyCollection<string>)` to `IDictionaryLookup`. Add an optional immutable entries collection to `GroupedWord` while preserving `Token` and `Bounds`.
+Define `LookupSpan` with immutable source tokens, surface, reading, lookup key, entries, UTF-16 start/end offsets. Add a separate `IBatchDictionaryLookup.LookupForms(IReadOnlyCollection<string>)` port so the existing single-token interface remains compatible. Add immutable entries/source-token values to `GroupedWord` while preserving its `(Token, Bounds)` positional record contract.
 
 **Step 4: Run the focused test**
 
@@ -56,7 +56,7 @@ git commit -m "feat(core): add lookup span contracts"
 
 Use a fake tokenizer and fake batch lookup to cover:
 
-- `で / も / ちゃんと` -> `で`, `でも`, `ちゃんと`;
+- `で / も / ちゃんと` -> non-overlapping `でも`, `ちゃんと`;
 - no `もち` candidate when `も` and `ちゃんと` are separate tokens;
 - `そ / し / たら` -> `そしたら`;
 - `オール / ラウンダー` -> `オールラウンダー`;

@@ -33,8 +33,7 @@ public sealed class WordOverlayApplicationService
         var result = await _recognizer.RecognizeAsync(target, cancellationToken).ConfigureAwait(false);
         // 先在帧坐标系内经分词器把字符重组成词（纯逻辑、坐标不变），再把每个词的并集框映射到屏幕。
         var screenWords = _grouping.Group(result.Lines)
-            .Select(word => new GroupedWord(
-                word.Token,
+            .Select(word => word.WithBounds(
                 CoordinateMapper.ToScreen(word.Bounds, result.FrameWidth, result.FrameHeight, target.Bounds)))
             .ToArray();
 

@@ -58,6 +58,19 @@ public sealed class JmdictLookupServiceTests
         Assert.Equal("to receive", entry.Senses[0].Glosses[0]);
     }
 
+    [Fact]
+    public void Lookup_forms_uses_batch_query_and_maps_hiragana_fallback_to_original_key()
+    {
+        var repo = new FakeRepo { ThrowOnSingleLookup = true };
+        repo.AddKana("でも", Entry("でも", "でも", "but"));
+        var service = new JmdictLookupService(repo);
+
+        var result = service.LookupForms(["デモ"]);
+
+        var entry = Assert.Single(result["デモ"]);
+        Assert.Equal("でも", entry.Headword);
+    }
+
     private static Token Token(string surface, string lemma, string reading)
         => new(surface, lemma, lemma, reading, reading, reading,
             new PartsOfSpeech("", "", "", ""), "", "", "", 0);
@@ -70,13 +83,36 @@ public sealed class JmdictLookupServiceTests
         private readonly Dictionary<string, List<DictionaryEntry>> _kan = new();
         private readonly Dictionary<string, List<DictionaryEntry>> _kana = new();
 
+        public bool ThrowOnSingleLookup { get; init; }
+
         public void AddKanji(string key, params DictionaryEntry[] entries) => _kan[key] = entries.ToList();
         public void AddKana(string key, params DictionaryEntry[] entries) => _kana[key] = entries.ToList();
 
         public IReadOnlyList<DictionaryEntry> FindByKanji(string kanji)
-            => _kan.TryGetValue(kanji, out var v) ? v : [];
+            => ThrowOnSingleLookup
+                ? throw new InvalidOperationException("single-form lookup used")
+                : _kan.TryGetValue(kanji, out var v) ? v : [];
 
         public IReadOnlyList<DictionaryEntry> FindByKana(string kana)
-            => _kana.TryGetValue(kana, out var v) ? v : [];
+            => ThrowOnSingleLookup
+                ? throw new InvalidOperationException("single-form lookup used")
+                : _kana.TryGetValue(kana, out var v) ? v : [];
+
+        public IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> FindByForms(
+            IReadOnlyCollection<string> forms)
+        {
+            var result = new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal);
+            foreach (var form in forms.Distinct(StringComparer.Ordinal))
+            {
+                var entries = new List<DictionaryEntry>();
+                if (_kan.TryGetValue(form, out var kanji))
+                    entries.AddRange(kanji);
+                if (_kana.TryGetValue(form, out var kana))
+                    entries.AddRange(kana.Where(entry => !entries.Contains(entry)));
+                if (entries.Count > 0)
+                    result[form] = entries;
+            }
+            return result;
+        }
     }
 }

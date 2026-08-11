@@ -20,6 +20,8 @@ UniDic 输出的是形态素（例如 `で`、`も`），而悬停查词需要�
 - 不改变 OCR、UniDic 词典或 MeCab 版本。
 - 不引入基于上下文的语法消歧；因此 `実戦でも` 按用户要求合并为 `でも`。
 
+纯词典最长匹配也会把样例中的 `で+の`、`より+も`、`に+とっ+て`、`だ+よ+ね` 等合并为 JMdict 已收录的词块。这是当前“查词体验优先”选择的预期结果，不视为分词器回归。
+
 ## 数据流
 
 ```text
@@ -38,18 +40,18 @@ OCR line
 2. 直接候选由相邻完整 token 的 `Surface` 拼接产生；候选不能从 token 中间开始或结束。
 3. 单 token 的词典键按 `Lemma -> OrthBase -> Reading -> BaseReading` 顺序选择。
 4. 动词/形容词/助动词后面连续的活用助动词（以及明确的接续助词 `て/で`）可附着到基础 token；查词键仍使用基础 token 的 lemma。
-5. 在同一 token 起点，优先最长字符 span；长度相同优先直接 surface 命中，再优先 lemma 活用命中。
+5. 在同一 token 起点，优先最长字符 span；长度相同且完整覆盖同一活用链时，优先 UniDic lemma 命中，避免把 `した` 等活用形误当成同形词，其他情况使用直接 surface 命中。
 6. 选中一个 span 后跳过其覆盖的 token，继续处理下一个未消费 token；没有词典命中时仍保留原 token 的下划线。
 
 ## 性能与兼容性
 
 - 候选仅是短字符串和 token/span 元数据；不产生帧像素的额外拷贝。
-- `IDictionaryLookup` 增加批量表单查询，SQLite repository 在单次识别中复用一个查询连接并按参数上限分块。
-- `GroupedWord` 保留现有 `Token` 访问方式，并附带已解析的 entries；旧的 token-only 测试仍可运行。
+- 增加独立的 `IBatchDictionaryLookup` 批量端口，SQLite repository 在单次识别中复用一个查询连接并按参数上限分块；现有 `IDictionaryLookup` 契约保持不变。
+- `GroupedWord` 保留原有 `(Token, Bounds)` positional record 契约，并附带已解析的 entries/source tokens。
 
 ## 验证标准
 
-- `で / も / ちゃんと` 解析为 `で`、`でも`、`ちゃんと`，绝不产生 `もち`。
+- `で / も / ちゃんと` 解析为非重叠的 `でも`、`ちゃんと`，绝不产生 `もち`。
 - `そ / し / たら` 解析为 `そしたら`。
 - `オール / ラウンダー` 解析为 `オールラウンダー`。
 - `なかっ / た` 解析为 surface `なかった`、lookup key `無い`。

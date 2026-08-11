@@ -52,6 +52,52 @@ public sealed class JmdictSqliteRepositoryTests
         Assert.Empty(repo.FindByKanji("受ける"));
     }
 
+    [Fact]
+    public void Finds_multiple_forms_in_one_batch_and_deduplicates_indexes()
+    {
+        var db = CreateDb();
+        try
+        {
+            AddDuplicateReadingIndex(db);
+            var repo = new JmdictSqliteRepository(db);
+
+            var result = repo.FindByForms(["受ける", "うける", "存在しない"]);
+
+            Assert.Equal(2, result.Count);
+            Assert.Single(result["受ける"]);
+            Assert.Single(result["うける"]);
+            Assert.Equal("受ける", result["うける"][0].Headword);
+            Assert.DoesNotContain("存在しない", result.Keys);
+        }
+        finally
+        {
+            File.Delete(db);
+        }
+    }
+
+    [Fact]
+    public void Batch_query_chunks_large_form_sets()
+    {
+        var db = CreateDb();
+        try
+        {
+            var forms = Enumerable.Range(0, 405)
+                .Select(i => $"不存在{i}")
+                .Append("受ける")
+                .ToArray();
+            var repo = new JmdictSqliteRepository(db);
+
+            var result = repo.FindByForms(forms);
+
+            Assert.Single(result);
+            Assert.Single(result["受ける"]);
+        }
+        finally
+        {
+            File.Delete(db);
+        }
+    }
+
     /// <summary>构造与 JmdictIndexBuilder 相同 schema 的临时库（entries/kanji/reading + 索引）。</summary>
     private static string CreateDb()
     {
@@ -71,5 +117,14 @@ public sealed class JmdictSqliteRepositoryTests
             """;
         cmd.ExecuteNonQuery();
         return path;
+    }
+
+    private static void AddDuplicateReadingIndex(string path)
+    {
+        using var conn = new SqliteConnection($"Data Source={path};Pooling=False");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "INSERT INTO reading VALUES ('受ける', 1)";
+        cmd.ExecuteNonQuery();
     }
 }

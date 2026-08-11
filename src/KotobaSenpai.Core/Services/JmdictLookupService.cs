@@ -9,7 +9,7 @@ namespace KotobaSenpai.Core.Services;
 /// 每个键先查表记表再查读音表（归一为平假名）；全未命中返回空。
 /// MeCab 已给出辞书形，无需去活用引擎。
 /// </summary>
-public sealed class JmdictLookupService : IDictionaryLookup
+public sealed class JmdictLookupService : IDictionaryLookup, IBatchDictionaryLookup
 {
     private readonly IJmdictRepository _repository;
 
@@ -22,33 +22,60 @@ public sealed class JmdictLookupService : IDictionaryLookup
     {
         ArgumentNullException.ThrowIfNull(token);
 
-        if (TryLookup(token.Lemma, out var result)
-            || TryLookup(token.OrthBase, out result)
-            || TryLookup(Kana.ToHiragana(token.Reading), out result)
-            || TryLookup(Kana.ToHiragana(token.BaseReading), out result))
-            return result;
+        var forms = TokenLookupKeys(token).ToArray();
+        var matches = LookupForms(forms);
+        foreach (var form in forms)
+        {
+            if (matches.TryGetValue(form, out var result))
+                return result;
+        }
 
         return Array.Empty<DictionaryEntry>();
     }
 
-    /// <summary>对单个键先查表记表、再查读音表；命中返回 true。</summary>
-    private bool TryLookup(string key, out IReadOnlyList<DictionaryEntry> result)
+    public IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> LookupForms(
+        IReadOnlyCollection<string> forms)
     {
-        if (string.IsNullOrEmpty(key))
-        {
-            result = Array.Empty<DictionaryEntry>();
-            return false;
-        }
+        ArgumentNullException.ThrowIfNull(forms);
 
-        var byKanji = _repository.FindByKanji(key);
-        if (byKanji.Count > 0)
-        {
-            result = byKanji;
-            return true;
-        }
+        var requested = forms
+            .Where(form => !string.IsNullOrEmpty(form))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (requested.Length == 0)
+            return new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal);
 
-        var byKana = _repository.FindByKana(key);
-        result = byKana;
-        return byKana.Count > 0;
+        var queryForms = requested
+            .SelectMany(form => new[] { form, Kana.ToHiragana(form) })
+            .Where(form => !string.IsNullOrEmpty(form))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var raw = _repository.FindByForms(queryForms);
+        var result = new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal);
+        foreach (var form in requested)
+        {
+            if (raw.TryGetValue(form, out var entries) && entries.Count > 0)
+            {
+                result[form] = entries;
+                continue;
+            }
+
+            var normalized = Kana.ToHiragana(form);
+            if (raw.TryGetValue(normalized, out entries) && entries.Count > 0)
+                result[form] = entries;
+        }
+        return result;
+    }
+
+    private static IEnumerable<string> TokenLookupKeys(Token token)
+    {
+        var keys = new[]
+        {
+            token.Lemma,
+            token.OrthBase,
+            Kana.ToHiragana(token.Reading),
+            Kana.ToHiragana(token.BaseReading),
+        };
+        return keys.Where(key => !string.IsNullOrEmpty(key)).Distinct(StringComparer.Ordinal);
     }
 }
