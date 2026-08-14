@@ -10,4 +10,7 @@ public interface IDiagnosticReporter
 {
     /// <summary>记录一次识别的分词结果（token 细节 + 包围盒）。</summary>
     void RecordTokens(WindowTarget target, IReadOnlyList<GroupedWord> groupedWords);
+
+    /// <summary>记录一次 phrase 分析运行：句段/group 计数、提供方结果与校验警告。不记录截图、API key 或窗口标题。</summary>
+    void RecordPhraseAnalysis(PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning);
 }

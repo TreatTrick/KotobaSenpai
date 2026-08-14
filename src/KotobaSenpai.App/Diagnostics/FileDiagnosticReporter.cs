@@ -46,4 +46,20 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         }
         File.WriteAllLines(Path.Combine(dir, $"tokens-{DateTime.Now:HHmmss-fff}.txt"), lines);
     }
+
+    public void RecordPhraseAnalysis(PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning)
+    {
+        if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KotobaSenpai", "diag");
+        Directory.CreateDirectory(dir);
+
+        var flags = new[] { "## phrase 分析", $"outcome={outcome}", $"groups={groups.Count}" };
+        if (!string.IsNullOrEmpty(warning))
+            flags = flags.Append($"warning={warning}").ToArray();
+        File.WriteAllLines(Path.Combine(dir, $"phrase-{DateTime.Now:HHmmss-fff}.txt"), flags);
+    }
 }

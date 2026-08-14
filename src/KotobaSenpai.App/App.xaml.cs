@@ -11,6 +11,7 @@ using KotobaSenpai.App.Settings;
 using KotobaSenpai.App.Themes;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Contracts;
+using KotobaSenpai.Platform.Windows.Llm;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Services;
@@ -100,6 +101,17 @@ public partial class App : Application
         services.AddSingleton<IWindowFrameCapture, GdiWindowFrameCapture>();
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
+
+        // Phrase 分析：DeepSeek 兼容适配器 + 编排器。本地词/span 先完成，失败只产生可重试警告，
+        // 由配置键 PhraseGroupsEnabled=true 启用；未配置 key 时适配器返回 NoKey 跳过调用。
+        services.AddSingleton<PhraseRequestBuilder>();
+        services.AddSingleton<PhraseResponseParser>();
+        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        services.AddSingleton<ILlmPhraseAnalyzer, DeepSeekPhraseAnalyzer>();
+        services.AddSingleton<SentenceSegmenter>();
+        services.AddSingleton<SentenceTokenBuilder>();
+        services.AddSingleton<PhraseAnalysisOrchestrator>();
+
         services.AddSingleton<WordOverlayApplicationService>();
         // 诊断记录：DiagEnabled=true 时把分词结果写盘，供离线分析。
         services.AddSingleton<IDiagnosticReporter, FileDiagnosticReporter>();
