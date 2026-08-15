@@ -7,8 +7,8 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
-/// phrase group 详情弹窗：显示标签、中文意思与中文语法解释。点击穿透、不激活、置顶；
-/// 由覆盖层在悬停 group 变化时更新、移出时隐藏。
+/// Phrase group detail popup: shows the label, meaning, and grammar explanation. Click-through, non-activating, topmost;
+/// updated by the overlay when the hovered group changes and hidden when it leaves.
 /// </summary>
 public sealed class PhrasePopup : Window
 {
@@ -41,9 +41,9 @@ public sealed class PhrasePopup : Window
         _panel.Children.Clear();
         _panel.Children.Add(Heading(label));
         if (!string.IsNullOrEmpty(meaning))
-            _panel.Children.Add(Block("意思", meaning));
+            _panel.Children.Add(Block("Meaning", meaning));
         if (!string.IsNullOrEmpty(grammar))
-            _panel.Children.Add(Block("语法", grammar));
+            _panel.Children.Add(Block("Grammar", grammar));
 
         _panel.Measure(new Size(FieldMaxWidth, FieldMaxHeight));
         Width = Math.Min(FieldMaxWidth, Math.Max(200, _panel.DesiredSize.Width + Pad * 2));

@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>一行 OCR 识别结果：按阅读顺序排列的字符及其字符框。</summary>
+/// <summary>One line of OCR recognition result: characters in reading order and their character boxes.</summary>
 public sealed record OcrLine
 {
     public OcrLine(IReadOnlyList<OcrWord> words)
@@ -11,6 +11,6 @@ public sealed record OcrLine
 
     public IReadOnlyList<OcrWord> Words { get; }
 
-    /// <summary>按阅读顺序拼接的字符文本，用作分词输入。</summary>
+    /// <summary>Character text concatenated in reading order, used as tokenizer input.</summary>
     public string Text => string.Concat(Words.Select(word => word.Text));
 }

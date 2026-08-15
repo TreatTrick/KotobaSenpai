@@ -6,11 +6,11 @@ using Wpf.Ui.Controls;
 namespace KotobaSenpai.App.Themes;
 
 /// <summary>
-/// 视图层主题服务：把主题模式（Auto/Light/Dark）解析为 WPF-UI Fluent 主题并应用，
-/// 持久化用户选择，并在 Auto 模式下经 <see cref="SystemThemeWatcher"/> 跟随 Windows 系统主题。
-/// 仅存在于 App 视图层（引用 Wpf.Ui 与 System.Windows），不注入 ViewModel。
-/// 不实现 IDisposable：SystemThemeWatcher 随窗口关闭/进程退出由 WPF-UI 自动清理，
-/// 退出时显式 UnWatch 会因窗口句柄已销毁而抛 InvalidOperationException。
+/// View-layer theme service: resolves a theme mode (Auto/Light/Dark) into a WPF-UI Fluent theme and applies it,
+/// persists the user's choice, and in Auto mode follows the Windows system theme via <see cref="SystemThemeWatcher"/>.
+/// Lives only in the App view layer (references Wpf.Ui and System.Windows); not injected into the ViewModel.
+/// Does not implement IDisposable: SystemThemeWatcher is cleaned up automatically by WPF-UI when the window closes/process exits,
+/// and an explicit UnWatch on exit would throw InvalidOperationException because the window handle is already destroyed.
 /// </summary>
 public sealed class FluentThemeService
 {
@@ -18,19 +18,19 @@ public sealed class FluentThemeService
     private Window? _window;
     private AppThemeMode _mode = AppThemeMode.Auto;
 
-    /// <summary>当前主题模式。</summary>
+    /// <summary>The current theme mode.</summary>
     public AppThemeMode CurrentMode => _mode;
 
     public FluentThemeService(IThemePreferenceStore store) => _store = store;
 
-    /// <summary>启动时绑定主窗口、应用持久化（或缺省 Auto）模式。须在窗口句柄创建后调用（如 OnSourceInitialized）。</summary>
+    /// <summary>At startup, binds the main window and applies the persisted (or default Auto) mode. Must be called after the window handle is created (e.g. OnSourceInitialized).</summary>
     public void Initialize(Window window)
     {
         _window = window;
         SetMode(_store.Load(), persist: false);
     }
 
-    /// <summary>设置主题模式并应用；persist=true 时持久化。null 视为 Auto。</summary>
+    /// <summary>Sets the theme mode and applies it; persisted when persist=true. null is treated as Auto.</summary>
     public void SetMode(AppThemeMode? mode, bool persist = true)
     {
         _mode = mode ?? AppThemeMode.Auto;
@@ -48,7 +48,7 @@ public sealed class FluentThemeService
         switch (_mode)
         {
             case AppThemeMode.Auto:
-                // 跟随系统：应用当前系统主题并订阅系统深浅变化。
+                // Follow the system: apply the current system theme and subscribe to system light/dark changes.
                 ApplicationThemeManager.ApplySystemTheme();
                 SystemThemeWatcher.Watch(_window, backdrop, true);
                 break;

@@ -4,8 +4,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 把句段内各行按阅读顺序分词，生成句级 <see cref="SentenceTokenReference"/>，并保留每行本地 span 摘要。
-/// 映射不到字符框的 token 被跳过（不生成词/横线，也不进入请求）。
+/// Tokenizes each line within a segment in reading order, producing sentence-level
+/// <see cref="SentenceTokenReference"/>s while retaining each line's local span summaries. Tokens that cannot
+/// be mapped to a character box are skipped (no word/underline is produced, and they don't enter the request).
 /// </summary>
 public sealed class SentenceTokenBuilder
 {
@@ -43,7 +44,7 @@ public sealed class SentenceTokenBuilder
                 var start = Math.Max(0, token.StartOffset);
                 var end = Math.Min(line.Words.Count, start + token.Surface.Length);
                 if (start >= end)
-                    continue; // 无字符框，跳过
+                    continue; // no character box, skip
 
                 var reference = new SentenceTokenReference(
                     sentenceIndex,

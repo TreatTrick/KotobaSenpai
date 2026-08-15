@@ -4,8 +4,8 @@ using System.Text.Json.Nodes;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// OpenAI Responses 协议：<c>/responses</c>，<c>text.format</c> strict JSON schema，group 数组在
-/// <c>output[].content[].text</c>。单轮 system+user 文本，无需多轮状态。
+/// OpenAI Responses protocol: <c>/responses</c>, with <c>text.format</c> strict JSON schema; the group array lives in
+/// <c>output[].content[].text</c>. Single-turn system+user text, no multi-turn state.
 /// </summary>
 public sealed class OpenAiResponsesProtocol : ILlmProtocol
 {

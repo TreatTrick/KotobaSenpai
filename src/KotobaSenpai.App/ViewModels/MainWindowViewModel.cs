@@ -11,10 +11,10 @@ using KotobaSenpai.Core.Services;
 namespace KotobaSenpai.App.ViewModels;
 
 /// <summary>
-/// 主窗口视图模型：编排窗口选择、识别和隐藏用例。
-/// 仅依赖 Core 端口与应用服务（含本地化端口 <see cref="IStringLocalizer"/> 与
-/// <see cref="IUserMessageResolver"/>），不引用 WPF 或平台实现，因此可在无桌面的测试中验证。
-/// 所有用户可见文案经 <see cref="IStringLocalizer"/> 解析；文化切换时按当前状态重算 <see cref="Status"/>。
+/// Main window view model: orchestrates the window selection, recognition, and hide use cases.
+/// Depends only on Core ports and application services (including the localization ports <see cref="IStringLocalizer"/>
+/// and <see cref="IUserMessageResolver"/>), and references no WPF or platform implementation, so it can be tested headlessly.
+/// All user-visible text is resolved through <see cref="IStringLocalizer"/>; on culture switch <see cref="Status"/> is recomputed from the current state.
 /// </summary>
 public sealed partial class MainWindowViewModel : ObservableObject
 {
@@ -24,7 +24,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IUserMessageResolver _messageResolver;
     private readonly ILogger _logger;
 
-    /// <summary>按当前状态渲染本地化 Status 的委托；文化切换时重新调用以就地刷新。</summary>
+    /// <summary>A delegate that renders the localized Status from the current state; re-invoked on culture switch to refresh in place.</summary>
     private Func<string> _renderStatus = () => string.Empty;
 
     public MainWindowViewModel(
@@ -44,29 +44,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SetStatus(ResourceKeys.Status_SelectTarget);
     }
 
-    /// <summary>可选目标窗口列表。</summary>
+    /// <summary>List of selectable target windows.</summary>
     public ObservableCollection<WindowTarget> Windows { get; } = new();
 
-    /// <summary>当前选中的目标窗口。</summary>
+    /// <summary>The currently selected target window.</summary>
     [ObservableProperty]
     private WindowTarget? _selectedWindow;
 
-    /// <summary>用户可见的状态文本。</summary>
+    /// <summary>User-visible status text.</summary>
     [ObservableProperty]
     private string _status = string.Empty;
 
     /// <summary>
-    /// 主窗口自身的句柄，用于从候选列表中排除自己。
-    /// 由视图在窗口句柄创建后设置（HWND 属于平台细节，不应下沉到领域）。
+    /// The main window's own handle, used to exclude itself from the candidate list.
+    /// Set by the view after the window handle is created (HWND is a platform detail that should not leak into the domain).
     /// </summary>
     public nint ExcludeHandle { get; set; }
 
-    /// <summary>选择窗口后更新状态提示。</summary>
+    /// <summary>Updates the status prompt after a window is selected.</summary>
     partial void OnSelectedWindowChanged(WindowTarget? value)
         => SetStatus(value is null ? ResourceKeys.Status_SelectTarget : ResourceKeys.Status_Selected,
                      value?.Title ?? string.Empty);
 
-    /// <summary>重新枚举可见窗口并刷新候选列表。</summary>
+    /// <summary>Re-enumerates visible windows and refreshes the candidate list.</summary>
     [RelayCommand]
     private void Refresh()
     {
@@ -90,7 +90,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>捕获并识别当前窗口的日语词，绘制下划线。</summary>
+    /// <summary>Captures and recognizes Japanese words in the current window, drawing underlines.</summary>
     [RelayCommand]
     private async Task RecognizeAsync()
     {
@@ -117,7 +117,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    /// <summary>隐藏下划线覆盖层。</summary>
+    /// <summary>Hides the underline overlay.</summary>
     [RelayCommand]
     private void Hide()
     {
@@ -125,14 +125,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SetStatus(ResourceKeys.Status_Hidden);
     }
 
-    /// <summary>记录普通状态（键 + 格式参数）并渲染。</summary>
+    /// <summary>Records a normal status (key + format arguments) and renders it.</summary>
     private void SetStatus(string key, params object[] args)
     {
         _renderStatus = () => _localizer.Get(key, args);
         Status = _renderStatus();
     }
 
-    /// <summary>记录错误状态（异常 + 回退码）并经解析器渲染；文化切换时按码重新翻译。</summary>
+    /// <summary>Records an error status (exception + fallback code) and renders it through the resolver; re-translated by code on culture switch.</summary>
     private void SetError(Exception exception, string fallbackErrorCode)
     {
         _logger.LogError(exception, "Error reported to user");
@@ -140,7 +140,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Status = _renderStatus();
     }
 
-    /// <summary>文化切换时按当前状态重新派生 <see cref="Status"/> 并通知视图。</summary>
+    /// <summary>On culture switch, re-derives <see cref="Status"/> from the current state and notifies the view.</summary>
     private void OnCultureChanged(object? sender, EventArgs e)
         => Status = _renderStatus();
 }

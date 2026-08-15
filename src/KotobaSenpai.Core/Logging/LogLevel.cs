@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Logging;
 
-/// <summary>日志严重级别（由低到高）。<see cref="ILogger"/> 据此与最小级别过滤。</summary>
+/// <summary>Log severity levels (low to high). <see cref="ILogger"/> uses these for minimum-level filtering.</summary>
 public enum LogLevel
 {
     Trace,

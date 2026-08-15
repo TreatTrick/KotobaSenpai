@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>OCR 返回的字符及其在捕获帧中的物理像素位置。meikiocr 引擎输出字符级粒度。</summary>
+/// <summary>A character returned by OCR and its physical-pixel position in the capture frame. The meikiocr engine outputs character-level granularity.</summary>
 public sealed record OcrWord
 {
     public OcrWord(string? text, ScreenRect frameBounds)

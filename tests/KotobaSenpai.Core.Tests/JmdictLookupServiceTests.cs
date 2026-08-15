@@ -26,7 +26,7 @@ public sealed class JmdictLookupServiceTests
         repo.AddKana("うける", Entry("受ける", "うける", "to receive"));
         var service = new JmdictLookupService(repo);
 
-        // lemma 未命中，reading 为片假名 → 归一为平假名 'うける' 命中读音表。
+        // lemma not found; reading is katakana → normalized to hiragana 'うける' which hits the reading table.
         var result = service.Lookup(Token("受ける", lemma: "受ケル", reading: "ウケル"));
 
         Assert.Single(result);

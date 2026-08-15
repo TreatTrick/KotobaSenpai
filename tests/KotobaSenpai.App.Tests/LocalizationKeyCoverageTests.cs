@@ -10,8 +10,8 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// 钉死本地化键无缺口：MainWindow.xaml、MainWindowViewModel（经 ResourceKeys）与 ErrorCodes 中
-/// 引用的每个键都必须存在于中性 Strings.resx，避免运行时回退为键名。
+/// Pins down that there are no gaps in the localization keys: every key referenced in MainWindow.xaml,
+/// MainWindowViewModel (via ResourceKeys), and ErrorCodes must exist in the neutral Strings.resx, so the runtime never falls back to the key name.
 /// </summary>
 public sealed partial class LocalizationKeyCoverageTests
 {
@@ -21,7 +21,7 @@ public sealed partial class LocalizationKeyCoverageTests
 
     private static HashSet<string>? _neutralKeys;
 
-    /// <summary>中性 Strings.resx 的全部键。GetResourceSet 返回的是缓存集合，不可释放；故缓存键集只枚举一次。</summary>
+    /// <summary>All keys in the neutral Strings.resx. GetResourceSet returns a cached collection that must not be disposed; the key set is therefore enumerated only once.</summary>
     private static HashSet<string> NeutralKeys
     {
         get
@@ -72,7 +72,7 @@ public sealed partial class LocalizationKeyCoverageTests
             Assert.Contains(match.Groups[1].Value, neutral);
     }
 
-    /// <summary>从测试输出目录向上查找仓库内的源文件，避免硬编码相对层级。</summary>
+    /// <summary>Searches upward from the test output directory for a source file in the repo, avoiding a hard-coded relative depth.</summary>
     private static string FindSourceFile(string relativePathFromRepo)
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
@@ -81,7 +81,7 @@ public sealed partial class LocalizationKeyCoverageTests
             if (File.Exists(candidate))
                 return candidate;
         }
-        throw new FileNotFoundException($"未找到源文件：{relativePathFromRepo}", relativePathFromRepo);
+        throw new FileNotFoundException($"source file not found: {relativePathFromRepo}", relativePathFromRepo);
     }
 
     [GeneratedRegex(@"loc:Loc\s+Key\s*=\s*([A-Za-z_][A-Za-z0-9_]*)")]

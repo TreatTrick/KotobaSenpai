@@ -1,10 +1,11 @@
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// 一个受 UniDic token 边界约束的可查词 span。
+/// A lookupable span constrained by UniDic token boundaries.
 /// <para>
-/// <see cref="Tokens"/> 保留原始形态素；<see cref="Token"/> 是供现有 UI/诊断接口使用的
-/// 合并词面视图。词典结果在识别阶段附着到 span，避免悬停时再从单个字符重新猜词。
+/// <see cref="Tokens"/> retains the original morphemes; <see cref="Token"/> is a merged surface view for the
+/// existing UI/diagnostic interfaces. Dictionary results are attached to the span during recognition so that
+/// hovering doesn't have to re-guess from individual characters.
 /// </para>
 /// </summary>
 public sealed record LookupSpan
@@ -30,27 +31,27 @@ public sealed record LookupSpan
         Token = CreateDisplayToken(Tokens, lookupKey, Surface, Reading);
     }
 
-    /// <summary>组成该 span 的原始 UniDic token，按输入顺序排列。</summary>
+    /// <summary>The original UniDic tokens composing this span, in input order.</summary>
     public IReadOnlyList<Token> Tokens { get; }
 
-    /// <summary>供兼容现有 popup/诊断 API 的合并 token 视图。</summary>
+    /// <summary>Merged token view for compatibility with existing popup/diagnostic APIs.</summary>
     public Token Token { get; }
 
-    /// <summary>实际覆盖的 OCR 文字。</summary>
+    /// <summary>The actual OCR text covered.</summary>
     public string Surface { get; }
 
-    /// <summary>组成 token 的出现读音拼接。</summary>
+    /// <summary>The concatenated occurring readings of the constituent tokens.</summary>
     public string Reading { get; }
 
-    /// <summary>用于词典命中的键（直接词面或基础 token lemma）。</summary>
+    /// <summary>The key used for the dictionary hit (the direct surface or the base token lemma).</summary>
     public string LookupKey { get; }
 
-    /// <summary>输入字符串中的 UTF-16 起止偏移，范围为 [StartOffset, EndOffset)。</summary>
+    /// <summary>UTF-16 start/end offsets in the input string, with the range [StartOffset, EndOffset).</summary>
     public int StartOffset { get; }
 
     public int EndOffset { get; }
 
-    /// <summary>本 span 在识别阶段得到的词典结果；未命中时为空。</summary>
+    /// <summary>The dictionary results this span obtained during recognition; empty when nothing matched.</summary>
     public IReadOnlyList<DictionaryEntry> Entries { get; }
 
     private static Token CreateDisplayToken(

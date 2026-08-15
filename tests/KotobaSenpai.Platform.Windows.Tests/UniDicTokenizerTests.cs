@@ -9,10 +9,10 @@ using KotobaSenpai.Platform.Windows.Japanese;
 namespace KotobaSenpai.Platform.Windows.Tests;
 
 /// <summary>
-/// UniDic 分词器测试。缺词典/版本错误测试始终运行（无需真实词典）；
-/// 黄金语料测试需本地具备 UniDic 词典（环境变量 <c>KOTOBA_UNIDIC_DIR</c> 或本机 DokiDokiDict 目录），
-/// 否则空跑跳过——词典不入 git、测试不联网下载。词典解析与 tokenizer 的
-/// <see cref="UniDicDictionaryMissing"/>/<see cref="UniDicDictionaryInvalid"/> 分支始终覆盖。
+/// UniDic tokenizer tests. The missing-dictionary / invalid-version tests always run (no real dictionary needed);
+/// the golden-corpus tests require a local UniDic dictionary (env var <c>KOTOBA_UNIDIC_DIR</c> or the machine's DokiDokiDict directory),
+/// otherwise they run empty and are skipped — the dictionary is not in git and tests do not download over the network.
+/// The dictionary-parsing and tokenizer <see cref="UniDicDictionaryMissing"/>/<see cref="UniDicDictionaryInvalid"/> branches are always covered.
 /// </summary>
 public sealed class UniDicTokenizerTests
 {
@@ -42,7 +42,7 @@ public sealed class UniDicTokenizerTests
         Directory.CreateDirectory(dir);
         try
         {
-            // 四个运行时文件齐，但 dicrc 不含 unidic22 格式 → Invalid（而非 Missing）。
+            // All four runtime files present, but dicrc does not use the unidic22 format → Invalid (not Missing).
             foreach (var f in UniDicAssets.RequiredRuntimeFiles)
                 File.WriteAllText(Path.Combine(dir, f), "x");
             File.WriteAllText(Path.Combine(dir, UniDicAssets.DicrcFileName), "output-format-type = mecab-ipadic");
@@ -60,7 +60,7 @@ public sealed class UniDicTokenizerTests
     [Fact]
     public void Null_empty_whitespace_returns_empty_without_dictionary()
     {
-        // 空输入在触碰 tagger 前返回空列表，无需真实词典。
+        // Empty input returns an empty list before touching the tagger, so no real dictionary is needed.
         var tokenizer = new UniDicTokenizer(Logger, Path.GetTempPath());
         Assert.Empty(tokenizer.Tokenize(null));
         Assert.Empty(tokenizer.Tokenize(string.Empty));
@@ -71,7 +71,7 @@ public sealed class UniDicTokenizerTests
     public void Golden_sentence_returns_expected_fields_and_offsets()
     {
         var dict = TryResolveDictionary();
-        if (dict is null) return; // 无词典则跳过（CI 不联网下载）
+        if (dict is null) return; // no dictionary, skip (CI does not download)
 
         var tokenizer = new UniDicTokenizer(Logger, dict);
         var tokens = tokenizer.Tokenize("日本語の解析テストです。");
@@ -79,7 +79,7 @@ public sealed class UniDicTokenizerTests
         Assert.Equal(["日本", "語", "の", "解析", "テスト", "です", "。"],
             tokens.Select(t => t.Surface));
 
-        // 已验证的黄金值：词面/偏移/词元/读音/词性。
+        // Verified golden values: surface / offset / lemma / reading / part of speech.
         Assert.Equal("日本", tokens[0].Surface);
         Assert.Equal(0, tokens[0].StartOffset);
         Assert.Equal("ニッポン", tokens[0].Reading);
@@ -87,7 +87,7 @@ public sealed class UniDicTokenizerTests
         Assert.Equal(4, tokens[3].StartOffset);
         Assert.Equal(new PartsOfSpeech("名詞", "普通名詞", "サ変可能", "*"), tokens[3].PartsOfSpeech);
 
-        // 每个 token 的源文本切片必须与其词面一致（校验偏移为 UTF-16 起点）。
+        // Each token's source-text slice must match its surface (offsets are UTF-16 code-unit starts).
         const string input = "日本語の解析テストです。";
         foreach (var t in tokens)
             Assert.Equal(t.Surface, input.Substring(t.StartOffset, t.Surface.Length));
@@ -121,7 +121,7 @@ public sealed class UniDicTokenizerTests
 
         var tokenizer = new UniDicTokenizer(Logger, dict);
         var tokens = tokenizer.Tokenize("アルミホイルを買った");
-        // UniDic 3.1.0（2.3.0 修订）把外来语缩写按两短单位切分。
+        // UniDic 3.1.0 (a 2.3.0 revision) splits foreign-language abbreviations into two short units.
         Assert.Contains(tokens, t => t.Surface == "アルミ");
         Assert.Contains(tokens, t => t.Surface == "ホイル");
     }
@@ -136,7 +136,7 @@ public sealed class UniDicTokenizerTests
         var tokens = tokenizer.Tokenize("覆うふりをした。");
         var cover = tokens.Single(t => t.Surface == "覆う");
 
-        // 强类型属性解码带引号/逗号的 aType 多值字段，保持为原始字符串。
+        // The strongly-typed property decodes the aType multi-value field (with quotes/commas), keeping it as the original string.
         Assert.Equal("0,2", cover.AType);
     }
 
@@ -150,7 +150,7 @@ public sealed class UniDicTokenizerTests
         var tokens = tokenizer.Tokenize("  日本\n語").ToArray();
 
         Assert.Equal("日本", tokens[0].Surface);
-        Assert.Equal(2, tokens[0].StartOffset);   // 前导两空格
+        Assert.Equal(2, tokens[0].StartOffset);   // two leading spaces
         Assert.Equal("語", tokens[1].Surface);
         Assert.Equal(5, tokens[1].StartOffset);   // 2 + 2 + 1(\n)
     }
@@ -165,7 +165,7 @@ public sealed class UniDicTokenizerTests
         var sentence = "日本語の解析テストです。";
         var expected = tokenizer.Tokenize(sentence).ToArray();
 
-        // 同一单例多线程并发：结果与孤立调用一致、无异常、无字段串扰。
+        // Concurrent use of the same single instance: results match isolated calls, no exceptions, no field cross-talk.
         Parallel.For(0, 64, _ =>
         {
             var actual = tokenizer.Tokenize(sentence).ToArray();

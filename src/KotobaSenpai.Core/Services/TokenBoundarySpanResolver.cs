@@ -6,7 +6,8 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 在完整 UniDic token 边界上做词典最长匹配，并把已命中的结果固化为非重叠 span。
+/// Performs dictionary longest-match on complete UniDic token boundaries and solidify the matched results into
+/// non-overlapping spans.
 /// </summary>
 public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
 {
@@ -138,7 +139,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
     {
         Candidate? best = null;
 
-        // 直接词面候选：只允许在完整 token 边界结束。
+        // Direct-surface candidates: only allowed to end at a complete token boundary.
         var surface = string.Empty;
         for (int end = start; end < segment.Count; end++)
         {
@@ -156,7 +157,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             }
         }
 
-        // 单 token lemma 命中，是活用扩展和单 token 回退的共同基础。
+        // A single-token lemma hit is the common basis for both inflection extension and the single-token fallback.
         var tokenMatch = FindTokenMatch(segment[start], matches);
         if (tokenMatch is not null)
         {
@@ -196,7 +197,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
                 best = singleSurface;
         }
 
-        // 无词典结果也要保留 token 的下划线；空 entries 由调用方识别为已解析未命中。
+        // Keep the token's underline even when there is no dictionary result; empty entries are recognized by the caller as "resolved but not matched".
         if (best is null)
         {
             var token = segment[start];

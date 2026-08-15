@@ -5,26 +5,26 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.App.Localization;
 
 /// <summary>
-/// <see cref="IStringLocalizer"/> 的 BCL 实现：用 <see cref="ResourceManager"/> 解析嵌入式 .resx，
-/// 自带 culture 回退链（active -> 中性英文）。本地维护当前文化，文化切换时触发
-/// <see cref="CultureChanged"/>；不直接改全局 <c>CurrentUICulture</c>（由 <see cref="LanguageService"/> 负责）。
+/// BCL implementation of <see cref="IStringLocalizer"/>: resolves embedded .resx through <see cref="ResourceManager"/>,
+/// with a built-in culture fallback chain (active -> neutral English). Maintains the current culture locally and raises
+/// <see cref="CultureChanged"/> on culture switch; does not modify the global <c>CurrentUICulture</c> directly (that is <see cref="LanguageService"/>'s job).
 /// </summary>
 public sealed class ResourceManagerStringLocalizer : IStringLocalizer
 {
-    /// <summary>嵌入式资源的基础名（根命名空间 + Resources 文件夹 + Strings）。</summary>
+    /// <summary>The base name of the embedded resource (root namespace + Resources folder + Strings).</summary>
     private const string ResourceBaseName = "KotobaSenpai.App.Resources.Strings";
 
     private readonly ResourceManager _manager;
     private CultureInfo _culture;
 
-    /// <summary>生产构造：从本程序集加载 <c>Strings</c> 资源，初始文化取当前 UI 文化。</summary>
+    /// <summary>Production constructor: loads the <c>Strings</c> resource from this assembly, with the initial culture taken from the current UI culture.</summary>
     public ResourceManagerStringLocalizer()
         : this(new ResourceManager(ResourceBaseName, typeof(ResourceManagerStringLocalizer).Assembly),
                CultureInfo.CurrentUICulture)
     {
     }
 
-    /// <summary>测试构造：注入自定义 <see cref="ResourceManager"/> 与初始文化。</summary>
+    /// <summary>Test constructor: injects a custom <see cref="ResourceManager"/> and an initial culture.</summary>
     public ResourceManagerStringLocalizer(ResourceManager manager, CultureInfo initialCulture)
     {
         _manager = manager;
@@ -33,7 +33,7 @@ public sealed class ResourceManagerStringLocalizer : IStringLocalizer
 
     public event EventHandler? CultureChanged;
 
-    /// <summary>本地维护的当前 UI 文化（与全局 CurrentUICulture 由 LanguageService 保持同步）。</summary>
+    /// <summary>The locally maintained current UI culture (kept in sync with the global CurrentUICulture by LanguageService).</summary>
     public CultureInfo CurrentCulture => _culture;
 
     /// <inheritdoc />
@@ -43,7 +43,7 @@ public sealed class ResourceManagerStringLocalizer : IStringLocalizer
         return args.Length == 0 ? value : string.Format(_culture, value, args);
     }
 
-    /// <summary>切换本地文化；若实际改变则触发 <see cref="CultureChanged"/>，使订阅者即时刷新。</summary>
+    /// <summary>Switches the local culture; when it actually changes, raises <see cref="CultureChanged"/> so subscribers refresh immediately.</summary>
     public void ApplyCulture(CultureInfo culture)
     {
         ArgumentNullException.ThrowIfNull(culture);

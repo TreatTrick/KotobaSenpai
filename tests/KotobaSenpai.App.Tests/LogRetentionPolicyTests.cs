@@ -4,8 +4,8 @@ using KotobaSenpai.App.Logging;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// <see cref="LogRetentionPolicy"/> 单元测试：8 天删除、恰好 7 天保留、近期保留、
-/// 非日志文件不删、匹配名但日期非法时回退 LastWriteTime。用临时目录与注入时钟隔离。
+/// <see cref="LogRetentionPolicy"/> unit tests: delete at 8 days, retain at exactly 7 days, retain recent files,
+/// never delete non-log files, and fall back to LastWriteTime when the name matches but the date is invalid. Isolated with a temp directory and an injected clock.
 /// </summary>
 public sealed class LogRetentionPolicyTests
 {
@@ -29,10 +29,10 @@ public sealed class LogRetentionPolicyTests
 
         new LogRetentionPolicy(dir).Cleanup(() => now);
 
-        Assert.False(File.Exists(eight));   // 8 天 -> 删除
-        Assert.True(File.Exists(seven));    // 恰好 7 天 -> 保留
-        Assert.True(File.Exists(recent));   // 近期 -> 保留
-        Assert.True(File.Exists(other));    // 非日志文件 -> 不删
+        Assert.False(File.Exists(eight));   // 8 days -> delete
+        Assert.True(File.Exists(seven));    // exactly 7 days -> retain
+        Assert.True(File.Exists(recent));   // recent -> retain
+        Assert.True(File.Exists(other));    // non-log file -> not deleted
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class LogRetentionPolicyTests
         Directory.CreateDirectory(dir);
         var now = new DateTime(2026, 8, 8, 12, 0, 0);
 
-        // 匹配命名规则但日期非法（月 13）；按 LastWriteTime 判断。
+        // Matches the naming rule but has an invalid date (month 13); judged by LastWriteTime.
         var oldInvalid = Path.Combine(dir, "kotobasenpai-2026-13-45.log");
         File.WriteAllText(oldInvalid, "x");
         File.SetLastWriteTime(oldInvalid, now.AddDays(-10));
@@ -69,7 +69,7 @@ public sealed class LogRetentionPolicyTests
 
         new LogRetentionPolicy(dir).Cleanup(() => now);
 
-        Assert.False(File.Exists(oldInvalid));    // 旧 -> 删除（回退 LastWriteTime）
-        Assert.True(File.Exists(recentInvalid));  // 近期 -> 保留
+        Assert.False(File.Exists(oldInvalid));    // old -> delete (fall back to LastWriteTime)
+        Assert.True(File.Exists(recentInvalid));  // recent -> retain
     }
 }

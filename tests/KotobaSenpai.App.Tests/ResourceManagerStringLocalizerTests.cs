@@ -27,7 +27,7 @@ public sealed class ResourceManagerStringLocalizerTests
     [Fact]
     public void Falls_back_to_english_neutral_when_active_culture_has_no_resource()
     {
-        // fr-FR 无卫星程序集；ResourceManager 回退链落到中性英文（与"某文化缺该键"同机制）。
+        // fr-FR has no satellite assembly; the ResourceManager fallback chain lands on neutral English (same mechanism as "a culture lacking that key").
         var localizer = LocalizerFactory.Create(new CultureInfo("zh-CN"));
         localizer.ApplyCulture(new CultureInfo("fr-FR"));
 

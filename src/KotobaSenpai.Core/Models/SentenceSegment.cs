@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>一个句级 segment：连续、可靠阅读顺序的 OCR 行索引序列。跨 segment 的 token 引用被禁止。</summary>
+/// <summary>A sentence-level segment: a sequence of OCR line indices in a contiguous, reliable reading order. Cross-segment token references are forbidden.</summary>
 public sealed record SentenceSegment(IReadOnlyList<int> LineIndices)
 {
     public SentenceSegment()

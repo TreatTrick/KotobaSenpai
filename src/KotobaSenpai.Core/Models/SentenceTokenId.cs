@@ -1,12 +1,13 @@
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// token 引用 ID 的值对象：强类型封装 <c>l{LineId}:t{LineTokenIndex}</c> 符号，避免字符串漂移。
-/// 线格式与 LLM 契约保持 {@code l0:t3}，但应用内部一律用此类型，格式/解析集中在此一处。
+/// Value object for token reference ids: a strongly typed wrapper around the <c>l{LineId}:t{LineTokenIndex}</c>
+/// symbol to avoid string drift. The wire format matches the LLM contract {@code l0:t3}, but the application
+/// always uses this type internally, with formatting/parsing centralized in this one place.
 /// </summary>
 public readonly record struct SentenceTokenId(int LineId, int LineTokenIndex)
 {
-    /// <summary>线格式：<c>l0:t3</c>。</summary>
+    /// <summary>Wire format: <c>l0:t3</c>.</summary>
     public override string ToString() => $"l{LineId}:t{LineTokenIndex}";
 
     public static SentenceTokenId Parse(string value)
@@ -16,7 +17,7 @@ public readonly record struct SentenceTokenId(int LineId, int LineTokenIndex)
         return id;
     }
 
-    /// <summary>解析 <c>l{line}:t{token}</c>；格式不符或下标为负返回 false。</summary>
+    /// <summary>Parses <c>l{line}:t{token}</c>; returns false when the format doesn't match or an index is negative.</summary>
     public static bool TryParse(string? value, out SentenceTokenId id)
     {
         id = default;

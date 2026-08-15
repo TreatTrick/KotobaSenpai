@@ -1,22 +1,25 @@
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// UniDic 四级词性（pos1..pos4）。字段缺失时保留空字符串，不改变列表长度。
+/// UniDic's four-level part of speech (pos1..pos4). Missing fields keep an empty string without changing the
+/// list length.
 /// </summary>
 public sealed record PartsOfSpeech(string Pos1, string Pos2, string Pos3, string Pos4);
 
 /// <summary>
-/// 日语分词结果的一个词元。镜像 UniDic unidic22 字段，供后续查词/振假名/语法解释使用。
+/// One token from Japanese tokenization. Mirrors the UniDic unidic22 fields for later lookup/furigana/grammar
+/// explanation.
 /// <list type="bullet">
-/// <item><see cref="Surface"/> 词面（出现形）；</item>
-/// <item><see cref="Lemma"/> UniDic 語彙素（辞书形）；</item>
-/// <item><see cref="OrthBase"/> 書字形基本形；</item>
-/// <item><see cref="Reading"/> 仮名形出現形（kana）；</item>
-/// <item><see cref="BaseReading"/> 仮名形基本形（kanaBase）；</item>
-/// <item><see cref="Pronunciation"/> 発音形出現形（pron）；</item>
+/// <item><see cref="Surface"/> surface (occurring form);</item>
+/// <item><see cref="Lemma"/> UniDic 語彙素 (dictionary form);</item>
+/// <item><see cref="OrthBase"/> 書字形基本形 (base orthographic form);</item>
+/// <item><see cref="Reading"/> 仮名形出現形 (kana, occurring form);</item>
+/// <item><see cref="BaseReading"/> 仮名形基本形 (kanaBase, base form);</item>
+/// <item><see cref="Pronunciation"/> 発音形出現形 (pron, occurring form);</item>
 /// </list>
-/// <see cref="AType"/> 是 UniDic 原始音高重音字段，可能为空或含多值/引号语义，不能解释为 Doki 的最终音高。
-/// <see cref="StartOffset"/> 是输入 .NET 字符串中的 UTF-16 code-unit 起点（非字节、非 code-point）。
+/// <see cref="AType"/> is UniDic's raw pitch-accent field; it may be empty or carry multi-value/quote semantics
+/// and must not be interpreted as Doki's final pitch.
+/// <see cref="StartOffset"/> is the UTF-16 code-unit start in the input .NET string (not bytes, not code points).
 /// </summary>
 public sealed record Token
 {
@@ -51,36 +54,36 @@ public sealed record Token
         StartOffset = startOffset;
     }
 
-    /// <summary>词面（出现形）。</summary>
+    /// <summary>Surface (occurring form).</summary>
     public string Surface { get; }
 
-    /// <summary>UniDic 語彙素（辞书形，用于查词典）。</summary>
+    /// <summary>UniDic 語彙素 (dictionary form, used for dictionary lookup).</summary>
     public string Lemma { get; }
 
-    /// <summary>書字形基本形。</summary>
+    /// <summary>書字形基本形 (base orthographic form).</summary>
     public string OrthBase { get; }
 
-    /// <summary>仮名形出現形（kana）。</summary>
+    /// <summary>仮名形出現形 (kana, occurring form).</summary>
     public string Reading { get; }
 
-    /// <summary>仮名形基本形（kanaBase）。</summary>
+    /// <summary>仮名形基本形 (kanaBase, base form).</summary>
     public string BaseReading { get; }
 
-    /// <summary>発音形出現形（pron）。</summary>
+    /// <summary>発音形出現形 (pron, occurring form).</summary>
     public string Pronunciation { get; }
 
-    /// <summary>四级词性（pos1..pos4，缺失为空字符串）。</summary>
+    /// <summary>Four-level part of speech (pos1..pos4, empty string when missing).</summary>
     public PartsOfSpeech PartsOfSpeech { get; }
 
-    /// <summary>活用型（cType）。</summary>
+    /// <summary>Conjugation type (cType).</summary>
     public string ConjugationType { get; }
 
-    /// <summary>活用形（cForm）。</summary>
+    /// <summary>Conjugation form (cForm).</summary>
     public string ConjugationForm { get; }
 
-    /// <summary>UniDic 原始音高重音字段（aType），非最终音高。</summary>
+    /// <summary>UniDic's raw pitch-accent field (aType), not the final pitch.</summary>
     public string AType { get; }
 
-    /// <summary>输入字符串中的 UTF-16 code-unit 起始偏移。</summary>
+    /// <summary>UTF-16 code-unit start offset in the input string.</summary>
     public int StartOffset { get; }
 }

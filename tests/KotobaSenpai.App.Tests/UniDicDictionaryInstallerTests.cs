@@ -10,8 +10,9 @@ using KotobaSenpai.Platform.Windows;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// <see cref="UniDicDictionaryInstaller"/> 测试：用小型 zip fixture 覆盖离线安装、SHA-256 校验、
-/// 顶层目录探测、已安装短路、哈希/文件集失败、取消与清理，不联网、不下载 502MB 真实词典。
+/// <see cref="UniDicDictionaryInstaller"/> tests: a small zip fixture covers offline install, SHA-256 verification,
+/// top-level directory detection, already-installed short-circuit, hash/file-set failures, cancellation and cleanup —
+/// no network, and no downloading of the real 502MB dictionary.
 /// </summary>
 public sealed class UniDicDictionaryInstallerTests : IDisposable
 {
@@ -30,7 +31,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
             Assert.True(File.Exists(Path.Combine(installer.DictionaryDirectory, f)));
         Assert.True(File.Exists(Path.Combine(installer.DictionaryDirectory, UniDicAssets.ManifestFileName)));
 
-        // 无 staging/final 半成品残留。
+        // No leftover staging/final half-products.
         var leftovers = Directory.EnumerateDirectories(cacheRoot)
             .Select(Path.GetFileName)
             .Where(n => n != "dicdir");
@@ -44,7 +45,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
         var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
         await installer.InstallFromArchiveAsync(fixtureSha.ZipPath);
 
-        // 已安装后再次触发：短路返回，绝不发起网络请求。
+        // Triggered again after install: short-circuits and never makes a network request.
         var noNetwork = new UniDicDictionaryInstaller(new HttpClient(ThrowingHandler.Instance), cacheRoot, Manif(cacheRoot, fixtureSha.Sha));
         await noNetwork.EnsureInstalledAsync();
         Assert.True(noNetwork.IsInstalled);
@@ -68,7 +69,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
     [Fact]
     public async Task Archive_missing_runtime_files_throws_unicdic_dictionary_invalid()
     {
-        var (cacheRoot, fixtureSha) = CreateFixture(populate: false); // 缺 char.bin 等
+        var (cacheRoot, fixtureSha) = CreateFixture(populate: false); // missing char.bin etc.
         var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
 
         var ex = await Assert.ThrowsAsync<WindowsPlatformException>(
@@ -90,7 +91,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
             () => installer.InstallFromArchiveAsync(fixtureSha.ZipPath, cts.Token));
 
         Assert.False(Directory.Exists(installer.DictionaryDirectory));
-        Assert.Empty(Directory.EnumerateDirectories(cacheRoot)); // 无残留
+        Assert.Empty(Directory.EnumerateDirectories(cacheRoot)); // no leftovers
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
         var (cacheRoot, fixtureSha) = CreateFixture(populate: true);
         var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
 
-        // 同一 installer 并发触发两次安装：进程内锁串行化，均成功且无半成品。
+        // Same installer triggered twice concurrently: the in-process lock serializes them, both succeed with no half-products.
         var tasks = new[]
         {
             installer.InstallFromArchiveAsync(fixtureSha.ZipPath),
@@ -120,7 +121,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
     private static UniDicManifest Manif(string cacheRoot, string sha)
         => new(UniDicAssets.Version, "https://example.test/unidic.zip", sha, UniDicAssets.Format, UniDicAssets.RequiredRuntimeFiles);
 
-    /// <summary>构造含 dicdir/（四运行时文件 + version + dicrc）的 zip fixture，返回其路径与 SHA-256。</summary>
+    /// <summary>Builds a zip fixture containing dicdir/ (four runtime files + version + dicrc); returns its path and SHA-256.</summary>
     private (string CacheRoot, (string ZipPath, string Sha) Fixture) CreateFixture(bool populate)
     {
         var cacheRoot = NewDir();
@@ -135,7 +136,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
             File.WriteAllText(Path.Combine(dicDir, UniDicAssets.DicrcFileName), $"output-format-type = {UniDicAssets.Format}");
         }
 
-        // zip 目标必须在被压缩目录之外（否则自包含导致文件锁）。
+        // The zip target must be outside the directory being compressed (otherwise self-containment causes a file lock).
         var zipPath = Path.Combine(Path.GetTempPath(), "ksfix_" + Guid.NewGuid().ToString("N") + ".zip");
         ZipFile.CreateFromDirectory(buildDir, zipPath, CompressionLevel.Fastest, includeBaseDirectory: false);
         return (cacheRoot, (zipPath, ComputeSha256(zipPath)));

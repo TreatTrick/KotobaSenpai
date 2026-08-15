@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>短生命周期的目标窗口引用；句柄只在当前进程内使用，不持久化。</summary>
+/// <summary>A short-lived reference to the target window; the handle is used only within the current process and is not persisted.</summary>
 public sealed record WindowTarget
 {
     public WindowTarget(nint handle, string? title, ScreenRect bounds)

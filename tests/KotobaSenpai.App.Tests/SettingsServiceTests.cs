@@ -4,8 +4,8 @@ using KotobaSenpai.App.Settings;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// <see cref="SettingsService"/> 单元测试：作为 settings.json 的唯一归属，覆盖缺失/损坏文件容错、
-/// 缺键回退、写穿往返、保留未知字段、目录自动创建、以及懒加载后不再重读文件。
+/// <see cref="SettingsService"/> unit tests: as the sole owner of settings.json, covering missing/corrupt-file fault tolerance,
+/// absent-key fallback, write-through round-trips, preserving unknown fields, auto-creating the directory, and not re-reading the file after lazy load.
 /// </summary>
 public sealed class SettingsServiceTests : IDisposable
 {
@@ -110,7 +110,7 @@ public sealed class SettingsServiceTests : IDisposable
         svc.SetValue("Language", "en");
 
         Assert.True(File.Exists(path));
-        // 新实例从磁盘重读，验证写穿落盘。
+        // A new instance re-reads from disk, verifying the write-through persisted.
         Assert.Equal("en", new SettingsService(path).GetValue("Language"));
     }
 
@@ -123,7 +123,7 @@ public sealed class SettingsServiceTests : IDisposable
 
         Assert.Equal("en", svc.GetValue("Language"));
 
-        // 外部改写文件；服务应从内存视图返回旧值，证明懒加载后不再重读。
+        // An external process rewrites the file; the service should return the old value from its in-memory view, proving it does not re-read after lazy load.
         File.WriteAllText(path, @"{""Language"":""zh-CN""}");
 
         Assert.Equal("en", svc.GetValue("Language"));

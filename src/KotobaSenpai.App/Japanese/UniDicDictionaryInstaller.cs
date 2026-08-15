@@ -10,12 +10,12 @@ using KotobaSenpai.Platform.Windows;
 namespace KotobaSenpai.App.Japanese;
 
 /// <summary>
-/// UniDic 词典安装器（M1 分发）：首次运行从固定 URL 下载并原子安装到本地缓存目录，
-/// 也支持从已校验的离线压缩包导入。下载/解压后校验 SHA-256、版本、<c>unidic22</c> 格式与
-/// 四个运行时文件，全部通过后才原子替换 <c>dicdir</c>，并写入已安装 manifest。
-/// 安装过程可取消、可重试且不会留下半成品；跨进程用命名 Mutex 保证同一时刻只有一个进程替换词典。
-/// 失败抛 <see cref="WindowsPlatformException"/>：哈希/格式不匹配抛 <c>UniDicDictionaryInvalid</c>，
-/// 网络/解压类 I/O 失败抛 <c>UniDicDownloadFailed</c>。
+/// UniDic dictionary installer (M1 distribution): on first run downloads from a fixed URL and atomically installs into the local cache directory,
+/// and also supports importing from a validated offline archive. After download/extraction it validates the SHA-256, version, <c>unidic22</c> format, and
+/// the four runtime files, and only after all pass does it atomically replace <c>dicdir</c> and write an installed-manifest.
+/// Installation is cancellable, retryable, and never leaves a half-finished result; a named Mutex guarantees that only one process replaces the dictionary at a time.
+/// Failures throw <see cref="WindowsPlatformException"/>: hash/format mismatches throw <c>UniDicDictionaryInvalid</c>,
+/// network/extraction I/O failures throw <c>UniDicDownloadFailed</c>.
 /// </summary>
 public sealed class UniDicDictionaryInstaller : IDisposable
 {
@@ -28,17 +28,17 @@ public sealed class UniDicDictionaryInstaller : IDisposable
     private readonly SemaphoreSlim _inProcessLock = new(1, 1);
     private bool _disposed;
 
-    /// <summary>最终词典目录（<c>&lt;cacheRoot&gt;/dicdir</c>）。</summary>
+    /// <summary>The final dictionary directory (<c>&lt;cacheRoot&gt;/dicdir</c>).</summary>
     public string DictionaryDirectory => _dicDir;
 
-    /// <summary>使用真实缓存根目录与固定资产清单。</summary>
+    /// <summary>Uses the real cache root directory and the fixed asset manifest.</summary>
     public UniDicDictionaryInstaller(HttpClient http)
         : this(http, DefaultCacheRoot(), DefaultManifest())
     {
     }
 
     /// <summary>
-    /// <paramref name="cacheRoot"/> 与 <paramref name="manifest"/> 可注入（无网络单元测试用临时目录与 fixture 哈希）。
+    /// <paramref name="cacheRoot"/> and <paramref name="manifest"/> can be injected (network-free unit tests use a temp directory and fixture hashes).
     /// </summary>
     public UniDicDictionaryInstaller(HttpClient http, string cacheRoot, UniDicManifest manifest)
     {
@@ -48,7 +48,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         _dicDir = Path.Combine(_cacheRoot, "dicdir");
     }
 
-    /// <summary>真：四个运行时文件、期望版本/格式与已安装 manifest 全部有效。</summary>
+    /// <summary>True: the four runtime files, expected version/format, and the installed manifest are all valid.</summary>
     public bool IsInstalled
     {
         get
@@ -61,7 +61,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         }
     }
 
-    /// <summary>已安装则立即返回；否则下载→校验→原子安装。可在无安装前并行触发。</summary>
+    /// <summary>Returns immediately when already installed; otherwise downloads, validates, and atomically installs. Safe to trigger in parallel before installation.</summary>
     public async Task EnsureInstalledAsync(IProgress<double>? progress = null, CancellationToken ct = default)
     {
         if (IsInstalled)
@@ -108,7 +108,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         }
     }
 
-    /// <summary>从本地压缩包导入，复用同一哈希/版本/格式/文件集与原子替换验证，不依赖网络。</summary>
+    /// <summary>Imports from a local archive, reusing the same hash/version/format/file-set and atomic-replacement validation, without depending on the network.</summary>
     public async Task InstallFromArchiveAsync(string archivePath, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
@@ -135,7 +135,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         }
     }
 
-    /// <summary>在线与离线共用的安装核心：SHA-256 → 解压 → 定位 → 版本/格式校验 → 写 manifest → 原子替换。</summary>
+    /// <summary>The install core shared by online and offline paths: SHA-256 → extract → locate → version/format validation → write manifest → atomic replace.</summary>
     private async Task InstallFromArchiveCoreAsync(string archivePath, string stagingRoot, CancellationToken ct)
     {
         var sha = await ComputeSha256Async(archivePath, ct);
@@ -156,7 +156,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
                 ErrorCodes.UniDicDictionaryInvalid,
                 "UniDic archive version/format does not match expected unidic22 asset.");
 
-        // 组装最终内容（含 manifest），再拿到跨进程锁后原子替换。
+        // Assemble the final content (including the manifest), then take the cross-process lock and atomically replace.
         var finalStaging = Path.Combine(_cacheRoot, "final-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(finalStaging);
         MoveContents(dicDir, finalStaging);
@@ -165,7 +165,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         await PromoteAsync(finalStaging, ct);
     }
 
-    /// <summary>跨进程串行化 dicdir 替换：备份旧目录 → 新目录原子改名 → 清理备份。</summary>
+    /// <summary>Serializes the dicdir replacement across processes: back up the old directory → atomically rename in the new one → clean up the backup.</summary>
     private async Task PromoteAsync(string finalStaging, CancellationToken ct)
     {
         using var mutex = new Mutex(initiallyOwned: false, MutexName);
@@ -176,14 +176,14 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         }
         catch (AbandonedMutexException)
         {
-            // 前任进程崩溃遗留锁：Mutex 已授予，可继续。
+            // A lock left behind by a crashed prior process: the Mutex has been granted, so we may continue.
         }
 
         try
         {
             ct.ThrowIfCancellationRequested();
 
-            // 另一进程可能已装好；装好则清理本次 staging 即可。
+            // Another process may have already installed it; if so, just clean up this run's staging.
             if (IsInstalled)
             {
                 TryDeleteDirectory(finalStaging);
@@ -201,7 +201,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
             }
             catch
             {
-                // 回滚：把旧目录恢复。
+                // Rollback: restore the old directory.
                 if (Directory.Exists(backup) && !Directory.Exists(_dicDir))
                     Directory.Move(backup, _dicDir);
                 throw;
@@ -245,7 +245,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         return Convert.ToHexStringLower(hash);
     }
 
-    /// <summary>在解压根下定位含四个运行时文件的目录（顶层优先，zip 顶层名不定）。</summary>
+    /// <summary>Locates the directory containing the four runtime files under the extraction root (top level preferred; the zip's top-level name varies).</summary>
     private static string? LocateDicDir(string root)
     {
         foreach (var dir in Directory.EnumerateDirectories(root))
@@ -261,8 +261,8 @@ public sealed class UniDicDictionaryInstaller : IDisposable
 
     private static bool VersionAndFormatValid(string dicDir)
     {
-        // 实测 cotonoha-dic 的 unidic-3.1.0.zip 不含 version 文件（仅 dicrc/README/licenses）；
-        // 版本与身份已由固定 URL + SHA-256 校验固定，此处仅校验 dicrc 携带的 unidic22 格式标识。
+        // Empirically, cotonoha-dic's unidic-3.1.0.zip contains no version file (only dicrc/README/licenses);
+        // version and identity are already pinned by the fixed URL + SHA-256 validation, so here we only validate the unidic22 format marker carried by dicrc.
         return File.Exists(Path.Combine(dicDir, UniDicAssets.DicrcFileName))
             && File.ReadAllText(Path.Combine(dicDir, UniDicAssets.DicrcFileName))
                 .Contains(UniDicAssets.Format, StringComparison.Ordinal);
@@ -297,7 +297,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         }
     }
 
-    /// <summary>把 source 的顶层文件与子目录整体移入 destination（保留子目录，如 licenses/）。</summary>
+    /// <summary>Moves source's top-level files and subdirectories into destination as a whole (preserving subdirectories, e.g. licenses/).</summary>
     private static void MoveContents(string source, string destination)
     {
         foreach (var file in Directory.EnumerateFiles(source))

@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>虚拟屏幕坐标下的物理像素矩形。</summary>
+/// <summary>A physical-pixel rectangle in virtual screen coordinates.</summary>
 public readonly record struct ScreenRect
 {
     public ScreenRect(int x, int y, int width, int height)
@@ -21,7 +21,7 @@ public readonly record struct ScreenRect
     public int Right => checked(X + Width);
     public int Bottom => checked(Y + Height);
 
-    /// <summary>将本矩形裁剪到 <paramref name="bounds"/> 内；无交集时抛出异常。</summary>
+    /// <summary>Clips this rectangle into <paramref name="bounds"/>; throws when there is no intersection.</summary>
     public ScreenRect ClampTo(ScreenRect bounds)
     {
         var left = Math.Max(X, bounds.X);

@@ -1,9 +1,9 @@
 namespace KotobaSenpai.Core.Japanese;
 
-/// <summary>平假/片假名转换工具。</summary>
+/// <summary>Hiragana/katakana conversion utilities.</summary>
 public static class Kana
 {
-    /// <summary>把片假名转为平假名；非片假名字符原样保留。读音表统一存平假名，查词时归一化。</summary>
+    /// <summary>Converts katakana to hiragana; non-katakana characters are kept as-is. Reading tables uniformly store hiragana, normalized during lookup.</summary>
     public static string ToHiragana(string text)
     {
         if (string.IsNullOrEmpty(text))

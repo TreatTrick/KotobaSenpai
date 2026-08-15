@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>OCR 字符映射到最终查词 span 后的屏幕词块。</summary>
+/// <summary>A screen word group produced by mapping OCR characters onto the final lookup span.</summary>
 public sealed record GroupedWord(Token Token, ScreenRect Bounds)
 {
     public GroupedWord(LookupSpan span, ScreenRect bounds)
@@ -29,7 +29,7 @@ public sealed record GroupedWord(Token Token, ScreenRect Bounds)
         HasResolvedLookup = hasResolvedLookup;
     }
 
-    /// <summary>组成合并词块的原始 UniDic token；旧调用方构造时默认为当前 token。</summary>
+    /// <summary>The original UniDic tokens that make up the merged word group; defaults to the current token when constructed by legacy callers.</summary>
     public IReadOnlyList<Token> SourceTokens { get; } = [Token];
 
     public string Surface => Token.Surface;
@@ -40,14 +40,14 @@ public sealed record GroupedWord(Token Token, ScreenRect Bounds)
 
     public IReadOnlyList<DictionaryEntry> Entries { get; } = Array.Empty<DictionaryEntry>();
 
-    /// <summary>区分“已预解析但未命中”和旧调用方尚未执行预解析。</summary>
+    /// <summary>Distinguishes "pre-resolved but not matched" from legacy callers that haven't performed pre-resolution.</summary>
     public bool HasResolvedLookup { get; }
 
-    /// <summary>只替换坐标，复用已解析的 token/span/entries 引用。</summary>
+    /// <summary>Replaces only the coordinates, reusing the already-resolved token/span/entries references.</summary>
     public GroupedWord WithBounds(ScreenRect bounds)
         => new(Token, bounds, SourceTokens, LookupKey, Entries, HasResolvedLookup);
 
-    /// <summary>新增的预解析元数据不改变原 positional record 的值相等语义。</summary>
+    /// <summary>The added pre-resolution metadata does not change the original positional record's value-equality semantics.</summary>
     public bool Equals(GroupedWord? other)
         => ReferenceEquals(this, other)
             || (other is not null && Token == other.Token && Bounds == other.Bounds);

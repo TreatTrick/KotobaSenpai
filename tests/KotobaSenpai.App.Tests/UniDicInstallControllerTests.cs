@@ -69,7 +69,7 @@ public sealed class UniDicInstallControllerTests
 
     private sealed class FakeLocalizer : IStringLocalizer
     {
-#pragma warning disable CS0067 // 接口要求的事件，测试未订阅
+#pragma warning disable CS0067 // event required by the interface; tests do not subscribe
         public event EventHandler? CultureChanged;
 #pragma warning restore CS0067
         public string Get(string key, params object[] args) => key;

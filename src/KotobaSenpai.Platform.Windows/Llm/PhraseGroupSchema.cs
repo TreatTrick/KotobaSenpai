@@ -4,12 +4,13 @@ using System.Text.Json.Nodes;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// 三个协议共用的 group 数组 JSON schema（根对象包一个 <c>groups</c> 数组），与
-/// <see cref="PhraseResponseParser.ParseGroups"/> 的字段校验一致。各协议在自己的结构化输出声明里内嵌此 schema。
+/// The group-array JSON schema shared by the three protocols (a root object wrapping a <c>groups</c> array), consistent
+/// with the field validation in <see cref="PhraseResponseParser.ParseGroups"/>. Each protocol embeds this schema in its
+/// own structured-output declaration.
 /// </summary>
 public static class PhraseGroupSchema
 {
-    /// <summary>根对象：{ "groups": [ group, ... ] }。</summary>
+    /// <summary>Root object: { "groups": [ group, ... ] }.</summary>
     public static JsonObject Root { get; } = new()
     {
         ["type"] = "object",

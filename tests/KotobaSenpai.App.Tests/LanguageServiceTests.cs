@@ -39,7 +39,7 @@ public sealed class LanguageServiceTests
     [Fact]
     public void Default_uses_english_when_os_culture_is_not_chinese()
     {
-        // 系统既非中文也非英文（如法语）时，默认英文（而非简体中文）。
+        // When the OS culture is neither Chinese nor English (e.g. French), default to English (not Simplified Chinese).
         var svc = new LanguageService(
             LocalizerFactory.Create(new CultureInfo("zh-CN")),
             new FakeStore(null),
@@ -68,7 +68,7 @@ public sealed class LanguageServiceTests
     [Fact]
     public void Corrupt_persisted_preference_falls_through_to_os_default()
     {
-        // "xx-XX" 非法文化名 -> 视为无偏好 -> 走 OS 默认。
+        // "xx-XX" is an invalid culture name -> treated as no preference -> falls through to the OS default.
         var svc = new LanguageService(
             LocalizerFactory.Create(new CultureInfo("zh-CN")),
             new FakeStore("xx-XX"),

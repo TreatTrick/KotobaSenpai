@@ -3,8 +3,10 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// 捕获帧数据不合法时抛出的领域异常。派生自 <see cref="ArgumentException"/> 以保留参数名语义，
-/// 同时携带稳定 <see cref="ErrorCode"/> 并实现用户可见异常标记接口；具体文案由表现层按码本地化。
+/// Domain exception thrown when capture frame data is invalid. It derives from <see cref="ArgumentException"/>
+/// to preserve the parameter-name semantics, while also carrying a stable <see cref="ErrorCode"/> and
+/// implementing the user-visible exception marker interface; the concrete wording is localized by the
+/// presentation layer by code.
 /// </summary>
 public sealed class InvalidFrameException : ArgumentException, IUserFacingException
 {

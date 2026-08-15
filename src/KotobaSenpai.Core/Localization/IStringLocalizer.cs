@@ -1,18 +1,19 @@
 namespace KotobaSenpai.Core.Localization;
 
 /// <summary>
-/// 本地化端口：按资源键（及可选格式参数）解析为当前文化的本地化字符串，
-/// 并在运行时文化切换时通过 <see cref="CultureChanged"/> 通知订阅者即时刷新。
+/// Localization port: resolves a localized string for the current culture by resource key (plus optional format
+/// arguments), and notifies subscribers via <see cref="CultureChanged"/> to refresh immediately when the culture
+/// is switched at runtime.
 /// <para>
-/// 端口位于 Core（零外部依赖，BCL-only）；具体实现位于 App，ViewModel 仅依赖本接口，
-/// 故可在无桌面的测试中以 fake 验证。
+/// The port lives in Core (zero external dependencies, BCL-only); the concrete implementation lives in App and
+/// the ViewModel depends only on this interface, so it can be verified with a fake in desktop-less tests.
 /// </para>
 /// </summary>
 public interface IStringLocalizer
 {
-    /// <summary>按键解析本地化字符串；资源值中的 {0} 占位符由 <paramref name="args"/> 替换。</summary>
+    /// <summary>Resolves a localized string by key; {0} placeholders in the resource value are replaced by <paramref name="args"/>.</summary>
     string Get(string key, params object[] args);
 
-    /// <summary>当前 UI 文化在运行时切换后触发，订阅者应据此重算已显示的本地化属性。</summary>
+    /// <summary>Raised when the current UI culture is switched at runtime; subscribers should recompute their displayed localized properties.</summary>
     event EventHandler? CultureChanged;
 }

@@ -2,10 +2,10 @@ using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Core.Contracts;
 
-/// <summary>为一次识别批量查询候选表单，避免每个候选单独打开词典连接。</summary>
+/// <summary>Batches candidate-form lookups for one recognition pass to avoid opening a dictionary connection per candidate.</summary>
 public interface IBatchDictionaryLookup
 {
-    /// <summary>返回字典的键与传入表单一致；实现可在内部做假名归一化。</summary>
+    /// <summary>Returns the dictionary keys matching the passed-in forms; implementations may normalize kana internally.</summary>
     IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> LookupForms(
         IReadOnlyCollection<string> forms);
 }

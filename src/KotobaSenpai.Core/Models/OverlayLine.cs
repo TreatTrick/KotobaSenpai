@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>覆盖层在屏幕上绘制的下划线几何，使用物理像素坐标。</summary>
+/// <summary>Underline geometry the overlay draws on screen, in physical pixel coordinates.</summary>
 public readonly record struct OverlayLine
 {
     public OverlayLine(int x, int y, int width, int thickness = 2)

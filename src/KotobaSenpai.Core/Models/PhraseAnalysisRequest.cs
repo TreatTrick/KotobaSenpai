@@ -1,8 +1,9 @@
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// 一次 LLM phrase 分析请求：单个句级 segment 的文本、稳定 token 引用与本地连续 span 摘要。
-/// 只携带文本与元数据，绝不包含截图、窗口坐标、窗口标题或 API key。
+/// A single LLM phrase analysis request: the text of one sentence-level segment, stable token references, and
+/// local contiguous span summaries. It carries only text and metadata, never screenshots, window coordinates,
+/// window titles, or API keys.
 /// </summary>
 public sealed record PhraseAnalysisRequest
 {
@@ -24,15 +25,15 @@ public sealed record PhraseAnalysisRequest
         LocalSpans = localSpans.ToArray();
     }
 
-    /// <summary>请求内句段 ID（仅请求内唯一）。</summary>
+    /// <summary>Request-scoped segment id (unique only within the request).</summary>
     public string SegmentId { get; }
 
-    /// <summary>句段原始 OCR 文本。</summary>
+    /// <summary>The segment's raw OCR text.</summary>
     public string SegmentText { get; }
 
-    /// <summary>句段内按阅读顺序的稳定 token 引用。</summary>
+    /// <summary>The segment's stable token references in reading order.</summary>
     public IReadOnlyList<SentenceTokenReference> Tokens { get; }
 
-    /// <summary>本地已解析的连续 span 摘要。</summary>
+    /// <summary>Locally resolved contiguous span summaries.</summary>
     public IReadOnlyList<LocalSpanSummary> LocalSpans { get; }
 }

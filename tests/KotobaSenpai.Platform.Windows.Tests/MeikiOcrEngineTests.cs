@@ -6,9 +6,9 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace KotobaSenpai.Platform.Windows.Tests;
 
 /// <summary>
-/// meikiocr 引擎测试。缺模型测试始终运行（无需模型）；端到端黄金测试需
-/// 本地具备模型文件（环境变量 <c>KOTOBA_MEIKIOCR_MODEL_DIR</c>）与样例图
-/// （<c>KOTOBA_MEIKIOCR_GOLDEN_IMAGE</c>），否则跳过——模型不入 git，故 CI 不生效。
+/// meikiocr engine tests. The missing-model tests always run (no model needed); the end-to-end golden tests
+/// require a local model file (env var <c>KOTOBA_MEIKIOCR_MODEL_DIR</c>) and a sample image
+/// (<c>KOTOBA_MEIKIOCR_GOLDEN_IMAGE</c>), otherwise they are skipped — the model is not in git, so CI is unaffected.
 /// </summary>
 public sealed class MeikiOcrEngineTests
 {
@@ -51,20 +51,20 @@ public sealed class MeikiOcrEngineTests
         var modelDir = Environment.GetEnvironmentVariable("KOTOBA_MEIKIOCR_MODEL_DIR");
         var samplePath = Environment.GetEnvironmentVariable("KOTOBA_MEIKIOCR_GOLDEN_IMAGE");
         if (string.IsNullOrWhiteSpace(modelDir) || string.IsNullOrWhiteSpace(samplePath) || !File.Exists(samplePath))
-            return; // 模型/样例未就绪，跳过（CI 无模型）。
+            return; // model/sample not ready, skip (CI has no model).
 
         using var engine = new MeikiOcrEngine(modelDir);
         var (bgra, width, height) = LoadBgra(samplePath);
         var lines = engine.RunOcr(bgra, width, height);
 
         Assert.NotEmpty(lines);
-        // 黄金校验：至少有一行非空文本，且字符框全部在帧内。
+        // Golden check: at least one line of non-empty text, and every character box lies within the frame.
         foreach (var line in lines)
         {
             Assert.False(string.IsNullOrEmpty(line.Text));
             foreach (var c in line.Chars)
             {
-                Assert.True(c.X2 > c.X1 && c.Y2 > c.Y1, "字符框必须非零面积");
+                Assert.True(c.X2 > c.X1 && c.Y2 > c.Y1, "character box must have non-zero area");
                 Assert.InRange(c.X1, 0, width);
                 Assert.InRange(c.Y1, 0, height);
             }
@@ -77,7 +77,7 @@ public sealed class MeikiOcrEngineTests
         var modelDir = Environment.GetEnvironmentVariable("KOTOBA_MEIKIOCR_MODEL_DIR");
         var samplePath = Environment.GetEnvironmentVariable("KOTOBA_MEIKIOCR_GOLDEN_IMAGE");
         if (string.IsNullOrWhiteSpace(modelDir) || string.IsNullOrWhiteSpace(samplePath) || !File.Exists(samplePath))
-            return; // 模型/样例未就绪，跳过（CI 无模型）。
+            return; // model/sample not ready, skip (CI has no model).
 
         var (bgra, width, height) = LoadBgra(samplePath);
         using var singleItemEngine = new MeikiOcrEngine(modelDir, maxBatchSize: 1);

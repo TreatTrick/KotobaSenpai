@@ -7,8 +7,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Platform.Windows.Capture;
 
 /// <summary>
-/// 第一阶段捕获适配器：使用 GDI 从屏幕拷贝目标窗口当前画面。
-/// 作为 Windows.Graphics.Capture 的兼容回退，可在同一端口下替换而不影响领域或 UI 契约。
+/// Phase-one capture adapter: uses GDI to copy the target window's current frame from the screen. Serves as a compatible
+/// fallback for Windows.Graphics.Capture and can be swapped under the same port without affecting the domain or UI
+/// contracts.
 /// </summary>
 internal sealed class GdiWindowFrame : IDisposable
 {
@@ -49,7 +50,7 @@ internal sealed class GdiWindowFrame : IDisposable
     public void Dispose() => _bitmap.Dispose();
 }
 
-/// <summary>端口 <see cref="IWindowFrameCapture"/> 的 GDI 实现。</summary>
+/// <summary>GDI implementation of the <see cref="IWindowFrameCapture"/> port.</summary>
 public sealed class GdiWindowFrameCapture : IWindowFrameCapture
 {
     public Task<CapturedFrame> CaptureAsync(WindowTarget target, CancellationToken cancellationToken = default)

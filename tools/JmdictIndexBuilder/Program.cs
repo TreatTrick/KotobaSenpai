@@ -2,11 +2,11 @@ using System.Text.Json;
 using KotobaSenpai.Core.Models;
 using Microsoft.Data.Sqlite;
 
-// 构建工具：jmdict-simplified JSON → KotobaSenpai 用的 SQLite 词典索引。
-// 用法: JmdictIndexBuilder [jsonPath] [dbOut]
-//   jsonPath 省略时从 jmdict-simplified 最新 release 下载 JMdict_e.json。
-//   dbOut 默认 ./jmdict.db。
-// 输出 schema 与 JmdictSqliteRepository 一致：entries / kanji / reading 三表。
+// Build tool: jmdict-simplified JSON → the SQLite dictionary index used by KotobaSenpai.
+// Usage: JmdictIndexBuilder [jsonPath] [dbOut]
+//   When jsonPath is omitted, downloads JMdict_e.json from the latest jmdict-simplified release.
+//   dbOut defaults to ./jmdict.db.
+// Output schema matches JmdictSqliteRepository: the entries / kanji / reading tables.
 
 var jsonPath = args.Length > 0 ? args[0] : null;
 var dbOut = args.Length > 1 ? args[1] : "jmdict.db";
@@ -109,7 +109,7 @@ static List<DictionarySense> ReadSenses(JsonElement word)
         return list;
     }
 
-    // jmdict-simplified 的释义字段是 "gloss"（单数），每个元素是 {"lang","text",...} 对象。
+    // The gloss field in jmdict-simplified is "gloss" (singular), each element being a {"lang","text",...} object.
     static List<string> GlossTexts(JsonElement sense)
     {
         if (!sense.TryGetProperty("gloss", out var arr) || arr.ValueKind != JsonValueKind.Array)
@@ -151,7 +151,7 @@ static async Task<string> DownloadLatestEnglishJsonAsync()
     using var client = new HttpClient();
     client.DefaultRequestHeaders.UserAgent.ParseAdd("KotobaSenpai-JmdictIndexBuilder");
 
-    // 解析最新 release，取 jmdict-eng-*.json.zip（发行资产带版本号，非固定名）。
+    // Parse the latest release and take jmdict-eng-*.json.zip (release assets carry a version number, not a fixed name).
     using var release = JsonDocument.Parse(
         await client.GetStringAsync("https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest"));
     string? url = null;

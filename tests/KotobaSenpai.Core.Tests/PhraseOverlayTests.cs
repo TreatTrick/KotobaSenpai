@@ -17,7 +17,7 @@ public sealed class PhraseHoverResolverTests
     [Fact]
     public void Prefers_group_with_fewer_distinct_tokens()
     {
-        // 短 group（1 token）与包含它的长 group（2 token）重叠，光标同时命中两者。
+        // A short group (1 token) overlaps the longer group (2 tokens) that contains it; the cursor hits both.
         var groups = new[]
         {
             Group(0, 2, Rects(0, 0, 20, 20)),
@@ -115,7 +115,7 @@ public sealed class PhraseFallbackTests
         var group = Assert.Single(overlay.Session!.PhraseGroups);
         Assert.Equal("他是", group.Meaning);
         Assert.NotEqual(Guid.Empty, group.SessionGroupId);
-        // 帧 100x50 → 窗口 200x100（2x 缩放），part 框 (0,0,10,20) → 屏幕 (0,0,20,40)。
+        // Frame 100x50 → window 200x100 (2x scale), part box (0,0,10,20) → screen (0,0,20,40).
         var rect = Assert.Single(group.Parts[0].Rects);
         Assert.Equal(new ScreenRect(0, 0, 20, 40), rect);
     }
@@ -140,9 +140,9 @@ public sealed class PhraseOrchestratorConcurrencyTests
         var run = await orchestrator.AnalyzeAsync(FourSegments);
 
         Assert.Equal(4, run.Groups.Count);
-        // 顺序与 segment 顺序一致（Task.WhenAll 保序）。
+        // Order matches segment order (Task.WhenAll preserves order).
         Assert.Equal(["s0-0", "s1-1", "s2-2", "s3-3"], run.Groups.Select(g => g.Label).ToArray());
-        // 至少一度有多个请求在途，证明并发而非串行。
+        // At least once several requests were in flight, proving concurrency rather than serialization.
         Assert.True(analyzer.MaxInFlight > 1, $"expected concurrent calls, max in-flight was {analyzer.MaxInFlight}");
     }
 

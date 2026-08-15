@@ -5,9 +5,9 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.App.Japanese;
 
 /// <summary>
-/// 词典安装协调器：驱动 <see cref="UniDicDictionaryInstaller"/> 在启动时执行安装，
-/// 暴露进度/错误状态供主窗口遮挡层绑定。安装期间遮挡层阻断所有其他操作，失败时在层内显示错误并允许重试。
-/// <paramref name="install"/> 可注入（测试用），默认委托给安装器的 <see cref="UniDicDictionaryInstaller.EnsureInstalledAsync"/>。
+/// Dictionary install coordinator: drives <see cref="UniDicDictionaryInstaller"/> to perform the install at startup,
+/// exposing progress/error state for the main window's overlay to bind. During installation the overlay blocks all other operations; on failure it shows the error inside the overlay and allows retry.
+/// <paramref name="install"/> can be injected (for tests) and otherwise delegates to the installer's <see cref="UniDicDictionaryInstaller.EnsureInstalledAsync"/>.
 /// </summary>
 public sealed partial class UniDicInstallController : ObservableObject
 {
@@ -37,13 +37,13 @@ public sealed partial class UniDicInstallController : ObservableObject
         IsInstalled = installer.IsInstalled;
     }
 
-    /// <summary>遮挡层可见（阻断操作）：正在安装或已出错。</summary>
+    /// <summary>Overlay is visible (blocking operations): installing or an error is present.</summary>
     public bool IsBlocking => IsInstalling || HasError;
 
-    /// <summary>安装失败后有可展示的错误信息。</summary>
+    /// <summary>There is a displayable error message after a failed install.</summary>
     public bool HasError => Error is not null;
 
-    /// <summary>执行安装；已安装则直接返回。成功后收起遮挡层，失败时在层内显示本地化错误。</summary>
+    /// <summary>Performs the install; returns immediately when already installed. On success the overlay is dismissed; on failure a localized error is shown inside it.</summary>
     [RelayCommand]
     private async Task InstallAsync(CancellationToken ct = default)
     {
@@ -60,7 +60,7 @@ public sealed partial class UniDicInstallController : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            // 取消：保持遮挡层可见，交由用户决定重试或关窗。
+            // Cancelled: keep the overlay visible and let the user decide whether to retry or close the window.
         }
         catch (Exception ex)
         {

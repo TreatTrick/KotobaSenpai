@@ -10,10 +10,11 @@ using KotobaSenpai.Core.Services;
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
-/// 端口 <see cref="IOverlayRenderer"/> 的 WPF 实现：
-/// 透明、置顶、不激活、点击穿透的工具窗口，为每个分词词绘制一条下划线，并为每个 phrase group 的
-/// 每个 part 绘制组合词块标记。悬停本地词时该词整条线变色；悬停 group 任一 part 时高亮其全部 parts
-/// 并打开一个详情弹窗。点击始终穿透到下方窗口。
+/// WPF implementation of the <see cref="IOverlayRenderer"/> port:
+/// a transparent, topmost, non-activating, click-through tool window that draws an underline for each tokenized word and
+/// a compound phrase-block marker for each part of every phrase group. Hovering a local word recolors its whole line;
+/// hovering any part of a group highlights all its parts and opens a detail popup. Clicks always pass through to the
+/// window below.
 /// </summary>
 public sealed class WpfOverlayRenderer : IOverlayRenderer
 {
@@ -154,8 +155,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         }
 
         /// <summary>
-        /// 轮询光标位置做命中测试（窗口点击穿透、收不到自身鼠标事件）。先测 phrase group
-        /// （重叠按更少 token 数、再按 provider 顺序决胜），高亮该 group 全部 parts；否则回退到本地词热区。
+        /// Polls the cursor position for hit testing (the window is click-through and receives no mouse events of its own).
+        /// Tests phrase groups first (overlaps resolved by fewer tokens, then provider order), highlighting all parts of the
+        /// group; otherwise falls back to the local-word hot zone.
         /// </summary>
         private void PollHover()
         {
@@ -189,7 +191,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
             if (groupHit >= 0)
             {
-                // group 命中时挂起本地词悬停，避免两者弹窗打架。
+                // Suspend local-word hover while a group is hit, to keep the two popups from fighting.
                 if (_hoverIndex >= 0 && _hoverIndex < _lineElements.Count)
                     _lineElements[_hoverIndex].Background = DefaultLineBrush;
                 _popup.HidePopup();
@@ -197,7 +199,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 return;
             }
 
-            // 本地词热区：命中取包含光标的词，重叠时取中心最近者。
+            // Local-word hot zone: pick the word containing the cursor; on overlap, the one whose center is nearest.
             int hit = -1;
             double best = double.MaxValue;
             for (int i = 0; i < session.Words.Count; i++)
@@ -227,7 +229,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         private void ShowPhrasePopup(PhraseGroupView group)
         {
-            // 取该 group 首个 part 的首个矩形作为弹窗锚点。
+            // Use the first rectangle of the group's first part as the popup anchor.
             var anchor = group.Parts.SelectMany(part => part.Rects).FirstOrDefault();
             if (anchor == default)
             {
@@ -238,8 +240,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         }
 
         /// <summary>
-        /// 悬停词变化时更新弹窗。识别阶段已解析的 span 直接使用其结果；只有旧兼容词块
-        /// 才在这里按 token 查词，避免对“已解析但未命中”的词重复访问 SQLite。
+        /// Updates the popup when the hovered word changes. Spans already resolved during recognition reuse their results; only
+        /// legacy-compatible phrase blocks are looked up by token here, avoiding repeated SQLite access for words that were
+        /// parsed but not matched.
         /// </summary>
         private void UpdatePopup(int hit)
         {

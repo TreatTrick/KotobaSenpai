@@ -4,13 +4,13 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.App.Logging;
 
 /// <summary>
-/// 读取最小日志级别：经 <see cref="ISettingsService"/> 取 <c>MinimumLogLevel</c> 字段（如
-/// "Error"/"Warning"/"Information"）解析为 <see cref="LogLevel"/>；字段缺失或解析失败时回退
-/// <see cref="LogLevel.Error"/>。文件 I/O 与容错由设置服务统一承担，本类只负责字符串到级别的解析。
+/// Reads the minimum log level: through <see cref="ISettingsService"/> it takes the <c>MinimumLogLevel</c> field (e.g.
+/// "Error"/"Warning"/"Information") and parses it into a <see cref="LogLevel"/>; when the field is missing or parsing fails it falls back to
+/// <see cref="LogLevel.Error"/>. File I/O and fault tolerance are handled uniformly by the settings service; this class only parses strings to levels.
 /// </summary>
 public static class LogConfiguration
 {
-    /// <summary>读取最小日志级别；<paramref name="settings"/> 注入便于测试。</summary>
+    /// <summary>Reads the minimum log level; <paramref name="settings"/> is injected to make it testable.</summary>
     public static LogLevel LoadMinimumLevel(ISettingsService settings)
     {
         var raw = settings.GetValue("MinimumLogLevel");

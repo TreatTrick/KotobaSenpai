@@ -4,7 +4,7 @@ using KotobaSenpai.App.Localization;
 
 namespace KotobaSenpai.App.Tests;
 
-/// <summary>测试辅助：用真实嵌入式 Strings 资源构造本地化器，初始文化可控。</summary>
+/// <summary>Test helper: builds a localizer from the real embedded Strings resources, with a controllable initial culture.</summary>
 internal static class LocalizerFactory
 {
     public static ResourceManagerStringLocalizer Create(CultureInfo initialCulture)

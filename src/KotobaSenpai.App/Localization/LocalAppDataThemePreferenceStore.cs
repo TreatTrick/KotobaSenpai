@@ -4,9 +4,9 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.App.Localization;
 
 /// <summary>
-/// <see cref="IThemePreferenceStore"/> 实现：经 <see cref="ISettingsService"/> 读写 settings.json 的
-/// <c>Theme</c> 字段。文件 I/O 与未知字段保留由设置服务统一承担；本类只负责主题模式的枚举解析与回退。
-/// 文件不存在或损坏时经设置服务视为无偏好（返回 null），不在启动时崩溃。
+/// Implementation of <see cref="IThemePreferenceStore"/>: reads/writes the <c>Theme</c> field of settings.json through <see cref="ISettingsService"/>.
+/// File I/O and unknown-field preservation are handled uniformly by the settings service; this class only handles the theme mode's enum parsing and fallback.
+/// A missing or corrupt file is treated by the settings service as no preference (returns null), so it does not crash at startup.
 /// </summary>
 public sealed class LocalAppDataThemePreferenceStore : IThemePreferenceStore
 {

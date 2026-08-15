@@ -3,8 +3,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 把已验证 phrase group 的 token 引用映射为逐 part、逐行的可绘制矩形。每个 part 只覆盖其引用 token
-/// 的字符框并按行拆分，绝不把 group 间隔 token 或空白区域并入几何。
+/// Maps a validated phrase group's token references to drawable rectangles per part and per line. Each part
+/// covers only the character boxes of its referenced tokens and splits by line, never merging group-gap
+/// tokens or blank regions into the geometry.
 /// </summary>
 public static class PhraseGeometryMapper
 {

@@ -98,7 +98,7 @@ public sealed class JmdictSqliteRepositoryTests
         }
     }
 
-    /// <summary>构造与 JmdictIndexBuilder 相同 schema 的临时库（entries/kanji/reading + 索引）。</summary>
+    /// <summary>Builds a temp database with the same schema as JmdictIndexBuilder (entries/kanji/reading + indexes).</summary>
     private static string CreateDb()
     {
         var path = Path.Combine(Path.GetTempPath(), "jmdict-test-" + Guid.NewGuid().ToString("N") + ".db");

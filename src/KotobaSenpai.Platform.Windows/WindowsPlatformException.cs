@@ -3,9 +3,9 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.Platform.Windows;
 
 /// <summary>
-/// Windows 平台适配器抛出的可操作错误（语言包缺失、捕获失败等）。
-/// 携带稳定 <see cref="ErrorCode"/>（供表现层翻译）并实现用户可见异常标记接口；
-/// <c>message</c> 仅为开发者可读文本，不直接展示给用户。
+/// Actionable error thrown by the Windows platform adapter (missing language pack, capture failure, etc.). Carries a
+/// stable <see cref="ErrorCode"/> (for the presentation layer to translate) and implements the user-facing exception
+/// marker interface; <c>message</c> is developer-readable text only and is not shown directly to the user.
 /// </summary>
 public sealed class WindowsPlatformException : Exception, IUserFacingException
 {

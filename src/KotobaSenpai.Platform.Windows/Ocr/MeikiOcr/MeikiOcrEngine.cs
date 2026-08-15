@@ -10,21 +10,21 @@ using KotobaSenpai.Core.Logging;
 
 namespace KotobaSenpai.Platform.Windows.Ocr.MeikiOcr;
 
-/// <summary>识别出的单个字符及其在捕获帧中的像素框。</summary>
+/// <summary>A single recognized character and its pixel box in the captured frame.</summary>
 internal sealed record MeikiChar(char Char, int X1, int Y1, int X2, int Y2, float Conf);
 
-/// <summary>识别出的一个文本行。</summary>
+/// <summary>A single recognized text line.</summary>
 internal sealed record MeikiLine(string Text, IReadOnlyList<MeikiChar> Chars);
 
 /// <summary>
-/// meikiocr 本地 ONNX 引擎的 C# 移植。忠实复刻 rtr46/meikiocr 的 <c>meikiocr/ocr.py</c>
-/// （Apache-2.0）：文本检测 → 横排识别 → 逐字符 NMS → 标点因子 → 交换错对修正。
-/// 第一阶段仅处理横排文本（宽 &gt;= 高的框），竖排属后续变更。
-/// 重心是复刻而非改进——任何改动都可能改变字符框坐标，破坏取词精度。
+/// C# port of the meikiocr local ONNX engine. A faithful reproduction of rtr46/meikiocr's <c>meikiocr/ocr.py</c>
+/// (Apache-2.0): text detection → horizontal recognition → per-character NMS → punctuation factor → swapped-pair fixes.
+/// Phase one only handles horizontal text (boxes with width &gt;= height); vertical text is a later change. The focus is
+/// fidelity, not improvement — any change may alter character-box coordinates and break word-picking accuracy.
 /// </summary>
 public sealed class MeikiOcrEngine : IDisposable
 {
-    // --- 模型与输入尺寸（对应 ocr.py 常量） ---
+    // --- Model and input sizes (corresponding to ocr.py constants) ---
     private const string DetModelName = "meiki.text.detect.v0.1.960x544.onnx";
     private const string RecModelName = "meiki.text.rec.v0.960x32.onnx";
 
@@ -36,14 +36,14 @@ public sealed class MeikiOcrEngine : IDisposable
     private const float XOverlapThreshold = 0.3f;
     private const float Epsilon = 1e-6f;
 
-    // 对应 ocr.py 的 SWAPPED_PAIRS（模型把左右部件读反的常见汉字对）。
+    // Corresponds to SWAPPED_PAIRS in ocr.py (common kanji pairs the model reads with left/right parts swapped).
     private static readonly IReadOnlyDictionary<string, string> SwappedPairs = new Dictionary<string, string>
     {
         ["儡傀"] = "傀儡", ["談冗"] = "冗談", ["汰淘"] = "淘汰", ["沱滂"] = "滂沱",
         ["攣痙"] = "痙攣", ["酊酩"] = "酩酊", ["麭麺"] = "麺麭", ["哭慟"] = "慟哭",
     };
 
-    // 双线性缩放（Triangle 核即 OpenCV 的 INTER_LINEAR）。
+    // Bilinear resizing (the Triangle kernel is OpenCV's INTER_LINEAR).
     private static Image<Rgba32> ResizeBilinear(Image<Rgba32> image, int width, int height)
         => image.Clone(c => c.Resize(new ResizeOptions
         {
@@ -72,20 +72,20 @@ public sealed class MeikiOcrEngine : IDisposable
                 ErrorCodes.OcrModelMissing,
                 $"meikiocr model files not found in '{modelDirectory}'. Missing: {string.Join(", ", missing)}");
 
-        // ponytail: 用 CPU 而非 DirectML —— 实测 DML 把检测模型置信度压到 ~0.18（CPU 为 ~0.72），
-        // 导致全部低于 0.5 阈值、检测全灭。DirectML 对本模型精度不可用；若日后有可靠 GPU 路径再切回。
+        // ponytail: CPU instead of DirectML — measured DML crushes detection-model confidence to ~0.18 (CPU ~0.72), dropping
+        // everything below the 0.5 threshold and killing detection entirely. DirectML is unusable at this model's precision; switch back only if a reliable GPU path appears later.
         _detSession = CreateSession(detPath);
         _recSession = CreateSession(recPath);
     }
 
-    /// <summary>创建 CPU 推理会话。</summary>
+    /// <summary>Creates a CPU inference session.</summary>
     private static InferenceSession CreateSession(string modelPath)
     {
         var options = new SessionOptions { GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL };
         return new InferenceSession(modelPath, options);
     }
 
-    /// <summary>对 Bgra32 捕获帧执行 meikiocr 管线，返回横排文本行。</summary>
+    /// <summary>Runs the meikiocr pipeline over a Bgra32 captured frame and returns horizontal text lines.</summary>
     internal IReadOnlyList<MeikiLine> RunOcr(
         ReadOnlyMemory<byte> bgra32,
         int width,
@@ -107,7 +107,7 @@ public sealed class MeikiOcrEngine : IDisposable
             var (x1, y1, x2, y2) = boxes[i];
             if (x2 - x1 <= 0 || y2 - y1 <= 0)
                 continue;
-            // 第一阶段只处理横排（宽 >= 高）；竖排框跳过。
+            // Phase one only handles horizontal text (width >= height); vertical boxes are skipped.
             if (y2 - y1 > x2 - x1)
                 continue;
             hIndices.Add(i);
@@ -118,7 +118,7 @@ public sealed class MeikiOcrEngine : IDisposable
 
         var lines = results.Where(r => r is not null).Cast<MeikiLine>().ToArray();
         _logger?.LogInformation("MeikiOcr: recognized {lines} lines, {chars} chars", lines.Length, lines.Sum(l => l.Chars.Count));
-        // 诊断：打印每行实际识别出的文本，便于判断"认错字"还是"映射错位"。
+        // Diagnostics: print the text actually recognized on each line, to tell a misrecognized character from a mapping offset.
         foreach (var line in lines.Where(l => l.Text.Length > 0))
             _logger?.LogInformation("MeikiOcr: line '{text}' ({chars} chars)", line.Text, line.Chars.Count);
         return lines;
@@ -133,7 +133,7 @@ public sealed class MeikiOcrEngine : IDisposable
         _disposed = true;
     }
 
-    // --- 文本检测（对应 ocr.py run_detection） ---
+    // --- Text detection (corresponding to run_detection in ocr.py) ---
 
     private List<(int X1, int Y1, int X2, int Y2)> RunDetection(Image<Rgba32> image, float confThreshold)
     {
@@ -165,7 +165,7 @@ public sealed class MeikiOcrEngine : IDisposable
             list.Add((x1, y1, x2, y2));
         }
 
-        // 按 y（自上而下）排序，对应 ocr.py text_boxes.sort(key=bbox[1])。
+        // Sort by y (top to bottom), corresponding to ocr.py text_boxes.sort(key=bbox[1]).
         list.Sort((a, b) => a.Y1.CompareTo(b.Y1));
         return list;
     }
@@ -185,7 +185,7 @@ public sealed class MeikiOcrEngine : IDisposable
             for (int x = 0; x < wResized; x++)
             {
                 var p = pixels[y * wResized + x];
-                tensor[0, 0, y, x] = p.B / 255f; // B（OpenCV BGR 顺序）
+                tensor[0, 0, y, x] = p.B / 255f; // B (OpenCV BGR order)
                 tensor[0, 1, y, x] = p.G / 255f; // G
                 tensor[0, 2, y, x] = p.R / 255f; // R
             }
@@ -193,7 +193,7 @@ public sealed class MeikiOcrEngine : IDisposable
         return (tensor, scale);
     }
 
-    // --- 识别管线（对应 ocr.py _process_recognition_pipeline） ---
+    // --- Recognition pipeline (corresponding to _process_recognition_pipeline in ocr.py) ---
 
     private void ProcessRecognitionPipeline(
         Image<Rgba32> image,
@@ -243,7 +243,7 @@ public sealed class MeikiOcrEngine : IDisposable
             if (w <= 0 || h <= 0)
                 continue;
 
-            // 横排：缩放到高 32、宽最长 960，再垫到 (960,32)。
+            // Horizontal: scale to height 32, width up to 960, then pad to (960,32).
             int newH = InputRecHeight;
             float scale = (float)newH / h;
             int newW = (int)Math.Round(w * scale);
@@ -301,7 +301,7 @@ public sealed class MeikiOcrEngine : IDisposable
             NamedOnnxValue.CreateFromTensor(inputNames[0], batch),
             NamedOnnxValue.CreateFromTensor(inputNames[1], origSizes),
         });
-        // char_codes 输出为 Int32（见 rec 模型输出元数据）。
+        // char_codes output is Int32 (see the rec model's output metadata).
         var labels = outputs[0].AsTensor<int>();
         var boxes = outputs[1].AsTensor<float>();
         var scores = outputs[2].AsTensor<float>();
@@ -353,7 +353,7 @@ public sealed class MeikiOcrEngine : IDisposable
                     char ch = (char)labels[i, j];
                     float rx1 = boxes[i, j, 0], ry1 = boxes[i, j, 1], rx2 = boxes[i, j, 2], ry2 = boxes[i, j, 3];
 
-                    // 横排映射（对应 ocr.py 非竖排分支）。
+                    // Horizontal mapping (corresponding to the non-vertical branch in ocr.py).
                     int effectiveW = meta.EffectiveW;
                     if (rx1 >= effectiveW)
                         continue;
@@ -421,7 +421,7 @@ public sealed class MeikiOcrEngine : IDisposable
         }
     }
 
-    // 对应 ocr.py _fix_swapped_pairs。
+    // Corresponds to _fix_swapped_pairs in ocr.py.
     private static string FixSwappedPairs(string text, List<Candidate> chars)
     {
         foreach (var (wrong, correct) in SwappedPairs)
@@ -451,7 +451,7 @@ public sealed class MeikiOcrEngine : IDisposable
 
     private static Image<Rgba32> MakeRgbaImage(ReadOnlyMemory<byte> bgra32, int width, int height)
     {
-        // Bgra32 -> Rgba32（交换 B/R 通道）。
+        // Bgra32 -> Rgba32 (swap the B/R channels).
         var rgba = new byte[bgra32.Length];
         var src = bgra32.Span;
         for (int i = 0; i < bgra32.Length; i += 4)

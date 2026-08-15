@@ -36,7 +36,7 @@ public sealed class PhraseSegmentationTests
     [Fact]
     public void Breaks_when_reading_order_unreliable()
     {
-        // 下一行起点左移 => 顺序不可靠，切段。
+        // Next line starts further left => reading order is unreliable, so split.
         var segments = new SentenceSegmenter().Segment([Line("右", 0, xStart: 50), Line("左", 0, xStart: 0)]);
         Assert.Equal(2, segments.Count);
     }
@@ -231,7 +231,7 @@ public sealed class PhraseGroupValidatorTests
             new PartsOfSpeech("", "", "", ""), "", "", "", 0);
 }
 
-/// <summary>按输入文本逐字符分词，供句段构建测试精确控制行内 token。</summary>
+/// <summary>Tokenizes the input text character by character so sentence-building tests can control each token precisely.</summary>
 internal sealed class CharTokenizer : ITokenizer
 {
     public IReadOnlyList<Token> Tokenize(string? text)

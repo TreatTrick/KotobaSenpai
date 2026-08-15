@@ -6,11 +6,11 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.App.Settings;
 
 /// <summary>
-/// <see cref="ISettingsService"/> 文件实现：作为 <c>%LocalAppData%/KotobaSenpai/settings.json</c> 的唯一归属。
-/// 单例、懒加载到内存 <see cref="JsonObject"/> + 写穿（write-through）；保留未知字段
-/// （<c>Language</c>/<c>Theme</c>/<c>MinimumLogLevel</c> 共存互不覆盖）；文件缺失或损坏视为空对象，不抛异常。
-/// 所有读写经内部 <see cref="lock"/> 串行化。取代此前散落在 <c>LocalAppDataSettingsFile</c> 与
-/// <c>LogConfiguration</c> 中的各自文件读取逻辑。
+/// File implementation of <see cref="ISettingsService"/>: the single owner of <c>%LocalAppData%/KotobaSenpai/settings.json</c>.
+/// Singleton, lazily loaded into an in-memory <see cref="JsonObject"/> with write-through persistence; unknown fields are preserved
+/// (<c>Language</c>/<c>Theme</c>/<c>MinimumLogLevel</c> coexist without overwriting each other); a missing or corrupt file is treated as an empty object, never throwing.
+/// All reads and writes are serialized through an internal <see cref="lock"/>. Replaces the per-file read logic previously scattered across
+/// <c>LocalAppDataSettingsFile</c> and <c>LogConfiguration</c>.
 /// </summary>
 public sealed class SettingsService : ISettingsService
 {
@@ -26,10 +26,10 @@ public sealed class SettingsService : ISettingsService
         "KotobaSenpai",
         "settings.json");
 
-    /// <summary>使用真实的 <see cref="DefaultFilePath"/>。</summary>
+    /// <summary>Uses the real <see cref="DefaultFilePath"/>.</summary>
     public SettingsService() : this(DefaultFilePath) { }
 
-    /// <summary><paramref name="filePath"/> 注入便于测试指向临时文件。</summary>
+    /// <summary><paramref name="filePath"/> is injected so tests can point at a temporary file.</summary>
     public SettingsService(string filePath) => _filePath = filePath;
 
     /// <inheritdoc />
@@ -41,7 +41,7 @@ public sealed class SettingsService : ISettingsService
             if (!_settings!.TryGetPropertyValue(key, out JsonNode? node) || node is null)
                 return null;
 
-            // 值非字符串节点时（如数字/对象）回退 null，与既有偏好存储的容错语义一致。
+            // When the node is not a string (e.g. a number or object), fall back to null, consistent with the existing preference store's fault-tolerance semantics.
             try
             {
                 return node.GetValue<string>();
@@ -67,7 +67,7 @@ public sealed class SettingsService : ISettingsService
         }
     }
 
-    /// <summary>首次访问时懒加载文件；缺失或损坏视为空对象。</summary>
+    /// <summary>Lazily loads the file on first access; a missing or corrupt file is treated as an empty object.</summary>
     private void EnsureLoaded()
     {
         if (_loaded)
@@ -97,7 +97,7 @@ public sealed class SettingsService : ISettingsService
         return new JsonObject();
     }
 
-    /// <summary>写穿：序列化整个内存对象（保留未知字段），含目录自动创建。</summary>
+    /// <summary>Write-through: serializes the entire in-memory object (preserving unknown fields), including automatic directory creation.</summary>
     private void Save()
     {
         var directory = Path.GetDirectoryName(_filePath);

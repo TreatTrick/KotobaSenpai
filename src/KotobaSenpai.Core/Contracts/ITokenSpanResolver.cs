@@ -2,13 +2,14 @@ using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Core.Contracts;
 
-/// <summary>把 UniDic token 序列解析为非重叠、可查词的最终 span。</summary>
+/// <summary>Resolves a UniDic token sequence into non-overlapping, lookupable final spans.</summary>
 public interface ITokenSpanResolver
 {
     IReadOnlyList<LookupSpan> Resolve(IReadOnlyList<Token> tokens);
 
     /// <summary>
-    /// 解析一次 OCR 中的多行 token。默认实现逐行回退；批量实现可共享一次词典查询。
+    /// Resolves multiple lines of tokens from one OCR pass. The default implementation falls back to
+    /// per-line resolution; batch implementations can share a single dictionary query.
     /// </summary>
     IReadOnlyList<IReadOnlyList<LookupSpan>> ResolveMany(
         IReadOnlyList<IReadOnlyList<Token>> tokenLines)

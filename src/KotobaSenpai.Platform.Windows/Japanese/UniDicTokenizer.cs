@@ -12,12 +12,13 @@ using NMeCab.Specialized;
 namespace KotobaSenpai.Platform.Windows.Japanese;
 
 /// <summary>
-/// 用 LibNMeCab 的 <see cref="MeCabUniDic22Tagger"/> 加载 UniDic unidic22 词典的日语分词器。
-/// 词典目录用 <c>KOTOBA_UNIDIC_DIR</c> 环境变量覆盖（开发/测试），否则回退到
-/// <c>%LocalAppData%/KotobaSenpai/UniDic/dicdir</c>（M1 首次运行下载的位置）。
-/// 编译期可注入目录以支持无网络测试（避免并行测试改进程级环境变量）。
-/// 词典缺失抛 <see cref="WindowsPlatformException"/>（<see cref="ErrorCodes.UniDicDictionaryMissing"/>）；
-/// 存在但版本/格式/manifest 无效抛 <see cref="ErrorCodes.UniDicDictionaryInvalid"/>。
+/// Japanese tokenizer loading the UniDic unidic22 dictionary via LibNMeCab's <see cref="MeCabUniDic22Tagger"/>. The
+/// dictionary directory is overridden with the <c>KOTOBA_UNIDIC_DIR</c> environment variable (development/testing);
+/// otherwise it falls back to <c>%LocalAppData%/KotobaSenpai/UniDic/dicdir</c> (where the first run downloads it). A
+/// directory can be injected at compile time to support offline tests (avoiding parallel tests mutating a
+/// process-level environment variable). Throws <see cref="WindowsPlatformException"/>
+/// (<see cref="ErrorCodes.UniDicDictionaryMissing"/>) when the dictionary is missing; throws
+/// <see cref="ErrorCodes.UniDicDictionaryInvalid"/> when present but with an invalid version/format/manifest.
 /// </summary>
 public sealed class UniDicTokenizer : ITokenizer, IDisposable
 {
@@ -29,8 +30,9 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
     private bool _disposed;
 
     /// <summary>
-    /// <paramref name="dictionaryDirectory"/> 为空时按 环境变量 <c>KOTOBA_UNIDIC_DIR</c> → 默认缓存目录 解析。
-    /// 仅默认缓存目录要求已安装 manifest（安装器写入）；环境变量/注入目录可无项目 manifest，但须过版本/格式校验。
+    /// When <paramref name="dictionaryDirectory"/> is empty, resolves via the <c>KOTOBA_UNIDIC_DIR</c> environment variable
+    /// → default cache directory. Only the default cache directory requires an installed manifest (written by the
+    /// installer); env-var/injected directories may lack the project manifest but must pass version/format validation.
     /// </summary>
     public UniDicTokenizer(ILogger logger, string? dictionaryDirectory = null)
     {
@@ -47,7 +49,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
         if (string.IsNullOrWhiteSpace(text))
             return Array.Empty<Token>();
 
-        // Parse 与节点投影在同一同步保护内，保证单例适配器的并发调用结果不互相污染。
+        // Parse and node projection run under the same sync guard, so concurrent calls on the singleton adapter don't pollute each other's results.
         lock (_gate)
         {
             try
@@ -72,26 +74,27 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
                         node.CType,
                         node.CForm,
                         node.AType,
-                        /* UTF-16 code-unit 起点：保留词前空格/换行，不用前序表面长度累加。 */
+                        /* UTF-16 code-unit start: preserves leading spaces/newlines before the word, instead of summing prior surface lengths. */
                         node.BPos + (node.RLength - node.Length)));
                 }
                 return result;
             }
             catch (WindowsPlatformException)
             {
-                throw; // 词典缺失/无效：按既有错误契约上抛，由上层呈现 UniDicDictionaryMissing/Invalid。
+                throw; // Dictionary missing/invalid: rethrow per the existing error contract; the upper layer surfaces UniDicDictionaryMissing/Invalid.
             }
             catch (Exception ex)
             {
-                // OCR 文本是不可信输入，可能含 MeCab 原生解析无法处理的字符（孤立代理/控制符等），
-                // 导致 ParseToLattice 越界。防御：跳过该行，不因单行坏文本拖垮整次识别。
+                // OCR text is untrusted input and may contain characters native MeCab parsing cannot handle (lone surrogates/control
+                // chars, etc.), causing ParseToLattice to go out of bounds. Defensive: skip the line, don't let one bad line
+                // tank the whole recognition pass.
                 _logger.Log(LogLevel.Warning, ex, "UniDicTokenizer: MeCab failed to parse '{text}' (skipping line)", Truncate(text));
                 return Array.Empty<Token>();
             }
         }
     }
 
-    /// <summary>截断日志文本，避免把整段 OCR 乱码写进日志。</summary>
+    /// <summary>Truncates log text so a whole block of OCR garbage isn't written to the log.</summary>
     private static string Truncate(string text) => text.Length <= 200 ? text : text[..200] + "…";
 
     public void Dispose()
@@ -103,7 +106,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
         _disposed = true;
     }
 
-    /// <summary>懒加载失败抛异常，Lazy 不缓存半初始化实例（下次访问重跑）。</summary>
+    /// <summary>Lazy loading throws on failure; Lazy does not cache a half-initialized instance (re-runs on next access).</summary>
     private MeCabUniDic22Tagger CreateTagger()
     {
         _logger.LogInformation("UniDicTokenizer: loading dictionary from '{dir}'", _dictionaryDirectory);
@@ -137,7 +140,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
                 ErrorCodes.UniDicDictionaryMissing,
                 $"UniDic dictionary missing required runtime files at '{_dictionaryDirectory}': {string.Join(", ", missing)}");
 
-        // 档案不含 version 文件（见 UniDicDictionaryInstaller）；版本由 SHA-256 固定，此处仅校验 dicrc 格式。
+        // The archive has no version file (see UniDicDictionaryInstaller); the version is pinned by SHA-256, so only the dicrc format is checked here.
         var dicrcOk = File.Exists(Path.Combine(_dictionaryDirectory, UniDicAssets.DicrcFileName))
             && File.ReadAllText(Path.Combine(_dictionaryDirectory, UniDicAssets.DicrcFileName))
                 .Contains(UniDicAssets.Format, StringComparison.Ordinal);

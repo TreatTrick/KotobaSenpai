@@ -3,7 +3,8 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// 一次识别会话的聚合根，保证覆盖层只属于当前目标窗口，并按整体替换刷新词列表。
+/// The aggregate root of a single recognition session. It guarantees the overlay belongs only to the
+/// current target window and refreshes the word list by wholesale replacement.
 /// </summary>
 public sealed class WordOverlaySession
 {
@@ -30,13 +31,13 @@ public sealed class WordOverlaySession
 
     public IReadOnlyList<GroupedWord> Words => _words;
 
-    /// <summary>已验证的 phrase group（含逐 part 屏幕几何）；无 phrase 分析时为空。</summary>
+    /// <summary>Validated phrase groups (with per-part screen geometry); empty when no phrase analysis ran.</summary>
     public IReadOnlyList<PhraseGroupView> PhraseGroups => _phraseGroups;
 
-    /// <summary>phrase 分析的可重试警告；无失败时为 null。</summary>
+    /// <summary>A retryable warning from phrase analysis; null when there was no failure.</summary>
     public string? PhraseWarning { get; }
 
-    /// <summary>每个词框底部内侧的一条下划线；刷新时整体替换，不留残留。</summary>
+    /// <summary>One underline at the bottom inside of each word box; replaced wholesale on refresh, leaving no residue.</summary>
     public IReadOnlyList<OverlayLine> Lines => _words
         .Select(word => new OverlayLine(
             word.Bounds.X,
@@ -44,7 +45,7 @@ public sealed class WordOverlaySession
             word.Bounds.Width))
         .ToArray();
 
-    /// <summary>启动一个新会话：过滤零宽词，并校验目标窗口不变量。</summary>
+    /// <summary>Starts a new session: filters zero-width words and validates the target-window invariants.</summary>
     public static WordOverlaySession Start(
         WindowTarget target,
         IEnumerable<GroupedWord> words,

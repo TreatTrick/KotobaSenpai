@@ -10,9 +10,10 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// <see cref="ILlmPhraseAnalyzer"/> 的协议无关适配器。BYOK 设置经 <see cref="ISettingsService"/> 读取；
-/// 传输、Bearer 鉴权、错误映射、取消/超时在此，请求/响应信封交给所选 <see cref="ILlmProtocol"/>。
-/// 未配置 key 时跳过调用。取消/超时/传输/拒绝/畸形 JSON 均映射为可重试诊断，不抛穿识别流程。
+/// Protocol-agnostic adapter for <see cref="ILlmPhraseAnalyzer"/>. BYOK settings are read via <see cref="ISettingsService"/>;
+/// transport, Bearer auth, error mapping, cancellation/timeout live here; the request/response envelope is handed to the
+/// selected <see cref="ILlmProtocol"/>. Skips the call when no key is configured. Cancellation/timeout/transport/refusal/
+/// malformed JSON are all mapped to retryable diagnostics rather than thrown through the recognition flow.
 /// </summary>
 public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
 {
@@ -33,7 +34,7 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _protocol = protocol ?? new OpenAiChatCompletionsProtocol();
-        // ponytail: fallback 仅服务于未注入 builder 的调用（生产经 DI 总注入）；本地化器缺失时返回键本身。
+        // ponytail: fallback only serves callers that don't inject a builder (production always injects via DI); returns the key itself when a localizer is missing.
         _promptBuilder = promptBuilder ?? new PhrasePromptBuilder(localizer ?? new KeyReturningLocalizer());
         _parser = parser ?? new PhraseResponseParser();
     }
@@ -94,16 +95,16 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
         }
         catch (Exception ex) when (ex is PhraseResponseException or JsonException or KeyNotFoundException or ArgumentNullException)
         {
-            // 协议信封或 group 结构不符（缺字段/文本为 null/非 JSON）→ 可重试警告，不抛穿识别流程。
+            // Protocol envelope or group structure mismatch (missing field / null text / non-JSON) → retryable warning, not thrown through the recognition flow.
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.MalformedJson, [], ex.Message);
         }
     }
 }
 
-/// <summary>未注入本地化器时的兜底：返回键名本身（仅测试/手动构造路径命中）。</summary>
+/// <summary>Fallback when no localizer is injected: returns the key name itself (only hit via tests/manual construction).</summary>
 internal sealed class KeyReturningLocalizer : IStringLocalizer
 {
-#pragma warning disable CS0067 // 接口要求的事件，兜底路径从不触发
+#pragma warning disable CS0067 // Event required by the interface; never raised on the fallback path
     public event EventHandler? CultureChanged;
 #pragma warning restore CS0067
 

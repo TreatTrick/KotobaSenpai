@@ -4,13 +4,14 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 编排 phrase 分析：先做本地句段划分与 token 引用，再并发调用提供方（每句独立请求，限并发），
-/// 校验 group、分配会话 ID、映射几何并保留提供方顺序。任何失败都只产生可重试警告，不抛穿识别流程，
-/// 本地词/span 保持可用。
+/// Orchestrates phrase analysis: first performs local sentence segmentation and token references, then calls
+/// the provider concurrently (one independent request per sentence, concurrency-limited), validates groups,
+/// assigns session ids, maps geometry, and preserves provider order. Any failure only produces a retryable
+/// warning and never throws through the recognition flow; local words/spans remain usable.
 /// </summary>
 public sealed class PhraseAnalysisOrchestrator
 {
-    // ponytail: 并发上限 4——典型 VN 对话框 2~5 句，超过是对 DeepSeek 温和；若遇 429 或需更高吞吐再调。
+    // ponytail: concurrency cap of 4 — a typical VN dialogue box has 2~5 sentences, capping beyond that is gentle on DeepSeek; tune if 429s occur or higher throughput is needed.
     private const int MaxConcurrency = 4;
 
     private readonly ILlmPhraseAnalyzer _analyzer;
@@ -33,7 +34,7 @@ public sealed class PhraseAnalysisOrchestrator
     {
         ArgumentNullException.ThrowIfNull(lines);
 
-        // 先纯本地构建请求（快、零 I/O），保持 segment 顺序；Task.WhenAll 按输入顺序返回结果，故无需再排序。
+        // First build the requests purely locally (fast, zero I/O), preserving segment order; Task.WhenAll returns results in input order, so no re-sorting is needed.
         var requests = BuildRequests(lines);
         if (requests.Count == 0)
             return new PhraseAnalysisRun(PhraseAnalysisOutcome.Success, [], null);
@@ -48,7 +49,7 @@ public sealed class PhraseAnalysisOrchestrator
             return Failed(PhraseAnalysisOutcome.Cancelled, "Phrase analysis cancelled.", []);
         }
 
-        // 逐句独立评估：失败句记 warning 跳过，其余照常，符合"部分可用"定位。
+        // Evaluate each sentence independently: failed sentences are recorded as warnings and skipped, the rest proceed as usual, matching the "partially usable" positioning.
         var groups = new List<PhraseGroup>();
         var warnings = new List<string>();
         PhraseAnalysisOutcome? firstFailure = null;
@@ -71,7 +72,7 @@ public sealed class PhraseAnalysisOrchestrator
             groups.AddRange(validation.ValidGroups.Select(group => group.WithSessionId(Guid.NewGuid())));
         }
 
-        // 只要任一（能处理的）句成功即整体 Success；全失败才取首个失败类别。
+        // As long as any (processable) sentence succeeds, the overall outcome is Success; only when all fail is the first failure category taken.
         var outcome = groups.Count > 0 || results.Any(result => result.Succeeded)
             ? PhraseAnalysisOutcome.Success
             : firstFailure ?? PhraseAnalysisOutcome.Success;
@@ -100,7 +101,7 @@ public sealed class PhraseAnalysisOrchestrator
         return requests;
     }
 
-    // ponytail: 限流逻辑收进私有方法，主流程平铺可读。
+    // ponytail: throttle logic folded into a private method so the main flow stays flat and readable.
     private async Task<PhraseAnalysisResult[]> RunThrottledAsync(
         IReadOnlyList<PhraseAnalysisRequest> requests,
         CancellationToken cancellationToken)

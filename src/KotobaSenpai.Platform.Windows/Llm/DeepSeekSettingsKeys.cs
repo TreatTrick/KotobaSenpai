@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Platform.Windows.Llm;
 
-/// <summary>DeepSeek 兼容 BYOK 配置的 settings.json 键与默认值。</summary>
+/// <summary>settings.json keys and defaults for DeepSeek-compatible BYOK configuration.</summary>
 public static class DeepSeekSettingsKeys
 {
     public const string ApiKey = "DeepSeekApiKey";

@@ -5,9 +5,10 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 依据 token 的 lemma（辞书形）查词典，按 Lemma → OrthBase → Reading → BaseReading 回退。
-/// 每个键先查表记表再查读音表（归一为平假名）；全未命中返回空。
-/// MeCab 已给出辞书形，无需去活用引擎。
+/// Looks up the dictionary by the token's lemma (dictionary form), falling back through
+/// Lemma → OrthBase → Reading → BaseReading. Each key is looked up in the kanji table first, then the reading
+/// table (normalized to hiragana); returns empty when nothing matches. MeCab already provides the dictionary
+/// form, so no de-inflection engine is needed.
 /// </summary>
 public sealed class JmdictLookupService : IDictionaryLookup, IBatchDictionaryLookup
 {

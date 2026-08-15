@@ -5,8 +5,8 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// <see cref="LogConfiguration"/> 单元测试：经 in-memory fake <see cref="ISettingsService"/> 验证
-/// 缺省/缺字段回退 Error、解析 "Warning"、非法值回退 Error。文件 I/O 与容错由设置服务承担，本测试不触磁盘。
+/// <see cref="LogConfiguration"/> unit tests: via an in-memory fake <see cref="ISettingsService"/>, verify
+/// absent-field fallback to Error, parsing "Warning", and invalid-value fallback to Error. File I/O and fault tolerance are handled by the settings service; these tests do not touch the disk.
 /// </summary>
 public sealed class LogConfigurationTests
 {

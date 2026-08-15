@@ -6,8 +6,8 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.App.Diagnostics;
 
 /// <summary>
-/// 诊断记录：设置项 <c>DiagEnabled</c> 为 "true" 时，把最终查词词块（source token 细节 + 包围盒）
-/// 写到 <c>%LocalAppData%/KotobaSenpai/diag/</c>，与识别器保存的截图/OCR 结构同目录，供离线分析。
+/// Diagnostics: when the setting <c>DiagEnabled</c> is "true", writes the final lookup phrase groups (source token details + bounding boxes)
+/// to <c>%LocalAppData%/KotobaSenpai/diag/</c>, in the same directory as the screenshots/OCR that the recognizer saves, for offline analysis.
 /// </summary>
 public sealed class FileDiagnosticReporter : IDiagnosticReporter
 {
@@ -35,7 +35,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
             $"target={target.Title} bounds={target.Bounds}",
             $"tokens={groupedWords.Count} spans={groupedWords.Count}",
             "",
-            "## 查词词块结果",
+            "## word lookup results",
         };
         for (int i = 0; i < groupedWords.Count; i++)
         {
@@ -57,7 +57,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
             "KotobaSenpai", "diag");
         Directory.CreateDirectory(dir);
 
-        var flags = new[] { "## phrase 分析", $"outcome={outcome}", $"groups={groups.Count}" };
+        var flags = new[] { "## phrase analysis", $"outcome={outcome}", $"groups={groups.Count}" };
         if (!string.IsNullOrEmpty(warning))
             flags = flags.Append($"warning={warning}").ToArray();
         File.WriteAllLines(Path.Combine(dir, $"phrase-{DateTime.Now:HHmmss-fff}.txt"), flags);

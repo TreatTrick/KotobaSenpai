@@ -5,8 +5,8 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 应用服务：编排“捕获 -> OCR -> 坐标映射 -> 覆盖层”用例。
-/// 仅依赖 Core 端口，平台实现通过依赖注入注入。
+/// Application service orchestrating the "capture -> OCR -> coordinate mapping -> overlay" use case.
+/// Depends only on Core ports; platform implementations are injected via dependency injection.
 /// </summary>
 public sealed class WordOverlayApplicationService
 {
@@ -38,13 +38,13 @@ public sealed class WordOverlayApplicationService
         CancellationToken cancellationToken = default)
     {
         var result = await _recognizer.RecognizeAsync(target, cancellationToken).ConfigureAwait(false);
-        // 先在帧坐标系内经分词器把字符重组成词（纯逻辑、坐标不变），再把每个词的并集框映射到屏幕。
+        // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
             .Select(word => word.WithBounds(
                 CoordinateMapper.ToScreen(word.Bounds, result.FrameWidth, result.FrameHeight, target.Bounds)))
             .ToArray();
 
-        // 本地识别完成后，按设置开关做 phrase 分析；失败只产生警告，本地词/span 保持可用。
+        // After local recognition, run phrase analysis per the settings toggle; failure only produces a warning, and local words/spans remain usable.
         PhraseAnalysisRun? phraseRun = null;
         if (_phraseOrchestrator is not null && IsPhraseEnabled())
         {

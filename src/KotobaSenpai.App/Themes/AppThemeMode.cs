@@ -1,6 +1,6 @@
 namespace KotobaSenpai.App.Themes;
 
-/// <summary>主题模式：<see cref="Auto"/> 跟随 Windows 系统主题；<see cref="Light"/>/<see cref="Dark"/> 为显式覆盖。</summary>
+/// <summary>Theme mode: <see cref="Auto"/> follows the Windows system theme; <see cref="Light"/>/<see cref="Dark"/> are explicit overrides.</summary>
 public enum AppThemeMode
 {
     Auto,

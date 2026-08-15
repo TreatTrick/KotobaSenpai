@@ -3,8 +3,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 将 OCR 词框按捕获帧与窗口屏幕矩形的比例映射为屏幕物理像素坐标，并裁剪到窗口边界内。
-/// 仅依赖物理像素，与 DPI 无关；DPI 到 DIP 的转换由平台适配器负责。
+/// Maps OCR word boxes to screen physical-pixel coordinates by the ratio of the capture frame to the window's
+/// screen rectangle, clipping into the window bounds. Depends only on physical pixels, independent of DPI;
+/// the DPI-to-DIP conversion is handled by the platform adapter.
 /// </summary>
 public static class CoordinateMapper
 {

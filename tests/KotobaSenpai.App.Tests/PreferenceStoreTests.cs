@@ -5,8 +5,8 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// 偏好存储门面测试：经 in-memory fake <see cref="ISettingsService"/> 验证语言/主题存储的类型化存取与回退，
-/// 不触磁盘。文件 I/O 与未知字段保留由 <see cref="SettingsService"/> 测试覆盖。
+/// Preference-store facade tests: verify typed access and fallback for the language/theme stores via an in-memory fake <see cref="ISettingsService"/>,
+/// without touching the disk. File I/O and unknown-field preservation are covered by the <see cref="SettingsService"/> tests.
 /// </summary>
 public sealed class PreferenceStoreTests
 {

@@ -1,14 +1,14 @@
 namespace KotobaSenpai.App.Localization;
 
 /// <summary>
-/// 语言偏好持久化端口：跨重启保存/恢复用户选择的语言。最小 JSON 持久化，待设置模块落地后迁移。
-/// 抽象为端口便于在测试中以 in-memory fake 验证恢复逻辑，无需触碰磁盘。
+/// Language-preference persistence port: saves/restores the user's chosen language across restarts. Minimal JSON persistence, to migrate once the settings module lands.
+/// Abstracted as a port so tests can validate the restore logic with an in-memory fake without touching disk.
 /// </summary>
 public interface ILanguagePreferenceStore
 {
-    /// <summary>读取已持久化的语言偏好（culture 名）；不存在或损坏时返回 null。</summary>
+    /// <summary>Reads the persisted language preference (culture name); returns null when absent or corrupt.</summary>
     string? Load();
 
-    /// <summary>持久化语言偏好（culture 名）。</summary>
+    /// <summary>Persists the language preference (culture name).</summary>
     void Save(string cultureName);
 }

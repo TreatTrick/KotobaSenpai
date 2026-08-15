@@ -6,8 +6,8 @@ using KotobaSenpai.Core.Logging;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// <see cref="FileLogger"/> 单元测试：行格式、错误码提取、异常转储、按日滚动、目录自动创建、
-/// 级别过滤、并发安全、文件系统失败不抛。用临时目录与可注入时钟隔离。
+/// <see cref="FileLogger"/> unit tests: line format, error-code extraction, exception dump, daily rotation, auto-creating the directory,
+/// level filtering, concurrency safety, and not throwing on file-system failure. Isolated with a temp directory and an injectable clock.
 /// </summary>
 public sealed class FileLoggerTests
 {
@@ -145,14 +145,14 @@ public sealed class FileLoggerTests
     [Fact]
     public void Does_not_throw_when_file_system_fails()
     {
-        // 把一个文件路径当作日志目录传入 -> 创建目录/写入失败，必须吞掉而非抛给调用方。
+        // Pass a file path in as the log directory -> creating the directory / writing fails; must swallow it rather than throw to the caller.
         var fileAsDir = Path.Combine(Path.GetTempPath(), "kslog_blocker_" + Guid.NewGuid().ToString("N") + ".log");
         File.WriteAllText(fileAsDir, "x");
         try
         {
             var logger = new FileLogger(fileAsDir, LogLevel.Error);
             logger.LogError(new InvalidOperationException("boom"), "msg");
-            logger.Dispose(); // 也不抛
+            logger.Dispose(); // also does not throw
         }
         finally
         {

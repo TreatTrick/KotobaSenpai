@@ -2,7 +2,7 @@ using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Core.Contracts;
 
-/// <summary>端口：按表记（汉字）或平假读音查 JMdict 条目。实现位于 Platform（SQLite）。</summary>
+/// <summary>Port: looks up JMdict entries by orthography (kanji) or kana reading. Implementations live in Platform (SQLite).</summary>
 public interface IJmdictRepository
 {
     IReadOnlyList<DictionaryEntry> FindByKanji(string kanji);
@@ -10,8 +10,9 @@ public interface IJmdictRepository
     IReadOnlyList<DictionaryEntry> FindByKana(string kana);
 
     /// <summary>
-    /// 按多个表记/读音键批量返回结果，键为数据库中的原始 form。
-    /// 默认实现保留旧适配器兼容性；SQLite 适配器覆盖为单连接批量查询。
+    /// Returns results batched by multiple orthography/reading keys, the keys being the raw forms in the
+    /// database. The default implementation preserves legacy adapter compatibility; the SQLite adapter overrides
+    /// it with a single-connection batch query.
     /// </summary>
     IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> FindByForms(
         IReadOnlyCollection<string> forms)

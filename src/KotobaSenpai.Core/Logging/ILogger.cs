@@ -1,24 +1,25 @@
 namespace KotobaSenpai.Core.Logging;
 
 /// <summary>
-/// 跨切面日志端口。位于 Core（零外部依赖），文件实现在 App；ViewModel 仅依赖本端口，
-/// 与 <c>IStringLocalizer</c> 端口-适配器风格一致。端口不引用 <c>Core.Localization</c>：
-/// 用户可见异常的 <c>ErrorCode</c> 提取由 App 实现完成，保持日志与本地化两个跨切面端口解耦。
+/// Cross-cutting logging port. It lives in Core (zero external dependencies) with the file implementation in
+/// App; the ViewModel depends only on this port, in the same port-adapter style as <c>IStringLocalizer</c>. The
+/// port does not reference <c>Core.Localization</c>: extracting the <c>ErrorCode</c> of user-visible exceptions
+/// is done by the App implementation, keeping the logging and localization cross-cutting ports decoupled.
 /// </summary>
 public interface ILogger
 {
-    /// <summary>写一条日志；<paramref name="exception"/> 非 null 时附带类型/消息/堆栈。</summary>
+    /// <summary>Writes a log entry; when <paramref name="exception"/> is non-null its type/message/stack trace are included.</summary>
     void Log(LogLevel level, Exception? exception, string message, params object[] args);
 
-    /// <summary>Error 级便捷重载（记异常）。</summary>
+    /// <summary>Error-level convenience overload (records an exception).</summary>
     void LogError(Exception exception, string message, params object[] args)
         => Log(LogLevel.Error, exception, message, args);
 
-    /// <summary>Warning 级便捷重载。</summary>
+    /// <summary>Warning-level convenience overload.</summary>
     void LogWarning(string message, params object[] args)
         => Log(LogLevel.Warning, null, message, args);
 
-    /// <summary>Information 级便捷重载。</summary>
+    /// <summary>Information-level convenience overload.</summary>
     void LogInformation(string message, params object[] args)
         => Log(LogLevel.Information, null, message, args);
 }

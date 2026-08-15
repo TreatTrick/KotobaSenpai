@@ -71,7 +71,7 @@ public sealed class MainWindowViewModelTests
         vm.SelectedWindow = target;
         Assert.Equal($"{ResourceKeys.Status_Selected}:Other", vm.Status);
 
-        // 模拟文化切换后渲染结果改变；ViewModel 应据此重算 Status。
+        // Simulate the rendered result changing after a culture switch; the ViewModel should recompute Status accordingly.
         localizer.Suffix = "!";
         localizer.RaiseCultureChanged();
 
@@ -86,7 +86,7 @@ public sealed class MainWindowViewModelTests
 
         vm.RefreshCommand.Execute(null);
 
-        // 所有错误路径汇集到 SetError，记一次日志；状态经解析器映射为回退错误码。
+        // All error paths funnel into SetError, logging once; the status is mapped via the resolver to a fallback error code.
         Assert.Equal(1, logger.ErrorCount);
         Assert.Equal(ErrorCodes.WindowEnumerationFailed, vm.Status);
     }
@@ -144,7 +144,7 @@ public sealed class MainWindowViewModelTests
         public void Hide() => HideCount++;
     }
 
-    /// <summary>本地化 fake：按键返回可辨识字符串（含 Suffix 以便测试文化切换后的重渲染）。</summary>
+    /// <summary>Localization fake: returns a recognizable string per key (including Suffix so culture-switch re-rendering can be tested).</summary>
     private sealed class FakeStringLocalizer : IStringLocalizer
     {
         public string Suffix { get; set; } = string.Empty;
@@ -157,7 +157,7 @@ public sealed class MainWindowViewModelTests
         public void RaiseCultureChanged() => CultureChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>日志 fake：捕获 Error 级调用次数与异常，验证错误路径恰好记一次。</summary>
+    /// <summary>Logging fake: captures Error-level call count and exceptions, verifying error paths log exactly once.</summary>
     private sealed class FakeLogger : ILogger
     {
         public int ErrorCount { get; private set; }

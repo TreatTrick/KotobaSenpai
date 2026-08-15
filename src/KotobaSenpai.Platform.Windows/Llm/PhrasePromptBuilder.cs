@@ -5,10 +5,12 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// 构造三个协议共享的语义 prompt：system prompt + 用户内容（句段文本、token 元数据与本地连续 span 摘要）。
-/// 只发文本与元数据，绝不发送截图、窗口坐标、标题或 API key。信封（含结构化输出声明）由各
-/// <see cref="ILlmProtocol"/> 负责。超出体积上限时抛 <see cref="RequestTooLargeException"/>。
-/// prompt 文案经 <see cref="IStringLocalizer"/> 按当前激活文化解析，运行时切语在下次请求时生效。
+/// Builds the semantic prompt shared by the three protocols: system prompt + user content (segment text, token metadata,
+/// and a summary of local consecutive spans). Only text and metadata are sent; screenshots, window coordinates, titles,
+/// and API keys are never. Each <see cref="ILlmProtocol"/> owns the envelope (including the structured-output
+/// declaration). Throws <see cref="RequestTooLargeException"/> when the size limit is exceeded. The prompt copy is
+/// resolved by <see cref="IStringLocalizer"/> against the active culture; a runtime language switch takes effect on the
+/// next request.
 /// </summary>
 public sealed class PhrasePromptBuilder
 {
@@ -21,7 +23,7 @@ public sealed class PhrasePromptBuilder
         _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
     }
 
-    /// <summary>返回 (systemPrompt, userContent)。userContent 超过体积上限时抛 <see cref="RequestTooLargeException"/>。</summary>
+    /// <summary>Returns (systemPrompt, userContent). Throws <see cref="RequestTooLargeException"/> when userContent exceeds the size limit.</summary>
     public (string SystemPrompt, string UserContent) Build(PhraseAnalysisRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -47,5 +49,5 @@ public sealed class PhrasePromptBuilder
     }
 }
 
-/// <summary>请求 prompt 超出提供方文本上限。</summary>
+/// <summary>The request prompt exceeds the provider's text limit.</summary>
 public sealed class RequestTooLargeException(string message) : Exception(message);

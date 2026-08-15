@@ -26,12 +26,12 @@ using Microsoft.Extensions.DependencyInjection;
 namespace KotobaSenpai.App;
 
 /// <summary>
-/// 组合根：启动时按端口注册依赖并由容器装配对象图。
-/// 平台适配器实现领域端口，应用服务与视图模型由容器自动解析其构造依赖。
-/// 本地化端口（<see cref="IStringLocalizer"/> 等）位于 Core，实现位于 App；启动时在任何本地化资源
-/// 被访问前由 <see cref="LanguageService"/> 解析并设置 UI 文化。
-/// 日志端口 <see cref="ILogger"/> 位于 Core，<see cref="FileLogger"/> 实现位于 App；启动时清理过期日志、
-/// 注册全局未处理异常兜底（记日志后向用户显示本地化提示再受控退出），运行期靠跨日滚动事件触发清理。
+/// Composition root: registers dependencies by port at startup and lets the container assemble the object graph.
+/// Platform adapters implement domain ports; application services and view models have their constructor dependencies resolved automatically by the container.
+/// Localization ports (<see cref="IStringLocalizer"/>, etc.) live in Core, their implementations in App; at startup, before any localization resource
+/// is accessed, <see cref="LanguageService"/> resolves and sets the UI culture.
+/// The logging port <see cref="ILogger"/> lives in Core, its <see cref="FileLogger"/> implementation in App; at startup expired logs are cleaned up,
+/// a global unhandled-exception handler is registered (logs, shows a localized notice to the user, then exits in a controlled way), and at runtime cleanup is triggered by the cross-midnight rollover event.
 /// </summary>
 public partial class App : Application
 {
@@ -42,21 +42,21 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
-        // 主窗口关闭即退出整个应用；否则下划线 overlay 作为独立窗口会残留（默认 OnLastWindowClose 等不到它关）。
+        // Closing the main window exits the whole app; otherwise the underline overlay, being a separate window, would linger (the default OnLastWindowClose never waits for it to close).
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
         var services = new ServiceCollection();
         ConfigureServices(services);
         _services = services.BuildServiceProvider();
 
-        // 在任何本地化资源被访问前，按偏好/OS 解析并设置 UI 文化。
+        // Before any localization resource is accessed, resolve and set the UI culture from preference/OS.
         var languageService = _services.GetRequiredService<LanguageService>();
         languageService.Initialize();
 
-        // 供 XAML LocExtension 静态桥解析键。
+        // Provides the static bridge for the XAML LocExtension to resolve keys.
         LocalizationHost.Localizer = _services.GetRequiredService<IStringLocalizer>();
 
-        // 日志：启动即清理过期日志，存日志器供全局兜底（运行期靠跨日滚动事件触发清理，无后台定时器）。
+        // Logging: clean up expired logs at startup, keep the logger for the global fallback (at runtime cleanup is triggered by the cross-midnight rollover event; no background timer).
         _services.GetRequiredService<LogRetentionPolicy>().Cleanup();
         _logger = _services.GetRequiredService<FileLogger>();
 
@@ -74,7 +74,7 @@ public partial class App : Application
         };
         window.Show();
 
-        // 词典安装：主窗显示后触发，遮挡层阻断其余操作并显示进度/错误；失败可在层内重试。
+        // Dictionary install: triggered after the main window is shown; the overlay blocks all other operations and shows progress/errors; on failure it can retry inside the overlay.
         if (!installController.IsInstalled)
             installController.InstallCommand.Execute(null);
     }
@@ -86,7 +86,7 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    /// <summary>供词典下载的 HttpClient：502MB 压缩包下载需长超时，避免默认 100s 中途失败。</summary>
+    /// <summary>HttpClient for the dictionary download: a 502MB archive download needs a long timeout to avoid failing mid-way on the default 100s.</summary>
     private static HttpClient CreateDownloadHttpClient()
     {
         var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
@@ -94,7 +94,7 @@ public partial class App : Application
         return client;
     }
 
-    /// <summary>按端口注册领域端口与其平台适配器；本地化端口与语言服务由容器解析依赖。</summary>
+    /// <summary>Registers domain ports and their platform adapters by port; the localization ports and language service have their dependencies resolved by the container.</summary>
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddSingleton<IWindowCatalog, Win32WindowCatalog>();
@@ -102,9 +102,9 @@ public partial class App : Application
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
 
-        // Phrase 分析：协议无关适配器 + 可插拔协议。本地词/span 先完成，失败只产生可重试警告，
-        // 由配置键 PhraseGroupsEnabled=true 启用；未配置 key 时适配器返回 NoKey 跳过调用。
-        // 协议由 DeepSeekProtocol 选择（anthropic/responses/默认 OpenAI Chat Completions）。
+        // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
+        // enabled by the config key PhraseGroupsEnabled=true; when the key is not configured the adapter returns NoKey and skips the call.
+        // The protocol is selected by DeepSeekProtocol (anthropic/responses/default OpenAI Chat Completions).
         services.AddSingleton<PhrasePromptBuilder>();
         services.AddSingleton<PhraseResponseParser>();
         services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
@@ -124,11 +124,11 @@ public partial class App : Application
         services.AddSingleton<PhraseAnalysisOrchestrator>();
 
         services.AddSingleton<WordOverlayApplicationService>();
-        // 诊断记录：DiagEnabled=true 时把分词结果写盘，供离线分析。
+        // Diagnostics: when DiagEnabled=true, write the tokenization results to disk for offline analysis.
         services.AddSingleton<IDiagnosticReporter, FileDiagnosticReporter>();
 
-        // 本地日英词典：JMdict .db 随发布捆绑在程序目录；同一个 lookup 实例同时提供单项与批量端口，
-        // 让一次识别只做一轮候选查询并共享其缓存。
+        // Local Japanese-English dictionary: the JMdict .db is bundled with the release in the program directory; the same lookup instance provides both single and batch ports,
+        // so one recognition runs a single round of candidate lookups and shares its cache.
         var jmdictDbPath = Path.Combine(AppContext.BaseDirectory, "jmdict.db");
         services.AddSingleton<IJmdictRepository>(new JmdictSqliteRepository(jmdictDbPath));
         services.AddSingleton<JmdictLookupService>();
@@ -136,27 +136,27 @@ public partial class App : Application
         services.AddSingleton<IBatchDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
         services.AddSingleton<ITokenSpanResolver, TokenBoundarySpanResolver>();
 
-        // 日语分词：平台适配器懒加载 UniDic 词典；安装器单例持有固定 URL 的 HttpClient（M1 首次运行下载）。
+        // Japanese tokenization: the platform adapter lazily loads the UniDic dictionary; the installer singleton holds a fixed-URL HttpClient (downloaded on first M1 run).
         services.AddSingleton<ITokenizer>(sp => new UniDicTokenizer(sp.GetRequiredService<ILogger>()));
         services.AddSingleton(sp => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
-        // 安装协调器：驱动启动遮挡层（进度/错误/重试）。
+        // Install coordinator: drives the startup overlay (progress/error/retry).
         services.AddSingleton<UniDicInstallController>();
-        // 词分组：先整次 OCR 批量解析 token-boundary span，再把同一结果用于下划线和悬停。
+        // Word grouping: first resolve token-boundary spans in a single batched OCR pass, then reuse the same result for both underlines and hover.
         services.AddSingleton<IOcrWordGroupingService>(sp => new WordGroupingService(
             sp.GetRequiredService<ITokenizer>(),
             sp.GetRequiredService<ITokenSpanResolver>()));
 
-        // 设置：统一 settings.json 读写，为偏好存储与日志级别配置提供唯一归属（单例，持有内存视图）。
+        // Settings: unified settings.json read/write, the single owner for preference storage and log-level configuration (singleton, holds the in-memory view).
         services.AddSingleton<ISettingsService, SettingsService>();
 
-        // 本地化：具体实现与 Core 端口指向同一单例，使 LanguageService 与 ViewModel 共享文化状态。
+        // Localization: the concrete implementation and the Core port point at the same singleton, so LanguageService and the ViewModel share culture state.
         services.AddSingleton<ResourceManagerStringLocalizer>();
         services.AddSingleton<IStringLocalizer>(sp => sp.GetRequiredService<ResourceManagerStringLocalizer>());
         services.AddSingleton<IUserMessageResolver, UserMessageResolver>();
         services.AddSingleton<ILanguagePreferenceStore, LocalAppDataLanguagePreferenceStore>();
         services.AddSingleton<LanguageService>();
 
-        // 日志：FileLogger 单例持有文件句柄；LogRetentionPolicy 单例供启动/定时器/跨日滚动共用。
+        // Logging: the FileLogger singleton holds the file handle; the LogRetentionPolicy singleton is shared by startup/timer/cross-midnight rollover.
         var logsDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KotobaSenpai", "logs");
@@ -167,14 +167,14 @@ public partial class App : Application
             sp.GetRequiredService<LogRetentionPolicy>()));
         services.AddSingleton<ILogger>(sp => sp.GetRequiredService<FileLogger>());
 
-        // 主题：偏好存储端口与视图层 FluentThemeService 单例（持有窗口 OS 跟随订阅，须共享）。
+        // Theme: the preference-store port and the view-layer FluentThemeService singleton (holds the window OS-follow subscription; must be shared).
         services.AddSingleton<IThemePreferenceStore, LocalAppDataThemePreferenceStore>();
         services.AddSingleton<FluentThemeService>();
 
         services.AddSingleton<MainWindowViewModel>();
     }
 
-    /// <summary>注册全局未处理异常兜底：均记 Error 级日志；终止性异常记日志后向用户显示本地化提示再退出。</summary>
+    /// <summary>Registers global unhandled-exception fallbacks: all log at Error level; terminating exceptions log, show a localized notice to the user, then exit.</summary>
     private void ConfigureGlobalErrorHandling()
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
@@ -184,7 +184,7 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        // 记日志（FileLogger 每次写入即刷新，崩溃前已落盘）后向用户提示，再受控退出。
+        // Log (FileLogger flushes on each write, so it is on disk before a crash), then prompt the user, then exit in a controlled way.
         Try(() => _logger?.LogError(e.Exception, "Unhandled exception on dispatcher thread"));
         ShowUnexpectedErrorNotice();
         e.Handled = true;
@@ -203,10 +203,10 @@ public partial class App : Application
     private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
         Try(() => _logger?.LogError(e.Exception, "Unobserved task exception"));
-        // 不 SetObserved、不弹窗、不改变默认（非致命）语义。
+        // Do not SetObserved, do not show a dialog, do not change the default (non-fatal) semantics.
     }
 
-    /// <summary>显示通用本地化错误提示（不向用户暴露堆栈）。容器未就绪时跳过。</summary>
+    /// <summary>Shows a generic localized error notice (without exposing the stack trace to the user). Skipped when the container is not ready.</summary>
     private void ShowUnexpectedErrorNotice()
     {
         var localizer = _services?.GetService<IStringLocalizer>();
@@ -218,7 +218,7 @@ public partial class App : Application
         MessageBox.Show(message, title, MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
-    /// <summary>吞掉所有异常的简易包装，用于日志/兜底路径，确保这些路径绝不向调用方抛。</summary>
+    /// <summary>A simple wrapper that swallows all exceptions, used on logging/fallback paths to ensure these paths never throw to the caller.</summary>
     private static void Try(Action action)
     {
         try { action(); }

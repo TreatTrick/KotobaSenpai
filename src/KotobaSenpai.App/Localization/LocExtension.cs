@@ -4,9 +4,9 @@ using System.Windows.Markup;
 namespace KotobaSenpai.App.Localization;
 
 /// <summary>
-/// XAML 标记扩展：<c>{loc:Loc Key=...}</c> 解析为当前文化的本地化文本，并在运行时文化切换后
-/// 就地更新，无需重启或重建窗口。键缺失时显示键名以便发现缺口。标记扩展由 XAML 实例化、
-/// 无法走 DI，故通过 <see cref="LocalizationHost"/> 静态桥获取本地化器。
+/// XAML markup extension: <c>{loc:Loc Key=...}</c> resolves to the current culture's localized text and updates in place
+/// after a runtime culture switch, without needing a restart or window rebuild. When the key is missing, the key name is shown so gaps are easy to spot. Markup extensions are instantiated by XAML
+/// and cannot go through DI, so the localizer is obtained through the <see cref="LocalizationHost"/> static bridge.
 /// </summary>
 [MarkupExtensionReturnType(typeof(string))]
 public sealed class LocExtension : MarkupExtension
@@ -15,7 +15,7 @@ public sealed class LocExtension : MarkupExtension
 
     public LocExtension(string key) => Key = key;
 
-    /// <summary>要解析的资源键（对应 Strings.resx 中的条目名）。</summary>
+    /// <summary>The resource key to resolve (corresponds to an entry name in Strings.resx).</summary>
     public string Key { get; set; } = string.Empty;
 
     public override object ProvideValue(IServiceProvider serviceProvider)

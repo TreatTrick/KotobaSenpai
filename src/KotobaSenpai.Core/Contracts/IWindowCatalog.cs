@@ -2,7 +2,7 @@ using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Core.Contracts;
 
-/// <summary>端口：枚举当前可见的顶层窗口。</summary>
+/// <summary>Port: enumerates the currently visible top-level windows.</summary>
 public interface IWindowCatalog
 {
     IReadOnlyList<WindowTarget> ListVisibleWindows();

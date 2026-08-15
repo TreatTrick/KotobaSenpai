@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace KotobaSenpai.Platform.Windows.Llm;
 
-/// <summary>OpenAI Chat Completions 协议：<c>/chat/completions</c>，<c>response_format</c> strict JSON schema。</summary>
+/// <summary>OpenAI Chat Completions protocol: <c>/chat/completions</c>, with <c>response_format</c> strict JSON schema.</summary>
 public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
 {
     public string Path => "/chat/completions";

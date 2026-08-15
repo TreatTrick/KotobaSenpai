@@ -6,8 +6,8 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Platform.Windows.Capture;
 
 /// <summary>
-/// 通过 Win32 枚举当前可见、未最小化且有标题的顶层窗口，供用户选择目标。
-/// 选择结果仅在进程内保留句柄，不写入截图或原始窗口内容。
+/// Enumerates the currently visible, non-minimized, titled top-level windows via Win32 for the user to pick a target.
+/// The selection only keeps a handle in-process; no screenshots or raw window content are written.
 /// </summary>
 public sealed class Win32WindowCatalog : IWindowCatalog
 {
@@ -25,8 +25,9 @@ public sealed class Win32WindowCatalog : IWindowCatalog
             if (string.IsNullOrWhiteSpace(title) || !GetClientRect(handle, out var rect))
                 return true;
 
-            // 用客户区（不含标题栏/边框）作为捕获与坐标基准：避免标题栏文字干扰 OCR，
-            // 且与 DokiDokiDict 的 GetClientRect 捕获一致。ClientToScreen 把客户区原点转到屏幕坐标。
+            // Use the client area (excluding the title bar/borders) as the capture and coordinate basis: avoids title-bar text
+            // interfering with OCR, and matches DokiDokiDict's GetClientRect capture. ClientToScreen converts the client-area
+            // origin to screen coordinates.
             var width = rect.Right - rect.Left;
             var height = rect.Bottom - rect.Top;
             if (width <= 0 || height <= 0 || !ClientToScreen(handle, out var origin))

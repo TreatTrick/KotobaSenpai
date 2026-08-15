@@ -4,10 +4,11 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// 严格校验结构化输出中的 group 数组。结构不符（缺字段、类型错误、parts 非数组）抛
-/// <see cref="PhraseResponseException"/>；token 归属/顺序等语义校验由 Core 编排器负责。
-/// 信封提取（各协议读取结构化输出位置）由 <see cref="ILlmProtocol.ExtractGroupsJson"/> 承担，
-/// 这里只做字段校验。可选字段（confidence/reason）被忽略。
+/// Strictly validates the group array in structured output. Structural mismatches (missing fields, wrong types, parts
+/// not being an array) throw <see cref="PhraseResponseException"/>; semantic validation such as token ownership/order is
+/// the Core orchestrator's job. Envelope extraction (where each protocol reads the structured output) is handled by
+/// <see cref="ILlmProtocol.ExtractGroupsJson"/>; this only does field validation. Optional fields (confidence/reason)
+/// are ignored.
 /// </summary>
 public sealed class PhraseResponseParser
 {
@@ -60,6 +61,6 @@ public sealed class PhraseResponseParser
     }
 }
 
-/// <summary>提供方响应结构不符。</summary>
+/// <summary>The provider response structure does not match what was expected.</summary>
 public sealed class PhraseResponseException(string message, Exception? innerException = null)
     : Exception(message, innerException);

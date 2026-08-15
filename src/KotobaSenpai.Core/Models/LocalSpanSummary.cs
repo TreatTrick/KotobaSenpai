@@ -1,6 +1,6 @@
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>本地已解析的连续 JMdict span 摘要，供 LLM 看到已由本地托底的连续词，避免其重复发现。</summary>
+/// <summary>Summary of a locally resolved contiguous JMdict span, letting the LLM see the contiguous words already covered locally and avoid re-discovering them.</summary>
 public sealed record LocalSpanSummary(
     string Surface,
     string Reading,

@@ -10,20 +10,20 @@ using NetArchTest.Rules;
 namespace KotobaSenpai.Architecture.Tests;
 
 /// <summary>
-/// 依赖方向架构测试：用 NetArchTest 把 Core / Platform.Windows / App 的依赖方向钉死，
-/// 等价于 ESLint 的 import 规则，随 <c>dotnet test</c> / CI 执行。
+/// Dependency-direction architecture tests: NetArchTest pins down the dependency direction of Core / Platform.Windows / App,
+/// equivalent to ESLint import rules, run as part of <c>dotnet test</c> / CI.
 /// <para>
-/// 规则依据端口适配器（六边形）架构与组合根边界：
+/// The rules follow the ports-and-adapters (hexagonal) architecture and composition-root boundaries:
 /// <list type="bullet">
-/// <item>Core 是纯领域，零外部依赖；</item>
-/// <item>Platform.Windows 是适配器，只往内指 Core，禁止反向引用 App；</item>
-/// <item>App 是组合根，ViewModel 仅依赖 Core 端口与应用服务，不碰 WPF / 平台实现。</item>
+/// <item>Core is pure domain with zero external dependencies;</item>
+/// <item>Platform.Windows is an adapter pointing inward at Core only, and must not reference App;</item>
+/// <item>App is the composition root; ViewModels depend only on Core ports and application services, not WPF / platform implementations.</item>
 /// </list>
 /// </para>
 /// </summary>
 public sealed class DependencyDirectionTests
 {
-    /// <summary>纳入检查的三个程序集，用各项目的公共类型作标记以稳定取到 Assembly。</summary>
+    /// <summary>The three assemblies under check, marked by a public type from each project so the Assembly is resolved stably.</summary>
     private static readonly Assembly[] Assemblies =
     [
         typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly, // Core
@@ -35,7 +35,7 @@ public sealed class DependencyDirectionTests
     private const string PlatformNamespace = @"KotobaSenpai\.Platform\.Windows(\..*)?$";
     private const string ViewModelsNamespace = @"KotobaSenpai\.App\.ViewModels(\..*)?$";
 
-    /// <summary>Core 不得依赖 Platform.Windows 或 App（纯领域，零外部依赖）。</summary>
+    /// <summary>Core must not depend on Platform.Windows or App (pure domain, zero external dependencies).</summary>
     [Fact]
     public void Core_ShouldNotDependOn_Platform_Or_App()
     {
@@ -44,10 +44,10 @@ public sealed class DependencyDirectionTests
             .ShouldNot().HaveDependencyOnAny("KotobaSenpai.Platform.Windows", "KotobaSenpai.App")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("Core 不得依赖 Platform.Windows / App", result));
+        Assert.True(result.IsSuccessful, FormatFailure("Core must not depend on Platform.Windows / App", result));
     }
 
-    /// <summary>Platform.Windows 不得依赖 App（适配器只能往内指 Core）。</summary>
+    /// <summary>Platform.Windows must not depend on App (an adapter only points inward at Core).</summary>
     [Fact]
     public void Platform_ShouldNotDependOn_App()
     {
@@ -56,10 +56,10 @@ public sealed class DependencyDirectionTests
             .ShouldNot().HaveDependencyOn("KotobaSenpai.App")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("Platform.Windows 不得依赖 App", result));
+        Assert.True(result.IsSuccessful, FormatFailure("Platform.Windows must not depend on App", result));
     }
 
-    /// <summary>ViewModel 仅依赖 Core 端口与应用服务，不得引用平台实现或 WPF。</summary>
+    /// <summary>ViewModels depend only on Core ports and application services; they must not reference platform implementations or WPF.</summary>
     [Fact]
     public void ViewModels_ShouldNotDependOn_Platform_Or_Wpf()
     {
@@ -68,10 +68,10 @@ public sealed class DependencyDirectionTests
             .ShouldNot().HaveDependencyOnAny("KotobaSenpai.Platform.Windows", "System.Windows")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels 不得依赖 Platform.Windows / WPF", result));
+        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must not depend on Platform.Windows / WPF", result));
     }
 
-    /// <summary>本地化端口 IStringLocalizer 必须位于 Core，实现 ResourceManagerStringLocalizer 必须位于 App。</summary>
+    /// <summary>The localization port IStringLocalizer must live in Core; its implementation ResourceManagerStringLocalizer must live in App.</summary>
     [Fact]
     public void Localization_Port_ResidesInCore_Implementation_ResidesInApp()
     {
@@ -82,7 +82,7 @@ public sealed class DependencyDirectionTests
         Assert.Same(appAssembly, typeof(ResourceManagerStringLocalizer).Assembly);
     }
 
-    /// <summary>ViewModel 仅依赖 Core 的 IStringLocalizer 端口，不引用 App 实现 ResourceManagerStringLocalizer。</summary>
+    /// <summary>ViewModels depend only on Core's IStringLocalizer port, not the App implementation ResourceManagerStringLocalizer.</summary>
     [Fact]
     public void ViewModels_DependOnCoreLocalizationInterface_NotAppImplementation()
     {
@@ -91,10 +91,10 @@ public sealed class DependencyDirectionTests
             .ShouldNot().HaveDependencyOn(typeof(ResourceManagerStringLocalizer).FullName!)
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("ViewModels 不得依赖本地化实现 ResourceManagerStringLocalizer（应依赖 Core 端口）", result));
+        Assert.True(result.IsSuccessful, FormatFailure("ViewModels must not depend on the localization implementation ResourceManagerStringLocalizer (should depend on the Core port)", result));
     }
 
-    /// <summary>日志端口 ILogger/LogLevel 必须位于 Core，文件实现 FileLogger 必须位于 App。</summary>
+    /// <summary>The logging port ILogger/LogLevel must live in Core; the file implementation FileLogger must live in App.</summary>
     [Fact]
     public void Logging_Port_ResidesInCore_Implementation_ResidesInApp()
     {
@@ -106,7 +106,7 @@ public sealed class DependencyDirectionTests
         Assert.Same(appAssembly, typeof(FileLogger).Assembly);
     }
 
-    /// <summary>ViewModel 仅依赖 Core 的 ILogger 端口，不引用 App 实现 FileLogger。</summary>
+    /// <summary>ViewModels depend only on Core's ILogger port, not the App implementation FileLogger.</summary>
     [Fact]
     public void ViewModels_DependOnCoreLoggingInterface_NotAppImplementation()
     {
@@ -115,10 +115,10 @@ public sealed class DependencyDirectionTests
             .ShouldNot().HaveDependencyOn(typeof(FileLogger).FullName!)
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("ViewModels 不得依赖日志实现 FileLogger（应依赖 Core 端口）", result));
+        Assert.True(result.IsSuccessful, FormatFailure("ViewModels must not depend on the logging implementation FileLogger (should depend on the Core port)", result));
     }
 
-    /// <summary>Wpf.Ui 程序集仅被 App 引用（视图层依赖），Core 与 Platform.Windows 不得引用。</summary>
+    /// <summary>The Wpf.Ui assembly is referenced only by App (a view-layer dependency); Core and Platform.Windows must not reference it.</summary>
     [Fact]
     public void WpfUi_Assembly_Referenced_OnlyBy_App()
     {
@@ -129,11 +129,11 @@ public sealed class DependencyDirectionTests
         static bool isWpfUi(string? name)
             => name is not null && name.StartsWith("Wpf.Ui", StringComparison.Ordinal);
 
-        // App 引用了 Wpf.Ui（视图层 UI 库）。
+        // App references Wpf.Ui (a view-layer UI library).
         var appRefs = appAssembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
         Assert.Contains(appRefs, isWpfUi);
 
-        // Core 与 Platform.Windows 不得引用 Wpf.Ui。
+        // Core and Platform.Windows must not reference Wpf.Ui.
         foreach (var assembly in new[] { coreAssembly, platformAssembly })
         {
             var refs = assembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
@@ -141,7 +141,7 @@ public sealed class DependencyDirectionTests
         }
     }
 
-    /// <summary>ViewModel 不得依赖主题服务 MaterialThemeService（主题为视图层关切，不入 ViewModel）。</summary>
+    /// <summary>ViewModels must not depend on the theme service MaterialThemeService (theme is a view-layer concern, not for ViewModels).</summary>
     [Fact]
     public void ViewModels_ShouldNotDependOn_ThemeService()
     {
@@ -150,10 +150,10 @@ public sealed class DependencyDirectionTests
             .ShouldNot().HaveDependencyOn("KotobaSenpai.App.Themes")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels 不得依赖主题服务 MaterialThemeService（主题为视图层关切）", result));
+        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must not depend on the theme service MaterialThemeService (theme is a view-layer concern)", result));
     }
 
-    /// <summary>设置端口 ISettingsService 必须位于 Core，文件实现 SettingsService 必须位于 App。</summary>
+    /// <summary>The settings port ISettingsService must live in Core; the file implementation SettingsService must live in App.</summary>
     [Fact]
     public void Settings_Port_ResidesInCore_Implementation_ResidesInApp()
     {
@@ -164,24 +164,24 @@ public sealed class DependencyDirectionTests
         Assert.Same(appAssembly, typeof(SettingsService).Assembly);
     }
 
-    /// <summary>偏好存储与日志级别配置须经 ISettingsService 端口存取设置，不直接读写文件。</summary>
+    /// <summary>Preference stores and log-level configuration must access settings through the ISettingsService port, not read/write files directly.</summary>
     [Fact]
     public void Settings_Consumers_DependOnCoreSettingsPort()
     {
-        // 偏好存储经构造函数注入 ISettingsService，不再经静态助手直接读写文件。
+        // Preference stores receive ISettingsService via constructor injection, no longer reading/writing files via static helpers.
         var languageStoreCtor = typeof(LocalAppDataLanguagePreferenceStore).GetConstructors().Single();
         Assert.Contains(languageStoreCtor.GetParameters(), p => p.ParameterType == typeof(ISettingsService));
 
         var themeStoreCtor = typeof(LocalAppDataThemePreferenceStore).GetConstructors().Single();
         Assert.Contains(themeStoreCtor.GetParameters(), p => p.ParameterType == typeof(ISettingsService));
 
-        // LogConfiguration 经方法参数接收 ISettingsService（不再自带文件路径/读取逻辑）。
+        // LogConfiguration receives ISettingsService via method parameter (no longer carries its own file path/reading logic).
         var loadMinLevel = typeof(LogConfiguration).GetMethod(nameof(LogConfiguration.LoadMinimumLevel));
         Assert.NotNull(loadMinLevel);
         Assert.Contains(loadMinLevel!.GetParameters(), p => p.ParameterType == typeof(ISettingsService));
     }
 
-    /// <summary>ViewModel 不得依赖设置文件实现（设置实现位于 App 基础设施层，ViewModel 须经端口）。</summary>
+    /// <summary>ViewModels must not depend on the settings file implementation (settings implementation lives in the App infrastructure layer; ViewModels must go through the port).</summary>
     [Fact]
     public void ViewModels_ShouldNotDependOn_SettingsImplementation()
     {
@@ -190,11 +190,11 @@ public sealed class DependencyDirectionTests
             .ShouldNot().HaveDependencyOn("KotobaSenpai.App.Settings")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels 不得依赖设置实现 SettingsService（设置实现位于 App 基础设施层）", result));
+        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must not depend on the settings implementation SettingsService (settings implementation lives in the App infrastructure layer)", result));
     }
 
     private static string FormatFailure(string rule, TestResult result) =>
         result.IsSuccessful
             ? rule
-            : $"{rule}。违规类型：{string.Join(", ", result.FailingTypeNames)}";
+            : $"{rule}. Violating types: {string.Join(", ", result.FailingTypeNames)}";
 }

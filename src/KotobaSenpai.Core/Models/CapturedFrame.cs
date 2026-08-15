@@ -2,7 +2,7 @@ using KotobaSenpai.Core.Localization;
 
 namespace KotobaSenpai.Core.Models;
 
-/// <summary>一次捕获的内存帧；像素数据只在识别会话中存在，不做持久化。</summary>
+/// <summary>An in-memory frame from one capture; the pixel data exists only during the recognition session and is not persisted.</summary>
 public sealed record CapturedFrame
 {
     public CapturedFrame(int width, int height, ReadOnlyMemory<byte> bgra32)

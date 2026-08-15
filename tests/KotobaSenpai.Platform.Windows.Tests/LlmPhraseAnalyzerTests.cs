@@ -35,7 +35,7 @@ public sealed class PhrasePromptBuilderTests
         Assert.Contains("[Llm.LocalSpansLabel]", user);
     }
 
-    /// <summary>本地化 fake：把键包进方括号，便于断言 prompt 文案确实经本地化器解析。</summary>
+    /// <summary>Localization fake: wraps keys in square brackets so tests can assert the prompt text is actually resolved through the localizer.</summary>
     private sealed class BracketedLocalizer : IStringLocalizer
     {
 #pragma warning disable CS0067
@@ -155,7 +155,7 @@ public sealed class LlmProtocolTests
         Assert.Contains("\"disabled\"", body);
         Assert.Contains("\"tools\"", body);
         Assert.Contains("return_groups", body);
-        Assert.Contains("\"type\":\"tool\"", body); // thinking 关掉后允许强制指定单工具
+        Assert.Contains("\"type\":\"tool\"", body); // thinking disabled allows forcing a single tool
     }
 
     [Fact]
@@ -261,7 +261,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_wrong_shape_envelope_to_malformed_json_not_crash()
     {
-        // 合法 JSON 但缺 message 字段 → 旧代码抛 KeyNotFoundException 逃逸；应映射为 MalformedJson。
+        // Valid JSON but missing the message field → old code let KeyNotFoundException escape; should map to MalformedJson.
         var analyzer = new DeepSeekPhraseAnalyzer(
             new FakeSettings(apiKey: "k"),
             new HttpClient(new StubHandler(HttpStatusCode.OK, """{"choices":[{}]}""")));

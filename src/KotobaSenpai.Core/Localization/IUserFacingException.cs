@@ -1,12 +1,13 @@
 namespace KotobaSenpai.Core.Localization;
 
 /// <summary>
-/// 用户可见异常的标记接口。Core/Platform 中消息可能漏到 UI 的异常实现本接口并暴露稳定
-/// <see cref="ErrorCode"/>；App 表现层的 <c>IUserMessageResolver</c> 据此把码翻译为本地化消息，
-/// 而不把原始异常文本当作已翻译文本直接展示。
+/// Marker interface for user-visible exceptions. Exceptions in Core/Platform whose message could reach the UI
+/// implement this interface and expose a stable <see cref="ErrorCode"/>; the App's presentation layer
+/// <c>IUserMessageResolver</c> translates the code into a localized message rather than showing the raw
+/// exception text as translated text.
 /// </summary>
 public interface IUserFacingException
 {
-    /// <summary>与 <c>ErrorCodes</c> 键对应的稳定错误码，永不为 null。</summary>
+    /// <summary>Stable error code corresponding to an <c>ErrorCodes</c> key, never null.</summary>
     string ErrorCode { get; }
 }

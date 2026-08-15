@@ -7,10 +7,10 @@ using KotobaSenpai.Core.Logging;
 namespace KotobaSenpai.App.Logging;
 
 /// <summary>
-/// <see cref="ILogger"/> 文件实现：按本地日期滚动写入
-/// <c>%LocalAppData%/KotobaSenpai/logs/kotobasenpai-yyyy-MM-dd.log</c>，并发安全，
-/// 低于最小级别的条目被过滤。自动提取 <see cref="IUserFacingException.ErrorCode"/> 附加到日志行。
-/// 文件系统失败被吞掉，记日志绝不向调用方抛异常；每次写入即刷新，崩溃前已写条目不丢。
+/// File implementation of <see cref="ILogger"/>: writes to per-local-date rolling files
+/// <c>%LocalAppData%/KotobaSenpai/logs/kotobasenpai-yyyy-MM-dd.log</c>, thread-safe,
+/// filtering out entries below the minimum level. Automatically extracts <see cref="IUserFacingException.ErrorCode"/> and appends it to the log line.
+/// File-system failures are swallowed; logging never throws to the caller; each write is flushed, so entries written before a crash are not lost.
 /// </summary>
 public sealed class FileLogger : ILogger, IDisposable
 {
@@ -57,7 +57,7 @@ public sealed class FileLogger : ILogger, IDisposable
         // ponytail: logging must never throw to callers; swallowing fs/format failures is intentional.
     }
 
-    // 便捷重载：默认接口方法仅经接口引用可用；在具体类型上提供同名方法，供组合根与测试直接调用。
+    // Convenience overloads: default interface methods are only available through an interface reference; the same-named methods on the concrete type let the composition root and tests call them directly.
     public void LogError(Exception exception, string message, params object[] args)
         => Log(LogLevel.Error, exception, message, args);
 
@@ -77,37 +77,37 @@ public sealed class FileLogger : ILogger, IDisposable
         Directory.CreateDirectory(_logsDirectory);
         _currentDate = today;
         _writer = new StreamWriter(Path.Combine(_logsDirectory, LogRetentionPolicy.FileNameFor(today)), append: true);
-        // 跨日滚动触发：清理过期文件。
+        // Cross-midnight rollover triggers cleanup of expired files.
         _retention.Cleanup(_now);
     }
 
     /// <summary>
-    /// 将一条日志组装为待写入的单行（异常信息追加在后续行）。
-    /// 输出形如：
-    /// <c>yyyy-MM-ddTHH:mm:ss.fffzzz [LVL] (ErrorCode=…) 消息文本</c>，
-    /// 若带异常则在换行后依次附加“类型全名: 消息”与堆栈。
+    /// Assembles a single-line log entry for writing (exception info is appended on following lines).
+    /// Output looks like:
+    /// <c>yyyy-MM-ddTHH:mm:ss.fffzzz [LVL] (ErrorCode=…) message text</c>,
+    /// and when an exception is present, "type full name: message" and the stack trace are appended after a newline.
     /// </summary>
-    /// <param name="level">日志级别，映射为 <c>[TRC]/[INF]/…</c> 标签。</param>
-    /// <param name="exception">关联异常；为 null 时仅记录消息。若实现 <see cref="IUserFacingException"/>，则提取其错误码。</param>
-    /// <param name="message">复合格式字符串，语义同 <see cref="string.Format(IFormatProvider, string, object?[])"/>。</param>
-    /// <param name="args">用于填充 <paramref name="message"/> 占位符的参数；为空时直接原样输出。</param>
-    /// <returns>组装完成的日志文本（可能跨多行）。</returns>
+    /// <param name="level">The log level, mapped to a <c>[TRC]/[INF]/…</c> tag.</param>
+    /// <param name="exception">The associated exception; when null only the message is recorded. If it implements <see cref="IUserFacingException"/>, its error code is extracted.</param>
+    /// <param name="message">A composite format string, with the same semantics as <see cref="string.Format(IFormatProvider, string, object?[])"/>.</param>
+    /// <param name="args">Arguments used to fill the <paramref name="message"/> placeholders; output verbatim when empty.</param>
+    /// <returns>The assembled log text (possibly spanning multiple lines).</returns>
     private string FormatEntry(LogLevel level, Exception? exception, string message, params object[] args)
     {
-        // 时间戳固定为 ISO 8601 带时区偏移格式，使用InvariantCulture避免区域设置影响。
+        // Timestamp is fixed to ISO 8601 with a timezone-offset format; InvariantCulture avoids locale influence.
         var timestamp = _now().ToString("yyyy-MM-ddTHH:mm:ss.fffzzz", CultureInfo.InvariantCulture);
         var tag = LevelTag(level);
-        // 仅当异常被标记为面向用户的异常时才提取错误码，普通异常不附加该段。
+        // Only when the exception is marked as user-facing is the error code extracted; ordinary exceptions do not get that segment.
         var errorCode = (exception as IUserFacingException)?.ErrorCode;
         var codeSegment = errorCode is null ? string.Empty : $" (ErrorCode={errorCode})";
-        // 无参时跳过 string.Format，避免把含 { } 的字面消息误当作格式串解析。
+        // Skip string.Format when there are no arguments, to avoid mis-parsing a literal message containing { } as a format string.
         var formatted = args.Length == 0 ? message : string.Format(CultureInfo.InvariantCulture, message, args);
 
         var sb = new StringBuilder();
         sb.Append(timestamp).Append(' ').Append(tag).Append(codeSegment).Append(' ').Append(formatted);
         if (exception is not null)
         {
-            // 异常信息另起一行，与首行日志分隔；优先用类型全名以便定位来源程序集。
+            // Exception info goes on its own line, separated from the first log line; the type full name is preferred so the originating assembly can be located.
             sb.AppendLine();
             sb.Append(exception.GetType().FullName ?? exception.GetType().Name).Append(": ").Append(exception.Message);
             if (!string.IsNullOrEmpty(exception.StackTrace))

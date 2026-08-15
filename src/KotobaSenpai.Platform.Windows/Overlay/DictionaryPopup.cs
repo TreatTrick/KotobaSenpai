@@ -7,8 +7,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
-/// 本地词典释义弹窗：显示在悬停词旁的只读小窗。点击穿透（不拦截下方窗口点击）、
-/// 不激活、置顶；由覆盖层在悬停词变化时更新、移出时隐藏。
+/// Local dictionary definition popup: a small read-only window shown next to a hovered word. Click-through (does not
+/// intercept clicks on the window below), non-activating, topmost; updated by the overlay when the hovered word changes
+/// and hidden when it leaves.
 /// </summary>
 public sealed class DictionaryPopup : Window
 {
@@ -36,7 +37,7 @@ public sealed class DictionaryPopup : Window
         SourceInitialized += (_, _) => SetClickThrough();
     }
 
-    /// <summary>按查词结果重建内容并定位到词旁；无结果时显示读音与"未收录"。</summary>
+    /// <summary>Rebuilds the content from the lookup result and positions it beside the word; when there is no result, shows the reading and "not found".</summary>
     public void ShowResult(IReadOnlyList<DictionaryEntry> entries, string reading, ScreenRect wordBounds)
     {
         _panel.Children.Clear();
@@ -60,7 +61,7 @@ public sealed class DictionaryPopup : Window
             Hide();
     }
 
-    /// <summary>定位在词包围盒下方；贴屏幕底/右时翻到词上方并钳制到工作区（仅主屏，多屏待后续）。</summary>
+    /// <summary>Positions below the word's bounding box; when it would hit the screen bottom/right, flips above the word and clamps to the work area (primary screen only; multi-screen later).</summary>
     private void Position(ScreenRect wordBounds)
     {
         var wa = SystemParameters.WorkArea;

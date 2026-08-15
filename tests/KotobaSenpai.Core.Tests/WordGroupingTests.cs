@@ -17,7 +17,7 @@ public sealed class WordGroupingTests
 
         Assert.Single(grouped);
         Assert.Equal("日本語", grouped[0].Token.Surface);
-        Assert.Equal(30, grouped[0].Bounds.Width); // 三个字符框并集 = 30 宽
+        Assert.Equal(30, grouped[0].Bounds.Width); // union of three character boxes = 30 wide
         Assert.Equal(20, grouped[0].Bounds.Height);
     }
 
@@ -31,7 +31,7 @@ public sealed class WordGroupingTests
         Assert.Equal(2, grouped.Count);
         Assert.Equal("彼", grouped[0].Token.Surface);
         Assert.Equal(10, grouped[0].Bounds.Width);
-        Assert.Equal("が", grouped[1].Token.Surface); // 助词被保留
+        Assert.Equal("が", grouped[1].Token.Surface); // particle is retained
         Assert.Equal(10, grouped[1].Bounds.Width);
     }
 
@@ -95,7 +95,7 @@ public sealed class WordGroupingTests
 
 internal sealed record TokenSpec(string Surface, int StartOffset);
 
-/// <summary>按显式 span 切分，供分组测试精确控制分词结果。</summary>
+/// <summary>Splits on explicit spans so grouping tests can control the tokenization result precisely.</summary>
 internal sealed class StubTokenizer : ITokenizer
 {
     private readonly TokenSpec[] _specs;

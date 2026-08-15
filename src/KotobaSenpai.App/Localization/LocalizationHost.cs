@@ -5,9 +5,9 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.App.Localization;
 
 /// <summary>
-/// 标记扩展与本地化器之间的静态桥：在启动时注入 <see cref="IStringLocalizer"/>，
-/// 跟踪所有已解析的 XAML 绑定目标（弱引用），文化切换时就地重设属性值。
-/// XAML 标记扩展由解析器实例化、无法走 DI，故用静态桥注入。
+/// Static bridge between the markup extension and the localizer: injects <see cref="IStringLocalizer"/> at startup,
+/// tracks all resolved XAML binding targets (weak references), and resets their property values in place on culture switch.
+/// XAML markup extensions are instantiated by the parser and cannot go through DI, so injection uses this static bridge.
 /// </summary>
 internal static class LocalizationHost
 {
@@ -16,11 +16,11 @@ internal static class LocalizationHost
 
     public static IStringLocalizer? Localizer { get; set; }
 
-    /// <summary>按键解析本地化文本；本地化器尚未注入或键缺失时返回键名本身。</summary>
+    /// <summary>Resolves localized text by key; returns the key name itself when the localizer is not yet injected or the key is missing.</summary>
     public static string Resolve(string key)
         => Localizer is null ? key : Localizer.Get(key);
 
-    /// <summary>登记一个绑定目标，使其在文化切换时被就地刷新。</summary>
+    /// <summary>Registers a binding target so it is refreshed in place on culture switch.</summary>
     public static void Register(DependencyObject target, DependencyProperty property, string key)
     {
         EnsureSubscribed();

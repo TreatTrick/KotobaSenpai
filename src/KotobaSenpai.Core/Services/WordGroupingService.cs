@@ -5,8 +5,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 逐行对 OCR 字符做分词，把 token 的 span 映射回成员字符框并求并集，生成每词一条下划线几何。
-/// 范围：全部词含助词，仅排除标点与空白类 token；映射不到字符框的 token 跳过。
+/// Tokenizes OCR characters line by line, maps each token's span back to its member character boxes, takes
+/// their union, and produces one underline geometry per word. Scope: all words including particles, only
+/// punctuation and whitespace tokens are excluded; tokens that can't be mapped to a character box are skipped.
 /// </summary>
 public sealed class WordGroupingService : IOcrWordGroupingService
 {
@@ -52,7 +53,7 @@ public sealed class WordGroupingService : IOcrWordGroupingService
             return result;
         }
 
-        // 兼容未注入 span resolver 的旧调用：每个 UniDic token 独立生成一个词。
+        // Compatibility for legacy callers without an injected span resolver: each UniDic token generates one word independently.
         foreach (var (line, tokens) in tokenizedLines)
         {
             foreach (var token in tokens)
@@ -70,7 +71,7 @@ public sealed class WordGroupingService : IOcrWordGroupingService
         return result;
     }
 
-    /// <summary>对 [start, end) 的成员字符框求并集包围盒（每词一个宽度合法矩形）。</summary>
+    /// <summary>Computes the union bounding box of the member character boxes in [start, end) (one valid-width rectangle per word).</summary>
     private static ScreenRect Union(IReadOnlyList<OcrWord> words, int start, int end)
     {
         int x1 = int.MaxValue, y1 = int.MaxValue, x2 = 0, y2 = 0;

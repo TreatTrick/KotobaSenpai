@@ -13,10 +13,10 @@ using CoreOcrWord = KotobaSenpai.Core.Models.OcrWord;
 namespace KotobaSenpai.Platform.Windows.Ocr;
 
 /// <summary>
-/// 通过本地 meikiocr ONNX 引擎对目标窗口执行日语 OCR，输出字符级词框。
-/// 模型目录可用环境变量 <c>KOTOBA_MEIKIOCR_MODEL_DIR</c> 覆盖（开发/测试）；
-/// 否则回退到程序目录下的 Models/（随发布打包）。模型缺失时抛
-/// <see cref="WindowsPlatformException"/>（<see cref="ErrorCodes.OcrModelMissing"/>）。
+/// Runs Japanese OCR against the target window via the local meikiocr ONNX engine, producing character-level word boxes.
+/// The model directory can be overridden with the <c>KOTOBA_MEIKIOCR_MODEL_DIR</c> environment variable
+/// (development/testing); otherwise it falls back to Models/ under the app directory (shipped with the release). Throws
+/// <see cref="WindowsPlatformException"/> (<see cref="ErrorCodes.OcrModelMissing"/>) when the model is missing.
 /// </summary>
 public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
 {
@@ -63,11 +63,11 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         if (IsDiagEnabled())
             DumpDiagnostics(frame, lines, target);
 
-        // 保留行结构：每行一个 OcrLine，供分词服务逐行重新组合成词。
+        // Preserve line structure: one OcrLine per line, so the tokenizer service can re-assemble words line by line.
         var ocrLines = lines
             .Select(meikiLine => new OcrLine(
                 meikiLine.Chars
-                    // 模型可能为空白/blank 兜底输出非词字符；OcrWord 拒绝空文本，须在构造前过滤。
+                    // The model may output non-word characters for blank/whitespace fallbacks; OcrWord rejects empty text, so filter before constructing.
                     .Where(charBox => !char.IsWhiteSpace(charBox.Char) && charBox.Char != '\0')
                     .Select(charBox => new CoreOcrWord(
                         charBox.Char.ToString(),
@@ -79,12 +79,13 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         return new WordRecognitionResult(frame.Width, frame.Height, ocrLines);
     }
 
-    /// <summary>诊断落盘开关：设置项 <c>DiagEnabled</c> 为 "true" 时开启（默认关）。</summary>
+    /// <summary>Toggle for writing diagnostics to disk: enabled when the setting <c>DiagEnabled</c> is "true" (off by default).</summary>
     private bool IsDiagEnabled()
         => string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 诊断落盘：把捕获帧 PNG 与 OCR 识别文本存到固定目录，便于核对"截了什么、识别出什么"。
+    /// Writes diagnostics to disk: saves the captured frame PNG and the OCR-recognized text to a fixed directory, so you can
+    /// verify what was captured and what was recognized.
     /// </summary>
     private static void DumpDiagnostics(CapturedFrame frame, IReadOnlyList<MeikiLine> lines, WindowTarget target)
     {
@@ -105,7 +106,7 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
 
     private static void SavePng(string path, CapturedFrame frame)
     {
-        // Bgra32 与 Format32bppArgb 在内存里同为 B,G,R,A 顺序，可直接拷贝。
+        // Bgra32 and Format32bppArgb are both B,G,R,A in memory, so a direct copy works.
         using var bmp = new Bitmap(frame.Width, frame.Height, PixelFormat.Format32bppArgb);
         var data = bmp.LockBits(
             new Rectangle(0, 0, frame.Width, frame.Height),
@@ -122,7 +123,7 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         bmp.Save(path, ImageFormat.Png);
     }
 
-    /// <summary>把字符框钳制为合法 <see cref="ScreenRect"/>（非负、不越界、至少 1px）。</summary>
+    /// <summary>Clamps a character box into a valid <see cref="ScreenRect"/> (non-negative, in bounds, at least 1px).</summary>
     private static ScreenRect ToValidRect(MeikiChar c, int frameWidth, int frameHeight)
     {
         var x1 = Math.Max(0, c.X1);

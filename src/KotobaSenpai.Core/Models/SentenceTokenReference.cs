@@ -1,10 +1,12 @@
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// 句级 token 引用：把 OCR 阅读顺序中的 token 绑定到源行与行内位置，并携带 UniDic 元数据和源字符框。
+/// A sentence-level token reference binding a token in the OCR reading order to its source line and in-line
+/// position, carrying UniDic metadata and the source character boxes.
 /// <para>
-/// <see cref="Id"/> 是请求内稳定 ID（如 <c>l0:t3</c>），供 LLM 引用；<see cref="SentenceIndex"/> 是该 token
-/// 在整句阅读顺序中的全局序号，用于判断 part 内 token 是否连续。行内偏移与字符框保持本地，供几何映射。
+/// <see cref="Id"/> is a request-scoped stable id (e.g. <c>l0:t3</c>) for the LLM to reference;
+/// <see cref="SentenceIndex"/> is the token's global ordinal within the whole sentence's reading order, used to
+/// tell whether tokens within a part are contiguous. In-line offsets and character boxes stay local for geometry mapping.
 /// </para>
 /// </summary>
 public sealed record SentenceTokenReference
@@ -35,24 +37,24 @@ public sealed record SentenceTokenReference
         Boxes = (boxes ?? throw new ArgumentNullException(nameof(boxes))).ToArray();
     }
 
-    /// <summary>整句阅读顺序中的全局 token 序号。</summary>
+    /// <summary>The token's global ordinal within the whole sentence's reading order.</summary>
     public int SentenceIndex { get; }
 
-    /// <summary>源 OCR 行索引。</summary>
+    /// <summary>The source OCR line index.</summary>
     public int LineId { get; }
 
-    /// <summary>该 token 在其源行内的 token 序号。</summary>
+    /// <summary>The token's ordinal within its source line.</summary>
     public int LineTokenIndex { get; }
 
-    /// <summary>该 token 在源行文本内的 UTF-16 起始偏移。</summary>
+    /// <summary>The token's UTF-16 start offset within the source line text.</summary>
     public int LineOffset { get; }
 
-    /// <summary>UniDic 分词元数据。</summary>
+    /// <summary>UniDic tokenization metadata.</summary>
     public Token Token { get; }
 
-    /// <summary>该 token 覆盖的源字符框（行内物理坐标）。</summary>
+    /// <summary>The source character boxes covered by this token (in-line physical coordinates).</summary>
     public IReadOnlyList<ScreenRect> Boxes { get; }
 
-    /// <summary>请求内稳定引用 ID（强类型值对象，线格式 <c>l0:t3</c>）。</summary>
+    /// <summary>Request-scoped stable reference id (a strongly typed value object, wire format <c>l0:t3</c>).</summary>
     public SentenceTokenId Id => new(LineId, LineTokenIndex);
 }

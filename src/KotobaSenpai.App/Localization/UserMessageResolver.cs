@@ -3,8 +3,8 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.App.Localization;
 
 /// <summary>
-/// <see cref="IUserMessageResolver"/> 实现：用户可见异常按其 <see cref="IUserFacingException.ErrorCode"/>
-/// 经 <see cref="IStringLocalizer"/> 翻译；其余异常按回退码翻译。原始异常文本不被嵌入模板。
+/// Implementation of <see cref="IUserMessageResolver"/>: user-facing exceptions are translated by <see cref="IStringLocalizer"/>
+/// according to their <see cref="IUserFacingException.ErrorCode"/>; other exceptions are translated by the fallback code. The raw exception text is never embedded in a template.
 /// </summary>
 public sealed class UserMessageResolver : IUserMessageResolver
 {

@@ -1,8 +1,8 @@
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
-/// 一个 phrase group part：有序、连续、非空的 token 引用序列。part 内部不得有间隔，
-/// 词面与读音由所引 token 本地推导，不信任模型文本。
+/// A phrase group part: an ordered, contiguous, non-empty sequence of token references. There must be no gaps
+/// within a part; the surface and reading are derived locally from the referenced tokens, not trusted from model text.
 /// </summary>
 public sealed record PhraseGroupPart
 {
@@ -17,12 +17,12 @@ public sealed record PhraseGroupPart
         Reading = string.Concat(Tokens.Select(reference => reference.Token.Reading));
     }
 
-    /// <summary>按阅读顺序排列、连续无间隔的 token 引用。</summary>
+    /// <summary>Token references in reading order, contiguous with no gaps.</summary>
     public IReadOnlyList<SentenceTokenReference> Tokens { get; }
 
-    /// <summary>由所引 token 词面本地拼接的显示文本。</summary>
+    /// <summary>Display surface text concatenated locally from the referenced tokens.</summary>
     public string Surface { get; }
 
-    /// <summary>由所引 token 读音本地拼接的显示读音。</summary>
+    /// <summary>Display reading concatenated locally from the referenced tokens.</summary>
     public string Reading { get; }
 }

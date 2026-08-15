@@ -12,10 +12,10 @@ using Wpf.Ui.Controls;
 namespace KotobaSenpai.App;
 
 /// <summary>
-/// 视图：仅保留与平台相关的少量代码。
-/// 在窗口句柄创建后把它告诉视图模型（用于排除自身），再触发一次刷新；其余逻辑全部在 ViewModel。
-/// 暴露 <see cref="LanguageService"/> 供语言选择 ComboBox 绑定、<see cref="ThemeService"/> 供主题选择 ComboBox 调用
-/// （二者均不入 ViewModel，保持依赖方向纯净）。
+/// View: keeps only a small amount of platform-related code.
+/// After the window handle is created it is handed to the view model (to exclude itself), then a refresh is triggered; all other logic lives in the ViewModel.
+/// Exposes <see cref="LanguageService"/> for the language-selection ComboBox binding and <see cref="ThemeService"/> for the theme-selection ComboBox
+/// (neither enters the ViewModel, keeping the dependency direction clean).
 /// </summary>
 public partial class MainWindow : FluentWindow
 {
@@ -56,7 +56,7 @@ public partial class MainWindow : FluentWindow
             typeof(MainWindow),
             new PropertyMetadata(null));
 
-    /// <summary>词典安装协调器：驱动启动时的遮挡层（进度/错误/重试）。属视图级服务，不入 ViewModel。</summary>
+    /// <summary>Dictionary install coordinator: drives the startup overlay (progress/error/retry). A view-level service, not in the ViewModel.</summary>
     public UniDicInstallController? InstallController
     {
         get => (UniDicInstallController?)GetValue(InstallControllerProperty);
@@ -73,7 +73,7 @@ public partial class MainWindow : FluentWindow
             viewModel.RefreshCommand.Execute(null);
         }
 
-        // 主题：在窗口句柄就绪后应用持久化（或缺省 Auto）模式并绑定 OS 跟随，再同步下拉框选中项。
+        // Theme: after the window handle is ready, apply the persisted (or default Auto) mode, bind OS-follow, then sync the combo-box selection.
         ThemeService?.Initialize(this);
         SyncThemeModeComboBox();
 
@@ -81,7 +81,7 @@ public partial class MainWindow : FluentWindow
             localizer.CultureChanged += (_, _) => SyncThemeModeComboBox();
     }
 
-    /// <summary>主题模式 ComboBox 选择变化：解析 Tag 调用主题服务。</summary>
+    /// <summary>Theme-mode ComboBox selection change: parses the Tag and calls the theme service.</summary>
     private void ThemeModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ThemeService is null || _syncing)
@@ -96,7 +96,7 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    /// <summary>按当前模式选中主题 ComboBox 对应项（带重入保护，避免编程式选中触发回写）。</summary>
+    /// <summary>Selects the theme ComboBox item matching the current mode (with re-entrancy protection to avoid a programmatic selection triggering a write-back).</summary>
     private void SyncThemeModeComboBox()
     {
         if (ThemeService is null)

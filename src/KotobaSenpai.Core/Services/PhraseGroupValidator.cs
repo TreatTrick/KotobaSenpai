@@ -3,8 +3,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 把提供方返回的线级 group 校验并转换为 <see cref="PhraseGroup"/>。无效 group 被单独丢弃，
-/// 不影响有效 group 或本地结果；最多保留 <see cref="PhraseGroup.MaxGroupsPerSegment"/> 个。
+/// Validates the provider-returned line-level groups and converts them to <see cref="PhraseGroup"/>.
+/// Invalid groups are dropped individually without affecting valid groups or local results; at most
+/// <see cref="PhraseGroup.MaxGroupsPerSegment"/> are kept.
 /// </summary>
 public static class PhraseGroupValidator
 {

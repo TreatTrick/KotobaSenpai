@@ -3,8 +3,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 悬停重叠决胜：光标命中多个 phrase group 时，选引用 token 总数更少的 group；相同则选
-/// provider 返回顺序更靠前的。返回命中 group 的下标，未命中返回 -1。
+/// Hover-overlap tie-breaking: when the cursor hits multiple phrase groups, pick the group with fewer
+/// referenced tokens; on a tie pick the one earlier in the provider return order. Returns the index of the hit
+/// group, or -1 when nothing is hit.
 /// </summary>
 public static class PhraseHoverResolver
 {

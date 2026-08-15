@@ -5,14 +5,14 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.App.Localization;
 
 /// <summary>
-/// 管理应用 UI 语言：解析启动文化（持久化偏好 -> 系统中文则简体中文，否则英文），
-/// 设置全局 <c>CurrentUICulture</c> 与 <see cref="ResourceManagerStringLocalizer"/>，
-/// 持久化/恢复偏好，并向视图暴露 <see cref="AvailableCultures"/> 与 <see cref="CurrentCulture"/> 供绑定。
-/// 默认 UI：系统为中文则简体中文，否则英文；英文为中性回退。
+/// Manages the app's UI language: resolves the startup culture (persisted preference -> Simplified Chinese when the system is Chinese, otherwise English),
+/// sets the global <c>CurrentUICulture</c> and the <see cref="ResourceManagerStringLocalizer"/>,
+/// persists/restores the preference, and exposes <see cref="AvailableCultures"/> and <see cref="CurrentCulture"/> for binding.
+/// Default UI: Simplified Chinese when the system is Chinese, otherwise English; English is the neutral fallback.
 /// </summary>
 public sealed partial class LanguageService : ObservableObject
 {
-    /// <summary>支持的文化：默认简体中文在前，英文为回退。</summary>
+    /// <summary>Supported cultures: Simplified Chinese first by default, English as the fallback.</summary>
     public IReadOnlyList<CultureInfo> AvailableCultures { get; } = [new CultureInfo("zh-CN"), new CultureInfo("en")];
 
     private readonly ResourceManagerStringLocalizer _localizer;
@@ -43,20 +43,20 @@ public sealed partial class LanguageService : ObservableObject
         CultureInfo.DefaultThreadCurrentUICulture = culture;
     }
 
-    /// <summary>启动时解析并应用文化（不持久化，仅恢复或取默认）。</summary>
+    /// <summary>Resolves and applies the culture at startup (does not persist; restores or takes the default).</summary>
     public void Initialize()
     {
         SetCulture(ResolveStartupCulture(), persist: false);
     }
 
-    /// <summary>运行时切换文化：应用全局与本地化器，并持久化用户选择。</summary>
+    /// <summary>Switches the culture at runtime: applies the global and the localizer, and persists the user's choice.</summary>
     public void ChangeCulture(CultureInfo culture)
     {
         ArgumentNullException.ThrowIfNull(culture);
         SetCulture(culture, persist: true);
     }
 
-    /// <summary>ComboBox 双向绑定设置 CurrentCulture 时触发应用与持久化。</summary>
+    /// <summary>Triggered when the ComboBox two-way binding sets CurrentCulture; applies and persists.</summary>
     partial void OnCurrentCultureChanged(CultureInfo value)
     {
         if (_applying)
@@ -84,21 +84,21 @@ public sealed partial class LanguageService : ObservableObject
         }
     }
 
-    /// <summary>解析启动文化：持久化偏好 -> 系统中文则简体中文，否则英文。</summary>
+    /// <summary>Resolves the startup culture: persisted preference -> Simplified Chinese when the system is Chinese, otherwise English.</summary>
     private CultureInfo ResolveStartupCulture()
     {
         var persisted = _store.Load();
         if (persisted is not null && TryMatchSupported(persisted, out var persistedCulture))
             return persistedCulture;
 
-        // 无持久化偏好（首次启动）时：系统 UI 文化为中文则默认简体中文，否则默认英文。
+        // With no persisted preference (first launch): default to Simplified Chinese when the system UI culture is Chinese, otherwise default to English.
         return IsChinese(_osCultureProvider()) ? AvailableCultures[0] : AvailableCultures[1];
     }
 
     private static bool IsChinese(CultureInfo culture)
         => string.Equals(culture.TwoLetterISOLanguageName, "zh", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>按 TwoLetterISOLanguageName 匹配支持的文化（en* -> en, zh* -> zh-CN）。</summary>
+    /// <summary>Matches a supported culture by TwoLetterISOLanguageName (en* -> en, zh* -> zh-CN).</summary>
     private bool TryMatchSupported(CultureInfo culture, out CultureInfo matched)
     {
         foreach (var supported in AvailableCultures)
@@ -114,7 +114,7 @@ public sealed partial class LanguageService : ObservableObject
         return false;
     }
 
-    /// <summary>按 culture 名匹配支持的文化；非法名不抛异常而是返回 false。</summary>
+    /// <summary>Matches a supported culture by culture name; an invalid name does not throw but returns false.</summary>
     private bool TryMatchSupported(string cultureName, out CultureInfo matched)
     {
         try

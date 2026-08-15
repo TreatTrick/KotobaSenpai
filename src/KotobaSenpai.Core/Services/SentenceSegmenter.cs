@@ -3,14 +3,15 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// 把 OCR 行按句段划分，保留阅读顺序。相邻行仅在顺序/布局可靠、无句末标点、无段落间隙时合并；
-/// 跨 segment 的 token 引用被禁止，避免把不同对话块拼在一起。
+/// Divides OCR lines into sentence segments while preserving reading order. Adjacent lines are merged only when
+/// order/layout is reliable, there is no sentence-final punctuation, and there is no paragraph gap;
+/// cross-segment token references are forbidden to avoid joining unrelated dialogue blocks.
 /// </summary>
 public sealed class SentenceSegmenter
 {
     private static readonly string SentenceFinalPunctuation = "。！？…‥．";
 
-    /// <summary>视为段落间隙的垂直间距因子（相对上一行行高）。</summary>
+    /// <summary>Vertical gap factor treated as a paragraph gap (relative to the previous line's height).</summary>
     private const double ParagraphGapFactor = 1.5;
 
     public IReadOnlyList<SentenceSegment> Segment(IReadOnlyList<OcrLine> lines)
@@ -45,7 +46,7 @@ public sealed class SentenceSegmenter
         var gap = next.Top - previous.Bottom;
         if (gap > Math.Max(1, previous.Height) * ParagraphGapFactor)
             return true;
-        // 下一行起点左移说明阅读顺序不可靠（假定从左到右），切段。
+        // The next line's start moving left indicates the reading order is unreliable (assuming left-to-right); break the segment.
         return next.Left < previous.Left;
     }
 

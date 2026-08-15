@@ -7,8 +7,9 @@ using Microsoft.Data.Sqlite;
 namespace KotobaSenpai.Platform.Windows.Dictionary;
 
 /// <summary>
-/// JMdict 的 SQLite 实现：打开捆绑 .db，按表记（kanji 表）或平假读音（reading 表）查询条目。
-/// 每次查询按需打开连接（低频、单条），数据待磁盘不常驻内存；缺失或查询失败返回空不崩溃。
+/// SQLite implementation of JMdict: opens the bundled .db and queries entries by written form (kanji table) or hiragana
+/// reading (reading table). Each lookup opens a connection on demand (low-frequency, single items); data stays on disk
+/// and is not kept in memory. Missing data or a failed query returns empty rather than crashing.
 /// </summary>
 public sealed class JmdictSqliteRepository : IJmdictRepository
 {
@@ -98,11 +99,11 @@ public sealed class JmdictSqliteRepository : IJmdictRepository
 
         try
         {
-            // Pooling=False：每次查询开/关，避免长期持有 .db 文件句柄。
+            // Pooling=False: open/close per query, avoiding long-held handles on the .db file.
             using var connection = new SqliteConnection($"Data Source={_dbPath};Pooling=False");
             connection.Open();
             using var command = connection.CreateCommand();
-            // table 仅来自内部常量 "kanji"/"reading"，非用户输入。
+            // table comes only from the internal constants "kanji"/"reading", not user input.
             command.CommandText = $"""
                 SELECT e.headword, e.reading, e.senses
                 FROM entries e
