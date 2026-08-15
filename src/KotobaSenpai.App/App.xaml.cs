@@ -102,11 +102,22 @@ public partial class App : Application
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
 
-        // Phrase 分析：DeepSeek 兼容适配器 + 编排器。本地词/span 先完成，失败只产生可重试警告，
+        // Phrase 分析：协议无关适配器 + 可插拔协议。本地词/span 先完成，失败只产生可重试警告，
         // 由配置键 PhraseGroupsEnabled=true 启用；未配置 key 时适配器返回 NoKey 跳过调用。
-        services.AddSingleton<PhraseRequestBuilder>();
+        // 协议由 DeepSeekProtocol 选择（anthropic/responses/默认 OpenAI Chat Completions）。
+        services.AddSingleton<PhrasePromptBuilder>();
         services.AddSingleton<PhraseResponseParser>();
         services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        services.AddSingleton<ILlmProtocol>(sp =>
+        {
+            var key = sp.GetRequiredService<ISettingsService>().GetValue(DeepSeekSettingsKeys.Protocol);
+            return key switch
+            {
+                "anthropic" => new AnthropicMessagesProtocol(),
+                "responses" => new OpenAiResponsesProtocol(),
+                _ => new OpenAiChatCompletionsProtocol(),
+            };
+        });
         services.AddSingleton<ILlmPhraseAnalyzer, DeepSeekPhraseAnalyzer>();
         services.AddSingleton<SentenceSegmenter>();
         services.AddSingleton<SentenceTokenBuilder>();

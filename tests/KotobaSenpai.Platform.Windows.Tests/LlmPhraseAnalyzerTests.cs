@@ -1,31 +1,32 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Llm;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 
-public sealed class PhraseRequestBuilderTests
+public sealed class PhrasePromptBuilderTests
 {
-    private readonly PhraseRequestBuilder _builder = new();
+    private readonly PhrasePromptBuilder _builder = new();
 
     [Fact]
     public void Body_contains_token_ids_and_metadata_but_no_key_or_offsets()
     {
-        var body = _builder.BuildBody(Request(Segment("あ")), "deepseek-chat");
+        var (system, user) = _builder.Build(Request(Segment("あ")));
 
-        Assert.Contains("l0:t0", body);
-        Assert.DoesNotContain("apiKey", body);
-        Assert.DoesNotContain("screenshot", body);
-        Assert.DoesNotContain("offset", body);
+        Assert.Contains("l0:t0", user);
+        Assert.DoesNotContain("apiKey", system + user);
+        Assert.DoesNotContain("screenshot", user);
+        Assert.DoesNotContain("offset", user);
     }
 
     [Fact]
     public void Body_rejects_oversized_segment_text()
     {
         var large = new string('あ', 20_000);
-        Assert.Throws<RequestTooLargeException>(() => _builder.BuildBody(Request(Segment(large)), "deepseek-chat"));
+        Assert.Throws<RequestTooLargeException>(() => _builder.Build(Request(Segment(large))));
     }
 
     private static SentenceTokenReference Ref()
@@ -48,10 +49,8 @@ public sealed class PhraseResponseParserTests
     [Fact]
     public void Parses_multi_part_and_cross_line_groups()
     {
-        var json = """
-        {"choices":[{"message":{"content":"[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"],[\"l1:t0\"]],\"label\":\"できれば\",\"meaningZh\":\"如果可能\",\"grammarZh\":\"表示条件\"}]"}}]}
-        """;
-        var groups = _parser.Parse(json);
+        var groups = _parser.ParseGroups(Groups(
+            """[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"],["l1:t0"]],"label":"できれば","meaningZh":"如果可能","grammarZh":"表示条件"}]"""));
         var group = Assert.Single(groups);
         Assert.Equal("g1", group.ModelGroupId);
         Assert.Equal(2, group.PartTokenIds.Count);
@@ -61,49 +60,119 @@ public sealed class PhraseResponseParserTests
     [Fact]
     public void Parses_empty_group_list()
     {
-        var groups = _parser.Parse("""{"choices":[{"message":{"content":"[]"}}]}""");
+        var groups = _parser.ParseGroups(Groups("[]"));
         Assert.Empty(groups);
     }
 
     [Fact]
-    public void Rejects_malformed_json()
+    public void Rejects_non_array_root()
     {
-        Assert.Throws<PhraseResponseException>(() => _parser.Parse("not json"));
-    }
-
-    [Fact]
-    public void Extracts_array_wrapped_in_prose_and_code_fence()
-    {
-        var json = """{"choices":[{"message":{"content":"好的，以下是分组：\n```json\n[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]\n```\n希望对你有帮助。"}}]}""";
-        var groups = _parser.Parse(json);
-        var group = Assert.Single(groups);
-        Assert.Equal("g1", group.ModelGroupId);
+        Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(JsonDocument.Parse("{}").RootElement));
     }
 
     [Fact]
     public void Rejects_group_missing_required_field()
     {
-        var json = """{"choices":[{"message":{"content":"[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[],\"label\":\"x\",\"meaningZh\":\"y\"}]"}}]}""";
-        Assert.Throws<PhraseResponseException>(() => _parser.Parse(json));
+        Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
+            """[{"modelGroupId":"g1","type":"grammar","parts":[],"label":"x","meaningZh":"y"}]""")));
     }
 
     [Fact]
     public void Rejects_parts_with_non_string_token_id()
     {
-        var json = """{"choices":[{"message":{"content":"[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[1]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]"}}]}""";
-        Assert.Throws<PhraseResponseException>(() => _parser.Parse(json));
+        Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
+            """[{"modelGroupId":"g1","type":"grammar","parts":[[1]],"label":"x","meaningZh":"y","grammarZh":"z"}]""")));
     }
 
     [Fact]
     public void Rejects_malformed_token_id_string()
     {
-        var json = """{"choices":[{"message":{"content":"[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"foo\"]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]"}}]}""";
-        Assert.Throws<PhraseResponseException>(() => _parser.Parse(json));
+        Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
+            """[{"modelGroupId":"g1","type":"grammar","parts":[["foo"]],"label":"x","meaningZh":"y","grammarZh":"z"}]""")));
+    }
+
+    private static JsonElement Groups(string arrayJson)
+        => JsonDocument.Parse(arrayJson).RootElement.Clone();
+}
+
+public sealed class LlmProtocolTests
+{
+    private const string Group =
+        """{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}""";
+
+    [Fact]
+    public void OpenAiChatCompletions_builds_strict_schema_envelope()
+    {
+        var protocol = new OpenAiChatCompletionsProtocol();
+        Assert.Equal("/chat/completions", protocol.Path);
+
+        var body = protocol.BuildBody("sys", "user", "m");
+        Assert.Contains("response_format", body);
+        Assert.Contains("json_schema", body);
+        Assert.Contains("strict", body);
+    }
+
+    [Fact]
+    public void OpenAiChatCompletions_extracts_from_choices_content()
+    {
+        var protocol = new OpenAiChatCompletionsProtocol();
+        var envelope = "{\"choices\":[{\"message\":{\"content\":" + JsonSerializer.Serialize(Group) + "}}]}";
+        var groups = protocol.ExtractGroupsJson(envelope);
+        Assert.Equal(JsonValueKind.Array, groups.ValueKind);
+        Assert.Equal(1, GetArrayLength(groups));
+    }
+
+    [Fact]
+    public void AnthropicMessages_builds_forced_tool_envelope_and_extracts_from_tool_use_input()
+    {
+        var protocol = new AnthropicMessagesProtocol();
+        var body = protocol.BuildBody("sys", "user", "m");
+        Assert.Contains("\"tools\"", body);
+        Assert.Contains("\"tool_choice\"", body);
+        Assert.Contains("return_groups", body);
+
+        var envelope = """
+            {"content":[{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}}]}
+            """;
+        var groups = protocol.ExtractGroupsJson(envelope);
+        Assert.Equal(1, GetArrayLength(groups));
+    }
+
+    [Fact]
+    public void OpenAiResponses_builds_text_format_envelope_and_extracts_from_output_text()
+    {
+        var protocol = new OpenAiResponsesProtocol();
+        var body = protocol.BuildBody("sys", "user", "m");
+        Assert.Contains("\"text\"", body);
+        Assert.Contains("\"format\"", body);
+
+        var envelope = "{\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":"
+            + JsonSerializer.Serialize(Group) + "}]}]}";
+        var groups = protocol.ExtractGroupsJson(envelope);
+        Assert.Equal(1, GetArrayLength(groups));
+    }
+
+    [Fact]
+    public void AnthropicMessages_throws_when_no_tool_use_block()
+    {
+        var protocol = new AnthropicMessagesProtocol();
+        Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[{"type":"text","text":"hi"}]}"""));
+    }
+
+    private static int GetArrayLength(JsonElement array)
+    {
+        var count = 0;
+        foreach (var _ in array.EnumerateArray())
+            count++;
+        return count;
     }
 }
 
 public sealed class DeepSeekPhraseAnalyzerTests
 {
+    private const string GroupEnvelope =
+        """{"choices":[{"message":{"content":"{\"groups\":[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]}"}}]}""";
+
     [Fact]
     public async Task Returns_no_key_outcome_without_configuration()
     {
@@ -115,9 +184,8 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Parses_valid_response_into_groups()
     {
-        var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[{"message":{"content":"[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]"}}]}""");
         var analyzer = new DeepSeekPhraseAnalyzer(
-            new FakeSettings(apiKey: "k"), new HttpClient(handler));
+            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, GroupEnvelope)));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Success, result.Outcome);
         Assert.Single(result.Groups);
@@ -126,9 +194,8 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_http_500_to_refused()
     {
-        var handler = new StubHandler(HttpStatusCode.InternalServerError, "");
         var analyzer = new DeepSeekPhraseAnalyzer(
-            new FakeSettings(apiKey: "k"), new HttpClient(handler));
+            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.InternalServerError, "")));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Refused, result.Outcome);
     }
@@ -136,9 +203,8 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_timeout_to_timeout_outcome()
     {
-        var handler = new StubHandler(throwEx: new TaskCanceledException("timeout"));
         var analyzer = new DeepSeekPhraseAnalyzer(
-            new FakeSettings(apiKey: "k"), new HttpClient(handler));
+            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(throwEx: new TaskCanceledException("timeout"))));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Timeout, result.Outcome);
     }
@@ -146,9 +212,8 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_cancellation_to_cancelled_outcome()
     {
-        var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[]}""");
         var analyzer = new DeepSeekPhraseAnalyzer(
-            new FakeSettings(apiKey: "k"), new HttpClient(handler));
+            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, """{"choices":[]}""")));
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         var result = await analyzer.AnalyzeAsync(Request(), cts.Token);
@@ -158,9 +223,19 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_malformed_response_to_malformed_json()
     {
-        var handler = new StubHandler(HttpStatusCode.OK, "not json");
         var analyzer = new DeepSeekPhraseAnalyzer(
-            new FakeSettings(apiKey: "k"), new HttpClient(handler));
+            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, "not json")));
+        var result = await analyzer.AnalyzeAsync(Request());
+        Assert.Equal(PhraseAnalysisOutcome.MalformedJson, result.Outcome);
+    }
+
+    [Fact]
+    public async Task Maps_wrong_shape_envelope_to_malformed_json_not_crash()
+    {
+        // 合法 JSON 但缺 message 字段 → 旧代码抛 KeyNotFoundException 逃逸；应映射为 MalformedJson。
+        var analyzer = new DeepSeekPhraseAnalyzer(
+            new FakeSettings(apiKey: "k"),
+            new HttpClient(new StubHandler(HttpStatusCode.OK, """{"choices":[{}]}""")));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.MalformedJson, result.Outcome);
     }
@@ -169,9 +244,9 @@ public sealed class DeepSeekPhraseAnalyzerTests
     public async Task Sends_bearer_authorization_header()
     {
         string? auth = null;
-        var handler = new StubHandler(HttpStatusCode.OK, """{"choices":[]}""", captureAuth: v => auth = v);
         var analyzer = new DeepSeekPhraseAnalyzer(
-            new FakeSettings(apiKey: "secret"), new HttpClient(handler));
+            new FakeSettings(apiKey: "secret"),
+            new HttpClient(new StubHandler(HttpStatusCode.OK, """{"choices":[]}""", captureAuth: v => auth = v)));
         await analyzer.AnalyzeAsync(Request());
         Assert.Equal("Bearer secret", auth);
     }
@@ -187,7 +262,13 @@ public sealed class DeepSeekPhraseAnalyzerTests
     {
         private readonly string? _apiKey;
         public FakeSettings(string? apiKey = null) => _apiKey = apiKey;
-        public string? GetValue(string key) => key == DeepSeekSettingsKeys.ApiKey ? _apiKey : null;
+        public string? GetValue(string key) => key switch
+        {
+            DeepSeekSettingsKeys.ApiKey => _apiKey,
+            DeepSeekSettingsKeys.Endpoint => "https://example.com",
+            DeepSeekSettingsKeys.Model => "deepseek-chat",
+            _ => null,
+        };
         public void SetValue(string key, string? value) { }
     }
 
