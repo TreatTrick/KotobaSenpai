@@ -123,21 +123,22 @@ public sealed class LlmProtocolTests
     }
 
     [Fact]
-    public void AnthropicMessages_builds_fast_text_envelope()
+    public void AnthropicMessages_builds_thinking_off_forced_tool_envelope()
     {
         var protocol = new AnthropicMessagesProtocol();
         var body = protocol.BuildBody("sys", "user", "m");
         Assert.Contains("\"thinking\"", body);
         Assert.Contains("\"disabled\"", body);
-        Assert.DoesNotContain("\"tools\"", body);
-        Assert.DoesNotContain("\"tool_choice\"", body);
+        Assert.Contains("\"tools\"", body);
+        Assert.Contains("return_groups", body);
+        Assert.Contains("\"type\":\"tool\"", body); // thinking 关掉后允许强制指定单工具
     }
 
     [Fact]
-    public void AnthropicMessages_extracts_groups_from_text_block()
+    public void AnthropicMessages_extracts_groups_from_tool_use_input()
     {
         var protocol = new AnthropicMessagesProtocol();
-        var envelope = """{"content":[{"type":"text","text":"\n```json\n{\"groups\":[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]}\n```\n"}]}""";
+        var envelope = """{"content":[{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}}]}""";
         var groups = protocol.ExtractGroupsJson(envelope);
         Assert.Equal(1, GetArrayLength(groups));
     }
@@ -157,10 +158,10 @@ public sealed class LlmProtocolTests
     }
 
     [Fact]
-    public void AnthropicMessages_throws_when_no_text_block()
+    public void AnthropicMessages_throws_when_no_tool_use_block()
     {
         var protocol = new AnthropicMessagesProtocol();
-        Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[]}"""));
+        Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[{"type":"text","text":"hi"}]}"""));
     }
 
     private static int GetArrayLength(JsonElement array)
