@@ -123,18 +123,21 @@ public sealed class LlmProtocolTests
     }
 
     [Fact]
-    public void AnthropicMessages_builds_forced_tool_envelope_and_extracts_from_tool_use_input()
+    public void AnthropicMessages_builds_fast_text_envelope()
     {
         var protocol = new AnthropicMessagesProtocol();
         var body = protocol.BuildBody("sys", "user", "m");
-        Assert.Contains("\"tools\"", body);
-        Assert.Contains("return_groups", body);
-        Assert.Contains("\"type\":\"any\"", body); // thinking 模式不允许强制单工具，用 any + 唯一工具兜底
+        Assert.Contains("\"thinking\"", body);
+        Assert.Contains("\"disabled\"", body);
+        Assert.DoesNotContain("\"tools\"", body);
+        Assert.DoesNotContain("\"tool_choice\"", body);
+    }
 
-        // 真实响应在 tool_use 前有 thinking 块，须跳过。
-        var envelope = """
-            {"content":[{"type":"thinking","thinking":"..."},{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}}]}
-            """;
+    [Fact]
+    public void AnthropicMessages_extracts_groups_from_text_block()
+    {
+        var protocol = new AnthropicMessagesProtocol();
+        var envelope = """{"content":[{"type":"text","text":"\n```json\n{\"groups\":[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]}\n```\n"}]}""";
         var groups = protocol.ExtractGroupsJson(envelope);
         Assert.Equal(1, GetArrayLength(groups));
     }
@@ -154,10 +157,10 @@ public sealed class LlmProtocolTests
     }
 
     [Fact]
-    public void AnthropicMessages_throws_when_no_tool_use_block()
+    public void AnthropicMessages_throws_when_no_text_block()
     {
         var protocol = new AnthropicMessagesProtocol();
-        Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[{"type":"text","text":"hi"}]}"""));
+        Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[]}"""));
     }
 
     private static int GetArrayLength(JsonElement array)
