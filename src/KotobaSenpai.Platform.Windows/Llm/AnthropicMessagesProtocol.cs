@@ -28,7 +28,9 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
                 ["description"] = "Return the phrase group array.",
                 ["input_schema"] = PhraseGroupSchema.Root.DeepClone(),
             }),
-            ["tool_choice"] = new JsonObject { ["type"] = "tool", ["name"] = "return_groups" },
+            // ponytail: 用 {type:"any"} 而非 {type:"tool",name}——火山 ARK 等端点在 thinking 模式下禁止
+            // 强制指定单工具；只有 return_groups 一个工具时，any 同样保证调用它。
+            ["tool_choice"] = new JsonObject { ["type"] = "any" },
         };
         return payload.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));
     }

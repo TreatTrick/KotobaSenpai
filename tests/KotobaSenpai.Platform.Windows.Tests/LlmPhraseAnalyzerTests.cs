@@ -128,11 +128,12 @@ public sealed class LlmProtocolTests
         var protocol = new AnthropicMessagesProtocol();
         var body = protocol.BuildBody("sys", "user", "m");
         Assert.Contains("\"tools\"", body);
-        Assert.Contains("\"tool_choice\"", body);
         Assert.Contains("return_groups", body);
+        Assert.Contains("\"type\":\"any\"", body); // thinking 模式不允许强制单工具，用 any + 唯一工具兜底
 
+        // 真实响应在 tool_use 前有 thinking 块，须跳过。
         var envelope = """
-            {"content":[{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}}]}
+            {"content":[{"type":"thinking","thinking":"..."},{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}}]}
             """;
         var groups = protocol.ExtractGroupsJson(envelope);
         Assert.Equal(1, GetArrayLength(groups));
