@@ -1,6 +1,6 @@
 using KotobaSenpai.Core.Localization;
 
-namespace KotobaSenpai.Core.SeedWork;
+namespace KotobaSenpai.Core.Models;
 
 /// <summary>
 /// 聚合不变量被打破时抛出的异常。携带稳定 <see cref="ErrorCode"/>（供表现层翻译），
@@ -8,18 +8,16 @@ namespace KotobaSenpai.Core.SeedWork;
 /// </summary>
 public sealed class BusinessRuleValidationException : Exception, IUserFacingException
 {
-    public IBusinessRule BrokenRule { get; }
+    public string ErrorCode { get; }
 
     public string Details { get; }
 
-    string IUserFacingException.ErrorCode => BrokenRule.ErrorCode;
-
-    public BusinessRuleValidationException(IBusinessRule brokenRule)
-        : base(brokenRule.Message)
+    public BusinessRuleValidationException(string errorCode, string message)
+        : base(message)
     {
-        BrokenRule = brokenRule;
-        Details = brokenRule.Message;
+        ErrorCode = errorCode;
+        Details = message;
     }
 
-    public override string ToString() => $"{BrokenRule.GetType().FullName}: {BrokenRule.Message}";
+    public override string ToString() => $"{GetType().FullName}: {Message}";
 }

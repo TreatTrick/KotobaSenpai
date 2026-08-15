@@ -2,7 +2,6 @@ using System.Globalization;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
-using KotobaSenpai.Core.SeedWork;
 using KotobaSenpai.Platform.Windows;
 
 namespace KotobaSenpai.App.Tests;
@@ -22,7 +21,7 @@ public sealed class UserMessageResolverTests
     [Fact]
     public void Maps_overlay_target_not_specified_code_via_business_rule_exception()
     {
-        var ex = new BusinessRuleValidationException(new FakeRule(ErrorCodes.OverlayTargetNotSpecified));
+        var ex = new BusinessRuleValidationException(ErrorCodes.OverlayTargetNotSpecified, "dev detail");
 
         Assert.Equal("覆盖层会话必须指定目标窗口。", _resolver.Resolve(ex, ErrorCodes.RecognitionFailed));
     }
@@ -55,11 +54,4 @@ public sealed class UserMessageResolverTests
         Assert.Equal("日语 OCR 推理失败，请查看日志了解详情。", message);
     }
 
-    private sealed class FakeRule : IBusinessRule
-    {
-        public FakeRule(string errorCode) => ErrorCode = errorCode;
-        public string Message => "test rule";
-        public string ErrorCode { get; }
-        public bool IsBroken() => true;
     }
-}

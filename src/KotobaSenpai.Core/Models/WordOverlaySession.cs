@@ -1,12 +1,11 @@
-using KotobaSenpai.Core.Models.Rules;
-using KotobaSenpai.Core.SeedWork;
+using KotobaSenpai.Core.Localization;
 
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
 /// 一次识别会话的聚合根，保证覆盖层只属于当前目标窗口，并按整体替换刷新词列表。
 /// </summary>
-public sealed class WordOverlaySession : Entity, IAggregateRoot
+public sealed class WordOverlaySession
 {
     private readonly List<GroupedWord> _words;
     private readonly List<PhraseGroupView> _phraseGroups;
@@ -55,7 +54,10 @@ public sealed class WordOverlaySession : Entity, IAggregateRoot
         ArgumentNullException.ThrowIfNull(words);
 
         var validWords = words.Where(word => word.Bounds.Width > 0).ToArray();
-        CheckRule(new OverlayTargetMustBeSpecifiedRule(target));
+        if (target is null)
+            throw new BusinessRuleValidationException(
+                ErrorCodes.OverlayTargetNotSpecified,
+                "Overlay session target must be specified.");
         return new WordOverlaySession(
             Guid.NewGuid(),
             target,
