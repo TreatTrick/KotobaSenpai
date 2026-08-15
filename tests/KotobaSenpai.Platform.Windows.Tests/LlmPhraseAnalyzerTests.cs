@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Llm;
@@ -9,7 +10,7 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class PhrasePromptBuilderTests
 {
-    private readonly PhrasePromptBuilder _builder = new();
+    private readonly PhrasePromptBuilder _builder = new(new BracketedLocalizer());
 
     [Fact]
     public void Body_contains_token_ids_and_metadata_but_no_key_or_offsets()
@@ -20,6 +21,29 @@ public sealed class PhrasePromptBuilderTests
         Assert.DoesNotContain("apiKey", system + user);
         Assert.DoesNotContain("screenshot", user);
         Assert.DoesNotContain("offset", user);
+    }
+
+    [Fact]
+    public void Prompt_text_is_resolved_through_the_localizer()
+    {
+        var (system, user) = _builder.Build(Request(Segment("あ")));
+
+        Assert.Contains("[Llm.PhraseSystemPrompt]", system);
+        Assert.Contains("[Llm.PhraseUserInstruction]", user);
+        Assert.Contains("[Llm.SegmentLabel]", user);
+        Assert.Contains("[Llm.TokenTableLabel]", user);
+        Assert.Contains("[Llm.LocalSpansLabel]", user);
+    }
+
+    /// <summary>本地化 fake：把键包进方括号，便于断言 prompt 文案确实经本地化器解析。</summary>
+    private sealed class BracketedLocalizer : IStringLocalizer
+    {
+#pragma warning disable CS0067
+        public event EventHandler? CultureChanged;
+#pragma warning restore CS0067
+
+        public string Get(string key, params object[] args)
+            => $"[{key}]";
     }
 
     [Fact]
@@ -50,7 +74,7 @@ public sealed class PhraseResponseParserTests
     public void Parses_multi_part_and_cross_line_groups()
     {
         var groups = _parser.ParseGroups(Groups(
-            """[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"],["l1:t0"]],"label":"できれば","meaningZh":"如果可能","grammarZh":"表示条件"}]"""));
+            """[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"],["l1:t0"]],"label":"できれば","meaning":"如果可能","grammar":"表示条件"}]"""));
         var group = Assert.Single(groups);
         Assert.Equal("g1", group.ModelGroupId);
         Assert.Equal(2, group.PartTokenIds.Count);
@@ -74,21 +98,21 @@ public sealed class PhraseResponseParserTests
     public void Rejects_group_missing_required_field()
     {
         Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
-            """[{"modelGroupId":"g1","type":"grammar","parts":[],"label":"x","meaningZh":"y"}]""")));
+            """[{"modelGroupId":"g1","type":"grammar","parts":[],"label":"x","meaning":"y"}]""")));
     }
 
     [Fact]
     public void Rejects_parts_with_non_string_token_id()
     {
         Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
-            """[{"modelGroupId":"g1","type":"grammar","parts":[[1]],"label":"x","meaningZh":"y","grammarZh":"z"}]""")));
+            """[{"modelGroupId":"g1","type":"grammar","parts":[[1]],"label":"x","meaning":"y","grammar":"z"}]""")));
     }
 
     [Fact]
     public void Rejects_malformed_token_id_string()
     {
         Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
-            """[{"modelGroupId":"g1","type":"grammar","parts":[["foo"]],"label":"x","meaningZh":"y","grammarZh":"z"}]""")));
+            """[{"modelGroupId":"g1","type":"grammar","parts":[["foo"]],"label":"x","meaning":"y","grammar":"z"}]""")));
     }
 
     private static JsonElement Groups(string arrayJson)
@@ -98,7 +122,7 @@ public sealed class PhraseResponseParserTests
 public sealed class LlmProtocolTests
 {
     private const string Group =
-        """{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}""";
+        """{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaning":"y","grammar":"z"}]}""";
 
     [Fact]
     public void OpenAiChatCompletions_builds_strict_schema_envelope()
@@ -138,7 +162,7 @@ public sealed class LlmProtocolTests
     public void AnthropicMessages_extracts_groups_from_tool_use_input()
     {
         var protocol = new AnthropicMessagesProtocol();
-        var envelope = """{"content":[{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaningZh":"y","grammarZh":"z"}]}}]}""";
+        var envelope = """{"content":[{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaning":"y","grammar":"z"}]}}]}""";
         var groups = protocol.ExtractGroupsJson(envelope);
         Assert.Equal(1, GetArrayLength(groups));
     }
@@ -176,7 +200,7 @@ public sealed class LlmProtocolTests
 public sealed class DeepSeekPhraseAnalyzerTests
 {
     private const string GroupEnvelope =
-        """{"choices":[{"message":{"content":"{\"groups\":[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaningZh\":\"y\",\"grammarZh\":\"z\"}]}"}}]}""";
+        """{"choices":[{"message":{"content":"{\"groups\":[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaning\":\"y\",\"grammar\":\"z\"}]}"}}]}""";
 
     [Fact]
     public async Task Returns_no_key_outcome_without_configuration()

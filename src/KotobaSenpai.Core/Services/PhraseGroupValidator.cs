@@ -51,8 +51,8 @@ public static class PhraseGroupValidator
                 parsed.Type,
                 parts,
                 parsed.Label,
-                parsed.MeaningZh,
-                parsed.GrammarZh,
+                parsed.Meaning,
+                parsed.Grammar,
                 providerOrder: valid.Count));
         }
 
@@ -70,15 +70,15 @@ public static class PhraseGroupValidator
             return "duplicate model group id";
         if (string.IsNullOrWhiteSpace(group.Label))
             return "missing label";
-        if (string.IsNullOrWhiteSpace(group.MeaningZh))
-            return "missing Chinese meaning";
-        if (string.IsNullOrWhiteSpace(group.GrammarZh))
-            return "missing Chinese grammar explanation";
+        if (string.IsNullOrWhiteSpace(group.Meaning))
+            return "missing meaning";
+        if (string.IsNullOrWhiteSpace(group.Grammar))
+            return "missing grammar explanation";
         if (group.Label.Length > PhraseGroup.MaxLabelLength)
             return "label too long";
-        if (group.MeaningZh.Length > PhraseGroup.MaxMeaningLength)
+        if (group.Meaning.Length > PhraseGroup.MaxMeaningLength)
             return "meaning too long";
-        if (group.GrammarZh.Length > PhraseGroup.MaxGrammarLength)
+        if (group.Grammar.Length > PhraseGroup.MaxGrammarLength)
             return "grammar explanation too long";
         if (group.PartTokenIds.Count == 0)
             return "no parts";

@@ -154,4 +154,20 @@
   <data name="ThemeMode_Dark" xml:space="preserve">
     <value>深色</value>
   </data>
+  <!-- LLM 短语分析 prompt -->
+  <data name="Llm.PhraseSystemPrompt" xml:space="preserve">
+    <value>你是日语视觉小说文本的短语组合分析器。只返回真正有教学价值的多词组合（非连续语法、搭配、依赖上下文的惯用表达），不要重复已经由本地识别出的普通词或连续词块。每个 group 的 parts 必须是 token id 的有序连续列表，part 之间可被其他 token 间隔。meaning 与 grammar 字段请以简体中文书写。</value>
+  </data>
+  <data name="Llm.PhraseUserInstruction" xml:space="preserve">
+    <value>请只返回组合 group（遵循结构化输出的 schema）。</value>
+  </data>
+  <data name="Llm.SegmentLabel" xml:space="preserve">
+    <value>句段文本：</value>
+  </data>
+  <data name="Llm.TokenTableLabel" xml:space="preserve">
+    <value>token 表（id/surface/lemma/reading/pos1/cType/cForm）：</value>
+  </data>
+  <data name="Llm.LocalSpansLabel" xml:space="preserve">
+    <value>本地已识别连续词块：</value>
+  </data>
 </root>

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using KotobaSenpai.Core.Contracts;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 
@@ -26,12 +27,14 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
         HttpClient httpClient,
         ILlmProtocol? protocol = null,
         PhrasePromptBuilder? promptBuilder = null,
-        PhraseResponseParser? parser = null)
+        PhraseResponseParser? parser = null,
+        IStringLocalizer? localizer = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _protocol = protocol ?? new OpenAiChatCompletionsProtocol();
-        _promptBuilder = promptBuilder ?? new PhrasePromptBuilder();
+        // ponytail: fallback 仅服务于未注入 builder 的调用（生产经 DI 总注入）；本地化器缺失时返回键本身。
+        _promptBuilder = promptBuilder ?? new PhrasePromptBuilder(localizer ?? new KeyReturningLocalizer());
         _parser = parser ?? new PhraseResponseParser();
     }
 
@@ -95,4 +98,15 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.MalformedJson, [], ex.Message);
         }
     }
+}
+
+/// <summary>未注入本地化器时的兜底：返回键名本身（仅测试/手动构造路径命中）。</summary>
+internal sealed class KeyReturningLocalizer : IStringLocalizer
+{
+#pragma warning disable CS0067 // 接口要求的事件，兜底路径从不触发
+    public event EventHandler? CultureChanged;
+#pragma warning restore CS0067
+
+    public string Get(string key, params object[] args)
+        => args.Length == 0 ? key : string.Join(",", args);
 }

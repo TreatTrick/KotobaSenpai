@@ -113,7 +113,7 @@ public sealed class PhraseFallbackTests
         await service.RecognizeAndShowAsync(Target());
 
         var group = Assert.Single(overlay.Session!.PhraseGroups);
-        Assert.Equal("他是", group.MeaningZh);
+        Assert.Equal("他是", group.Meaning);
         Assert.NotEqual(Guid.Empty, group.SessionGroupId);
         // 帧 100x50 → 窗口 200x100（2x 缩放），part 框 (0,0,10,20) → 屏幕 (0,0,20,40)。
         var rect = Assert.Single(group.Parts[0].Rects);

@@ -234,7 +234,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _phrasePopup?.HidePopup();
                 return;
             }
-            _phrasePopup?.ShowResult(group.Label, group.MeaningZh, group.GrammarZh, anchor);
+            _phrasePopup?.ShowResult(group.Label, group.Meaning, group.Grammar, anchor);
         }
 
         /// <summary>

@@ -36,14 +36,14 @@ public sealed class PhrasePopup : Window
         SourceInitialized += (_, _) => SetClickThrough();
     }
 
-    public void ShowResult(string label, string meaningZh, string grammarZh, ScreenRect anchor)
+    public void ShowResult(string label, string meaning, string grammar, ScreenRect anchor)
     {
         _panel.Children.Clear();
         _panel.Children.Add(Heading(label));
-        if (!string.IsNullOrEmpty(meaningZh))
-            _panel.Children.Add(Block("意思", meaningZh));
-        if (!string.IsNullOrEmpty(grammarZh))
-            _panel.Children.Add(Block("语法", grammarZh));
+        if (!string.IsNullOrEmpty(meaning))
+            _panel.Children.Add(Block("意思", meaning));
+        if (!string.IsNullOrEmpty(grammar))
+            _panel.Children.Add(Block("语法", grammar));
 
         _panel.Measure(new Size(FieldMaxWidth, FieldMaxHeight));
         Width = Math.Min(FieldMaxWidth, Math.Max(200, _panel.DesiredSize.Width + Pad * 2));

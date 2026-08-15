@@ -17,8 +17,8 @@ public sealed record PhraseGroup
         string type,
         IReadOnlyList<PhraseGroupPart> parts,
         string label,
-        string meaningZh,
-        string grammarZh,
+        string meaning,
+        string grammar,
         Guid? sessionGroupId = null,
         int providerOrder = 0)
     {
@@ -30,10 +30,10 @@ public sealed record PhraseGroup
             throw new ArgumentException("A phrase group must contain at least one part.", nameof(parts));
         if (string.IsNullOrWhiteSpace(label))
             throw new ArgumentException("A phrase group label must not be empty.", nameof(label));
-        if (string.IsNullOrWhiteSpace(meaningZh))
-            throw new ArgumentException("A phrase group meaning must not be empty.", nameof(meaningZh));
-        if (string.IsNullOrWhiteSpace(grammarZh))
-            throw new ArgumentException("A phrase group grammar explanation must not be empty.", nameof(grammarZh));
+        if (string.IsNullOrWhiteSpace(meaning))
+            throw new ArgumentException("A phrase group meaning must not be empty.", nameof(meaning));
+        if (string.IsNullOrWhiteSpace(grammar))
+            throw new ArgumentException("A phrase group grammar explanation must not be empty.", nameof(grammar));
         if (providerOrder < 0)
             throw new ArgumentOutOfRangeException(nameof(providerOrder));
 
@@ -41,8 +41,8 @@ public sealed record PhraseGroup
         Type = type;
         Parts = parts.ToArray();
         Label = label;
-        MeaningZh = meaningZh;
-        GrammarZh = grammarZh;
+        Meaning = meaning;
+        Grammar = grammar;
         SessionGroupId = sessionGroupId ?? Guid.Empty;
         ProviderOrder = providerOrder;
     }
@@ -57,9 +57,9 @@ public sealed record PhraseGroup
 
     public string Label { get; }
 
-    public string MeaningZh { get; }
+    public string Meaning { get; }
 
-    public string GrammarZh { get; }
+    public string Grammar { get; }
 
     /// <summary>应用分配的会话 group ID；验证后非空，作为所有 part/hover/弹窗的共享身份。</summary>
     public Guid SessionGroupId { get; }
@@ -71,8 +71,8 @@ public sealed record PhraseGroup
     public int DistinctTokenCount => Parts.SelectMany(part => part.Tokens).Select(token => token.Id).Distinct().Count();
 
     public PhraseGroup WithSessionId(Guid sessionGroupId) => new(
-        ModelGroupId, Type, Parts, Label, MeaningZh, GrammarZh, sessionGroupId, ProviderOrder);
+        ModelGroupId, Type, Parts, Label, Meaning, Grammar, sessionGroupId, ProviderOrder);
 
     public PhraseGroup WithProviderOrder(int providerOrder) => new(
-        ModelGroupId, Type, Parts, Label, MeaningZh, GrammarZh, SessionGroupId, providerOrder);
+        ModelGroupId, Type, Parts, Label, Meaning, Grammar, SessionGroupId, providerOrder);
 }

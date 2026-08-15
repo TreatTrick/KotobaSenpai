@@ -23,9 +23,9 @@ public sealed class PhraseResponseParser
             var type = Str(element, "type");
             var parts = Parts(element);
             var label = Str(element, "label");
-            var meaningZh = Str(element, "meaningZh");
-            var grammarZh = Str(element, "grammarZh");
-            result.Add(new ParsedPhraseGroup(modelGroupId, type, parts, label, meaningZh, grammarZh));
+            var meaning = Str(element, "meaning");
+            var grammar = Str(element, "grammar");
+            result.Add(new ParsedPhraseGroup(modelGroupId, type, parts, label, meaning, grammar));
         }
         return result;
     }

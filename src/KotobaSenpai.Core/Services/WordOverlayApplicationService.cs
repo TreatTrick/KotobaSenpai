@@ -74,8 +74,8 @@ public sealed class WordOverlayApplicationService
             group.SessionGroupId,
             group.Label,
             group.Type,
-            group.MeaningZh,
-            group.GrammarZh,
+            group.Meaning,
+            group.Grammar,
             group.ProviderOrder,
             group.DistinctTokenCount,
             group.Parts

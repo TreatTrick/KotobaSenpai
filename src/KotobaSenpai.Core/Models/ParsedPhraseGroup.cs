@@ -11,22 +11,22 @@ public sealed record ParsedPhraseGroup
         string type,
         IReadOnlyList<IReadOnlyList<SentenceTokenId>> partTokenIds,
         string label,
-        string meaningZh,
-        string grammarZh)
+        string meaning,
+        string grammar)
     {
         ArgumentNullException.ThrowIfNull(modelGroupId);
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(partTokenIds);
         ArgumentNullException.ThrowIfNull(label);
-        ArgumentNullException.ThrowIfNull(meaningZh);
-        ArgumentNullException.ThrowIfNull(grammarZh);
+        ArgumentNullException.ThrowIfNull(meaning);
+        ArgumentNullException.ThrowIfNull(grammar);
 
         ModelGroupId = modelGroupId;
         Type = type;
         PartTokenIds = partTokenIds.Select(ids => (IReadOnlyList<SentenceTokenId>)ids.ToArray()).ToArray();
         Label = label;
-        MeaningZh = meaningZh;
-        GrammarZh = grammarZh;
+        Meaning = meaning;
+        Grammar = grammar;
     }
 
     /// <summary>请求内模型返回的 group ID。</summary>
@@ -39,7 +39,7 @@ public sealed record ParsedPhraseGroup
 
     public string Label { get; }
 
-    public string MeaningZh { get; }
+    public string Meaning { get; }
 
-    public string GrammarZh { get; }
+    public string Grammar { get; }
 }

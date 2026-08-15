@@ -154,4 +154,20 @@
   <data name="ThemeMode_Dark" xml:space="preserve">
     <value>Dark</value>
   </data>
+  <!-- LLM phrase-analysis prompt -->
+  <data name="Llm.PhraseSystemPrompt" xml:space="preserve">
+    <value>You are a phrase-combination analyzer for Japanese visual-novel text. Return only multi-word combinations that have real teaching value (non-contiguous grammar, collocations, context-dependent idiomatic expressions); do not repeat ordinary words or contiguous word chunks already recognized locally. The parts of each group must be an ordered contiguous list of token ids, and parts may be separated by other tokens. Write the meaning and grammar fields in English.</value>
+  </data>
+  <data name="Llm.PhraseUserInstruction" xml:space="preserve">
+    <value>Return only combination groups (following the structured-output schema).</value>
+  </data>
+  <data name="Llm.SegmentLabel" xml:space="preserve">
+    <value>Segment text:</value>
+  </data>
+  <data name="Llm.TokenTableLabel" xml:space="preserve">
+    <value>token table (id/surface/lemma/reading/pos1/cType/cForm):</value>
+  </data>
+  <data name="Llm.LocalSpansLabel" xml:space="preserve">
+    <value>Locally recognized contiguous word chunks:</value>
+  </data>
 </root>

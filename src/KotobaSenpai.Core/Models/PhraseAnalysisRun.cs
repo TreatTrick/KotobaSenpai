@@ -14,8 +14,8 @@ public sealed record PhraseGroupView(
     Guid SessionGroupId,
     string Label,
     string Type,
-    string MeaningZh,
-    string GrammarZh,
+    string Meaning,
+    string Grammar,
     int ProviderOrder,
     int DistinctTokenCount,
     IReadOnlyList<PhrasePartView> Parts);
