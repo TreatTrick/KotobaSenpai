@@ -6,7 +6,7 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// Port for the provider's wire protocol: covers only the three real differences — the POST target path, the request-body
 /// envelope (including each provider's structured-output declaration), and the <see cref="JsonElement"/> of the group
 /// array extracted from the response envelope. HTTP, Bearer auth, error mapping, cancellation/timeout all stay in the
-/// transport layer (<see cref="DeepSeekPhraseAnalyzer"/>); the semantic content is built by
+/// transport layer (<see cref="LlmPhraseAnalyzer"/>); the semantic content is built by
 /// <see cref="PhrasePromptBuilder"/>.
 /// </summary>
 public interface ILlmProtocol

@@ -15,7 +15,7 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// selected <see cref="ILlmProtocol"/>. Skips the call when no key is configured. Cancellation/timeout/transport/refusal/
 /// malformed JSON are all mapped to retryable diagnostics rather than thrown through the recognition flow.
 /// </summary>
-public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
+public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
 {
     private readonly ISettingsService _settings;
     private readonly HttpClient _http;
@@ -24,7 +24,7 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
     private readonly PhraseResponseParser _parser;
     private readonly IDiagnosticReporter? _diagnostics;
 
-    public DeepSeekPhraseAnalyzer(
+    public LlmPhraseAnalyzer(
         ISettingsService settings,
         HttpClient httpClient,
         ILlmProtocol? protocol = null,
@@ -46,9 +46,9 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
         PhraseAnalysisRequest request,
         CancellationToken cancellationToken = default)
     {
-        var apiKey = _settings.GetValue(DeepSeekSettingsKeys.ApiKey);
-        var endpoint = _settings.GetValue(DeepSeekSettingsKeys.Endpoint);
-        var model = _settings.GetValue(DeepSeekSettingsKeys.Model);
+        var apiKey = _settings.GetValue(LlmSettingsKeys.ApiKey);
+        var endpoint = _settings.GetValue(LlmSettingsKeys.Endpoint);
+        var model = _settings.GetValue(LlmSettingsKeys.Model);
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(model))
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.NoKey, [], null);
 

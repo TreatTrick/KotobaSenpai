@@ -250,7 +250,7 @@ public sealed class LlmProtocolTests
     }
 }
 
-public sealed class DeepSeekPhraseAnalyzerTests
+public sealed class LlmPhraseAnalyzerTests
 {
     private const string GroupEnvelope =
         """{"choices":[{"message":{"content":"{\"groups\":[{\"modelGroupId\":\"g1\",\"type\":\"grammar\",\"parts\":[[\"l0:t0\"]],\"label\":\"x\",\"meaning\":\"y\",\"grammar\":\"z\"}]}"}}]}""";
@@ -258,7 +258,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Returns_no_key_outcome_without_configuration()
     {
-        var analyzer = new DeepSeekPhraseAnalyzer(new FakeSettings(), new HttpClient());
+        var analyzer = new LlmPhraseAnalyzer(new FakeSettings(), new HttpClient());
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.NoKey, result.Outcome);
     }
@@ -266,7 +266,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Parses_valid_response_into_groups()
     {
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, GroupEnvelope)));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Success, result.Outcome);
@@ -277,14 +277,14 @@ public sealed class DeepSeekPhraseAnalyzerTests
     public async Task Records_raw_request_and_response_exchange()
     {
         var reporter = new FakeDiagnosticReporter();
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, GroupEnvelope)),
             diagnostics: reporter);
         await analyzer.AnalyzeAsync(Request());
 
         Assert.NotNull(reporter.RequestJson);
         Assert.NotNull(reporter.ResponseJson);
-        Assert.Contains("deepseek-chat", reporter.RequestJson); // model name in the request body
+        Assert.Contains("test-model", reporter.RequestJson); // model name in the request body
         Assert.Contains("groups", reporter.ResponseJson);        // raw provider envelope saved verbatim
     }
 
@@ -292,7 +292,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     public async Task Parses_words_into_result()
     {
         const string envelope = """{"choices":[{"message":{"content":"{\"groups\":[],\"words\":[{\"headword\":\"来\",\"pos\":\"自動・カ変\",\"meaning\":\"来\",\"grammar\":\"カ変活用\"}]}"}}]}""";
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, envelope)));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Success, result.Outcome);
@@ -304,7 +304,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_http_500_to_refused()
     {
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.InternalServerError, "")));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Refused, result.Outcome);
@@ -313,7 +313,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_timeout_to_timeout_outcome()
     {
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(throwEx: new TaskCanceledException("timeout"))));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Timeout, result.Outcome);
@@ -322,7 +322,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_cancellation_to_cancelled_outcome()
     {
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, """{"choices":[]}""")));
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -333,7 +333,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     [Fact]
     public async Task Maps_malformed_response_to_malformed_json()
     {
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, "not json")));
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.MalformedJson, result.Outcome);
@@ -343,7 +343,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     public async Task Maps_wrong_shape_envelope_to_malformed_json_not_crash()
     {
         // Valid JSON but missing the message field → old code let KeyNotFoundException escape; should map to MalformedJson.
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "k"),
             new HttpClient(new StubHandler(HttpStatusCode.OK, """{"choices":[{}]}""")));
         var result = await analyzer.AnalyzeAsync(Request());
@@ -354,7 +354,7 @@ public sealed class DeepSeekPhraseAnalyzerTests
     public async Task Sends_bearer_authorization_header()
     {
         string? auth = null;
-        var analyzer = new DeepSeekPhraseAnalyzer(
+        var analyzer = new LlmPhraseAnalyzer(
             new FakeSettings(apiKey: "secret"),
             new HttpClient(new StubHandler(HttpStatusCode.OK, """{"choices":[]}""", captureAuth: v => auth = v)));
         await analyzer.AnalyzeAsync(Request());
@@ -374,9 +374,9 @@ public sealed class DeepSeekPhraseAnalyzerTests
         public FakeSettings(string? apiKey = null) => _apiKey = apiKey;
         public string? GetValue(string key) => key switch
         {
-            DeepSeekSettingsKeys.ApiKey => _apiKey,
-            DeepSeekSettingsKeys.Endpoint => "https://example.com",
-            DeepSeekSettingsKeys.Model => "deepseek-chat",
+            LlmSettingsKeys.ApiKey => _apiKey,
+            LlmSettingsKeys.Endpoint => "https://example.com",
+            LlmSettingsKeys.Model => "test-model",
             _ => null,
         };
         public void SetValue(string key, string? value) { }

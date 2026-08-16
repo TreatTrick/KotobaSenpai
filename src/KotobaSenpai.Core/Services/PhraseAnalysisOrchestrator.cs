@@ -11,7 +11,7 @@ namespace KotobaSenpai.Core.Services;
 /// </summary>
 public sealed class PhraseAnalysisOrchestrator
 {
-    // ponytail: concurrency cap of 4 — a typical VN dialogue box has 2~5 sentences, capping beyond that is gentle on DeepSeek; tune if 429s occur or higher throughput is needed.
+    // ponytail: concurrency cap of 4 — a typical VN dialogue box has 2~5 sentences, capping beyond that is gentle on the LLM provider; tune if 429s occur or higher throughput is needed.
     private const int MaxConcurrency = 4;
 
     private readonly ILlmPhraseAnalyzer _analyzer;

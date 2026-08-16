@@ -104,13 +104,13 @@ public partial class App : Application
 
         // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
         // enabled by the config key PhraseGroupsEnabled=true; when the key is not configured the adapter returns NoKey and skips the call.
-        // The protocol is selected by DeepSeekProtocol (anthropic/responses/default OpenAI Chat Completions).
+        // The protocol is selected by LlmProtocol (anthropic/responses/default OpenAI Chat Completions).
         services.AddSingleton<PhrasePromptBuilder>();
         services.AddSingleton<PhraseResponseParser>();
         services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         services.AddSingleton<ILlmProtocol>(sp =>
         {
-            var key = sp.GetRequiredService<ISettingsService>().GetValue(DeepSeekSettingsKeys.Protocol);
+            var key = sp.GetRequiredService<ISettingsService>().GetValue(LlmSettingsKeys.Protocol);
             return key switch
             {
                 "anthropic" => new AnthropicMessagesProtocol(),
@@ -118,7 +118,7 @@ public partial class App : Application
                 _ => new OpenAiChatCompletionsProtocol(),
             };
         });
-        services.AddSingleton<ILlmPhraseAnalyzer, DeepSeekPhraseAnalyzer>();
+        services.AddSingleton<ILlmPhraseAnalyzer, LlmPhraseAnalyzer>();
         services.AddSingleton<SentenceSegmenter>();
         services.AddSingleton<SentenceTokenBuilder>();
         services.AddSingleton<PhraseAnalysisOrchestrator>();
