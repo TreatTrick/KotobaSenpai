@@ -30,15 +30,15 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 - **THEN** 系统返回空结果，不抛未处理异常
 
 ### Requirement: Dictionary popup on hover
-系统 SHALL 在覆盖层悬停某个分词词时，弹出本地词典释义小窗，显示`头词 + [读音] + 各义项(词性 + 英文释义)`，并定位在该词包围盒下方且不遮挡该词。
+系统 SHALL 在覆盖层悬停某个本地合并词时，弹出释义小窗，显示`头词 + [词性] + [读音] + LLM 最佳中文释义 + 语法`，并定位在该词包围盒下方且不遮挡该词。头词、读音与活用型由本地 jmdic/UniDic 提供，语境词性、最佳中文释义与语法来自 `llm-word-meanings`。本地 JMdict 的英文释义不再作为弹窗语义来源。
 
 #### Scenario: Show popup on hover
-- **WHEN** 鼠标悬停在某个有词典条目的分词词上
-- **THEN** 系统弹出释义窗，展示头词、读音与各义项的英文释义
+- **WHEN** 鼠标悬停在某个有本地合并词的词上
+- **THEN** 系统弹出释义窗，展示头词、语境词性、读音与 LLM 返回的最佳中文释义与语法
 
 #### Scenario: No entry shows minimal content
-- **WHEN** 悬停词无词典条目
-- **THEN** 系统展示该词的读音与"未收录"提示，而不是空白或崩溃
+- **WHEN** 悬停词无词典条目或 LLM 词条
+- **THEN** 系统展示该词的读音与"未收录/无释义"提示，而不是空白或崩溃
 
 ### Requirement: Precomputed span lookup
 系统 SHALL 使用识别阶段生成的完整词块 span 和词典结果进行悬停查词。已确认未命中的 span 也 SHALL 直接显示未收录，不得再次按鼠标所在字符发起单字符最长匹配。
@@ -61,3 +61,4 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 #### Scenario: Update on word switch
 - **WHEN** 悬停切换到另一个词
 - **THEN** 弹窗内容更新为新词的释义，不残留旧词内容
+

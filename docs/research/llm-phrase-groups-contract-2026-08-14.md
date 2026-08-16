@@ -48,6 +48,8 @@ assigns an application-owned session `SessionGroupId` used for all parts, hover,
 The app derives each part's surface, reading, and screen geometry **locally** from referenced OCR
 character boxes. Model-provided offsets and surface text are never trusted for rendering.
 
+> **更新(2026-08-16):** 同一响应现还携带一个平行的 `words[]` 数组——每条以 `headword`(从请求词块表逐字复制的 surface)引用一个本地合并词,返回语境词性、最佳中文释义与语法;不返回 token id/读音(本地已有)。每词按 headword 精确匹配本地合并词,匹配不到/重复/超长则单独丢弃,不发生级联错位;每句段上限 32 词。悬停弹窗释义源由英文 gloss 改为该词义(`llm-word-meanings`)。
+
 ## 3. Privacy boundary
 
 The provider payload contains **no** screenshots, image bytes, window coordinates, window titles, or

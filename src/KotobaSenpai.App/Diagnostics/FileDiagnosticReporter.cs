@@ -1,4 +1,8 @@
 using System.IO;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
@@ -14,6 +18,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
     private const string DiagEnabledKey = "DiagEnabled";
 
     private readonly ISettingsService _settings;
+    private static int _seq;
 
     public FileDiagnosticReporter(ISettingsService settings)
     {
@@ -44,7 +49,8 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
             var source = string.Join("+", word.SourceTokens.Select(sourceToken => sourceToken.Surface));
             lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={token.Reading} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}");
         }
-        File.WriteAllLines(Path.Combine(dir, $"tokens-{DateTime.Now:HHmmss-fff}.txt"), lines);
+        File.WriteAllLines(Path.Combine(dir, $"tokens-{DateTime.Now:HHmmss-fff}.txt"), lines, Utf8Bom);
+        PruneToLatest(dir, "tokens-");
     }
 
     public void RecordPhraseAnalysis(PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning)
@@ -60,6 +66,64 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         var flags = new[] { "## phrase analysis", $"outcome={outcome}", $"groups={groups.Count}" };
         if (!string.IsNullOrEmpty(warning))
             flags = flags.Append($"warning={warning}").ToArray();
-        File.WriteAllLines(Path.Combine(dir, $"phrase-{DateTime.Now:HHmmss-fff}.txt"), flags);
+        File.WriteAllLines(Path.Combine(dir, $"phrase-{DateTime.Now:HHmmss-fff}.txt"), flags, Utf8Bom);
+        PruneToLatest(dir, "phrase-");
+    }
+
+    public void RecordLlmExchange(string segmentId, string requestJson, string responseJson)
+    {
+        if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KotobaSenpai", "diag");
+        Directory.CreateDirectory(dir);
+
+        var seq = Interlocked.Increment(ref _seq);
+        var safe = Sanitize(segmentId);
+        var stamp = $"{DateTime.Now:HHmmss-fff}-{seq:D3}-{safe}";
+        // Indented + UTF-8 with BOM so each file opens correctly in a Chinese-locale editor/JSON viewer; the request body never contains the API key (it lives in the Authorization header).
+        File.WriteAllText(Path.Combine(dir, $"llm-req-{stamp}.json"), FormatJson(requestJson), Utf8Bom);
+        File.WriteAllText(Path.Combine(dir, $"llm-resp-{stamp}.json"), FormatJson(responseJson), Utf8Bom);
+        PruneToLatest(dir, "llm-req-");
+        PruneToLatest(dir, "llm-resp-");
+    }
+
+    /// <summary>Keeps only the latest <paramref name="max"/> files whose name starts with <paramref name="prefix"/>, deleting older ones so diag never accumulates unboundedly.</summary>
+    private static void PruneToLatest(string dir, string prefix, int max = 10)
+    {
+        foreach (var file in Directory.GetFiles(dir, $"{prefix}*")
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .Skip(max))
+        {
+            try { File.Delete(file); } catch (IOException) { }
+        }
+    }
+
+    private static readonly Encoding Utf8Bom = new UTF8Encoding(true);
+    // UnsafeRelaxedJsonEscaping writes CJK as literal UTF-8 (readable) instead of \uXXXX escapes; the "unsafe" caveat only concerns HTML contexts, irrelevant for a local diag file.
+    private static readonly JsonSerializerOptions Indented = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    private static string FormatJson(string json)
+    {
+        try
+        {
+            return JsonNode.Parse(json)?.ToJsonString(Indented) ?? json;
+        }
+        catch (JsonException)
+        {
+            return json; // not valid JSON; keep the raw bytes so nothing is lost
+        }
+    }
+
+    private static string Sanitize(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        return string.Concat(value.Select(c => invalid.Contains(c) ? '_' : c));
     }
 }

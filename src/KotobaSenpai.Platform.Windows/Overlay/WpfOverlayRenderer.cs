@@ -4,33 +4,33 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Contracts;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Services;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
-/// WPF implementation of the <see cref="IOverlayRenderer"/> port:
-/// a transparent, topmost, non-activating, click-through tool window that draws an underline for each tokenized word and
-/// a compound phrase-block marker for each part of every phrase group. Hovering a local word recolors its whole line;
-/// hovering any part of a group highlights all its parts and opens a detail popup. Clicks always pass through to the
-/// window below.
+/// WPF implementation of the <see cref="IOverlayRenderer"/> port: a transparent, topmost, non-activating, click-through
+/// tool window that draws one underline for each local merged word. Hovering a local word recolors its underline and shows
+/// its LLM meaning popup; hovering a group recolors the underlines of its member words and shows the group detail popup.
+/// Clicks always pass through to the window below.
 /// </summary>
 public sealed class WpfOverlayRenderer : IOverlayRenderer
 {
-    private readonly IDictionaryLookup _lookup;
+    private readonly IStringLocalizer? _localizer;
     private OverlayWindow? _window;
 
-    public WpfOverlayRenderer(IDictionaryLookup lookup)
+    public WpfOverlayRenderer(IStringLocalizer? localizer = null)
     {
-        _lookup = lookup ?? throw new ArgumentNullException(nameof(lookup));
+        _localizer = localizer;
     }
 
     public void Show(WordOverlaySession session)
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            _window ??= new OverlayWindow(_lookup);
+            _window ??= new OverlayWindow(_localizer);
             _window.Render(session);
         });
     }
@@ -48,27 +48,21 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     {
         private static readonly Brush DefaultLineBrush = Brushes.DeepSkyBlue;
         private static readonly Brush HoverLineBrush = Brushes.OrangeRed;
-        private static readonly Color DefaultPartColor = Color.FromRgb(0x7A, 0xC0, 0xFF);
 
         private const int HoverPollMs = 50;
 
-        private readonly IDictionaryLookup _lookup;
         private readonly Canvas _canvas = new();
         private readonly List<Border> _lineElements = new();
-        private readonly List<(Border Element, int GroupIndex)> _partElements = new();
         private readonly DispatcherTimer _hoverTimer;
-        private readonly DictionaryPopup _popup;
-        private readonly PhrasePopup? _phrasePopup;
-        private readonly Dictionary<string, IReadOnlyList<DictionaryEntry>> _lookupCache = new();
+        private readonly PhrasePopup _phrasePopup;
         private WordOverlaySession? _session;
         private int _hoverIndex = -1;
         private int _hoveredGroup = -1;
+        private IReadOnlyList<int> _hoveredGroupLines = Array.Empty<int>();
 
-        public OverlayWindow(IDictionaryLookup lookup)
+        public OverlayWindow(IStringLocalizer? localizer = null)
         {
-            _lookup = lookup ?? throw new ArgumentNullException(nameof(lookup));
-            _popup = new DictionaryPopup();
-            _phrasePopup = new PhrasePopup();
+            _phrasePopup = new PhrasePopup(localizer);
 
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
@@ -92,7 +86,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _session = session;
             _hoverIndex = -1;
             _hoveredGroup = -1;
-            _lookupCache.Clear();
+            _hoveredGroupLines = Array.Empty<int>();
 
             var handle = new WindowInteropHelper(this).Handle;
             var scale = NativeMethods.GetDpiForWindow(handle) / 96d;
@@ -108,7 +102,6 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 NativeMethods.SwpNoActivate | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
             _canvas.Children.Clear();
             _lineElements.Clear();
-            _partElements.Clear();
 
             foreach (var line in session.Lines)
             {
@@ -118,26 +111,6 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _canvas.Children.Add(element);
                 _lineElements.Add(element);
             }
-
-            foreach (var (group, groupIndex) in session.PhraseGroups.Select((g, i) => (g, i)))
-            {
-                foreach (var part in group.Parts)
-                {
-                    foreach (var rect in part.Rects)
-                    {
-                        var element = MakeBox(
-                            rect.Width / scale,
-                            3.0 / scale,
-                            new SolidColorBrush(DefaultPartColor));
-                        element.BorderBrush = new SolidColorBrush(DefaultPartColor);
-                        element.Opacity = 0.9;
-                        Canvas.SetLeft(element, (rect.X - session.Target.Bounds.X) / scale);
-                        Canvas.SetTop(element, (rect.Y - session.Target.Bounds.Y) / scale);
-                        _canvas.Children.Add(element);
-                        _partElements.Add((element, groupIndex));
-                    }
-                }
-            }
             _hoverTimer.Start();
         }
 
@@ -146,18 +119,16 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _hoverTimer.Stop();
             _hoverIndex = -1;
             _hoveredGroup = -1;
-            _popup.HidePopup();
-            _phrasePopup?.HidePopup();
+            _hoveredGroupLines = Array.Empty<int>();
+            _phrasePopup.HidePopup();
             foreach (var element in _lineElements)
                 element.Background = DefaultLineBrush;
-            foreach (var (element, _) in _partElements)
-                element.Background = new SolidColorBrush(DefaultPartColor);
         }
 
         /// <summary>
         /// Polls the cursor position for hit testing (the window is click-through and receives no mouse events of its own).
-        /// Tests phrase groups first (overlaps resolved by fewer tokens, then provider order), highlighting all parts of the
-        /// group; otherwise falls back to the local-word hot zone.
+        /// Tests phrase groups first (overlaps resolved by fewer tokens, then provider order), highlighting the underlines of
+        /// the group's member words; otherwise falls back to the local-word hot zone.
         /// </summary>
         private void PollHover()
         {
@@ -171,30 +142,30 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var groupHit = PhraseHoverResolver.Resolve(session.PhraseGroups, cursor.X, cursor.Y);
             if (groupHit != _hoveredGroup)
             {
-                if (_hoveredGroup >= 0)
-                {
-                    foreach (var (element, index) in _partElements.Where(p => p.GroupIndex == _hoveredGroup))
-                        element.Background = new SolidColorBrush(DefaultPartColor);
-                }
+                foreach (var i in _hoveredGroupLines)
+                    if (i >= 0 && i < _lineElements.Count)
+                        _lineElements[i].Background = DefaultLineBrush;
+                _hoveredGroupLines = Array.Empty<int>();
                 _hoveredGroup = groupHit;
                 if (groupHit >= 0)
                 {
-                    foreach (var (element, index) in _partElements.Where(p => p.GroupIndex == groupHit))
-                        element.Background = HoverLineBrush;
+                    _hoveredGroupLines = session.GetCoveredWordIndices(session.PhraseGroups[groupHit]);
+                    foreach (var i in _hoveredGroupLines)
+                        if (i >= 0 && i < _lineElements.Count)
+                            _lineElements[i].Background = HoverLineBrush;
                     ShowPhrasePopup(session.PhraseGroups[groupHit]);
                 }
                 else
                 {
-                    _phrasePopup?.HidePopup();
+                    _phrasePopup.HidePopup();
                 }
             }
 
             if (groupHit >= 0)
             {
-                // Suspend local-word hover while a group is hit, to keep the two popups from fighting.
+                // Suspend local-word hover while a group is hit, to keep the two popup states from fighting.
                 if (_hoverIndex >= 0 && _hoverIndex < _lineElements.Count)
                     _lineElements[_hoverIndex].Background = DefaultLineBrush;
-                _popup.HidePopup();
                 _hoverIndex = -1;
                 return;
             }
@@ -229,49 +200,40 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         private void ShowPhrasePopup(PhraseGroupView group)
         {
-            // Use the first rectangle of the group's first part as the popup anchor.
             var anchor = group.Parts.SelectMany(part => part.Rects).FirstOrDefault();
             if (anchor == default)
             {
-                _phrasePopup?.HidePopup();
+                _phrasePopup.HidePopup();
                 return;
             }
-            _phrasePopup?.ShowResult(group.Label, group.Meaning, group.Grammar, anchor);
+            var session = _session;
+            var memberMeanings = session is null
+                ? Array.Empty<WordMeaningView>()
+                : session.GetCoveredWordIndices(group)
+                    .Select(i => session.Words[i])
+                    .Select(session.TryGetMeaning)
+                    .Where(meaning => meaning is not null)
+                    .Cast<WordMeaningView>()
+                    .ToArray();
+            _phrasePopup.ShowResult(group.Label, group.Meaning, group.Grammar, anchor, memberMeanings);
         }
 
-        /// <summary>
-        /// Updates the popup when the hovered word changes. Spans already resolved during recognition reuse their results; only
-        /// legacy-compatible phrase blocks are looked up by token here, avoiding repeated SQLite access for words that were
-        /// parsed but not matched.
-        /// </summary>
+        /// <summary>Shows the hovered word's LLM meaning popup, or headword + reading + "no meaning" when the provider returned none.</summary>
         private void UpdatePopup(int hit)
         {
             var session = _session;
             if (session is null || hit < 0 || hit >= session.Words.Count)
             {
-                _popup.HidePopup();
+                _phrasePopup.HidePopup();
                 return;
             }
 
             var word = session.Words[hit];
-            IReadOnlyList<DictionaryEntry> entries;
-            if (word.HasResolvedLookup)
-            {
-                entries = word.Entries;
-            }
+            var meaning = session.TryGetMeaning(word);
+            if (meaning is not null)
+                _phrasePopup.ShowWordMeaning(meaning, word.Bounds);
             else
-            {
-                if (!_lookupCache.TryGetValue(word.Token.Lemma, out var cachedEntries))
-                {
-                    entries = _lookup.Lookup(word.Token);
-                    _lookupCache[word.Token.Lemma] = entries;
-                }
-                else
-                {
-                    entries = cachedEntries;
-                }
-            }
-            _popup.ShowResult(entries, word.Reading, word.Bounds);
+                _phrasePopup.ShowWordWithoutMeaning(word.Surface, word.Reading, word.Bounds);
         }
 
         private static Border MakeBox(double width, double height, Brush background)

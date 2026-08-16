@@ -37,13 +37,21 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
     }
 
     public JsonElement ExtractGroupsJson(string envelopeJson)
+        => ExtractContentRoot(envelopeJson).GetProperty("groups").Clone();
+
+    public JsonElement ExtractWordsJson(string envelopeJson)
+        => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+
+    private static JsonElement ExtractContentRoot(string envelopeJson)
     {
         using var doc = JsonDocument.Parse(envelopeJson);
         foreach (var block in doc.RootElement.GetProperty("content").EnumerateArray())
         {
             if (block.TryGetProperty("type", out var type) && type.GetString() == "tool_use")
-                return block.GetProperty("input").GetProperty("groups").Clone();
+                return block.GetProperty("input").Clone();
         }
         throw new PhraseResponseException("Response lacks a tool_use block with group data.");
     }
+
+    private static JsonElement EmptyArray() => JsonDocument.Parse("[]").RootElement.Clone();
 }

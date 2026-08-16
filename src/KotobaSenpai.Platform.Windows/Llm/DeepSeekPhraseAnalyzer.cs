@@ -22,6 +22,7 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
     private readonly ILlmProtocol _protocol;
     private readonly PhrasePromptBuilder _promptBuilder;
     private readonly PhraseResponseParser _parser;
+    private readonly IDiagnosticReporter? _diagnostics;
 
     public DeepSeekPhraseAnalyzer(
         ISettingsService settings,
@@ -29,7 +30,8 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
         ILlmProtocol? protocol = null,
         PhrasePromptBuilder? promptBuilder = null,
         PhraseResponseParser? parser = null,
-        IStringLocalizer? localizer = null)
+        IStringLocalizer? localizer = null,
+        IDiagnosticReporter? diagnostics = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -37,6 +39,7 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
         // ponytail: fallback only serves callers that don't inject a builder (production always injects via DI); returns the key itself when a localizer is missing.
         _promptBuilder = promptBuilder ?? new PhrasePromptBuilder(localizer ?? new KeyReturningLocalizer());
         _parser = parser ?? new PhraseResponseParser();
+        _diagnostics = diagnostics;
     }
 
     public async Task<PhraseAnalysisResult> AnalyzeAsync(
@@ -88,10 +91,14 @@ public sealed class DeepSeekPhraseAnalyzer : ILlmPhraseAnalyzer
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.TransportError, [], ex.Message);
         }
 
+        // Capture the raw request/response verbatim (request body never contains the API key) for offline inspection.
+        _diagnostics?.RecordLlmExchange(request.SegmentId, body, envelope);
+
         try
         {
             var groups = _parser.ParseGroups(_protocol.ExtractGroupsJson(envelope));
-            return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null);
+            var words = _parser.ParseWords(_protocol.ExtractWordsJson(envelope));
+            return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words };
         }
         catch (Exception ex) when (ex is PhraseResponseException or JsonException or KeyNotFoundException or ArgumentNullException)
         {

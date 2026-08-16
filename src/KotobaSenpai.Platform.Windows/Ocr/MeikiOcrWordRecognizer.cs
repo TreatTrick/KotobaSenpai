@@ -102,6 +102,19 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
     };
         text.AddRange(lines.Select(l => $"[{l.Text}] chars={l.Chars.Count}"));
         File.WriteAllLines(Path.Combine(dir, $"ocr-{stamp}.txt"), text);
+        PruneToLatest(dir, "frame-");
+        PruneToLatest(dir, "ocr-");
+    }
+
+    /// <summary>Keeps only the latest <paramref name="max"/> files whose name starts with <paramref name="prefix"/>, deleting older ones so diag never accumulates unboundedly.</summary>
+    private static void PruneToLatest(string dir, string prefix, int max = 10)
+    {
+        foreach (var file in Directory.GetFiles(dir, $"{prefix}*")
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .Skip(max))
+        {
+            try { File.Delete(file); } catch (IOException) { }
+        }
     }
 
     private static void SavePng(string path, CapturedFrame frame)

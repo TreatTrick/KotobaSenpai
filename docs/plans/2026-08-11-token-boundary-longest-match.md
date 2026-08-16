@@ -4,6 +4,8 @@
 
 **Goal:** 将 UniDic 形态素转换为受 token 边界约束的非重叠最长词块，并让下划线、悬停查词与诊断共享同一解析结果。
 
+> **更新(2026-08-16):** jmdic 的角色收敛为"合并 + 词头/读音"——它仍提供 token→word 合并、词头与读音(本地确定、离线);悬停弹窗的释义与词性不再来自英文 gloss,改由 LLM 词级输出(`llm-word-meanings` 的 `words[]`)提供。英文释义不再作为弹窗语义来源。
+
 **Architecture:** 在 Core 增加独立的 token-span resolver。它先枚举完整 UniDic token 的连续 surface 候选，批量读取 JMdict，再以左到右贪心方式选择最长、不重叠的 span；对动词/形容词后的活用助动词使用首 token lemma。`WordGroupingService` 只负责把 span 映射到 OCR 字符框，`GroupedWord` 携带已解析 entries，WPF renderer 不再从鼠标字符重新猜词。
 
 **Tech Stack:** C#/.NET 10, xUnit, `Microsoft.Data.Sqlite`, 现有 Core/Platform.Windows 六边形端口。

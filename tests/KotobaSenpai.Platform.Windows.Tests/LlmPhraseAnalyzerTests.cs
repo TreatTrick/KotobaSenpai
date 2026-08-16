@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
@@ -115,7 +116,47 @@ public sealed class PhraseResponseParserTests
             """[{"modelGroupId":"g1","type":"grammar","parts":[["foo"]],"label":"x","meaning":"y","grammar":"z"}]""")));
     }
 
+    [Fact]
+    public void Parses_valid_words()
+    {
+        var words = _parser.ParseWords(Words(
+            """[{"headword":"来","pos":"自動・カ変","meaning":"来","grammar":"カ変活用"}]"""));
+        var word = Assert.Single(words);
+        Assert.Equal("来", word.Headword);
+        Assert.Equal("自動・カ変", word.Pos);
+        Assert.Equal("来", word.Meaning);
+    }
+
+    [Fact]
+    public void Parses_empty_word_list()
+    {
+        Assert.Empty(_parser.ParseWords(Words("[]")));
+    }
+
+    [Fact]
+    public void Rejects_non_array_words_root()
+    {
+        Assert.Throws<PhraseResponseException>(() => _parser.ParseWords(JsonDocument.Parse("{}").RootElement));
+    }
+
+    [Fact]
+    public void Rejects_word_missing_required_field()
+    {
+        Assert.Throws<PhraseResponseException>(() => _parser.ParseWords(Words(
+            """[{"headword":"学校","pos":"名詞","meaning":"学校"}]""")));
+    }
+
+    [Fact]
+    public void Rejects_word_missing_headword()
+    {
+        Assert.Throws<PhraseResponseException>(() => _parser.ParseWords(Words(
+            """[{"pos":"名詞","meaning":"学校","grammar":"名詞"}]""")));
+    }
+
     private static JsonElement Groups(string arrayJson)
+        => JsonDocument.Parse(arrayJson).RootElement.Clone();
+
+    private static JsonElement Words(string arrayJson)
         => JsonDocument.Parse(arrayJson).RootElement.Clone();
 }
 
@@ -144,6 +185,18 @@ public sealed class LlmProtocolTests
         var groups = protocol.ExtractGroupsJson(envelope);
         Assert.Equal(JsonValueKind.Array, groups.ValueKind);
         Assert.Equal(1, GetArrayLength(groups));
+    }
+
+    [Fact]
+    public void OpenAiChatCompletions_extracts_words_and_defaults_to_empty_when_absent()
+    {
+        var protocol = new OpenAiChatCompletionsProtocol();
+        var withWords = """{"groups":[],"words":[{"headword":"学校","pos":"名詞","meaning":"学校","grammar":"名詞"}]}""";
+        var envelope = "{\"choices\":[{\"message\":{\"content\":" + JsonSerializer.Serialize(withWords) + "}}]}";
+        Assert.Equal(1, GetArrayLength(protocol.ExtractWordsJson(envelope)));
+
+        var withoutWords = "{\"choices\":[{\"message\":{\"content\":" + JsonSerializer.Serialize(Group) + "}}]}";
+        Assert.Equal(0, GetArrayLength(protocol.ExtractWordsJson(withoutWords)));
     }
 
     [Fact]
@@ -218,6 +271,34 @@ public sealed class DeepSeekPhraseAnalyzerTests
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.Success, result.Outcome);
         Assert.Single(result.Groups);
+    }
+
+    [Fact]
+    public async Task Records_raw_request_and_response_exchange()
+    {
+        var reporter = new FakeDiagnosticReporter();
+        var analyzer = new DeepSeekPhraseAnalyzer(
+            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, GroupEnvelope)),
+            diagnostics: reporter);
+        await analyzer.AnalyzeAsync(Request());
+
+        Assert.NotNull(reporter.RequestJson);
+        Assert.NotNull(reporter.ResponseJson);
+        Assert.Contains("deepseek-chat", reporter.RequestJson); // model name in the request body
+        Assert.Contains("groups", reporter.ResponseJson);        // raw provider envelope saved verbatim
+    }
+
+    [Fact]
+    public async Task Parses_words_into_result()
+    {
+        const string envelope = """{"choices":[{"message":{"content":"{\"groups\":[],\"words\":[{\"headword\":\"来\",\"pos\":\"自動・カ変\",\"meaning\":\"来\",\"grammar\":\"カ変活用\"}]}"}}]}""";
+        var analyzer = new DeepSeekPhraseAnalyzer(
+            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, envelope)));
+        var result = await analyzer.AnalyzeAsync(Request());
+        Assert.Equal(PhraseAnalysisOutcome.Success, result.Outcome);
+        var word = Assert.Single(result.Words);
+        Assert.Equal("来", word.Headword);
+        Assert.Equal("自動・カ変", word.Pos);
     }
 
     [Fact]
@@ -299,6 +380,19 @@ public sealed class DeepSeekPhraseAnalyzerTests
             _ => null,
         };
         public void SetValue(string key, string? value) { }
+    }
+
+    private sealed class FakeDiagnosticReporter : IDiagnosticReporter
+    {
+        public string? RequestJson { get; private set; }
+        public string? ResponseJson { get; private set; }
+        public void RecordTokens(WindowTarget target, IReadOnlyList<GroupedWord> groupedWords) { }
+        public void RecordPhraseAnalysis(PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning) { }
+        public void RecordLlmExchange(string segmentId, string requestJson, string responseJson)
+        {
+            RequestJson = requestJson;
+            ResponseJson = responseJson;
+        }
     }
 
     private sealed class StubHandler : HttpMessageHandler

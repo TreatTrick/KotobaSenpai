@@ -40,6 +40,7 @@ public sealed class PhrasePromptBuilder
         foreach (var span in request.LocalSpans)
             userContent.Append(span.Surface).Append('|').Append(span.Reading).Append('|')
                 .Append(string.Join(",", span.TokenIds)).Append('\n');
+        userContent.Append(_localizer.Get("Llm.WordsInstruction")).Append('\n');
 
         var content = userContent.ToString();
         if (Encoding.UTF8.GetByteCount(content) > MaxBodyBytes)

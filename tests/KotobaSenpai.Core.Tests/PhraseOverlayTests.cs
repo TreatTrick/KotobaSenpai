@@ -54,6 +54,94 @@ public sealed class PhraseHoverResolverTests
         => new([new ScreenRect(x, y, w, h)]);
 }
 
+public sealed class WordMeaningValidatorTests
+{
+    private static readonly IReadOnlyList<LocalSpanSummary> Spans =
+    [
+        new LocalSpanSummary("でも", "でも", "でも", [SentenceTokenId.Parse("l0:t0"), SentenceTokenId.Parse("l0:t1")]),
+        new LocalSpanSummary("食べる", "たべる", "食べる", [SentenceTokenId.Parse("l0:t2")]),
+    ];
+
+    [Fact]
+    public void Accepts_valid_word_and_carries_merged_surface_and_reading()
+    {
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [Word("でも", "接続助詞", "即使", "强调让步")], Spans);
+        var word = Assert.Single(result.ValidWords);
+        Assert.Equal("でも", word.Headword);
+        Assert.Equal("でも", word.Reading);
+        Assert.Equal("接続助詞", word.Pos);
+        Assert.Equal(0, result.DroppedCount);
+    }
+
+    [Fact]
+    public void Drops_word_with_unmatched_headword()
+    {
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [Word("不存在", "名詞", "学校", "名詞")], Spans);
+        Assert.Empty(result.ValidWords);
+        Assert.Equal(1, result.DroppedCount);
+    }
+
+    [Fact]
+    public void Drops_word_that_repeats_a_headword()
+    {
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [Word("でも", "助詞", "即使", "让步"), Word("でも", "助詞", "即使", "让步")], Spans);
+        Assert.Single(result.ValidWords);
+        Assert.Equal(1, result.DroppedCount);
+    }
+
+    [Fact]
+    public void Retains_valid_word_alongside_unmatched_one()
+    {
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [Word("不存在", "名詞", "学校", "名詞"), Word("食べる", "動詞", "吃", "他動・五段")], Spans);
+        var word = Assert.Single(result.ValidWords);
+        Assert.Equal("食べる", word.Headword);
+        Assert.Equal(1, result.DroppedCount);
+    }
+
+    [Fact]
+    public void Caps_at_max_words_per_segment()
+    {
+        var spans = Enumerable.Range(0, ParsedWordMeaning.MaxWordsPerSegment + 2)
+            .Select(i => new LocalSpanSummary($"w{i}", $"w{i}", $"w{i}", [SentenceTokenId.Parse($"l0:t{i}")]))
+            .ToArray();
+        var words = Enumerable.Range(0, ParsedWordMeaning.MaxWordsPerSegment + 2)
+            .Select(i => Word($"w{i}", "動詞", "吃", "他動・五段"))
+            .ToArray();
+        var result = WordMeaningValidator.ValidateAndBuild(words, spans);
+        Assert.Equal(ParsedWordMeaning.MaxWordsPerSegment, result.ValidWords.Count);
+        Assert.Equal(2, result.DroppedCount);
+    }
+
+    [Fact]
+    public void Drops_oversized_pos()
+    {
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [Word("でも", new string('x', ParsedWordMeaning.MaxPosLength + 1), "即使", "让步")], Spans);
+        Assert.Empty(result.ValidWords);
+    }
+
+    [Fact]
+    public void Handles_a_word_that_appears_twice_without_throwing()
+    {
+        var spans = new[]
+        {
+            new LocalSpanSummary("は", "ハ", "は", [SentenceTokenId.Parse("l0:t0")]),
+            new LocalSpanSummary("は", "ハ", "は", [SentenceTokenId.Parse("l0:t3")]),
+        };
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [Word("は", "助詞", "（主题）", "提示主题")], spans);
+        var word = Assert.Single(result.ValidWords);
+        Assert.Equal("は", word.Headword);
+    }
+
+    private static ParsedWordMeaning Word(string headword, string pos, string meaning, string grammar)
+        => new(headword, pos, meaning, grammar);
+}
+
 public sealed class PhraseSessionTests
 {
     [Fact]
@@ -76,6 +164,75 @@ public sealed class PhraseSessionTests
         Assert.Empty(session.PhraseGroups);
         Assert.Null(session.PhraseWarning);
     }
+
+    [Fact]
+    public void Session_maps_word_meaning_by_merged_surface_and_reading()
+    {
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        var word = new GroupedWord(TokenOf("でも", "でも"), new ScreenRect(0, 0, 20, 20));
+        var meaning = new WordMeaningView("でも", "でも", "接続助詞", "即使", "让步");
+        var session = WordOverlaySession.Start(target, [word], wordMeanings: [meaning]);
+
+        Assert.Equal(meaning, session.TryGetMeaning(word));
+        Assert.Null(session.TryGetMeaning(new GroupedWord(TokenOf("食べる", "たべる"), new ScreenRect(0, 0, 20, 20))));
+    }
+
+    [Fact]
+    public void Group_member_meanings_filters_words_without_meaning()
+    {
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        var w0 = new GroupedWord(TokenOf("あ", "あ"), new ScreenRect(0, 0, 10, 20));
+        var w1 = new GroupedWord(TokenOf("食べる", "たべる"), new ScreenRect(10, 0, 10, 20));
+        var w2 = new GroupedWord(TokenOf("う", "う"), new ScreenRect(20, 0, 10, 20));
+        var meaning = new WordMeaningView("食べる", "たべる", "他動・五段", "吃", "动词");
+        var session = WordOverlaySession.Start(target, [w0, w1, w2], wordMeanings: [meaning]);
+        var group = new PhraseGroupView(Guid.NewGuid(), "label", "type", "m", "g", 0, 2,
+            [new PhrasePartView([new ScreenRect(0, 0, 20, 20)])]); // covers w0 + w1
+
+        var memberMeanings = session.GetCoveredWordIndices(group)
+            .Select(i => session.Words[i])
+            .Select(session.TryGetMeaning)
+            .Where(m => m is not null)
+            .Cast<WordMeaningView>()
+            .ToArray();
+        Assert.Equal([meaning], memberMeanings);
+    }
+
+    [Fact]
+    public void Session_maps_repeated_word_to_single_meaning_without_throwing()
+    {
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        var meaning = new WordMeaningView("は", "ハ", "助詞", "（主题）", "提示主题");
+        var session = WordOverlaySession.Start(target,
+            [
+                new GroupedWord(TokenOf("は", "ハ"), new ScreenRect(0, 0, 10, 20)),
+                new GroupedWord(TokenOf("は", "ハ"), new ScreenRect(20, 0, 10, 20)),
+            ],
+            wordMeanings: [meaning]);
+
+        Assert.Equal(meaning, session.TryGetMeaning(session.Words[0]));
+        Assert.Equal(meaning, session.TryGetMeaning(session.Words[1]));
+    }
+
+    [Fact]
+    public void Group_hover_covers_only_member_word_underlines()
+    {
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        // Words at x=0..10 (w0), x=10..20 (w1), x=20..30 (w2); a group covering only w1's rect.
+        var w0 = new GroupedWord(TokenOf("あ", "あ"), new ScreenRect(0, 0, 10, 20));
+        var w1 = new GroupedWord(TokenOf("でも", "でも"), new ScreenRect(10, 0, 10, 20));
+        var w2 = new GroupedWord(TokenOf("う", "う"), new ScreenRect(20, 0, 10, 20));
+        var session = WordOverlaySession.Start(target, [w0, w1, w2]);
+        var group = new PhraseGroupView(Guid.NewGuid(), "label", "type", "m", "g", 0, 1,
+            [new PhrasePartView([new ScreenRect(10, 0, 10, 20)])]);
+
+        var covered = session.GetCoveredWordIndices(group);
+        Assert.Equal([1], covered);
+    }
+
+    private static Token TokenOf(string surface, string reading)
+        => new(surface, reading, surface, reading, surface, reading,
+            new PartsOfSpeech("", "", "", ""), "", "", "", 0);
 }
 
 public sealed class PhraseFallbackTests

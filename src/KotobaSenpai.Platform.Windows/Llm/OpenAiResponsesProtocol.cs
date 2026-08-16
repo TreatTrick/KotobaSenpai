@@ -34,6 +34,12 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
     }
 
     public JsonElement ExtractGroupsJson(string envelopeJson)
+        => ExtractContentRoot(envelopeJson).GetProperty("groups").Clone();
+
+    public JsonElement ExtractWordsJson(string envelopeJson)
+        => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+
+    private static JsonElement ExtractContentRoot(string envelopeJson)
     {
         using var doc = JsonDocument.Parse(envelopeJson);
         foreach (var item in doc.RootElement.GetProperty("output").EnumerateArray())
@@ -45,10 +51,12 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
                 if (block.TryGetProperty("type", out var blockType) && blockType.GetString() == "output_text")
                 {
                     using var textDoc = JsonDocument.Parse(block.GetProperty("text").GetString()!);
-                    return textDoc.RootElement.GetProperty("groups").Clone();
+                    return textDoc.RootElement.Clone();
                 }
             }
         }
         throw new PhraseResponseException("Response lacks an output_text block with group data.");
     }
+
+    private static JsonElement EmptyArray() => JsonDocument.Parse("[]").RootElement.Clone();
 }

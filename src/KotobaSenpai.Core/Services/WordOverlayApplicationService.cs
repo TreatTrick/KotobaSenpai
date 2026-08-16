@@ -60,7 +60,7 @@ public sealed class WordOverlayApplicationService
         if (phraseRun is not null)
             _diagnostics?.RecordPhraseAnalysis(phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
         _diagnostics?.RecordTokens(target, screenWords);
-        _overlay.Show(WordOverlaySession.Start(target, screenWords, phraseGroups, phraseRun?.Warning));
+        _overlay.Show(WordOverlaySession.Start(target, screenWords, phraseGroups, phraseRun?.Warning, phraseRun?.Words));
         return result;
     }
 

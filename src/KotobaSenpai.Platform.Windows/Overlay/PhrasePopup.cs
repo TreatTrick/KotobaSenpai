@@ -2,13 +2,16 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using KotobaSenpai.Core.Japanese;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
-/// Phrase group detail popup: shows the label, meaning, and grammar explanation. Click-through, non-activating, topmost;
-/// updated by the overlay when the hovered group changes and hidden when it leaves.
+/// Detail popup for both phrase groups and LLM word meanings: shows the group's label/meaning/grammar (plus per-word
+/// meanings) or a single word's headword/pos/reading/meaning/grammar. Click-through, non-activating, topmost; updated by
+/// the overlay when the hovered group or word changes and hidden when it leaves.
 /// </summary>
 public sealed class PhrasePopup : Window
 {
@@ -17,9 +20,11 @@ public sealed class PhrasePopup : Window
     private const double Pad = 12;
 
     private readonly StackPanel _panel = new();
+    private readonly IStringLocalizer? _localizer;
 
-    public PhrasePopup()
+    public PhrasePopup(IStringLocalizer? localizer = null)
     {
+        _localizer = localizer;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x1B, 0x1B, 0x1B));
@@ -36,7 +41,9 @@ public sealed class PhrasePopup : Window
         SourceInitialized += (_, _) => SetClickThrough();
     }
 
-    public void ShowResult(string label, string meaning, string grammar, ScreenRect anchor)
+    public void ShowResult(
+        string label, string meaning, string grammar, ScreenRect anchor,
+        IReadOnlyList<WordMeaningView>? memberMeanings = null)
     {
         _panel.Children.Clear();
         _panel.Children.Add(Heading(label));
@@ -44,19 +51,92 @@ public sealed class PhrasePopup : Window
             _panel.Children.Add(Block("Meaning", meaning));
         if (!string.IsNullOrEmpty(grammar))
             _panel.Children.Add(Block("Grammar", grammar));
+        if (memberMeanings is { Count: > 0 })
+            _panel.Children.Add(Block(_localizer?.Get("Llm.WordsLabel") ?? "Words", RenderWords(memberMeanings)));
+        ShowAndPosition(anchor);
+    }
 
-        _panel.Measure(new Size(FieldMaxWidth, FieldMaxHeight));
-        Width = Math.Min(FieldMaxWidth, Math.Max(200, _panel.DesiredSize.Width + Pad * 2));
-        Height = Math.Min(FieldMaxHeight, _panel.DesiredSize.Height + Pad * 2);
-        Position(anchor);
-        if (!IsVisible)
-            Show();
+    private static UIElement RenderWords(IReadOnlyList<WordMeaningView> meanings)
+    {
+        var panel = new StackPanel();
+        foreach (var m in meanings)
+        {
+            var entry = new StackPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var header = new StackPanel { Orientation = Orientation.Horizontal };
+            header.Children.Add(new TextBlock
+            {
+                Text = m.Headword,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+            });
+            if (!string.IsNullOrEmpty(m.Reading))
+                header.Children.Add(new TextBlock
+                {
+                    Text = $" [{Kana.ToHiragana(m.Reading)}]",
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0xD8, 0xFF)),
+                });
+            if (!string.IsNullOrEmpty(m.Pos))
+                header.Children.Add(new TextBlock
+                {
+                    Text = $" {m.Pos}",
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0xC0, 0xFF)),
+                });
+            entry.Children.Add(header);
+            if (!string.IsNullOrEmpty(m.Meaning))
+                entry.Children.Add(new TextBlock
+                {
+                    Text = m.Meaning,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xE6, 0xE6, 0xE6)),
+                });
+            panel.Children.Add(entry);
+        }
+        return panel;
+    }
+
+    /// <summary>Shows a single word's LLM meaning: headword + pos + reading + meaning + grammar.</summary>
+    public void ShowWordMeaning(WordMeaningView meaning, ScreenRect anchor)
+    {
+        _panel.Children.Clear();
+        _panel.Children.Add(Heading($"{meaning.Headword} [{Kana.ToHiragana(meaning.Reading)}]"));
+        if (!string.IsNullOrEmpty(meaning.Pos))
+            _panel.Children.Add(Block(_localizer?.Get("Llm.WordPosLabel") ?? "Pos", meaning.Pos));
+        if (!string.IsNullOrEmpty(meaning.Meaning))
+            _panel.Children.Add(Block(_localizer?.Get("Llm.WordMeaningLabel") ?? "Meaning", meaning.Meaning));
+        if (!string.IsNullOrEmpty(meaning.Grammar))
+            _panel.Children.Add(Block("Grammar", meaning.Grammar));
+        ShowAndPosition(anchor);
+    }
+
+    /// <summary>Shows a word that has no LLM meaning: headword + reading + a "no meaning" hint.</summary>
+    public void ShowWordWithoutMeaning(string headword, string reading, ScreenRect anchor)
+    {
+        _panel.Children.Clear();
+        _panel.Children.Add(Heading($"{headword} [{Kana.ToHiragana(reading)}]"));
+        _panel.Children.Add(new TextBlock
+        {
+            Text = _localizer?.Get("Llm.WordNoMeaning") ?? "no meaning",
+            Foreground = new SolidColorBrush(Color.FromRgb(0xE6, 0xE6, 0xE6)),
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.8,
+        });
+        ShowAndPosition(anchor);
     }
 
     public void HidePopup()
     {
         if (IsVisible)
             Hide();
+    }
+
+    private void ShowAndPosition(ScreenRect anchor)
+    {
+        _panel.Measure(new Size(FieldMaxWidth, FieldMaxHeight));
+        Width = Math.Min(FieldMaxWidth, Math.Max(200, _panel.DesiredSize.Width + Pad * 2));
+        Height = Math.Min(FieldMaxHeight, _panel.DesiredSize.Height + Pad * 2);
+        Position(anchor);
+        if (!IsVisible)
+            Show();
     }
 
     private void Position(ScreenRect anchor)
@@ -83,6 +163,14 @@ public sealed class PhrasePopup : Window
         };
 
     private static UIElement Block(string title, string text)
+        => Block(title, new TextBlock
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = new SolidColorBrush(Color.FromRgb(0xE6, 0xE6, 0xE6)),
+        });
+
+    private static UIElement Block(string title, UIElement content)
     {
         var block = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
         block.Children.Add(new TextBlock
@@ -92,12 +180,7 @@ public sealed class PhrasePopup : Window
             Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0xD8, 0xFF)),
             Margin = new Thickness(0, 0, 0, 2),
         });
-        block.Children.Add(new TextBlock
-        {
-            Text = text,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = new SolidColorBrush(Color.FromRgb(0xE6, 0xE6, 0xE6)),
-        });
+        block.Children.Add(content);
         return block;
     }
 

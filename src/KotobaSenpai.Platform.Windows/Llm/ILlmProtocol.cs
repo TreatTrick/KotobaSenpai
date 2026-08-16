@@ -39,4 +39,7 @@ public interface ILlmProtocol
     /// </code>
     /// </example>
     JsonElement ExtractGroupsJson(string envelopeJson);
+
+    /// <summary>Extracts the <c>words</c> array from the same content root as <see cref="ExtractGroupsJson"/>. Returns an empty array when the provider omits it (tolerated for backward compatibility).</summary>
+    JsonElement ExtractWordsJson(string envelopeJson);
 }

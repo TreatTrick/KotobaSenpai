@@ -170,4 +170,19 @@
   <data name="Llm.LocalSpansLabel" xml:space="preserve">
     <value>本地已识别连续词块：</value>
   </data>
+  <data name="Llm.WordsInstruction" xml:space="preserve">
+    <value>请额外返回一个平行的 'words' 数组：对上方词块表里的每一个本地识别词块（含助词、助动词），都返回一条 {headword（从上方词块表逐字复制其 surface）、pos（语境词性，如 自動・カ変）、meaning（本语境最佳中文释义）、grammar（语法说明）}。词块表有多少个词块就返回多少条，一个都不遗漏，不要自行挑选。headword 必须是词块表中某个 surface 的逐字复制，不要自行发明 surface、token id 或读音。</value>
+  </data>
+  <data name="Llm.WordMeaningLabel" xml:space="preserve">
+    <value>释义</value>
+  </data>
+  <data name="Llm.WordsLabel" xml:space="preserve">
+    <value>单词</value>
+  </data>
+  <data name="Llm.WordPosLabel" xml:space="preserve">
+    <value>词性</value>
+  </data>
+  <data name="Llm.WordNoMeaning" xml:space="preserve">
+    <value>无释义</value>
+  </data>
 </root>

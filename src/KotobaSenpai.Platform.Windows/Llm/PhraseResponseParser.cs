@@ -31,6 +31,23 @@ public sealed class PhraseResponseParser
         return result;
     }
 
+    public IReadOnlyList<ParsedWordMeaning> ParseWords(JsonElement words)
+    {
+        if (words.ValueKind != JsonValueKind.Array)
+            throw new PhraseResponseException("Words payload must be a JSON array.");
+
+        var result = new List<ParsedWordMeaning>();
+        foreach (var element in words.EnumerateArray())
+        {
+            var headword = Str(element, "headword");
+            var pos = Str(element, "pos");
+            var meaning = Str(element, "meaning");
+            var grammar = Str(element, "grammar");
+            result.Add(new ParsedWordMeaning(headword, pos, meaning, grammar));
+        }
+        return result;
+    }
+
     private static string Str(JsonElement element, string name)
     {
         if (!element.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String)

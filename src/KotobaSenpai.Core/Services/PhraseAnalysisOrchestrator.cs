@@ -51,6 +51,7 @@ public sealed class PhraseAnalysisOrchestrator
 
         // Evaluate each sentence independently: failed sentences are recorded as warnings and skipped, the rest proceed as usual, matching the "partially usable" positioning.
         var groups = new List<PhraseGroup>();
+        var wordMeanings = new List<WordMeaningView>();
         var warnings = new List<string>();
         PhraseAnalysisOutcome? firstFailure = null;
 
@@ -70,6 +71,10 @@ public sealed class PhraseAnalysisOrchestrator
             var validation = PhraseGroupValidator.ValidateAndBuild(result.Groups, tokenById);
             warnings.AddRange(validation.Warnings);
             groups.AddRange(validation.ValidGroups.Select(group => group.WithSessionId(Guid.NewGuid())));
+
+            var wordValidation = WordMeaningValidator.ValidateAndBuild(result.Words, requests[i].LocalSpans);
+            warnings.AddRange(wordValidation.Warnings);
+            wordMeanings.AddRange(wordValidation.ValidWords);
         }
 
         // As long as any (processable) sentence succeeds, the overall outcome is Success; only when all fail is the first failure category taken.
@@ -80,7 +85,10 @@ public sealed class PhraseAnalysisOrchestrator
         return new PhraseAnalysisRun(
             outcome,
             groups.Select(PhraseGeometryMapper.MapGroup).ToArray(),
-            warnings.Count > 0 ? string.Join("; ", warnings) : null);
+            warnings.Count > 0 ? string.Join("; ", warnings) : null)
+        {
+            Words = wordMeanings.ToArray(),
+        };
     }
 
     private IReadOnlyList<PhraseAnalysisRequest> BuildRequests(IReadOnlyList<OcrLine> lines)

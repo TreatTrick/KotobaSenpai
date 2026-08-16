@@ -170,4 +170,19 @@
   <data name="Llm.LocalSpansLabel" xml:space="preserve">
     <value>Locally recognized contiguous word chunks:</value>
   </data>
+  <data name="Llm.WordsInstruction" xml:space="preserve">
+    <value>Return a parallel 'words' array: for EVERY local recognized word chunk in the table above (including particles and auxiliaries), return one entry {headword (copy the surface EXACTLY from the chunk table), pos (contextual part of speech, e.g. 自動・カ変), meaning (best Chinese meaning in this context), grammar (grammar note)}. Cover every chunk in the table — one entry per chunk, no omissions, no cherry-picking. Each headword must be a verbatim copy of a surface in the chunk table; do not invent surfaces, token ids, or readings.</value>
+  </data>
+  <data name="Llm.WordMeaningLabel" xml:space="preserve">
+    <value>Meaning</value>
+  </data>
+  <data name="Llm.WordsLabel" xml:space="preserve">
+    <value>Words</value>
+  </data>
+  <data name="Llm.WordPosLabel" xml:space="preserve">
+    <value>Pos</value>
+  </data>
+  <data name="Llm.WordNoMeaning" xml:space="preserve">
+    <value>no meaning</value>
+  </data>
 </root>

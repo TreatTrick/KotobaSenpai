@@ -43,8 +43,25 @@ public static class PhraseGroupSchema
                     ["additionalProperties"] = false,
                 },
             },
+            ["words"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["items"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject
+                    {
+                        ["headword"] = new JsonObject { ["type"] = "string" },
+                        ["pos"] = new JsonObject { ["type"] = "string" },
+                        ["meaning"] = new JsonObject { ["type"] = "string" },
+                        ["grammar"] = new JsonObject { ["type"] = "string" },
+                    },
+                    ["required"] = new JsonArray("headword", "pos", "meaning", "grammar"),
+                    ["additionalProperties"] = false,
+                },
+            },
         },
-        ["required"] = new JsonArray("groups"),
+        ["required"] = new JsonArray("groups", "words"),
         ["additionalProperties"] = false,
     };
 }

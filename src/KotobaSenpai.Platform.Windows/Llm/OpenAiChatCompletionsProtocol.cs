@@ -32,6 +32,12 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
     }
 
     public JsonElement ExtractGroupsJson(string envelopeJson)
+        => ExtractContentRoot(envelopeJson).GetProperty("groups").Clone();
+
+    public JsonElement ExtractWordsJson(string envelopeJson)
+        => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+
+    private static JsonElement ExtractContentRoot(string envelopeJson)
     {
         using var doc = JsonDocument.Parse(envelopeJson);
         var choices = doc.RootElement.GetProperty("choices");
@@ -41,6 +47,8 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
             .GetProperty("message").GetProperty("content").GetString()
             ?? throw new PhraseResponseException("Assistant content is empty.");
         using var contentDoc = JsonDocument.Parse(content);
-        return contentDoc.RootElement.GetProperty("groups").Clone();
+        return contentDoc.RootElement.Clone();
     }
+
+    private static JsonElement EmptyArray() => JsonDocument.Parse("[]").RootElement.Clone();
 }
