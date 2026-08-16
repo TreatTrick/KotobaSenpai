@@ -74,6 +74,15 @@
                         SelectedItem="{Binding LanguageService.CurrentCulture, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay}"
                         DisplayMemberPath="NativeName" />
             </Grid>
+            <Grid Margin="0,12,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="{loc:Loc Key=Label_FuriganaSize}" VerticalAlignment="Center" />
+              <Slider Grid.Column="1" x:Name="FuriganaSlider" Width="200" Minimum="0.1" Maximum="0.5"
+                      ValueChanged="FuriganaSlider_ValueChanged" />
+            </Grid>
           </StackPanel>
         </ui:Card>
 

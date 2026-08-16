@@ -4,9 +4,11 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Contracts;
+using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Services;
+using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
@@ -19,11 +21,13 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 public sealed class WpfOverlayRenderer : IOverlayRenderer
 {
     private readonly IStringLocalizer? _localizer;
+    private readonly ISettingsService? _settings;
     private OverlayWindow? _window;
 
-    public WpfOverlayRenderer(IStringLocalizer? localizer = null)
+    public WpfOverlayRenderer(IStringLocalizer? localizer = null, ISettingsService? settings = null)
     {
         _localizer = localizer;
+        _settings = settings;
     }
 
     public void Show(WordOverlaySession session)
@@ -31,9 +35,13 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         Application.Current.Dispatcher.Invoke(() =>
         {
             _window ??= new OverlayWindow(_localizer);
-            _window.Render(session);
+            _window.Render(session, ResolveFontScale());
         });
     }
+
+    /// <summary>Reads the configurable furigana font scale (proportion of OCR text height); missing/invalid falls back to the default 1/3.</summary>
+    private double ResolveFontScale()
+        => FuriganaSettings.ResolveFontScale(_settings?.GetValue(FuriganaSettings.FontScaleKey));
 
     public void Hide()
     {
@@ -79,7 +87,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _hoverTimer.Tick += (_, _) => PollHover();
         }
 
-        public void Render(WordOverlaySession session)
+        public void Render(WordOverlaySession session, double fontScale)
         {
             if (!IsVisible)
                 Show();
@@ -105,7 +113,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _lineElements.Clear();
             _lineOwner.Clear();
 
-            // One underline per word rect (a cross-line word has one per line).
+            // One underline per word rect (a cross-line word has one per line); kanji words get hiragana
+            // furigana centered above the word's union bounds. Furigana is cleared with the underlines on
+            // refresh, and the click-through window never receives mouse events, so hover logic stays untouched.
             for (int wordIndex = 0; wordIndex < session.Words.Count; wordIndex++)
             {
                 foreach (var rect in session.Words[wordIndex].Rects)
@@ -117,8 +127,45 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     _lineElements.Add(element);
                     _lineOwner.Add(wordIndex);
                 }
+
+                var word = session.Words[wordIndex];
+                if (FuriganaSettings.ContainsKanji(word.Surface) && !string.IsNullOrEmpty(word.Reading))
+                    AddFurigana(word, scale, fontScale);
             }
             _hoverTimer.Start();
+        }
+
+        /// <summary>
+        /// Adds the hiragana reading for just the word's kanji portion, centered above the leading kanji run
+        /// (okurigana is left as normal text, not annotated), clamped to the overlay top. It positions by character
+        /// ratio because Japanese full-width glyphs (kanji and kana) are ~1em wide, so the leading kanji occupy
+        /// (kanjiCharCount / surface.Length) of the word's width. // ponytail: multi-em-width edge cases (e.g. 全角・記号) are ignored.
+        /// </summary>
+        private void AddFurigana(GroupedWord word, double scale, double fontScale)
+        {
+            var (kanjiChars, kanjiReading) = FuriganaSettings.OkuriganaTrim(word.Surface, word.Reading);
+            if (kanjiChars == 0 || string.IsNullOrEmpty(kanjiReading))
+                return;
+
+            var bounds = word.Bounds;
+            var fontSize = (bounds.Height / scale) * fontScale;
+            var gap = 2.0;
+            var topDip = (bounds.Y - _session!.Target.Bounds.Y) / scale - fontSize - gap;
+            if (topDip < 0)
+                topDip = 0; // clamp to overlay top so it never draws off-window
+
+            var text = new TextBlock
+            {
+                Text = Kana.ToHiragana(kanjiReading),
+                FontSize = fontSize,
+                Foreground = DefaultLineBrush, // 天蓝色，与下划线一致
+            };
+            _canvas.Children.Add(text);
+            text.Measure(new Size(double.PositiveInfinity, fontSize));
+            var kanjiWidthDip = (bounds.Width / scale) * ((double)kanjiChars / word.Surface.Length);
+            var centerDip = (bounds.X - _session.Target.Bounds.X) / scale + kanjiWidthDip / 2;
+            Canvas.SetLeft(text, Math.Max(0, centerDip - text.DesiredSize.Width / 2));
+            Canvas.SetTop(text, topDip);
         }
 
         public void StopHover()

@@ -71,7 +71,8 @@ public partial class App : Application
             DataContext = _services.GetRequiredService<MainWindowViewModel>(),
             LanguageService = languageService,
             ThemeService = themeService,
-            InstallController = installController
+            InstallController = installController,
+            SettingsService = _services.GetRequiredService<ISettingsService>()
         };
         window.Show();
 

@@ -154,6 +154,9 @@
   <data name="Label_Theme" xml:space="preserve">
     <value>Theme</value>
   </data>
+  <data name="Label_FuriganaSize" xml:space="preserve">
+    <value>Furigana size</value>
+  </data>
   <data name="ThemeMode_Auto" xml:space="preserve">
     <value>Auto (follow system)</value>
   </data>

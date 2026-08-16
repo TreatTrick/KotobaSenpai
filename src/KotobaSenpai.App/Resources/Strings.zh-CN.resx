@@ -154,6 +154,9 @@
   <data name="Label_Theme" xml:space="preserve">
     <value>主题</value>
   </data>
+  <data name="Label_FuriganaSize" xml:space="preserve">
+    <value>振假名大小</value>
+  </data>
   <data name="ThemeMode_Auto" xml:space="preserve">
     <value>自动（跟随系统）</value>
   </data>

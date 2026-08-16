@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,6 +8,8 @@ using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.App.Themes;
 using KotobaSenpai.App.ViewModels;
+using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Platform.Windows.Overlay;
 using Wpf.Ui.Controls;
 
 namespace KotobaSenpai.App;
@@ -49,6 +52,20 @@ public partial class MainWindow : FluentWindow
         set => SetValue(ThemeServiceProperty, value);
     }
 
+    public static readonly DependencyProperty SettingsServiceProperty =
+        DependencyProperty.Register(
+            nameof(SettingsService),
+            typeof(ISettingsService),
+            typeof(MainWindow),
+            new PropertyMetadata(null));
+
+    /// <summary>Settings store for the furigana-size slider (read at init, written on change).</summary>
+    public ISettingsService? SettingsService
+    {
+        get => (ISettingsService?)GetValue(SettingsServiceProperty);
+        set => SetValue(SettingsServiceProperty, value);
+    }
+
     public static readonly DependencyProperty InstallControllerProperty =
         DependencyProperty.Register(
             nameof(InstallController),
@@ -76,9 +93,38 @@ public partial class MainWindow : FluentWindow
         // Theme: after the window handle is ready, apply the persisted (or default Auto) mode, bind OS-follow, then sync the combo-box selection.
         ThemeService?.Initialize(this);
         SyncThemeModeComboBox();
+        SyncFuriganaSlider();
 
         if (LocalizationHost.Localizer is { } localizer)
             localizer.CultureChanged += (_, _) => SyncThemeModeComboBox();
+    }
+
+    /// <summary>Slider change: writes the furigana font scale to settings (re-entrancy guarded by <see cref="_syncing"/>).</summary>
+    private void FuriganaSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (SettingsService is null || _syncing)
+            return;
+        SettingsService.SetValue(FuriganaSettings.FontScaleKey, e.NewValue.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Reads the persisted (or default 1/3) font scale into the slider, with re-entrancy protection.</summary>
+    private void SyncFuriganaSlider()
+    {
+        if (SettingsService is null)
+            return;
+
+        _syncing = true;
+        try
+        {
+            var raw = SettingsService.GetValue(FuriganaSettings.FontScaleKey);
+            FuriganaSlider.Value = double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale) && scale > 0
+                ? scale
+                : FuriganaSettings.DefaultFontScale;
+        }
+        finally
+        {
+            _syncing = false;
+        }
     }
 
     /// <summary>Theme-mode ComboBox selection change: parses the Tag and calls the theme service.</summary>

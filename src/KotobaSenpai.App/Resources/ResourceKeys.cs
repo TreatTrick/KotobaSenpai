@@ -39,6 +39,7 @@ public static class ResourceKeys
     // --- Theme mode (appearance card theme selection) ---
     public const string Label_Theme = nameof(Label_Theme);
     public const string Label_Appearance = nameof(Label_Appearance);
+    public const string Label_FuriganaSize = nameof(Label_FuriganaSize);
     public const string ThemeMode_Auto = nameof(ThemeMode_Auto);
     public const string ThemeMode_Light = nameof(ThemeMode_Light);
     public const string ThemeMode_Dark = nameof(ThemeMode_Dark);
