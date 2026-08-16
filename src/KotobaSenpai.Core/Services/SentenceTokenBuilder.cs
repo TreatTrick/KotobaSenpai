@@ -4,9 +4,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// Tokenizes each line within a segment in reading order, producing sentence-level
-/// <see cref="SentenceTokenReference"/>s while retaining each line's local span summaries. Tokens that cannot
-/// be mapped to a character box are skipped (no word/underline is produced, and they don't enter the request).
+/// Tokenizes a sentence segment's merged lines as one block so a word split across lines becomes a single token, producing
+/// sentence-level <see cref="SentenceTokenReference"/>s (each carrying all its line boxes) and local span summaries. Tokens
+/// that cannot be mapped to a character box are skipped (no word/underline is produced, and they don't enter the request).
 /// </summary>
 public sealed class SentenceTokenBuilder
 {
@@ -28,57 +28,47 @@ public sealed class SentenceTokenBuilder
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(segment);
 
+        var block = segment.LineIndices.Select(lineIndex => lines[lineIndex]).ToArray();
+        var splitTokens = LineBlockTokenizer.Tokenize(_tokenizer, block);
+
         var references = new List<SentenceTokenReference>();
-        var localSpans = new List<LocalSpanSummary>();
+        // Keyed by value so a resolver returning equivalent (not identical) token instances still maps; identical duplicate
+        // values in one segment are vanishingly rare and spans are contiguous, so the last-id fallback is acceptable.
+        var idByToken = new Dictionary<Token, SentenceTokenId>();
         var sentenceIndex = 0;
-
-        foreach (var lineIndex in segment.LineIndices)
+        for (int i = 0; i < splitTokens.Count; i++)
         {
-            var line = lines[lineIndex];
-            var tokens = _tokenizer.Tokenize(line.Text);
-            var lineRefs = new List<SentenceTokenReference>();
+            var st = splitTokens[i];
+            var boxes = st.Segments.SelectMany(s => s.Boxes).ToArray();
+            if (boxes.Length == 0)
+                continue; // no character box, skip
+            var reference = new SentenceTokenReference(
+                sentenceIndex,
+                st.Segments[0].LineIndex,
+                i,
+                st.Token.StartOffset,
+                st.Token,
+                boxes);
+            references.Add(reference);
+            idByToken[st.Token] = reference.Id;
+            sentenceIndex++;
+        }
 
-            for (int ti = 0; ti < tokens.Count; ti++)
+        var localSpans = new List<LocalSpanSummary>();
+        if (_spanResolver is not null)
+        {
+            foreach (var span in _spanResolver.Resolve(splitTokens.Select(st => st.Token).ToArray()))
             {
-                var token = tokens[ti];
-                var start = Math.Max(0, token.StartOffset);
-                var end = Math.Min(line.Words.Count, start + token.Surface.Length);
-                if (start >= end)
-                    continue; // no character box, skip
-
-                var reference = new SentenceTokenReference(
-                    sentenceIndex,
-                    lineIndex,
-                    ti,
-                    token.StartOffset,
-                    token,
-                    line.Words.Skip(start).Take(end - start).Select(word => word.FrameBounds).ToArray());
-                references.Add(reference);
-                lineRefs.Add(reference);
-                sentenceIndex++;
-            }
-
-            if (_spanResolver is not null)
-            {
-                foreach (var span in _spanResolver.Resolve(tokens))
-                {
-                    var spanIds = referenceIdsInOffsets(lineRefs, span.StartOffset, span.EndOffset);
-                    if (spanIds.Count == 0)
-                        continue;
-                    localSpans.Add(new LocalSpanSummary(span.Surface, span.Reading, span.LookupKey, spanIds));
-                }
+                var spanIds = span.Tokens
+                    .Where(token => idByToken.TryGetValue(token, out _))
+                    .Select(token => idByToken[token])
+                    .ToArray();
+                if (spanIds.Length == 0)
+                    continue;
+                localSpans.Add(new LocalSpanSummary(span.Surface, span.Reading, span.LookupKey, spanIds));
             }
         }
 
         return new SegmentTokens(references, localSpans);
     }
-
-    private static IReadOnlyList<SentenceTokenId> referenceIdsInOffsets(
-        IReadOnlyList<SentenceTokenReference> refs,
-        int start,
-        int end)
-        => refs
-            .Where(reference => reference.LineOffset >= start && reference.LineOffset < end)
-            .Select(reference => reference.Id)
-            .ToArray();
 }

@@ -67,12 +67,12 @@ public sealed class WordOverlaySession
     private static bool Intersects(ScreenRect a, ScreenRect b)
         => a.X < b.Right && a.Right > b.X && a.Y < b.Bottom && a.Bottom > b.Y;
 
-    /// <summary>One underline at the bottom inside of each word box; replaced wholesale on refresh, leaving no residue.</summary>
+    /// <summary>One underline at the bottom inside of each word rect (a cross-line word has one per line); replaced wholesale on refresh, leaving no residue.</summary>
     public IReadOnlyList<OverlayLine> Lines => _words
-        .Select(word => new OverlayLine(
-            word.Bounds.X,
-            Math.Max(word.Bounds.Y, word.Bounds.Bottom - 2),
-            word.Bounds.Width))
+        .SelectMany(word => word.Rects.Select(rect => new OverlayLine(
+            rect.X,
+            Math.Max(rect.Y, rect.Bottom - 2),
+            rect.Width)))
         .ToArray();
 
     /// <summary>Starts a new session: filters zero-width words and validates the target-window invariants.</summary>

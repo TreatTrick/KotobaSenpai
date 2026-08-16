@@ -53,6 +53,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         private readonly Canvas _canvas = new();
         private readonly List<Border> _lineElements = new();
+        private readonly List<int> _lineOwner = new(); // parallel to _lineElements: the word index each line belongs to
         private readonly DispatcherTimer _hoverTimer;
         private readonly PhrasePopup _phrasePopup;
         private WordOverlaySession? _session;
@@ -102,14 +103,20 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 NativeMethods.SwpNoActivate | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
             _canvas.Children.Clear();
             _lineElements.Clear();
+            _lineOwner.Clear();
 
-            foreach (var line in session.Lines)
+            // One underline per word rect (a cross-line word has one per line).
+            for (int wordIndex = 0; wordIndex < session.Words.Count; wordIndex++)
             {
-                var element = MakeBox(line.Width / scale, line.Thickness / scale, DefaultLineBrush);
-                Canvas.SetLeft(element, (line.X - session.Target.Bounds.X) / scale);
-                Canvas.SetTop(element, (line.Y - session.Target.Bounds.Y) / scale);
-                _canvas.Children.Add(element);
-                _lineElements.Add(element);
+                foreach (var rect in session.Words[wordIndex].Rects)
+                {
+                    var element = MakeBox(rect.Width / scale, 2.0 / scale, DefaultLineBrush);
+                    Canvas.SetLeft(element, (rect.X - session.Target.Bounds.X) / scale);
+                    Canvas.SetTop(element, (Math.Max(rect.Y, rect.Bottom - 2) - session.Target.Bounds.Y) / scale);
+                    _canvas.Children.Add(element);
+                    _lineElements.Add(element);
+                    _lineOwner.Add(wordIndex);
+                }
             }
             _hoverTimer.Start();
         }
@@ -164,20 +171,19 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (groupHit >= 0)
             {
                 // Suspend local-word hover while a group is hit, to keep the two popup states from fighting.
-                if (_hoverIndex >= 0 && _hoverIndex < _lineElements.Count)
-                    _lineElements[_hoverIndex].Background = DefaultLineBrush;
+                UnhighlightWord(_hoverIndex);
                 _hoverIndex = -1;
                 return;
             }
 
-            // Local-word hot zone: pick the word containing the cursor; on overlap, the one whose center is nearest.
+            // Local-word hot zone: hit any rect of a word; on overlap, the one whose union center is nearest.
             int hit = -1;
             double best = double.MaxValue;
             for (int i = 0; i < session.Words.Count; i++)
             {
-                var b = session.Words[i].Bounds;
-                if (cursor.X < b.X || cursor.X > b.Right || cursor.Y < b.Y || cursor.Y > b.Bottom)
+                if (!session.Words[i].Rects.Any(rect => Contains(rect, cursor)))
                     continue;
+                var b = session.Words[i].Bounds;
                 var cx = b.X + b.Width / 2d;
                 var cy = b.Y + b.Height / 2d;
                 var d = (cursor.X - cx) * (cursor.X - cx) + (cursor.Y - cy) * (cursor.Y - cy);
@@ -190,13 +196,29 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
             if (hit == _hoverIndex)
                 return;
-            if (_hoverIndex >= 0 && _hoverIndex < _lineElements.Count)
-                _lineElements[_hoverIndex].Background = DefaultLineBrush;
+            UnhighlightWord(_hoverIndex);
             _hoverIndex = hit;
-            if (hit >= 0 && hit < _lineElements.Count)
-                _lineElements[hit].Background = HoverLineBrush;
+            if (hit >= 0)
+                foreach (var li in WordLineIndices(hit))
+                    if (li < _lineElements.Count)
+                        _lineElements[li].Background = HoverLineBrush;
             UpdatePopup(hit);
         }
+
+        private void UnhighlightWord(int wordIndex)
+        {
+            if (wordIndex < 0)
+                return;
+            foreach (var li in WordLineIndices(wordIndex))
+                if (li < _lineElements.Count)
+                    _lineElements[li].Background = DefaultLineBrush;
+        }
+
+        private IEnumerable<int> WordLineIndices(int wordIndex)
+            => Enumerable.Range(0, _lineOwner.Count).Where(li => _lineOwner[li] == wordIndex);
+
+        private static bool Contains(ScreenRect rect, NativeMethods.POINT p)
+            => p.X >= rect.X && p.X <= rect.Right && p.Y >= rect.Y && p.Y <= rect.Bottom;
 
         private void ShowPhrasePopup(PhraseGroupView group)
         {

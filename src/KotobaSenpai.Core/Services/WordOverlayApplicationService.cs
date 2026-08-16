@@ -41,8 +41,9 @@ public sealed class WordOverlayApplicationService
         var result = await _recognizer.RecognizeAsync(target, cancellationToken, regionPixels).ConfigureAwait(false);
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
-            .Select(word => word.WithBounds(
-                CoordinateMapper.ToScreen(word.Bounds, result.FrameWidth, result.FrameHeight, target.Bounds)))
+            .Select(word => word.WithRects(word.Rects
+                .Select(rect => CoordinateMapper.ToScreen(rect, result.FrameWidth, result.FrameHeight, target.Bounds))
+                .ToArray()))
             .ToArray();
 
         // After local recognition, run phrase analysis per the settings toggle; failure only produces a warning, and local words/spans remain usable.

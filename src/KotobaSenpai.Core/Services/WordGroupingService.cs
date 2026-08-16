@@ -5,79 +5,68 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// Tokenizes OCR characters line by line, maps each token's span back to its member character boxes, takes
-/// their union, and produces one underline geometry per word. Scope: all words including particles, only
-/// punctuation and whitespace tokens are excluded; tokens that can't be mapped to a character box are skipped.
+/// Groups OCR characters into words by tokenizing each sentence segment (a set of merged lines) as one text block, so a
+/// word split across lines becomes a single word with one rect per line. Produces one underline geometry per word rect.
+/// Scope: all words including particles, only punctuation and whitespace tokens are excluded; tokens with no character
+/// box are skipped.
 /// </summary>
 public sealed class WordGroupingService : IOcrWordGroupingService
 {
     private readonly ITokenizer _tokenizer;
     private readonly ITokenSpanResolver? _spanResolver;
+    private readonly SentenceSegmenter? _segmenter;
 
-    public WordGroupingService(ITokenizer tokenizer, ITokenSpanResolver? spanResolver = null)
+    public WordGroupingService(ITokenizer tokenizer, ITokenSpanResolver? spanResolver = null, SentenceSegmenter? segmenter = null)
     {
         _tokenizer = tokenizer ?? throw new ArgumentNullException(nameof(tokenizer));
         _spanResolver = spanResolver;
+        _segmenter = segmenter;
     }
 
     public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines)
     {
         ArgumentNullException.ThrowIfNull(lines);
 
+        // When no segmenter is injected, fall back to one segment per line (legacy behavior).
+        var segments = _segmenter?.Segment(lines)
+            ?? lines.Select((_, i) => new SentenceSegment([i])).ToArray();
+
         var result = new List<GroupedWord>();
-        var tokenizedLines = lines
-            .Where(line => line.Words.Count > 0)
-            .Select(line => (Line: line, Tokens: _tokenizer.Tokenize(line.Text)))
-            .ToArray();
-
-        if (_spanResolver is not null)
+        foreach (var segment in segments)
         {
-            var resolvedLines = _spanResolver.ResolveMany(
-                tokenizedLines.Select(item => item.Tokens).ToArray());
-            if (resolvedLines.Count != tokenizedLines.Length)
-                throw new InvalidOperationException("Token span resolver returned an unexpected line count.");
+            var block = segment.LineIndices.Select(i => lines[i]).ToArray();
+            var splitTokens = LineBlockTokenizer.Tokenize(_tokenizer, block);
 
-            for (int lineIndex = 0; lineIndex < tokenizedLines.Length; lineIndex++)
+            if (_spanResolver is not null)
             {
-                var line = tokenizedLines[lineIndex].Line;
-                foreach (var span in resolvedLines[lineIndex])
+                var tokens = splitTokens.Select(st => st.Token).ToArray();
+                foreach (var span in _spanResolver.Resolve(tokens))
                 {
-                    var start = Math.Max(0, span.StartOffset);
-                    var end = Math.Min(line.Words.Count, span.EndOffset);
-                    if (start >= end)
+                    var rects = LineBlockTokenizer.RectsForTokens(splitTokens, span.Tokens);
+                    if (rects.Count == 0)
                         continue;
-
-                    result.Add(new GroupedWord(span, Union(line.Words, start, end)));
+                    result.Add(new GroupedWord(span, rects));
                 }
             }
-            return result;
-        }
-
-        // Compatibility for legacy callers without an injected span resolver: each UniDic token generates one word independently.
-        foreach (var (line, tokens) in tokenizedLines)
-        {
-            foreach (var token in tokens)
+            else
             {
-                if (IsSeparatorToken(token.Surface))
-                    continue;
-                var start = Math.Max(0, token.StartOffset);
-                var end = Math.Min(line.Words.Count, start + token.Surface.Length);
-                if (start >= end)
-                    continue;
-
-                result.Add(new GroupedWord(token, Union(line.Words, start, end)));
+                foreach (var st in splitTokens)
+                {
+                    if (IsSeparatorToken(st.Token.Surface))
+                        continue;
+                    var rects = st.Segments.Select(segment => Union(segment.Boxes)).ToArray();
+                    result.Add(new GroupedWord(st.Token, rects));
+                }
             }
         }
         return result;
     }
 
-    /// <summary>Computes the union bounding box of the member character boxes in [start, end) (one valid-width rectangle per word).</summary>
-    private static ScreenRect Union(IReadOnlyList<OcrWord> words, int start, int end)
+    private static ScreenRect Union(IReadOnlyList<ScreenRect> boxes)
     {
         int x1 = int.MaxValue, y1 = int.MaxValue, x2 = 0, y2 = 0;
-        for (int i = start; i < end; i++)
+        foreach (var b in boxes)
         {
-            var b = words[i].FrameBounds;
             x1 = Math.Min(x1, b.X);
             y1 = Math.Min(y1, b.Y);
             x2 = Math.Max(x2, b.Right);

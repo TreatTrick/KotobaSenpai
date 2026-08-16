@@ -34,11 +34,20 @@ public sealed class PhraseSegmentationTests
     }
 
     [Fact]
-    public void Breaks_when_reading_order_unreliable()
+    public void Reading_order_reversal_does_not_break_a_wrapped_sentence()
     {
-        // Next line starts further left => reading order is unreliable, so split.
+        // A wrapped line may start further left; without a gap or punctuation it is still the same sentence, so it merges.
         var segments = new SentenceSegmenter().Segment([Line("右", 0, xStart: 50), Line("左", 0, xStart: 0)]);
-        Assert.Equal(2, segments.Count);
+        Assert.Single(segments);
+        Assert.Equal([0, 1], segments[0].LineIndices);
+    }
+
+    [Fact]
+    public void Embedded_closing_quote_does_not_break_a_sentence()
+    {
+        // 」 alone is not sentence-final; only 。！？… break.
+        var segments = new SentenceSegmenter().Segment([Line("「彼は「行こう」と", 0), Line("言ったよ。」", 0)]);
+        Assert.Single(segments);
     }
 }
 
@@ -56,7 +65,8 @@ public sealed class SentenceTokenBuilderTests
         Assert.Equal(2, built.References.Count);
         Assert.Equal("l0:t0", built.References[0].Id.ToString());
         Assert.Equal(0, built.References[0].SentenceIndex);
-        Assert.Equal("l1:t0", built.References[1].Id.ToString());
+        // Merged-block tokenization: the second token's line id is its first line (1), token index is sequential (1).
+        Assert.Equal("l1:t1", built.References[1].Id.ToString());
         Assert.Equal(1, built.References[1].SentenceIndex);
     }
 

@@ -195,3 +195,7 @@ git commit -m "docs: specify tokenizer-boundary dictionary spans"
 ## 识别区域(2026-08-16)
 
 新增 `recognition-region`:用户可在目标窗口上拖拽四角直角框设定识别子区域,确定后持久化(窗口相对、归一化)。识别时捕获整窗帧 → 按区域裁剪 → 对裁剪帧 OCR → 坐标加回区域偏移还原,性能优先(区域外 UI/旁白不再识别)。主 UI 有"设置识别区域"按钮重拉。区域未设置时保持整窗行为。
+
+## 跨行合并分词 / 句段切分(2026-08-16)
+
+ONLY 按句末标点(`。！？…‥．`)或大段落间距断段;一个跨行词在本地按段合并成单一 `GroupedWord`(每行一个 rect),下划线按 rect 生成、悬停任一 rect 高亮整词。LLM 请求按句段并发,每段只带本段 token。`WordGroupingService`/`SentenceTokenBuilder` 用 `LineBlockTokenizer` 对合并块一次分词、把 offset 分段映射回各行。

@@ -3,9 +3,9 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Core.Services;
 
 /// <summary>
-/// Divides OCR lines into sentence segments while preserving reading order. Adjacent lines are merged only when
-/// order/layout is reliable, there is no sentence-final punctuation, and there is no paragraph gap;
-/// cross-segment token references are forbidden to avoid joining unrelated dialogue blocks.
+/// Divides OCR lines into sentence segments. Adjacent lines are merged into one segment unless the previous line ends
+/// with sentence-final punctuation or there is a paragraph gap; a wrapped sentence (no punctuation or gap) stays one
+/// segment so cross-line words are not split. Cross-segment token references are forbidden to avoid joining unrelated blocks.
 /// </summary>
 public sealed class SentenceSegmenter
 {
@@ -43,11 +43,10 @@ public sealed class SentenceSegmenter
     {
         if (previousLine.Words.Count == 0 || IsSentenceFinal(previousLine.Text))
             return true;
+        // ponytail: reading-order reversals are no longer a break — a wrapped line may start further left; only a
+        // paragraph gap separates unrelated blocks.
         var gap = next.Top - previous.Bottom;
-        if (gap > Math.Max(1, previous.Height) * ParagraphGapFactor)
-            return true;
-        // The next line's start moving left indicates the reading order is unreliable (assuming left-to-right); break the segment.
-        return next.Left < previous.Left;
+        return gap > Math.Max(1, previous.Height) * ParagraphGapFactor;
     }
 
     private static bool IsSentenceFinal(string text)

@@ -178,6 +178,19 @@ public sealed class PhraseSessionTests
     }
 
     [Fact]
+    public void Session_lines_emit_one_per_rect_for_a_cross_line_word()
+    {
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        var word = new GroupedWord(TokenOf("世界", "せかい"),
+            [new ScreenRect(0, 0, 10, 20), new ScreenRect(0, 100, 10, 20)]);
+        var session = WordOverlaySession.Start(target, [word]);
+
+        Assert.Equal(2, session.Lines.Count);
+        Assert.Equal(18, session.Lines[0].Y); // rect bottom - 2
+        Assert.Equal(118, session.Lines[1].Y);
+    }
+
+    [Fact]
     public void Group_member_meanings_filters_words_without_meaning()
     {
         var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
