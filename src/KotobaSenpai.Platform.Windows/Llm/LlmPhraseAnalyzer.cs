@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 
@@ -23,6 +25,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
     private readonly PhrasePromptBuilder _promptBuilder;
     private readonly PhraseResponseParser _parser;
     private readonly IDiagnosticReporter? _diagnostics;
+    private readonly ILogger? _logger;
 
     public LlmPhraseAnalyzer(
         ISettingsService settings,
@@ -31,7 +34,8 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         PhrasePromptBuilder? promptBuilder = null,
         PhraseResponseParser? parser = null,
         IStringLocalizer? localizer = null,
-        IDiagnosticReporter? diagnostics = null)
+        IDiagnosticReporter? diagnostics = null,
+        ILogger? logger = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -40,6 +44,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         _promptBuilder = promptBuilder ?? new PhrasePromptBuilder(localizer ?? new KeyReturningLocalizer());
         _parser = parser ?? new PhraseResponseParser();
         _diagnostics = diagnostics;
+        _logger = logger;
     }
 
     public async Task<PhraseAnalysisResult> AnalyzeAsync(
@@ -68,6 +73,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         string envelope;
+        var llmTimer = Stopwatch.StartNew();
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -77,6 +83,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
             if (!response.IsSuccessStatusCode)
                 return new PhraseAnalysisResult(PhraseAnalysisOutcome.Refused, [], $"Provider refused with {(int)response.StatusCode}.");
             envelope = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            _logger?.LogInformation("LLM {0} returned {1} in {2} ms", request.SegmentId, (int)response.StatusCode, llmTimer.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

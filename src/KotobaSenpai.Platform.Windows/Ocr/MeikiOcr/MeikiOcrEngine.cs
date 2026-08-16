@@ -96,7 +96,7 @@ public sealed class MeikiOcrEngine : IDisposable
     {
         using var image = MakeRgbaImage(bgra32, width, height);
         var boxes = RunDetection(image, detThreshold);
-        _logger?.LogInformation("MeikiOcr: frame {w}x{h}, detected {n} text boxes", width, height, boxes.Count);
+        _logger?.LogInformation("MeikiOcr: frame {0}x{1}, detected {2} text boxes", width, height, boxes.Count);
         if (boxes.Count == 0)
             return Array.Empty<MeikiLine>();
 
@@ -112,15 +112,15 @@ public sealed class MeikiOcrEngine : IDisposable
                 continue;
             hIndices.Add(i);
         }
-        _logger?.LogInformation("MeikiOcr: {h} horizontal, {v} vertical (skipped)", hIndices.Count, boxes.Count - hIndices.Count);
+        _logger?.LogInformation("MeikiOcr: {0} horizontal, {1} vertical (skipped)", hIndices.Count, boxes.Count - hIndices.Count);
 
         ProcessRecognitionPipeline(image, boxes, hIndices, results, recThreshold, punctConfFactor);
 
         var lines = results.Where(r => r is not null).Cast<MeikiLine>().ToArray();
-        _logger?.LogInformation("MeikiOcr: recognized {lines} lines, {chars} chars", lines.Length, lines.Sum(l => l.Chars.Count));
+        _logger?.LogInformation("MeikiOcr: recognized {0} lines, {1} chars", lines.Length, lines.Sum(l => l.Chars.Count));
         // Diagnostics: print the text actually recognized on each line, to tell a misrecognized character from a mapping offset.
         foreach (var line in lines.Where(l => l.Text.Length > 0))
-            _logger?.LogInformation("MeikiOcr: line '{text}' ({chars} chars)", line.Text, line.Chars.Count);
+            _logger?.LogInformation("MeikiOcr: line '{0}' ({1} chars)", line.Text, line.Chars.Count);
         return lines;
     }
 

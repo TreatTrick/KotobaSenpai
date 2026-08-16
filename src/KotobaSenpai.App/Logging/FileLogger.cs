@@ -101,7 +101,17 @@ public sealed class FileLogger : ILogger, IDisposable
         var errorCode = (exception as IUserFacingException)?.ErrorCode;
         var codeSegment = errorCode is null ? string.Empty : $" (ErrorCode={errorCode})";
         // Skip string.Format when there are no arguments, to avoid mis-parsing a literal message containing { } as a format string.
-        var formatted = args.Length == 0 ? message : string.Format(CultureInfo.InvariantCulture, message, args);
+        string formatted;
+        try
+        {
+            formatted = args.Length == 0 ? message : string.Format(CultureInfo.InvariantCulture, message, args);
+        }
+        catch (FormatException)
+        {
+            // A message with named placeholders (e.g. "{segment}") or stray braces is not a valid composite format string.
+            // Fall back to the raw message so the log entry is never silently dropped.
+            formatted = message;
+        }
 
         var sb = new StringBuilder();
         sb.Append(timestamp).Append(' ').Append(tag).Append(codeSegment).Append(' ').Append(formatted);

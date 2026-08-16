@@ -59,6 +59,7 @@ public partial class App : Application
         // Logging: clean up expired logs at startup, keep the logger for the global fallback (at runtime cleanup is triggered by the cross-midnight rollover event; no background timer).
         _services.GetRequiredService<LogRetentionPolicy>().Cleanup();
         _logger = _services.GetRequiredService<FileLogger>();
+        _logger.LogInformation("App starting (v{0})", Environment.Version);
 
         ConfigureGlobalErrorHandling();
 

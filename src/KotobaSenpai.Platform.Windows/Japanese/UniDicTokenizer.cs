@@ -109,12 +109,12 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
     /// <summary>Lazy loading throws on failure; Lazy does not cache a half-initialized instance (re-runs on next access).</summary>
     private MeCabUniDic22Tagger CreateTagger()
     {
-        _logger.LogInformation("UniDicTokenizer: loading dictionary from '{dir}'", _dictionaryDirectory);
+        _logger.LogInformation("UniDicTokenizer: loading dictionary from '{0}'", _dictionaryDirectory);
         ValidateDictionary();
         try
         {
             var tagger = MeCabUniDic22Tagger.Create(_dictionaryDirectory);
-            _logger.LogInformation("UniDicTokenizer: dictionary loaded from '{dir}'", _dictionaryDirectory);
+            _logger.LogInformation("UniDicTokenizer: dictionary loaded from '{0}'", _dictionaryDirectory);
             return tagger;
         }
         catch (WindowsPlatformException)
