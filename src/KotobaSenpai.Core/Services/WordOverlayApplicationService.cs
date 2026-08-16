@@ -37,7 +37,8 @@ public sealed class WordOverlayApplicationService
         WindowTarget target,
         CancellationToken cancellationToken = default)
     {
-        var result = await _recognizer.RecognizeAsync(target, cancellationToken).ConfigureAwait(false);
+        var regionPixels = ReadRegionPixels(target);
+        var result = await _recognizer.RecognizeAsync(target, cancellationToken, regionPixels).ConfigureAwait(false);
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
             .Select(word => word.WithBounds(
@@ -65,6 +66,17 @@ public sealed class WordOverlayApplicationService
     }
 
     public void Hide() => _overlay.Hide();
+
+    /// <summary>Reads the saved recognition region and converts it to a window/frame pixel rect; null when unset or invalid (=> full window).</summary>
+    private ScreenRect? ReadRegionPixels(WindowTarget target)
+    {
+        if (_settings is null)
+            return null;
+        var raw = _settings.GetValue(RecognitionRegion.SettingsKey);
+        return RecognitionRegion.TryParse(raw, out var region)
+            ? region.ToPixelRect(target.Bounds.Width, target.Bounds.Height)
+            : null;
+    }
 
     private bool IsPhraseEnabled()
         => string.Equals(_settings?.GetValue("PhraseGroupsEnabled"), "true", StringComparison.OrdinalIgnoreCase);

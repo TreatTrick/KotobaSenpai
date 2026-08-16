@@ -6,6 +6,7 @@ using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Models;
+using KotobaSenpai.Core.Services;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Ocr.MeikiOcr;
 using CoreOcrWord = KotobaSenpai.Core.Models.OcrWord;
@@ -37,11 +38,18 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
 
     public async Task<WordRecognitionResult> RecognizeAsync(
         WindowTarget target,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ScreenRect? region = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var frame = await _capture.CaptureAsync(target, cancellationToken).ConfigureAwait(false);
+        int frameWidth = target.Bounds.Width, frameHeight = target.Bounds.Height;
+        // The capture layer grabs only the region's screen rectangle directly (no whole-window grab then crop). A
+        // degenerate region falls back to the full window. Boxes from a region OCR are offset back to full-frame coords.
+        var crop = CropRegion.Resolve(region, frameWidth, frameHeight);
+        var frame = await _capture.CaptureAsync(target, cancellationToken, crop).ConfigureAwait(false);
+        var offsetX = crop?.X ?? 0;
+        var offsetY = crop?.Y ?? 0;
 
         IReadOnlyList<MeikiLine> lines;
         try
@@ -64,6 +72,7 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
             DumpDiagnostics(frame, lines, target);
 
         // Preserve line structure: one OcrLine per line, so the tokenizer service can re-assemble words line by line.
+        // Boxes from a region OCR are offset back to full-frame coordinates by the crop origin.
         var ocrLines = lines
             .Select(meikiLine => new OcrLine(
                 meikiLine.Chars
@@ -71,12 +80,13 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
                     .Where(charBox => !char.IsWhiteSpace(charBox.Char) && charBox.Char != '\0')
                     .Select(charBox => new CoreOcrWord(
                         charBox.Char.ToString(),
-                        ToValidRect(charBox, frame.Width, frame.Height)))
+                        ToValidRect(charBox, frameWidth, frameHeight, offsetX, offsetY)))
                     .ToArray()))
             .Where(line => line.Words.Count > 0)
             .ToArray();
 
-        return new WordRecognitionResult(frame.Width, frame.Height, ocrLines);
+        // Report the full-window frame dimensions (the capture may have been region-sized) so downstream screen mapping stays correct.
+        return new WordRecognitionResult(frameWidth, frameHeight, ocrLines);
     }
 
     /// <summary>Toggle for writing diagnostics to disk: enabled when the setting <c>DiagEnabled</c> is "true" (off by default).</summary>
@@ -136,13 +146,13 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         bmp.Save(path, ImageFormat.Png);
     }
 
-    /// <summary>Clamps a character box into a valid <see cref="ScreenRect"/> (non-negative, in bounds, at least 1px).</summary>
-    private static ScreenRect ToValidRect(MeikiChar c, int frameWidth, int frameHeight)
+    /// <summary>Clamps a character box into a valid <see cref="ScreenRect"/>, offset by the crop origin so cropped-OCR boxes land in full-frame coordinates.</summary>
+    private static ScreenRect ToValidRect(MeikiChar c, int frameWidth, int frameHeight, int offsetX = 0, int offsetY = 0)
     {
-        var x1 = Math.Max(0, c.X1);
-        var y1 = Math.Max(0, c.Y1);
-        var x2 = Math.Max(x1 + 1, Math.Min(frameWidth, c.X2));
-        var y2 = Math.Max(y1 + 1, Math.Min(frameHeight, c.Y2));
+        var x1 = Math.Max(0, c.X1 + offsetX);
+        var y1 = Math.Max(0, c.Y1 + offsetY);
+        var x2 = Math.Max(x1 + 1, Math.Min(frameWidth, c.X2 + offsetX));
+        var y2 = Math.Max(y1 + 1, Math.Min(frameHeight, c.Y2 + offsetY));
         return new ScreenRect(x1, y1, x2 - x1, y2 - y1);
     }
 

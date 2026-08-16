@@ -100,6 +100,9 @@
   <data name="Button_Hide" xml:space="preserve">
     <value>隐藏下划线</value>
   </data>
+  <data name="Button_SetRecognitionRegion" xml:space="preserve">
+    <value>设置识别区域</value>
+  </data>
   <data name="Label_Description" xml:space="preserve">
     <value>说明：选择一个窗口后，应用会抓取当前画面，识别日语词并在每个词下方绘制横线。</value>
   </data>
@@ -130,6 +133,12 @@
   </data>
   <data name="Status_Hidden" xml:space="preserve">
     <value>下划线已隐藏。</value>
+  </data>
+  <data name="Status_RegionSelecting" xml:space="preserve">
+    <value>拖拽四角设置识别区域，然后点击确定。</value>
+  </data>
+  <data name="Region_Confirm" xml:space="preserve">
+    <value>确定</value>
   </data>
   <!-- 意外错误提示（全局未处理异常兜底弹窗） -->
   <data name="UnexpectedError_Title" xml:space="preserve">

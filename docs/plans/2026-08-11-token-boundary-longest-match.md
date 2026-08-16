@@ -191,3 +191,7 @@ Run: `git diff HEAD~5 --stat` and `git status --short`; retain the user's pre-ex
 git add openspec/specs
 git commit -m "docs: specify tokenizer-boundary dictionary spans"
 ```
+
+## 识别区域(2026-08-16)
+
+新增 `recognition-region`:用户可在目标窗口上拖拽四角直角框设定识别子区域,确定后持久化(窗口相对、归一化)。识别时捕获整窗帧 → 按区域裁剪 → 对裁剪帧 OCR → 坐标加回区域偏移还原,性能优先(区域外 UI/旁白不再识别)。主 UI 有"设置识别区域"按钮重拉。区域未设置时保持整窗行为。

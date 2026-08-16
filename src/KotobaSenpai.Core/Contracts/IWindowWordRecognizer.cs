@@ -12,5 +12,13 @@ public sealed record WordRecognitionResult(
 /// <summary>Port: performs Japanese OCR on the target window and returns character-level coordinates grouped by line.</summary>
 public interface IWindowWordRecognizer
 {
-    Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Recognizes the target window. When <paramref name="region"/> (window-relative pixels, in the frame's coordinate
+    /// space) is provided, the frame is cropped to that region before OCR and result coordinates are offset back to the
+    /// full frame; otherwise the whole window is recognized.
+    /// </summary>
+    Task<WordRecognitionResult> RecognizeAsync(
+        WindowTarget target,
+        CancellationToken cancellationToken = default,
+        ScreenRect? region = null);
 }

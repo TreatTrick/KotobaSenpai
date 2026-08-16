@@ -7,6 +7,7 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Services;
+using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.ViewModels;
 
@@ -20,6 +21,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IWindowCatalog _catalog;
     private readonly WordOverlayApplicationService _workflow;
+    private readonly IRegionSelector _regionSelector;
+    private readonly ISettingsService _settings;
     private readonly IStringLocalizer _localizer;
     private readonly IUserMessageResolver _messageResolver;
     private readonly ILogger _logger;
@@ -30,12 +33,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public MainWindowViewModel(
         IWindowCatalog catalog,
         WordOverlayApplicationService workflow,
+        IRegionSelector regionSelector,
+        ISettingsService settings,
         IStringLocalizer localizer,
         IUserMessageResolver messageResolver,
         ILogger logger)
     {
         _catalog = catalog;
         _workflow = workflow;
+        _regionSelector = regionSelector;
+        _settings = settings;
         _localizer = localizer;
         _messageResolver = messageResolver;
         _logger = logger;
@@ -123,6 +130,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         _workflow.Hide();
         SetStatus(ResourceKeys.Status_Hidden);
+    }
+
+    /// <summary>Opens the interactive region selector over the selected window to set the recognition sub-region.</summary>
+    [RelayCommand]
+    private void SetRecognitionRegion()
+    {
+        if (SelectedWindow is null)
+        {
+            SetStatus(ResourceKeys.Status_SelectTargetFirst);
+            return;
+        }
+        _regionSelector.Show(SelectedWindow, ReadSavedRegion());
+        SetStatus(ResourceKeys.Status_RegionSelecting);
+    }
+
+    private RecognitionRegion? ReadSavedRegion()
+    {
+        var raw = _settings.GetValue(RecognitionRegion.SettingsKey);
+        return RecognitionRegion.TryParse(raw, out var region) ? region : null;
     }
 
     /// <summary>Records a normal status (key + format arguments) and renders it.</summary>

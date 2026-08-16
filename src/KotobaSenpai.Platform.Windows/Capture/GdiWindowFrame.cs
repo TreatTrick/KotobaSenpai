@@ -21,11 +21,20 @@ internal sealed class GdiWindowFrame : IDisposable
 
     public int Height => _bitmap.Height;
 
-    public static GdiWindowFrame Capture(WindowTarget target)
+    public static GdiWindowFrame Capture(WindowTarget target, ScreenRect? region = null)
     {
-        var bitmap = new Bitmap(target.Bounds.Width, target.Bounds.Height, PixelFormat.Format32bppPArgb);
+        int srcX = target.Bounds.X, srcY = target.Bounds.Y, w = target.Bounds.Width, h = target.Bounds.Height;
+        if (region is { } r)
+        {
+            // Capture only the region's screen rectangle directly, avoiding copying the whole window then cropping.
+            srcX = target.Bounds.X + r.X;
+            srcY = target.Bounds.Y + r.Y;
+            w = r.Width;
+            h = r.Height;
+        }
+        var bitmap = new Bitmap(w, h, PixelFormat.Format32bppPArgb);
         using var destination = Graphics.FromImage(bitmap);
-        destination.CopyFromScreen(target.Bounds.X, target.Bounds.Y, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
+        destination.CopyFromScreen(srcX, srcY, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
         return new GdiWindowFrame(bitmap);
     }
 
@@ -53,10 +62,10 @@ internal sealed class GdiWindowFrame : IDisposable
 /// <summary>GDI implementation of the <see cref="IWindowFrameCapture"/> port.</summary>
 public sealed class GdiWindowFrameCapture : IWindowFrameCapture
 {
-    public Task<CapturedFrame> CaptureAsync(WindowTarget target, CancellationToken cancellationToken = default)
+    public Task<CapturedFrame> CaptureAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using var frame = GdiWindowFrame.Capture(target);
+        using var frame = GdiWindowFrame.Capture(target, region);
         return Task.FromResult(new CapturedFrame(frame.Width, frame.Height, frame.ToBgraBytes()));
     }
 }

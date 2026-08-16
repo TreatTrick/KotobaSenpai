@@ -16,6 +16,7 @@ public static class ResourceKeys
     public const string Button_RefreshWindows = nameof(Button_RefreshWindows);
     public const string Button_Recognize = nameof(Button_Recognize);
     public const string Button_Hide = nameof(Button_Hide);
+    public const string Button_SetRecognitionRegion = nameof(Button_SetRecognitionRegion);
     public const string Label_Description = nameof(Label_Description);
 
     // --- ViewModel status text ({0} is a placeholder) ---
@@ -28,6 +29,8 @@ public static class ResourceKeys
     public const string Status_NoWords = nameof(Status_NoWords);
     public const string Status_WordsRecognized = nameof(Status_WordsRecognized);
     public const string Status_Hidden = nameof(Status_Hidden);
+    public const string Status_RegionSelecting = nameof(Status_RegionSelecting);
+    public const string Region_Confirm = nameof(Region_Confirm);
 
     // --- Unexpected-error prompt (global unhandled-exception fallback dialog) ---
     public const string UnexpectedError_Title = nameof(UnexpectedError_Title);

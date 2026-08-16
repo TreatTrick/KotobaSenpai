@@ -6,6 +6,7 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Services;
+using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -79,6 +80,31 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Set_recognition_region_shows_selector_for_selected_window()
+    {
+        var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target));
+        vm.RefreshCommand.Execute(null);
+        vm.SelectedWindow = vm.Windows[0];
+        FakeRegionSelector.ShowCount = 0;
+
+        vm.SetRecognitionRegionCommand.Execute(null);
+
+        Assert.Equal(1, FakeRegionSelector.ShowCount);
+        Assert.Equal("Other", FakeRegionSelector.LastTarget?.Title);
+    }
+
+    [Fact]
+    public void Set_recognition_region_without_window_shows_hint()
+    {
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog());
+
+        vm.SetRecognitionRegionCommand.Execute(null);
+
+        Assert.Equal(ResourceKeys.Status_SelectTargetFirst, vm.Status);
+    }
+
+    [Fact]
     public void Refresh_failure_logs_once_and_reports_error_status()
     {
         var (vm, _, _, logger) = CreateVm(new ThrowingCatalog());
@@ -101,7 +127,7 @@ public sealed class MainWindowViewModelTests
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
-        return (new MainWindowViewModel(catalog, workflow, localizer, resolver, logger), overlay, localizer, logger);
+        return (new MainWindowViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowCatalog : IWindowCatalog
@@ -118,9 +144,22 @@ public sealed class MainWindowViewModelTests
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
     {
-        public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default) =>
+        public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
             Task.FromResult(new WordRecognitionResult(100, 50,
                 [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]));
+    }
+
+    private sealed class FakeRegionSelector : IRegionSelector
+    {
+        public static WindowTarget? LastTarget;
+        public static int ShowCount;
+        public void Show(WindowTarget target, RecognitionRegion? initial = null) { LastTarget = target; ShowCount++; }
+    }
+
+    private sealed class FakeSettings : ISettingsService
+    {
+        public string? GetValue(string key) => null;
+        public void SetValue(string key, string? value) { }
     }
 
     private sealed class StubTokenizer : ITokenizer

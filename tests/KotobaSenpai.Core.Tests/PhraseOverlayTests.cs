@@ -409,7 +409,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
     {
-        public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default) =>
+        public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
             Task.FromResult(new WordRecognitionResult(100, 50,
                 [new OcrLine([new OcrWord("彼", new ScreenRect(0, 0, 10, 20))])]));
     }

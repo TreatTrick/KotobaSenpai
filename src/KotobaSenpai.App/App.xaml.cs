@@ -101,6 +101,7 @@ public partial class App : Application
         services.AddSingleton<IWindowFrameCapture, GdiWindowFrameCapture>();
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
+        services.AddSingleton<IRegionSelector, RegionSelectorWindow>();
 
         // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
         // enabled by the config key PhraseGroupsEnabled=true; when the key is not configured the adapter returns NoKey and skips the call.

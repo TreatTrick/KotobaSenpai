@@ -42,6 +42,7 @@
         <!-- 操作 -->
         <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
           <ui:Button Content="{loc:Loc Key=Button_Recognize}" Command="{Binding RecognizeCommand}" IsDefault="True" Appearance="Primary" />
+          <ui:Button Content="{loc:Loc Key=Button_SetRecognitionRegion}" Command="{Binding SetRecognitionRegionCommand}" Appearance="Secondary" Margin="8,0,0,0" />
           <ui:Button Content="{loc:Loc Key=Button_Hide}" Command="{Binding HideCommand}" Appearance="Secondary" Margin="8,0,0,0" />
         </StackPanel>
         <TextBlock Text="{loc:Loc Key=Label_Description}" TextWrapping="Wrap" Margin="0,12,0,0" Opacity="0.7" />

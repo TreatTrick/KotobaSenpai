@@ -100,6 +100,9 @@
   <data name="Button_Hide" xml:space="preserve">
     <value>Hide underline</value>
   </data>
+  <data name="Button_SetRecognitionRegion" xml:space="preserve">
+    <value>Set recognition region</value>
+  </data>
   <data name="Label_Description" xml:space="preserve">
     <value>Instructions: After selecting a window, the app captures the current screen, recognizes Japanese words, and draws a line beneath each word.</value>
   </data>
@@ -130,6 +133,12 @@
   </data>
   <data name="Status_Hidden" xml:space="preserve">
     <value>Underline hidden.</value>
+  </data>
+  <data name="Status_RegionSelecting" xml:space="preserve">
+    <value>Drag the corners to set the recognition region, then confirm.</value>
+  </data>
+  <data name="Region_Confirm" xml:space="preserve">
+    <value>OK</value>
   </data>
   <!-- Unexpected error notice (global unhandled-exception fallback) -->
   <data name="UnexpectedError_Title" xml:space="preserve">
