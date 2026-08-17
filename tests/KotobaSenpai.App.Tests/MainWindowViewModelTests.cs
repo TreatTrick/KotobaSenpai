@@ -122,7 +122,7 @@ public sealed class MainWindowViewModelTests
         var overlay = new FakeOverlay();
         var workflow = new WordOverlayApplicationService(
             new FakeRecognizer(),
-            new WordGroupingService(new StubTokenizer()),
+            new WordGroupingService(new StubTokenizer(), new SentenceSegmenter(), new StubSpanResolver()),
             overlay);
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
@@ -166,6 +166,11 @@ public sealed class MainWindowViewModelTests
     {
         public IReadOnlyList<Token> Tokenize(string? text)
             => [new Token("日", "日", "日", "日", "日", "日", new PartsOfSpeech("", "", "", ""), "", "", "", 0)];
+    }
+
+    private sealed class StubSpanResolver : ITokenSpanResolver
+    {
+        public IReadOnlyList<LookupSpan> Resolve(IReadOnlyList<Token> tokens) => [];
     }
 
     private sealed class FakeOverlay : IOverlayRenderer

@@ -63,7 +63,10 @@ public sealed class WindowWordOverlayTests
         var overlay = new FakeOverlay();
         var service = new WordOverlayApplicationService(
             new FakeRecognizer(),
-            new WordGroupingService(new StubTokenizer(new TokenSpec("日", 0))),
+            new WordGroupingService(
+                new StubTokenizer(new TokenSpec("日", 0)),
+                new SentenceSegmenter(),
+                new StubSpanResolver(new LookupSpan([Token("日")], "日", []))),
             overlay);
 
         var result = await service.RecognizeAndShowAsync(target);
@@ -85,6 +88,7 @@ public sealed class WindowWordOverlayTests
             new FakeRecognizer(),
             new WordGroupingService(
                 new StubTokenizer(new TokenSpec("日", 0)),
+                new SentenceSegmenter(),
                 new StubSpanResolver(new LookupSpan([Token("日")], "日", [entry]))),
             overlay);
 

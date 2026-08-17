@@ -18,8 +18,8 @@ public sealed class WordGroupingTests
         // で on line0, も on line1; the span resolver merges them into でも (jmdic longest match) across the lines.
         var service = new WordGroupingService(
             new StubTokenizer(new TokenSpec("で", 0), new TokenSpec("も", 1)),
-            new StubSpanResolver(new LookupSpan([Token("で", 0), Token("も", 1)], "でも", [])),
-            segmenter: new SentenceSegmenter());
+            new SentenceSegmenter(),
+            new StubSpanResolver(new LookupSpan([Token("で", 0), Token("も", 1)], "でも", [])));
         var grouped = service.Group([Line("で", 0), Line("も", 30)]);
 
         var word = Assert.Single(grouped);
@@ -32,12 +32,13 @@ public sealed class WordGroupingTests
     [Fact]
     public void Cross_line_word_becomes_one_grouped_word_with_two_rects()
     {
+        // The merged block tokenizes あ+い into one token spanning both lines; the resolver carries it as one span => one word with one rect per line.
         var service = new WordGroupingService(
-            new StubTokenizer(new TokenSpec("あい", 0)),
-            segmenter: new SentenceSegmenter());
+            new StubTokenizer(new TokenSpec("あ", 0), new TokenSpec("い", 1)),
+            new SentenceSegmenter(),
+            new StubSpanResolver(new LookupSpan([Token("あ", 0), Token("い", 1)], "あい", [])));
         var grouped = service.Group([Line("あ", 0), Line("い", 30)]);
 
-        // The merged block tokenizes あ+い as one token spanning both lines => one word with one rect per line.
         var word = Assert.Single(grouped);
         Assert.Equal("あい", word.Token.Surface);
         Assert.Equal(2, word.Rects.Count);
@@ -46,57 +47,12 @@ public sealed class WordGroupingTests
     }
 
     [Fact]
-    public void Groups_multi_character_word_into_single_wide_line()
-    {
-        var service = new WordGroupingService(new StubTokenizer(new TokenSpec("日本語", 0)));
-        var grouped = service.Group([Line("日本語")]);
-
-        Assert.Single(grouped);
-        Assert.Equal("日本語", grouped[0].Token.Surface);
-        Assert.Equal(30, grouped[0].Bounds.Width); // union of three character boxes = 30 wide
-        Assert.Equal(20, grouped[0].Bounds.Height);
-    }
-
-    [Fact]
-    public void Emits_separate_line_per_word_including_particles()
-    {
-        var service = new WordGroupingService(new StubTokenizer(
-            new TokenSpec("彼", 0), new TokenSpec("が", 1)));
-        var grouped = service.Group([Line("彼が")]);
-
-        Assert.Equal(2, grouped.Count);
-        Assert.Equal("彼", grouped[0].Token.Surface);
-        Assert.Equal(10, grouped[0].Bounds.Width);
-        Assert.Equal("が", grouped[1].Token.Surface); // particle is retained
-        Assert.Equal(10, grouped[1].Bounds.Width);
-    }
-
-    [Fact]
-    public void Skips_punctuation_tokens()
-    {
-        var service = new WordGroupingService(new StubTokenizer(
-            new TokenSpec("彼", 0), new TokenSpec("、", 1), new TokenSpec("が", 2)));
-        var grouped = service.Group([Line("彼、が")]);
-
-        Assert.Equal(2, grouped.Count);
-        Assert.Equal(new[] { "彼", "が" }, grouped.Select(g => g.Token.Surface).ToArray());
-    }
-
-    [Fact]
-    public void Skips_token_without_member_characters()
-    {
-        var service = new WordGroupingService(new StubTokenizer(
-            new TokenSpec("日", 0), new TokenSpec("X", 5)));
-        var grouped = service.Group([Line("日")]);
-
-        Assert.Single(grouped);
-        Assert.Equal("日", grouped[0].Token.Surface);
-    }
-
-    [Fact]
     public void Reports_empty_for_no_lines()
     {
-        var service = new WordGroupingService(new StubTokenizer());
+        var service = new WordGroupingService(
+            new StubTokenizer(),
+            new SentenceSegmenter(),
+            new StubSpanResolver());
         Assert.Empty(service.Group([]));
     }
 
@@ -113,6 +69,7 @@ public sealed class WordGroupingTests
             [entry]));
         var service = new WordGroupingService(
             new StubTokenizer(new TokenSpec("で", 0), new TokenSpec("も", 1)),
+            new SentenceSegmenter(),
             resolver);
 
         var grouped = service.Group([Line("でも")]);

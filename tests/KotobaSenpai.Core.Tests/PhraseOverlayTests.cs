@@ -394,7 +394,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
         var overlay = new FakeOverlay();
         var service = new WordOverlayApplicationService(
             new FakeRecognizer(),
-            new WordGroupingService(new CharTokenizer()),
+            new WordGroupingService(new CharTokenizer(), new SentenceSegmenter(), new IdentitySpanResolver()),
             overlay,
             phraseOrchestrator: phraseOrchestrator,
             settings: settings);
@@ -425,6 +425,13 @@ public sealed class PhraseOrchestratorConcurrencyTests
         public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
             Task.FromResult(new WordRecognitionResult(100, 50,
                 [new OcrLine([new OcrWord("彼", new ScreenRect(0, 0, 10, 20))])]));
+    }
+
+    /// <summary>Keeps every candidate word as its own span so grouping preserves the recognizer's words in this integration test.</summary>
+    private sealed class IdentitySpanResolver : ITokenSpanResolver
+    {
+        public IReadOnlyList<LookupSpan> Resolve(IReadOnlyList<Token> tokens)
+            => tokens.Select(t => new LookupSpan([t], t.Surface, [])).ToArray();
     }
 
     private sealed class FakeOverlay : IOverlayRenderer

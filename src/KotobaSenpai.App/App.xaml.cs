@@ -147,6 +147,7 @@ public partial class App : Application
         // Word grouping: first resolve token-boundary spans in a single batched OCR pass, then reuse the same result for both underlines and hover.
         services.AddSingleton<IOcrWordGroupingService>(sp => new WordGroupingService(
             sp.GetRequiredService<ITokenizer>(),
+            sp.GetRequiredService<SentenceSegmenter>(),
             sp.GetRequiredService<ITokenSpanResolver>()));
 
         // Settings: unified settings.json read/write, the single owner for preference storage and log-level configuration (singleton, holds the in-memory view).
