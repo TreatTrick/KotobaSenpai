@@ -136,25 +136,21 @@ public sealed class TokenSpanResolverTests
     }
 
     [Fact]
-    public void Resolves_all_ocr_lines_with_one_batch_lookup()
+    public void Resolves_all_segments_with_one_batch_lookup()
     {
         var lookup = new FakeLookup(Entry("でも"), Entry("そしたら")) { MaxCalls = 1 };
         var resolver = new TokenBoundarySpanResolver(lookup);
 
-        var lines = resolver.ResolveMany([
-            [
-                Token("で", 0, "デ", pos1: "助詞"),
-                Token("も", 1, "モ", pos1: "助詞"),
-            ],
-            [
-                Token("そ", 0, "ソ", pos1: "副詞"),
-                Token("し", 1, "シ", lemma: "為る", pos1: "動詞"),
-                Token("たら", 2, "タラ", lemma: "た", pos1: "助動詞"),
-            ],
+        var spans = resolver.Resolve([
+            Token("で", 0, "デ", pos1: "助詞"),
+            Token("も", 1, "モ", pos1: "助詞"),
+            Token("。", 2, "。"),
+            Token("そ", 3, "ソ", pos1: "副詞"),
+            Token("し", 4, "シ", lemma: "為る", pos1: "動詞"),
+            Token("たら", 5, "タラ", lemma: "た", pos1: "助動詞"),
         ]);
 
-        Assert.Equal("でも", Assert.Single(lines[0]).Surface);
-        Assert.Equal("そしたら", Assert.Single(lines[1]).Surface);
+        Assert.Equal(new[] { "でも", "そしたら" }, spans.Select(span => span.Surface));
     }
 
     [Fact]

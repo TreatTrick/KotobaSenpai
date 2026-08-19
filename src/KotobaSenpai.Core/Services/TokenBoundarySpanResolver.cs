@@ -22,40 +22,20 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
 
     public IReadOnlyList<LookupSpan> Resolve(IReadOnlyList<Token> tokens)
     {
-        var lines = ResolveMany(new[] { (IReadOnlyList<Token>)tokens });
-        return lines.Count == 0 ? Array.Empty<LookupSpan>() : lines[0];
-    }
+        ArgumentNullException.ThrowIfNull(tokens);
 
-    public IReadOnlyList<IReadOnlyList<LookupSpan>> ResolveMany(
-        IReadOnlyList<IReadOnlyList<Token>> tokenLines)
-    {
-        ArgumentNullException.ThrowIfNull(tokenLines);
-        if (tokenLines.Count == 0)
-            return Array.Empty<IReadOnlyList<LookupSpan>>();
-
-        var lineSegments = new List<IReadOnlyList<IReadOnlyList<Token>>>(tokenLines.Count);
         var forms = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var tokens in tokenLines)
-        {
-            ArgumentNullException.ThrowIfNull(tokens);
-            var segments = SplitSegments(tokens);
-            lineSegments.Add(segments);
-            foreach (var segment in segments)
-                CollectCandidateForms(segment, forms);
-        }
+        var segments = SplitSegments(tokens);
+        foreach (var segment in segments)
+            CollectCandidateForms(segment, forms);
 
         var matches = forms.Count == 0
             ? new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal)
             : _lookup.LookupForms(forms);
 
-        var result = new List<IReadOnlyList<LookupSpan>>(lineSegments.Count);
-        foreach (var segments in lineSegments)
-        {
-            var lineResult = new List<LookupSpan>();
-            foreach (var segment in segments)
-                ResolveSegment(segment, matches, lineResult);
-            result.Add(lineResult);
-        }
+        var result = new List<LookupSpan>();
+        foreach (var segment in segments)
+            ResolveSegment(segment, matches, result);
         return result;
     }
 

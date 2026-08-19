@@ -29,7 +29,7 @@ public sealed class WordGroupingService : IOcrWordGroupingService
         var result = new List<GroupedWord>();
         foreach (var segment in _segmenter.Segment(lines))
         {
-            var block = segment.LineIndices.Select(i => lines[i]).ToArray();
+            var block = segment.LineIndices.Select(i => lines[i]).ToArray();//all orclines in segment
             var splitTokens = LineBlockTokenizer.Tokenize(_tokenizer, block);
 
             var tokens = splitTokens.Select(st => st.Token).ToArray();

@@ -14,5 +14,5 @@ public sealed record OcrWord
 
     public string Text { get; }
 
-    public ScreenRect FrameBounds { get; }
+    public ScreenRect FrameBounds { get; }//这里的ScreenRect是当前OcrWord在整个被选中的窗口中的位置，不是屏幕边缘起始点，不是选定的选框起始点，是窗口
 }

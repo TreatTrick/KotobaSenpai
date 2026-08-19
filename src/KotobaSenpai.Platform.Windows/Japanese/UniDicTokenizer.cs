@@ -88,7 +88,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
                 // OCR text is untrusted input and may contain characters native MeCab parsing cannot handle (lone surrogates/control
                 // chars, etc.), causing ParseToLattice to go out of bounds. Defensive: skip the line, don't let one bad line
                 // tank the whole recognition pass.
-                _logger.Log(LogLevel.Warning, ex, "UniDicTokenizer: MeCab failed to parse '{text}' (skipping line)", Truncate(text));
+                _logger.Log(LogLevel.Warning, ex, "UniDicTokenizer: MeCab failed to parse '{0}' (skipping line)", Truncate(text));
                 return Array.Empty<Token>();
             }
         }
