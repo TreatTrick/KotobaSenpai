@@ -25,15 +25,15 @@ public interface ILlmProtocol
     ///   "response_format": { "type": "json_schema",
     ///     "json_schema": { "name": "return_groups", "schema": …, "strict": true } } }
     /// </code>
-    /// Anthropic instead uses <c>tools[0].input_schema</c> + a forced <c>tool_choice</c>; the group array lands in the
-    /// response's <c>content[].tool_use.input.groups</c>.
+    /// Anthropic uses a forced <c>return_groups</c> tool; the root object is in the response's
+    /// <c>content[].tool_use.input</c> block.
     /// </example>
     string BuildBody(string systemPrompt, string userContent, string model);
 
     /// <summary>Extracts the root element of the structured group array from the response envelope. Throws <see cref="PhraseResponseException"/> on structural mismatch.</summary>
     /// <example>
     /// OpenAI Chat Completions envelope: <c>choices[0].message.content</c> is an embedded JSON string whose root
-    /// <c>groups</c> is the target. Anthropic is extracted like this:
+    /// <c>groups</c> is the target. Anthropic is extracted from:
     /// <code>
     /// content[].tool_use.input.groups
     /// </code>

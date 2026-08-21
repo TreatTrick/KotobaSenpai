@@ -36,6 +36,23 @@ public sealed class PhrasePromptBuilderTests
         Assert.Contains("[Llm.LocalSpansLabel]", user);
     }
 
+    [Fact]
+    public void Prompt_contains_explicit_root_object_and_words_instructions()
+    {
+        var builder = new PhrasePromptBuilder(new ContractLocalizer());
+
+        var (system, user) = builder.Build(Request(Segment("あ")));
+
+        Assert.Contains("Call the `return_groups` tool exactly once", system);
+        Assert.Contains("Do not emit a plain-text or Markdown answer", system);
+        Assert.Contains("Return exactly one JSON object with two top-level arrays: groups and words.", user);
+        Assert.Contains("返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。", user);
+        Assert.Contains("必须调用 `return_groups` 工具恰好一次", system);
+        Assert.Contains("不得输出纯文本或 Markdown", system);
+        Assert.Contains("groups contains only meaningful multi-token combinations", system);
+        Assert.Contains("words contains one entry for every local word chunk", user);
+    }
+
     /// <summary>Localization fake: wraps keys in square brackets so tests can assert the prompt text is actually resolved through the localizer.</summary>
     private sealed class BracketedLocalizer : IStringLocalizer
     {
@@ -45,6 +62,25 @@ public sealed class PhrasePromptBuilderTests
 
         public string Get(string key, params object[] args)
             => $"[{key}]";
+    }
+
+    private sealed class ContractLocalizer : IStringLocalizer
+    {
+#pragma warning disable CS0067
+        public event EventHandler? CultureChanged;
+#pragma warning restore CS0067
+
+        public string Get(string key, params object[] args)
+            => key switch
+            {
+                "Llm.PhraseSystemPrompt" => "Call the `return_groups` tool exactly once. Do not emit a plain-text or Markdown answer. groups contains only meaningful multi-token combinations. 必须调用 `return_groups` 工具恰好一次。不得输出纯文本或 Markdown。",
+                "Llm.PhraseUserInstruction" => "Return exactly one JSON object with two top-level arrays: groups and words. 返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。",
+                "Llm.SegmentLabel" => "Segment text:",
+                "Llm.TokenTableLabel" => "Token table:",
+                "Llm.LocalSpansLabel" => "Local spans:",
+                "Llm.WordsInstruction" => "返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。 words contains one entry for every local word chunk.",
+                _ => key,
+            };
     }
 
     [Fact]
@@ -103,17 +139,19 @@ public sealed class PhraseResponseParserTests
     }
 
     [Fact]
-    public void Rejects_parts_with_non_string_token_id()
+    public void Skips_parts_with_non_string_token_id()
     {
-        Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
-            """[{"modelGroupId":"g1","type":"grammar","parts":[[1]],"label":"x","meaning":"y","grammar":"z"}]""")));
+        var groups = _parser.ParseGroups(Groups(
+            """[{"modelGroupId":"g1","type":"grammar","parts":[[1]],"label":"x","meaning":"y","grammar":"z"}]"""));
+        Assert.Empty(Assert.Single(groups).PartTokenIds[0]);
     }
 
     [Fact]
-    public void Rejects_malformed_token_id_string()
+    public void Skips_malformed_token_id_string()
     {
-        Assert.Throws<PhraseResponseException>(() => _parser.ParseGroups(Groups(
-            """[{"modelGroupId":"g1","type":"grammar","parts":[["foo"]],"label":"x","meaning":"y","grammar":"z"}]""")));
+        var groups = _parser.ParseGroups(Groups(
+            """[{"modelGroupId":"g1","type":"grammar","parts":[["foo"]],"label":"x","meaning":"y","grammar":"z"}]"""));
+        Assert.Empty(Assert.Single(groups).PartTokenIds[0]);
     }
 
     [Fact]
@@ -200,24 +238,33 @@ public sealed class LlmProtocolTests
     }
 
     [Fact]
-    public void AnthropicMessages_builds_thinking_off_forced_tool_envelope()
+    public void AnthropicMessages_builds_forced_tool_use_envelope()
     {
         var protocol = new AnthropicMessagesProtocol();
         var body = protocol.BuildBody("sys", "user", "m");
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+
         Assert.Contains("\"thinking\"", body);
         Assert.Contains("\"disabled\"", body);
-        Assert.Contains("\"tools\"", body);
-        Assert.Contains("return_groups", body);
-        Assert.Contains("\"type\":\"tool\"", body); // thinking disabled allows forcing a single tool
+        Assert.True(root.TryGetProperty("tools", out var tools));
+        var tool = tools[0];
+        Assert.Equal("return_groups", tool.GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Object, tool.GetProperty("input_schema").ValueKind);
+        Assert.True(root.TryGetProperty("tool_choice", out var toolChoice));
+        Assert.Equal("tool", toolChoice.GetProperty("type").GetString());
+        Assert.Equal("return_groups", toolChoice.GetProperty("name").GetString());
+        Assert.False(root.TryGetProperty("output_config", out _));
     }
 
     [Fact]
-    public void AnthropicMessages_extracts_groups_from_tool_use_input()
+    public void AnthropicMessages_extracts_groups_from_tool_use_content()
     {
         var protocol = new AnthropicMessagesProtocol();
-        var envelope = """{"content":[{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaning":"y","grammar":"z"}]}}]}""";
+        var envelope = """{"content":[{"type":"tool_use","name":"return_groups","input":{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaning":"y","grammar":"z"}],"words":[{"headword":"学校","pos":"名詞","meaning":"学校","grammar":"名詞"}]}}]}""";
         var groups = protocol.ExtractGroupsJson(envelope);
         Assert.Equal(1, GetArrayLength(groups));
+        Assert.Equal(1, GetArrayLength(protocol.ExtractWordsJson(envelope)));
     }
 
     [Fact]
@@ -238,7 +285,7 @@ public sealed class LlmProtocolTests
     public void AnthropicMessages_throws_when_no_tool_use_block()
     {
         var protocol = new AnthropicMessagesProtocol();
-        Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[{"type":"text","text":"hi"}]}"""));
+        Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[{"type":"text","text":"{}"}]}"""));
     }
 
     private static int GetArrayLength(JsonElement array)

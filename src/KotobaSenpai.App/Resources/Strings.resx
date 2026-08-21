@@ -168,10 +168,10 @@
   </data>
   <!-- LLM phrase-analysis prompt -->
   <data name="Llm.PhraseSystemPrompt" xml:space="preserve">
-    <value>You are a phrase-combination analyzer for Japanese visual-novel text. Return only multi-word combinations that have real teaching value (non-contiguous grammar, collocations, context-dependent idiomatic expressions); do not repeat ordinary words or contiguous word chunks already recognized locally. The parts of each group must be an ordered contiguous list of token ids, and parts may be separated by other tokens. Write the meaning and grammar fields in English.</value>
+    <value>You analyze Japanese visual-novel text for teaching value. Call the `return_groups` tool exactly once and put the complete answer in its input. Do not emit a plain-text or Markdown answer. The tool input must be exactly one object with exactly two top-level arrays, `groups` and `words`, and no other top-level fields. `groups` contains only meaningful multi-token combinations (non-contiguous grammar, collocations, or context-dependent idioms) that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. `parts` is an array of ordered contiguous token-id arrays; tokens within one part must be consecutive, while separate parts may be separated by other tokens. Every token value in `parts` must be copied exactly from the token table as a string ID in l&lt;line&gt;:t&lt;token&gt; form; never use numeric indexes or surface text. Write group `meaning` and `grammar` in English.</value>
   </data>
   <data name="Llm.PhraseUserInstruction" xml:space="preserve">
-    <value>Return only combination groups (following the structured-output schema).</value>
+    <value>Call the `return_groups` tool now. Its input must be exactly one object with the required top-level arrays `groups` and `words`; `groups` may be empty. Do not return JSON as text in a normal assistant message, and do not add any other fields or explanatory text.</value>
   </data>
   <data name="Llm.SegmentLabel" xml:space="preserve">
     <value>Segment text:</value>
@@ -183,7 +183,7 @@
     <value>Locally recognized contiguous word chunks:</value>
   </data>
   <data name="Llm.WordsInstruction" xml:space="preserve">
-    <value>Return a parallel 'words' array: for EVERY local recognized word chunk in the table above (including particles and auxiliaries), return one entry {headword (copy the surface EXACTLY from the chunk table), pos (contextual part of speech, e.g. 自動・カ変), meaning (best Chinese meaning in this context), grammar (grammar note)}. Cover every chunk in the table — one entry per chunk, no omissions, no cherry-picking. Each headword must be a verbatim copy of a surface in the chunk table; do not invent surfaces, token ids, or readings.</value>
+    <value>Populate `words` with exactly one entry for every local word chunk listed above, including particles and auxiliaries, in table order. Each entry must contain only `headword`, `pos`, `meaning`, and `grammar`. Copy `headword` exactly from the chunk's surface; do not add a `surface` field or invent a surface, token id, or reading. Set `pos` to contextual part of speech, `meaning` to the best contextual Chinese meaning, and `grammar` to a concise grammar explanation. Do not omit chunks or add entries for anything not in the table.</value>
   </data>
   <data name="Llm.WordMeaningLabel" xml:space="preserve">
     <value>Meaning</value>

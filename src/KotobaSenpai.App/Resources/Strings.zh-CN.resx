@@ -168,10 +168,10 @@
   </data>
   <!-- LLM 短语分析 prompt -->
   <data name="Llm.PhraseSystemPrompt" xml:space="preserve">
-    <value>你是日语视觉小说文本的短语组合分析器。只返回真正有教学价值的多词组合（非连续语法、搭配、依赖上下文的惯用表达），不要重复已经由本地识别出的普通词或连续词块。每个 group 的 parts 必须是 token id 的有序连续列表，part 之间可被其他 token 间隔。meaning 与 grammar 字段请以简体中文书写。</value>
+    <value>你是日语视觉小说文本的教学分析器。必须调用 `return_groups` 工具恰好一次，并把完整答案放入它的 input。不得输出纯文本、Markdown、解释或其他文本。工具 input 必须严格是一个对象，顶层只能有 `groups` 和 `words` 两个数组，不得有其他顶层字段。`groups` 只包含真正有教学价值的多词组合（非连续语法、搭配或依赖上下文的惯用表达），不要重复本地已经识别出的普通词或连续词块。每个 group 对象只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 是一个或多个部分组成的数组；每个部分内部必须是按顺序排列的连续 token id，部分之间可以被其他 token 间隔。`parts` 中每个值都必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式的字符串 token id，禁止使用数字索引或 surface 文本。`meaning` 与 `grammar` 字段请使用简体中文。</value>
   </data>
   <data name="Llm.PhraseUserInstruction" xml:space="preserve">
-    <value>请只返回组合 group（遵循结构化输出的 schema）。</value>
+    <value>现在调用 `return_groups` 工具。工具 input 必须严格是一个对象，必须包含顶层 `groups` 和 `words` 两个数组；`groups` 可以为空。不要在普通 assistant 消息中把 JSON 作为文本返回，不要添加其他字段或解释性文字。</value>
   </data>
   <data name="Llm.SegmentLabel" xml:space="preserve">
     <value>句段文本：</value>
@@ -183,7 +183,7 @@
     <value>本地已识别连续词块：</value>
   </data>
   <data name="Llm.WordsInstruction" xml:space="preserve">
-    <value>请额外返回一个平行的 'words' 数组：对上方词块表里的每一个本地识别词块（含助词、助动词），都返回一条 {headword（从上方词块表逐字复制其 surface）、pos（语境词性，如 自動・カ変）、meaning（本语境最佳中文释义）、grammar（语法说明）}。词块表有多少个词块就返回多少条，一个都不遗漏，不要自行挑选。headword 必须是词块表中某个 surface 的逐字复制，不要自行发明 surface、token id 或读音。</value>
+    <value>请在 `words` 中按词块表顺序，为上方列出的每一个本地词块各返回一条记录，包括助词和助动词。每条记录只能包含 `headword`、`pos`、`meaning`、`grammar` 四个字段。`headword` 必须从对应词块的 surface 逐字复制；不要添加 `surface` 字段，不要自行发明 surface、token id 或读音。`pos` 填写语境词性，`meaning` 填写本语境最佳中文释义，`grammar` 填写简洁的语法说明。不要遗漏词块，也不要为表外内容添加记录。</value>
   </data>
   <data name="Llm.WordMeaningLabel" xml:space="preserve">
     <value>释义</value>

@@ -4,9 +4,9 @@ using System.Text.Json.Nodes;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// Anthropic Messages protocol: <c>/v1/messages</c>. Disables thinking (fast, and thinking mode forbids forced tools) and
-/// forces a single <c>tool_use</c> (<c>return_groups</c>) to carry native structured output; the group array lives in
-/// <c>content[].tool_use.input</c>. The tool is only a structured-output carrier, not a general tool-calling loop.
+/// Anthropic Messages protocol: <c>/v1/messages</c>. The forced <c>return_groups</c> tool carries the structured
+/// result in <c>content[].tool_use.input</c>; this shape is supported by Anthropic-compatible endpoints that do not
+/// implement native <c>output_config.format</c> JSON outputs.
 /// </summary>
 public sealed class AnthropicMessagesProtocol : ILlmProtocol
 {
@@ -21,14 +21,14 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
         {
             ["model"] = model,
             ["max_tokens"] = MaxTokens,
-            // Disable thinking: endpoints like ARK enable thinking by default (slow, and thinking mode forbids forced tools); turning it off allows a forced tool_use and is fast.
+            // Keep thinking disabled for a compact, deterministic structured response.
             ["thinking"] = new JsonObject { ["type"] = "disabled" },
             ["system"] = systemPrompt,
             ["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = userContent }),
             ["tools"] = new JsonArray(new JsonObject
             {
                 ["name"] = "return_groups",
-                ["description"] = "Return the phrase group array.",
+                ["description"] = "Return exactly one object with the required groups and words arrays. Copy token IDs exactly from the request.",
                 ["input_schema"] = PhraseGroupSchema.Root.DeepClone(),
             }),
             ["tool_choice"] = new JsonObject { ["type"] = "tool", ["name"] = "return_groups" },
@@ -37,20 +37,28 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
     }
 
     public JsonElement ExtractGroupsJson(string envelopeJson)
-        => ExtractContentRoot(envelopeJson).GetProperty("groups").Clone();
+        => ExtractToolInput(envelopeJson).GetProperty("groups").Clone();
 
     public JsonElement ExtractWordsJson(string envelopeJson)
-        => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+        => ExtractToolInput(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
 
-    private static JsonElement ExtractContentRoot(string envelopeJson)
+    private static JsonElement ExtractToolInput(string envelopeJson)
     {
         using var doc = JsonDocument.Parse(envelopeJson);
-        foreach (var block in doc.RootElement.GetProperty("content").EnumerateArray())
+        if (!doc.RootElement.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
+            throw new PhraseResponseException("Response lacks a content array.");
+
+        foreach (var block in content.EnumerateArray())
         {
-            if (block.TryGetProperty("type", out var type) && type.GetString() == "tool_use")
-                return block.GetProperty("input").Clone();
+            if (!block.TryGetProperty("type", out var type) || type.GetString() != "tool_use")
+                continue;
+            if (!block.TryGetProperty("name", out var name) || name.GetString() != "return_groups")
+                continue;
+            if (!block.TryGetProperty("input", out var input) || input.ValueKind != JsonValueKind.Object)
+                throw new PhraseResponseException("return_groups tool block has no object input.");
+            return input.Clone();
         }
-        throw new PhraseResponseException("Response lacks a tool_use block with group data.");
+        throw new PhraseResponseException("Response lacks a return_groups tool block with structured group data.");
     }
 
     private static JsonElement EmptyArray() => JsonDocument.Parse("[]").RootElement.Clone();
