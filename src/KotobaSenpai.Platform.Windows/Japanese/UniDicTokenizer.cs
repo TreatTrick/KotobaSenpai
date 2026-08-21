@@ -25,7 +25,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
     private readonly ILogger _logger;
     private readonly string _dictionaryDirectory;
     private readonly bool _requireInstalledManifest;
-    private readonly Lazy<MeCabUniDic22Tagger> _tagger;
+    private readonly MeCabUniDic22Tagger _tagger;
     private readonly object _gate = new();
     private bool _disposed;
 
@@ -40,7 +40,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
         _dictionaryDirectory = dictionaryDirectory ?? ResolveDictionaryDirectory();
         _requireInstalledManifest = dictionaryDirectory is null
             && string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("KOTOBA_UNIDIC_DIR"));
-        _tagger = new Lazy<MeCabUniDic22Tagger>(CreateTagger, isThreadSafe: true);
+        _tagger = CreateTagger();
     }
 
     /// <inheritdoc />
@@ -54,7 +54,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
         {
             try
             {
-                var nodes = _tagger.Value.Parse(text).ToArray();
+                var nodes = _tagger.Parse(text).ToArray();
                 var result = new List<Token>(nodes.Length);
                 foreach (var node in nodes)
                 {
@@ -101,12 +101,10 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
     {
         if (_disposed)
             return;
-        if (_tagger.IsValueCreated)
-            _tagger.Value.Dispose();
+        _tagger.Dispose();
         _disposed = true;
     }
 
-    /// <summary>Lazy loading throws on failure; Lazy does not cache a half-initialized instance (re-runs on next access).</summary>
     private MeCabUniDic22Tagger CreateTagger()
     {
         _logger.LogInformation("UniDicTokenizer: loading dictionary from '{0}'", _dictionaryDirectory);

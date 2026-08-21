@@ -25,15 +25,13 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
 
     private readonly IWindowFrameCapture _capture;
     private readonly ISettingsService _settings;
-    private readonly Lazy<MeikiOcrEngine> _engine;
+    private readonly MeikiOcrEngine _engine;
 
     public MeikiOcrWordRecognizer(IWindowFrameCapture capture, ILogger logger, ISettingsService settings)
     {
         _capture = capture ?? throw new ArgumentNullException(nameof(capture));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
-        _engine = new Lazy<MeikiOcrEngine>(
-            () => new MeikiOcrEngine(ResolveModelDirectory(), logger: logger),
-            isThreadSafe: true);
+        _engine = new MeikiOcrEngine(ResolveModelDirectory(), logger: logger);
     }
 
     public async Task<WordRecognitionResult> RecognizeAsync(
@@ -54,7 +52,7 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         IReadOnlyList<MeikiLine> lines;
         try
         {
-            lines = _engine.Value.RunOcr(frame.Bgra32, frame.Width, frame.Height);
+            lines = _engine.RunOcr(frame.Bgra32, frame.Width, frame.Height);
         }
         catch (WindowsPlatformException)
         {

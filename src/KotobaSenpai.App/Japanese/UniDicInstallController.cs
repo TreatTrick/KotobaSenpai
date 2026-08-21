@@ -23,6 +23,8 @@ public sealed partial class UniDicInstallController : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBlocking), nameof(HasError))]
     private string? _error;
 
+    public event EventHandler? InstallationCompleted;
+
     [ObservableProperty]
     private bool _isInstalled;
 
@@ -57,6 +59,7 @@ public sealed partial class UniDicInstallController : ObservableObject
         {
             await _install(ct, new Progress<double>(p => Progress = p));
             IsInstalled = true;
+            InstallationCompleted?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException)
         {

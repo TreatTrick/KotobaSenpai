@@ -24,7 +24,11 @@ public partial class MainWindow : FluentWindow
 {
     private bool _syncing;
 
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        DataContextChanged += (_, _) => InitializeViewModel();
+    }
 
     public static readonly DependencyProperty LanguageServiceProperty =
         DependencyProperty.Register(
@@ -84,11 +88,7 @@ public partial class MainWindow : FluentWindow
     {
         base.OnSourceInitialized(e);
 
-        if (DataContext is MainWindowViewModel viewModel)
-        {
-            viewModel.ExcludeHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            viewModel.RefreshCommand.Execute(null);
-        }
+        InitializeViewModel();
 
         // Theme: after the window handle is ready, apply the persisted (or default Auto) mode, bind OS-follow, then sync the combo-box selection.
         ThemeService?.Initialize(this);
@@ -97,6 +97,15 @@ public partial class MainWindow : FluentWindow
 
         if (LocalizationHost.Localizer is { } localizer)
             localizer.CultureChanged += (_, _) => SyncThemeModeComboBox();
+    }
+
+    private void InitializeViewModel()
+    {
+        if (!IsInitialized || DataContext is not MainWindowViewModel viewModel)
+            return;
+
+        viewModel.ExcludeHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        viewModel.RefreshCommand.Execute(null);
     }
 
     /// <summary>Slider change: writes the furigana font scale to settings (re-entrancy guarded by <see cref="_syncing"/>).</summary>

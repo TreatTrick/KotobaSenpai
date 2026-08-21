@@ -68,7 +68,6 @@ public partial class App : Application
 
         var window = new MainWindow
         {
-            DataContext = _services.GetRequiredService<MainWindowViewModel>(),
             LanguageService = languageService,
             ThemeService = themeService,
             InstallController = installController,
@@ -76,9 +75,42 @@ public partial class App : Application
         };
         window.Show();
 
-        // Dictionary install: triggered after the main window is shown; the overlay blocks all other operations and shows progress/errors; on failure it can retry inside the overlay.
-        if (!installController.IsInstalled)
-            installController.InstallCommand.Execute(null);
+        installController.InstallationCompleted += (_, _) => InitializeRuntime(window);
+        _ = EnsureDictionaryAndInitializeAsync(installController, window);
+    }
+
+    private async Task EnsureDictionaryAndInitializeAsync(
+        UniDicInstallController installController,
+        MainWindow window)
+    {
+        try
+        {
+            if (!installController.IsInstalled)
+                await installController.InstallCommand.ExecuteAsync(null);
+            else
+                InitializeRuntime(window);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to initialize the UniDic tokenizer during startup");
+        }
+    }
+
+    private void InitializeRuntime(MainWindow? window)
+    {
+        if (window is null || window.DataContext is not null || _services is null)
+            return;
+
+        try
+        {
+            // Resolving these singletons now constructs the OCR model and UniDic tagger during startup.
+            _services.GetRequiredService<IWindowWordRecognizer>();
+            window.DataContext = _services.GetRequiredService<MainWindowViewModel>();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to initialize recognition services during startup");
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -139,8 +171,9 @@ public partial class App : Application
         services.AddSingleton<IBatchDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
         services.AddSingleton<ITokenSpanResolver, TokenBoundarySpanResolver>();
 
-        // Japanese tokenization: the platform adapter lazily loads the UniDic dictionary; the installer singleton holds a fixed-URL HttpClient (downloaded on first M1 run).
-        services.AddSingleton<ITokenizer>(sp => new UniDicTokenizer(sp.GetRequiredService<ILogger>()));
+        // Japanese tokenization: the adapter is explicitly initialized during startup after the dictionary installer completes.
+        services.AddSingleton<UniDicTokenizer>();
+        services.AddSingleton<ITokenizer>(sp => sp.GetRequiredService<UniDicTokenizer>());
         services.AddSingleton(sp => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
         // Install coordinator: drives the startup overlay (progress/error/retry).
         services.AddSingleton<UniDicInstallController>();

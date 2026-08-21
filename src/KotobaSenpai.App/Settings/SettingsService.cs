@@ -7,7 +7,7 @@ namespace KotobaSenpai.App.Settings;
 
 /// <summary>
 /// File implementation of <see cref="ISettingsService"/>: the single owner of <c>%LocalAppData%/KotobaSenpai/settings.json</c>.
-/// Singleton, lazily loaded into an in-memory <see cref="JsonObject"/> with write-through persistence; unknown fields are preserved
+/// Singleton, loaded into an in-memory <see cref="JsonObject"/> during construction with write-through persistence; unknown fields are preserved
 /// (<c>Language</c>/<c>Theme</c>/<c>MinimumLogLevel</c> coexist without overwriting each other); a missing or corrupt file is treated as an empty object, never throwing.
 /// All reads and writes are serialized through an internal <see cref="lock"/>. Replaces the per-file read logic previously scattered across
 /// <c>LocalAppDataSettingsFile</c> and <c>LogConfiguration</c>.
@@ -18,8 +18,7 @@ public sealed class SettingsService : ISettingsService
 
     private readonly string _filePath;
     private readonly object _gate = new();
-    private JsonObject? _settings;
-    private bool _loaded;
+    private readonly JsonObject _settings;
 
     public static string DefaultFilePath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -30,15 +29,18 @@ public sealed class SettingsService : ISettingsService
     public SettingsService() : this(DefaultFilePath) { }
 
     /// <summary><paramref name="filePath"/> is injected so tests can point at a temporary file.</summary>
-    public SettingsService(string filePath) => _filePath = filePath;
+    public SettingsService(string filePath)
+    {
+        _filePath = filePath;
+        _settings = LoadOrEmpty();
+    }
 
     /// <inheritdoc />
     public string? GetValue(string key)
     {
         lock (_gate)
         {
-            EnsureLoaded();
-            if (!_settings!.TryGetPropertyValue(key, out JsonNode? node) || node is null)
+            if (!_settings.TryGetPropertyValue(key, out JsonNode? node) || node is null)
                 return null;
 
             // When the node is not a string (e.g. a number or object), fall back to null, consistent with the existing preference store's fault-tolerance semantics.
@@ -58,23 +60,12 @@ public sealed class SettingsService : ISettingsService
     {
         lock (_gate)
         {
-            EnsureLoaded();
             if (value is null)
-                _settings!.Remove(key);
+                _settings.Remove(key);
             else
-                _settings![key] = value;
+                _settings[key] = value;
             Save();
         }
-    }
-
-    /// <summary>Lazily loads the file on first access; a missing or corrupt file is treated as an empty object.</summary>
-    private void EnsureLoaded()
-    {
-        if (_loaded)
-            return;
-
-        _loaded = true;
-        _settings = LoadOrEmpty();
     }
 
     private JsonObject LoadOrEmpty()
@@ -104,6 +95,6 @@ public sealed class SettingsService : ISettingsService
         if (directory is not null)
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(_filePath, _settings!.ToJsonString(SerializerOptions));
+        File.WriteAllText(_filePath, _settings.ToJsonString(SerializerOptions));
     }
 }

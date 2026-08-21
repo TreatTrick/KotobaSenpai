@@ -19,14 +19,13 @@ public sealed class UniDicTokenizerTests
     private static readonly ILogger Logger = new NullLogger();
 
     [Fact]
-    public void Missing_runtime_files_throws_unicdic_dictionary_missing()
+    public void Constructor_throws_unicdic_dictionary_missing_for_missing_runtime_files()
     {
         var emptyDir = Path.Combine(Path.GetTempPath(), "unicdic-missing-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(emptyDir);
         try
         {
-            var tokenizer = new UniDicTokenizer(Logger, emptyDir);
-            var ex = Assert.Throws<WindowsPlatformException>(() => tokenizer.Tokenize("日本語"));
+            var ex = Assert.Throws<WindowsPlatformException>(() => new UniDicTokenizer(Logger, emptyDir));
             Assert.Equal(ErrorCodes.UniDicDictionaryMissing, ex.ErrorCode);
         }
         finally
@@ -36,7 +35,7 @@ public sealed class UniDicTokenizerTests
     }
 
     [Fact]
-    public void Invalid_format_throws_unicdic_dictionary_invalid()
+    public void Constructor_throws_unicdic_dictionary_invalid_for_invalid_format()
     {
         var dir = Path.Combine(Path.GetTempPath(), "unicdic-invalid-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -47,8 +46,7 @@ public sealed class UniDicTokenizerTests
                 File.WriteAllText(Path.Combine(dir, f), "x");
             File.WriteAllText(Path.Combine(dir, UniDicAssets.DicrcFileName), "output-format-type = mecab-ipadic");
 
-            var tokenizer = new UniDicTokenizer(Logger, dir);
-            var ex = Assert.Throws<WindowsPlatformException>(() => tokenizer.Tokenize("日本語"));
+            var ex = Assert.Throws<WindowsPlatformException>(() => new UniDicTokenizer(Logger, dir));
             Assert.Equal(ErrorCodes.UniDicDictionaryInvalid, ex.ErrorCode);
         }
         finally
@@ -58,13 +56,10 @@ public sealed class UniDicTokenizerTests
     }
 
     [Fact]
-    public void Null_empty_whitespace_returns_empty_without_dictionary()
+    public void Constructor_requires_dictionary_even_for_empty_input()
     {
-        // Empty input returns an empty list before touching the tagger, so no real dictionary is needed.
-        var tokenizer = new UniDicTokenizer(Logger, Path.GetTempPath());
-        Assert.Empty(tokenizer.Tokenize(null));
-        Assert.Empty(tokenizer.Tokenize(string.Empty));
-        Assert.Empty(tokenizer.Tokenize("  \n\t "));
+        var ex = Assert.Throws<WindowsPlatformException>(() => new UniDicTokenizer(Logger, Path.GetTempPath()));
+        Assert.Equal(ErrorCodes.UniDicDictionaryMissing, ex.ErrorCode);
     }
 
     [Fact]
