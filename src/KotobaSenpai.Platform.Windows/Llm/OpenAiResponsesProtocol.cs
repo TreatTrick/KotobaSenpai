@@ -9,6 +9,8 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// </summary>
 public sealed class OpenAiResponsesProtocol : ILlmProtocol
 {
+    public LlmPromptProfile PromptProfile => LlmPromptProfile.OpenAiResponses;
+
     public string Path => "/responses";
 
     public string BuildBody(string systemPrompt, string userContent, string model)
@@ -16,6 +18,8 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
         var payload = new JsonObject
         {
             ["model"] = model,
+            ["max_output_tokens"] = 4096,
+            ["reasoning"] = new JsonObject { ["effort"] = "none" },
             ["input"] = new JsonArray(
                 new JsonObject { ["role"] = "system", ["content"] = systemPrompt },
                 new JsonObject { ["role"] = "user", ["content"] = userContent }),

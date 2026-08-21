@@ -167,11 +167,23 @@
     <value>Dark</value>
   </data>
   <!-- LLM phrase-analysis prompt -->
-  <data name="Llm.PhraseSystemPrompt" xml:space="preserve">
-    <value>You analyze Japanese visual-novel text for teaching value. Call the `return_groups` tool exactly once and put the complete answer in its input. Do not emit a plain-text or Markdown answer. The tool input must be exactly one object with exactly two top-level arrays, `groups` and `words`, and no other top-level fields. `groups` contains only meaningful multi-token combinations (non-contiguous grammar, collocations, or context-dependent idioms) that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. `parts` is an array of ordered contiguous token-id arrays; tokens within one part must be consecutive, while separate parts may be separated by other tokens. Every token value in `parts` must be copied exactly from the token table as a string ID in l&lt;line&gt;:t&lt;token&gt; form; never use numeric indexes or surface text. Write group `meaning` and `grammar` in English.</value>
+  <data name="Llm.AnthropicSystemPrompt" xml:space="preserve">
+    <value>You analyze Japanese visual-novel text for teaching value. Call the `return_groups` tool exactly once and put the complete answer in its input. Do not emit plain text, Markdown, or explanations. The tool input must be exactly one object with exactly two top-level arrays, `groups` and `words`, and no other top-level fields. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
   </data>
-  <data name="Llm.PhraseUserInstruction" xml:space="preserve">
-    <value>Call the `return_groups` tool now. Its input must be exactly one object with the required top-level arrays `groups` and `words`; `groups` may be empty. Do not return JSON as text in a normal assistant message, and do not add any other fields or explanatory text.</value>
+  <data name="Llm.AnthropicUserInstruction" xml:space="preserve">
+    <value>Call the `return_groups` tool now. Its input must contain exactly the top-level arrays `groups` and `words`; `groups` may be empty. Do not return JSON as normal assistant text or add explanatory fields.</value>
+  </data>
+  <data name="Llm.OpenAiChatSystemPrompt" xml:space="preserve">
+    <value>You analyze Japanese visual-novel text for teaching value. Return exactly one JSON object matching the response schema as the assistant content. Do not call tools and do not emit Markdown, explanations, or any other text. The object must contain exactly the top-level arrays `groups` and `words`. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
+  </data>
+  <data name="Llm.OpenAiChatUserInstruction" xml:space="preserve">
+    <value>Return exactly one JSON object with the top-level arrays `groups` and `words`, even when `groups` is empty. Do not call a tool and do not add any other fields or explanatory text. Follow the response schema exactly.</value>
+  </data>
+  <data name="Llm.OpenAiResponsesSystemPrompt" xml:space="preserve">
+    <value>You analyze Japanese visual-novel text for teaching value. Return exactly one JSON object matching the `text.format` schema as the output text. Do not call tools and do not emit Markdown, explanations, or any other text. The object must contain exactly the top-level arrays `groups` and `words`. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
+  </data>
+  <data name="Llm.OpenAiResponsesUserInstruction" xml:space="preserve">
+    <value>Return exactly one JSON object with the top-level arrays `groups` and `words`, even when `groups` is empty. Do not call a tool and do not add any other fields or explanatory text. Follow the `text.format` schema exactly.</value>
   </data>
   <data name="Llm.SegmentLabel" xml:space="preserve">
     <value>Segment text:</value>

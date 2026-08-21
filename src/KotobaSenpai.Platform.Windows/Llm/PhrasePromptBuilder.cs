@@ -5,12 +5,12 @@ using KotobaSenpai.Core.Models;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// Builds the semantic prompt shared by the three protocols: system prompt + user content (segment text, token metadata,
-/// and a summary of local consecutive spans). Only text and metadata are sent; screenshots, window coordinates, titles,
-/// and API keys are never. Each <see cref="ILlmProtocol"/> owns the envelope (including the structured-output
-/// declaration). Throws <see cref="RequestTooLargeException"/> when the size limit is exceeded. The prompt copy is
-/// resolved by <see cref="IStringLocalizer"/> against the active culture; a runtime language switch takes effect on the
-/// next request.
+/// Builds the semantic prompt for a protocol-specific profile: system prompt + user content (segment text, token
+/// metadata, and a summary of local consecutive spans). Only text and metadata are sent; screenshots, window
+/// coordinates, titles, and API keys are never. Each <see cref="ILlmProtocol"/> owns the envelope (including the
+/// structured-output declaration). Throws <see cref="RequestTooLargeException"/> when the size limit is exceeded. The
+/// prompt copy is resolved by <see cref="IStringLocalizer"/> against the active culture; a runtime language switch
+/// takes effect on the next request.
 /// </summary>
 public sealed class PhrasePromptBuilder
 {
@@ -25,10 +25,18 @@ public sealed class PhrasePromptBuilder
 
     /// <summary>Returns (systemPrompt, userContent). Throws <see cref="RequestTooLargeException"/> when userContent exceeds the size limit.</summary>
     public (string SystemPrompt, string UserContent) Build(PhraseAnalysisRequest request)
+        => Build(request, LlmPromptProfile.AnthropicMessages);
+
+    /// <summary>Builds prompts using wording compatible with the selected protocol's output mechanism.</summary>
+    public (string SystemPrompt, string UserContent) Build(
+        PhraseAnalysisRequest request,
+        LlmPromptProfile profile)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var userContent = new StringBuilder(_localizer.Get("Llm.PhraseUserInstruction")).Append('\n');
+        var (systemPromptKey, userInstructionKey) = PromptKeys(profile);
+
+        var userContent = new StringBuilder(_localizer.Get(userInstructionKey)).Append('\n');
         userContent.Append(_localizer.Get("Llm.SegmentLabel")).Append(request.SegmentText).Append('\n');
         userContent.Append(_localizer.Get("Llm.TokenTableLabel")).Append('\n');
         foreach (var token in request.Tokens)
@@ -46,8 +54,17 @@ public sealed class PhrasePromptBuilder
         if (Encoding.UTF8.GetByteCount(content) > MaxBodyBytes)
             throw new RequestTooLargeException(
                 $"Phrase prompt content exceeds {MaxBodyBytes} bytes.");
-        return (_localizer.Get("Llm.PhraseSystemPrompt"), content);
+        return (_localizer.Get(systemPromptKey), content);
     }
+
+    private static (string SystemPromptKey, string UserInstructionKey) PromptKeys(LlmPromptProfile profile)
+        => profile switch
+        {
+            LlmPromptProfile.AnthropicMessages => ("Llm.AnthropicSystemPrompt", "Llm.AnthropicUserInstruction"),
+            LlmPromptProfile.OpenAiChatCompletions => ("Llm.OpenAiChatSystemPrompt", "Llm.OpenAiChatUserInstruction"),
+            LlmPromptProfile.OpenAiResponses => ("Llm.OpenAiResponsesSystemPrompt", "Llm.OpenAiResponsesUserInstruction"),
+            _ => throw new ArgumentOutOfRangeException(nameof(profile), profile, "Unknown LLM prompt profile."),
+        };
 }
 
 /// <summary>The request prompt exceeds the provider's text limit.</summary>

@@ -29,8 +29,8 @@ public sealed class PhrasePromptBuilderTests
     {
         var (system, user) = _builder.Build(Request(Segment("あ")));
 
-        Assert.Contains("[Llm.PhraseSystemPrompt]", system);
-        Assert.Contains("[Llm.PhraseUserInstruction]", user);
+        Assert.Contains("[Llm.AnthropicSystemPrompt]", system);
+        Assert.Contains("[Llm.AnthropicUserInstruction]", user);
         Assert.Contains("[Llm.SegmentLabel]", user);
         Assert.Contains("[Llm.TokenTableLabel]", user);
         Assert.Contains("[Llm.LocalSpansLabel]", user);
@@ -41,7 +41,7 @@ public sealed class PhrasePromptBuilderTests
     {
         var builder = new PhrasePromptBuilder(new ContractLocalizer());
 
-        var (system, user) = builder.Build(Request(Segment("あ")));
+        var (system, user) = builder.Build(Request(Segment("あ")), LlmPromptProfile.AnthropicMessages);
 
         Assert.Contains("Call the `return_groups` tool exactly once", system);
         Assert.Contains("Do not emit a plain-text or Markdown answer", system);
@@ -51,6 +51,22 @@ public sealed class PhrasePromptBuilderTests
         Assert.Contains("不得输出纯文本或 Markdown", system);
         Assert.Contains("groups contains only meaningful multi-token combinations", system);
         Assert.Contains("words contains one entry for every local word chunk", user);
+    }
+
+    [Fact]
+    public void Prompt_profile_uses_protocol_specific_tool_or_json_instructions()
+    {
+        var builder = new PhrasePromptBuilder(new ContractLocalizer());
+
+        var anthropic = builder.Build(Request(Segment("あ")), LlmPromptProfile.AnthropicMessages);
+        var chat = builder.Build(Request(Segment("あ")), LlmPromptProfile.OpenAiChatCompletions);
+        var responses = builder.Build(Request(Segment("あ")), LlmPromptProfile.OpenAiResponses);
+
+        Assert.Contains("Call the `return_groups` tool exactly once", anthropic.SystemPrompt);
+        Assert.DoesNotContain("Call the `return_groups` tool", chat.SystemPrompt);
+        Assert.DoesNotContain("Call the `return_groups` tool", responses.SystemPrompt);
+        Assert.Contains("JSON object", chat.UserContent);
+        Assert.Contains("JSON object", responses.UserContent);
     }
 
     /// <summary>Localization fake: wraps keys in square brackets so tests can assert the prompt text is actually resolved through the localizer.</summary>
@@ -73,8 +89,12 @@ public sealed class PhrasePromptBuilderTests
         public string Get(string key, params object[] args)
             => key switch
             {
-                "Llm.PhraseSystemPrompt" => "Call the `return_groups` tool exactly once. Do not emit a plain-text or Markdown answer. groups contains only meaningful multi-token combinations. 必须调用 `return_groups` 工具恰好一次。不得输出纯文本或 Markdown。",
-                "Llm.PhraseUserInstruction" => "Return exactly one JSON object with two top-level arrays: groups and words. 返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。",
+                "Llm.AnthropicSystemPrompt" => "Call the `return_groups` tool exactly once. Do not emit a plain-text or Markdown answer. groups contains only meaningful multi-token combinations. 必须调用 `return_groups` 工具恰好一次。不得输出纯文本或 Markdown。",
+                "Llm.AnthropicUserInstruction" => "Call the `return_groups` tool now. Return exactly one JSON object with two top-level arrays: groups and words. 返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。",
+                "Llm.OpenAiChatSystemPrompt" => "Return exactly one JSON object as assistant content. Do not call tools.",
+                "Llm.OpenAiChatUserInstruction" => "Return exactly one JSON object.",
+                "Llm.OpenAiResponsesSystemPrompt" => "Return exactly one JSON object as output text. Do not call tools.",
+                "Llm.OpenAiResponsesUserInstruction" => "Return exactly one JSON object.",
                 "Llm.SegmentLabel" => "Segment text:",
                 "Llm.TokenTableLabel" => "Token table:",
                 "Llm.LocalSpansLabel" => "Local spans:",
@@ -213,6 +233,21 @@ public sealed class LlmProtocolTests
         Assert.Contains("response_format", body);
         Assert.Contains("json_schema", body);
         Assert.Contains("strict", body);
+
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        Assert.Equal("low", root.GetProperty("reasoning_effort").GetString());
+        Assert.Equal("disabled", root.GetProperty("thinking").GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public void OpenAiChatCompletions_disables_reasoning_for_supported_providers()
+    {
+        var body = new OpenAiChatCompletionsProtocol().BuildBody("sys", "user", "m");
+        using var document = JsonDocument.Parse(body);
+
+        Assert.Equal("low", document.RootElement.GetProperty("reasoning_effort").GetString());
+        Assert.Equal("disabled", document.RootElement.GetProperty("thinking").GetProperty("type").GetString());
     }
 
     [Fact]
@@ -274,6 +309,10 @@ public sealed class LlmProtocolTests
         var body = protocol.BuildBody("sys", "user", "m");
         Assert.Contains("\"text\"", body);
         Assert.Contains("\"format\"", body);
+
+        using var request = JsonDocument.Parse(body);
+        Assert.Equal(4096, request.RootElement.GetProperty("max_output_tokens").GetInt32());
+        Assert.Equal("none", request.RootElement.GetProperty("reasoning").GetProperty("effort").GetString());
 
         var envelope = "{\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":"
             + JsonSerializer.Serialize(Group) + "}]}]}";

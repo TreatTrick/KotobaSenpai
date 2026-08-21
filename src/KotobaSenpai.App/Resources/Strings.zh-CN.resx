@@ -167,11 +167,23 @@
     <value>深色</value>
   </data>
   <!-- LLM 短语分析 prompt -->
-  <data name="Llm.PhraseSystemPrompt" xml:space="preserve">
-    <value>你是日语视觉小说文本的教学分析器。必须调用 `return_groups` 工具恰好一次，并把完整答案放入它的 input。不得输出纯文本、Markdown、解释或其他文本。工具 input 必须严格是一个对象，顶层只能有 `groups` 和 `words` 两个数组，不得有其他顶层字段。`groups` 只包含真正有教学价值的多词组合（非连续语法、搭配或依赖上下文的惯用表达），不要重复本地已经识别出的普通词或连续词块。每个 group 对象只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 是一个或多个部分组成的数组；每个部分内部必须是按顺序排列的连续 token id，部分之间可以被其他 token 间隔。`parts` 中每个值都必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式的字符串 token id，禁止使用数字索引或 surface 文本。`meaning` 与 `grammar` 字段请使用简体中文。</value>
+  <data name="Llm.AnthropicSystemPrompt" xml:space="preserve">
+    <value>你是日语视觉小说文本的教学分析器。必须恰好调用一次 `return_groups` 工具，并把完整答案放入它的 input。不得输出普通文本、Markdown 或解释。工具 input 必须严格是一个对象，顶层只能有 `groups` 和 `words` 两个数组，不得有其他顶层字段。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
   </data>
-  <data name="Llm.PhraseUserInstruction" xml:space="preserve">
-    <value>现在调用 `return_groups` 工具。工具 input 必须严格是一个对象，必须包含顶层 `groups` 和 `words` 两个数组；`groups` 可以为空。不要在普通 assistant 消息中把 JSON 作为文本返回，不要添加其他字段或解释性文字。</value>
+  <data name="Llm.AnthropicUserInstruction" xml:space="preserve">
+    <value>现在调用一次 `return_groups` 工具。其 input 必须严格包含顶层 `groups` 和 `words` 两个数组；`groups` 可以为空。不要在普通 assistant 文本中返回 JSON，不要添加解释性字段。</value>
+  </data>
+  <data name="Llm.OpenAiChatSystemPrompt" xml:space="preserve">
+    <value>你是日语视觉小说文本的教学分析器。必须直接返回一个符合 response schema 的 JSON 对象，作为 assistant 内容。不得调用工具，不得输出 Markdown、解释或其他文本。对象顶层只能有 `groups` 和 `words` 两个数组。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
+  </data>
+  <data name="Llm.OpenAiChatUserInstruction" xml:space="preserve">
+    <value>直接返回一个 JSON 对象，必须包含顶层 `groups` 和 `words` 两个数组，即使 `groups` 为空。不要调用工具，不要添加其他字段或解释性文字。严格遵循 response schema。</value>
+  </data>
+  <data name="Llm.OpenAiResponsesSystemPrompt" xml:space="preserve">
+    <value>你是日语视觉小说文本的教学分析器。必须直接返回一个符合 `text.format` schema 的 JSON 对象，作为 output text。不得调用工具，不得输出 Markdown、解释或其他文本。对象顶层只能有 `groups` 和 `words` 两个数组。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
+  </data>
+  <data name="Llm.OpenAiResponsesUserInstruction" xml:space="preserve">
+    <value>直接返回一个 JSON 对象，必须包含顶层 `groups` 和 `words` 两个数组，即使 `groups` 为空。不要调用工具，不要添加其他字段或解释性文字。严格遵循 `text.format` schema。</value>
   </data>
   <data name="Llm.SegmentLabel" xml:space="preserve">
     <value>句段文本：</value>

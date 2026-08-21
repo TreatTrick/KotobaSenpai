@@ -60,7 +60,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         string systemPrompt, userContent;
         try
         {
-            (systemPrompt, userContent) = _promptBuilder.Build(request);
+            (systemPrompt, userContent) = _promptBuilder.Build(request, _protocol.PromptProfile);
         }
         catch (RequestTooLargeException ex)
         {

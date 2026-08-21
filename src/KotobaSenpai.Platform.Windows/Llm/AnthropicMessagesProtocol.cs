@@ -10,6 +10,8 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// </summary>
 public sealed class AnthropicMessagesProtocol : ILlmProtocol
 {
+    public LlmPromptProfile PromptProfile => LlmPromptProfile.AnthropicMessages;
+
     public string Path => "/v1/messages";
 
     // ponytail: fixed cap — group JSON output is tiny, no need to estimate per request; very long segments are backstopped by the PromptBuilder's size limit.

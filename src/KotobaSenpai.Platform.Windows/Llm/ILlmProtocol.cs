@@ -3,14 +3,16 @@ using System.Text.Json;
 namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
-/// Port for the provider's wire protocol: covers only the three real differences — the POST target path, the request-body
-/// envelope (including each provider's structured-output declaration), and the <see cref="JsonElement"/> of the group
-/// array extracted from the response envelope. HTTP, Bearer auth, error mapping, cancellation/timeout all stay in the
-/// transport layer (<see cref="LlmPhraseAnalyzer"/>); the semantic content is built by
-/// <see cref="PhrasePromptBuilder"/>.
+/// Port for the provider's wire protocol: covers the POST target path, the request-body envelope (including each
+/// provider's structured-output declaration), the prompt profile, and the <see cref="JsonElement"/> of the group array
+/// extracted from the response envelope. HTTP, Bearer auth, error mapping, cancellation/timeout all stay in the
+/// transport layer (<see cref="LlmPhraseAnalyzer"/>); semantic content is built by <see cref="PhrasePromptBuilder"/>.
 /// </summary>
 public interface ILlmProtocol
 {
+    /// <summary>Identifies the prompt wording required by the wire protocol.</summary>
+    LlmPromptProfile PromptProfile { get; }
+
     /// <summary>POST target relative path (appended to the configured endpoint).</summary>
     /// <example>OpenAI uses <c>/chat/completions</c>, Anthropic uses <c>/v1/messages</c>.</example>
     string Path { get; }
@@ -42,4 +44,12 @@ public interface ILlmProtocol
 
     /// <summary>Extracts the <c>words</c> array from the same content root as <see cref="ExtractGroupsJson"/>. Returns an empty array when the provider omits it (tolerated for backward compatibility).</summary>
     JsonElement ExtractWordsJson(string envelopeJson);
+}
+
+/// <summary>Prompt variants whose tool/structured-output instructions match each protocol.</summary>
+public enum LlmPromptProfile
+{
+    AnthropicMessages,
+    OpenAiChatCompletions,
+    OpenAiResponses,
 }

@@ -6,6 +6,8 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// <summary>OpenAI Chat Completions protocol: <c>/chat/completions</c>, with <c>response_format</c> strict JSON schema.</summary>
 public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
 {
+    public LlmPromptProfile PromptProfile => LlmPromptProfile.OpenAiChatCompletions;
+
     public string Path => "/chat/completions";
 
     public string BuildBody(string systemPrompt, string userContent, string model)
@@ -13,6 +15,9 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
         var payload = new JsonObject
         {
             ["model"] = model,
+            ["reasoning_effort"] = "low",
+            // DeepSeek's OpenAI-compatible endpoint uses this extension to explicitly disable thinking.
+            ["thinking"] = new JsonObject { ["type"] = "disabled" },
             ["temperature"] = 0.0,
             ["messages"] = new JsonArray(
                 new JsonObject { ["role"] = "system", ["content"] = systemPrompt },
