@@ -191,6 +191,18 @@ public sealed class PhraseSessionTests
     }
 
     [Fact]
+    public void Session_lines_include_only_requested_successful_segments()
+    {
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        var first = new GroupedWord(TokenOf("彼", "かれ"), new ScreenRect(0, 0, 10, 20)).WithSegmentId("s0-0");
+        var second = new GroupedWord(TokenOf("は", "は"), new ScreenRect(10, 0, 10, 20)).WithSegmentId("s1-1");
+        var session = WordOverlaySession.Start(target, [first, second], underlineSegmentIds: ["s0-0"]);
+
+        Assert.Single(session.Lines);
+        Assert.Equal(0, session.Lines[0].X);
+    }
+
+    [Fact]
     public void Group_member_meanings_filters_words_without_meaning()
     {
         var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
@@ -272,6 +284,66 @@ public sealed class PhraseFallbackTests
         Assert.Single(overlay.Session!.Words);
         Assert.Empty(overlay.Session.PhraseGroups);
         Assert.NotNull(overlay.Session.PhraseWarning);
+        Assert.Empty(overlay.Session.Lines);
+    }
+
+    [Fact]
+    public async Task App_service_publishes_furigana_before_provider_and_lines_after_success()
+    {
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new BlockingAnalyzer(release);
+        var (service, overlay) = BuildService(analyzer, new FakeSettings("true"));
+
+        var recognition = service.RecognizeAndShowAsync(Target());
+        await overlay.FirstShown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Single(overlay.Sessions);
+        Assert.Empty(overlay.Sessions[0].Lines);
+        release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+
+        await recognition;
+
+        Assert.Equal(2, overlay.Sessions.Count);
+        Assert.Single(overlay.Sessions[1].Lines);
+    }
+
+    [Fact]
+    public async Task App_service_does_not_publish_after_hide_supersedes_pending_analysis()
+    {
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (service, overlay) = BuildService(new BlockingAnalyzer(release), new FakeSettings("true"));
+
+        var recognition = service.RecognizeAndShowAsync(Target());
+        await overlay.FirstShown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        service.Hide();
+        release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+
+        await recognition;
+
+        Assert.Single(overlay.Sessions);
+        Assert.Null(overlay.Session);
+    }
+
+    [Fact]
+    public async Task Newer_recognition_replaces_older_pending_analysis()
+    {
+        var firstRelease = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondRelease = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new SequencedBlockingAnalyzer(firstRelease, secondRelease);
+        var (service, overlay) = BuildService(analyzer, new FakeSettings("true"));
+
+        var first = service.RecognizeAndShowAsync(Target());
+        await overlay.FirstShown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var second = service.RecognizeAndShowAsync(Target());
+        await overlay.SecondShown.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        firstRelease.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        await first;
+        Assert.Equal(2, overlay.Sessions.Count);
+
+        secondRelease.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        await second;
+        Assert.Equal(3, overlay.Sessions.Count);
     }
 
     [Fact]
@@ -332,6 +404,19 @@ public sealed class PhraseOrchestratorConcurrencyTests
         Assert.Equal(3, run.Groups.Count);
         Assert.NotNull(run.Warning);
         Assert.Contains("requires provider configuration", run.Warning);
+        Assert.Equal(["s1-1", "s2-2", "s3-3"], run.SuccessfulSegmentIds.OrderBy(id => id).ToArray());
+    }
+
+    [Fact]
+    public async Task Tracks_successful_segment_when_provider_returns_no_groups()
+    {
+        var analyzer = new TrackingAnalyzer(_ => new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        var orchestrator = new PhraseAnalysisOrchestrator(
+            analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
+
+        var run = await orchestrator.AnalyzeAsync([Line("ご。")]);
+
+        Assert.Equal(["s0-0"], run.SuccessfulSegmentIds);
     }
 
     [Fact]
@@ -420,6 +505,28 @@ public sealed class PhraseOrchestratorConcurrencyTests
             => Task.FromResult(new PhraseAnalysisResult(_outcome, _groups));
     }
 
+    private sealed class BlockingAnalyzer : ILlmPhraseAnalyzer
+    {
+        private readonly TaskCompletionSource<PhraseAnalysisResult> _release;
+
+        public BlockingAnalyzer(TaskCompletionSource<PhraseAnalysisResult> release) => _release = release;
+
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken ct = default)
+            => _release.Task;
+    }
+
+    private sealed class SequencedBlockingAnalyzer : ILlmPhraseAnalyzer
+    {
+        private readonly TaskCompletionSource<PhraseAnalysisResult>[] _releases;
+        private int _calls;
+
+        public SequencedBlockingAnalyzer(params TaskCompletionSource<PhraseAnalysisResult>[] releases)
+            => _releases = releases;
+
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken ct = default)
+            => _releases[Interlocked.Increment(ref _calls) - 1].Task;
+    }
+
     private sealed class FakeRecognizer : IWindowWordRecognizer
     {
         public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
@@ -437,7 +544,17 @@ public sealed class PhraseOrchestratorConcurrencyTests
     private sealed class FakeOverlay : IOverlayRenderer
     {
         public WordOverlaySession? Session { get; private set; }
-        public void Show(WordOverlaySession session) => Session = session;
+        public List<WordOverlaySession> Sessions { get; } = new();
+        public TaskCompletionSource<bool> FirstShown { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> SecondShown { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Show(WordOverlaySession session)
+        {
+            Session = session;
+            Sessions.Add(session);
+            FirstShown.TrySetResult(true);
+            if (Sessions.Count == 2)
+                SecondShown.TrySetResult(true);
+        }
         public void Hide() => Session = null;
     }
 }

@@ -53,6 +53,7 @@ public sealed class PhraseAnalysisOrchestrator
         var groups = new List<PhraseGroup>();
         var wordMeanings = new List<WordMeaningView>();
         var warnings = new List<string>();
+        var successfulSegmentIds = new HashSet<string>(StringComparer.Ordinal);
         PhraseAnalysisOutcome? firstFailure = null;
 
         for (int i = 0; i < results.Length; i++)
@@ -66,6 +67,8 @@ public sealed class PhraseAnalysisOrchestrator
                 firstFailure ??= result.Outcome;
                 continue;
             }
+
+            successfulSegmentIds.Add(requests[i].SegmentId);
 
             var tokenById = requests[i].Tokens.ToDictionary(reference => reference.Id);
             var validation = PhraseGroupValidator.ValidateAndBuild(result.Groups, tokenById);
@@ -88,6 +91,7 @@ public sealed class PhraseAnalysisOrchestrator
             warnings.Count > 0 ? string.Join("; ", warnings) : null)
         {
             Words = wordMeanings.ToArray(),
+            SuccessfulSegmentIds = successfulSegmentIds,
         };
     }
 

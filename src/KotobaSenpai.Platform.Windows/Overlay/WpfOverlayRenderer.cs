@@ -118,17 +118,20 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             // refresh, and the click-through window never receives mouse events, so hover logic stays untouched.
             for (int wordIndex = 0; wordIndex < session.Words.Count; wordIndex++)
             {
-                foreach (var rect in session.Words[wordIndex].Rects)
+                var word = session.Words[wordIndex];
+                if (session.ShouldUnderline(word))
                 {
-                    var element = MakeBox(rect.Width / scale, 2.0 / scale, DefaultLineBrush);
-                    Canvas.SetLeft(element, (rect.X - session.Target.Bounds.X) / scale);
-                    Canvas.SetTop(element, (Math.Max(rect.Y, rect.Bottom - 2) - session.Target.Bounds.Y) / scale);
-                    _canvas.Children.Add(element);
-                    _lineElements.Add(element);
-                    _lineOwner.Add(wordIndex);
+                    foreach (var rect in word.Rects)
+                    {
+                        var element = MakeBox(rect.Width / scale, 2.0 / scale, DefaultLineBrush);
+                        Canvas.SetLeft(element, (rect.X - session.Target.Bounds.X) / scale);
+                        Canvas.SetTop(element, (Math.Max(rect.Y, rect.Bottom - 2) - session.Target.Bounds.Y) / scale);
+                        _canvas.Children.Add(element);
+                        _lineElements.Add(element);
+                        _lineOwner.Add(wordIndex);
+                    }
                 }
 
-                var word = session.Words[wordIndex];
                 if (FuriganaSettings.ContainsKanji(word.Surface) && !string.IsNullOrEmpty(word.Reading))
                     AddFurigana(word, scale, fontScale);
             }

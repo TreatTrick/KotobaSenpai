@@ -38,7 +38,7 @@ public sealed class WordGroupingService : IOcrWordGroupingService
                 var rects = LineBlockTokenizer.RectsForTokens(splitTokens, span.Tokens);
                 if (rects.Count == 0)
                     continue;
-                result.Add(new GroupedWord(span, rects));
+                result.Add(new GroupedWord(span, rects).WithSegmentId(segment.SegmentId));
             }
         }
         return result;

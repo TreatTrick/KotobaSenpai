@@ -9,6 +9,9 @@ public sealed record PhraseAnalysisRun(PhraseAnalysisOutcome Outcome, IReadOnlyL
 {
     public bool Succeeded => Outcome == PhraseAnalysisOutcome.Success;
 
+    /// <summary>Sentence segments whose provider response completed successfully, including empty valid responses.</summary>
+    public IReadOnlySet<string> SuccessfulSegmentIds { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
     /// <summary>Validated per-word meanings (referencing local merged spans by surface+reading); empty when none or analysis failed.</summary>
     public IReadOnlyList<WordMeaningView> Words { get; init; } = Array.Empty<WordMeaningView>();
 }

@@ -43,6 +43,9 @@ public sealed record GroupedWord
     /// <summary>One rect per line the word spans; a single-line word has exactly one.</summary>
     public IReadOnlyList<ScreenRect> Rects { get; }
 
+    /// <summary>The sentence segment that produced this word, when available.</summary>
+    public string? SegmentId { get; }
+
     /// <summary>The union of <see cref="Rects"/>, for consumers that need a single box (hover hit-test, covered-word detection).</summary>
     public ScreenRect Bounds { get; }
 
@@ -59,7 +62,11 @@ public sealed record GroupedWord
 
     /// <summary>Replaces only the rects (e.g. frame -&gt; screen), reusing the already-resolved token/span/entries references.</summary>
     public GroupedWord WithRects(IReadOnlyList<ScreenRect> rects)
-        => new(Token, rects, SourceTokens, LookupKey, Entries, HasResolvedLookup);
+        => new(Token, rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, SegmentId);
+
+    /// <summary>Associates the word with its sentence segment for staged overlay publication.</summary>
+    public GroupedWord WithSegmentId(string? segmentId)
+        => new(Token, Rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, segmentId);
 
     private GroupedWord(
         Token token,
@@ -67,13 +74,15 @@ public sealed record GroupedWord
         IReadOnlyList<Token> sourceTokens,
         string lookupKey,
         IReadOnlyList<DictionaryEntry> entries,
-        bool hasResolvedLookup)
+        bool hasResolvedLookup,
+        string? segmentId)
         : this(token, rects)
     {
         SourceTokens = sourceTokens;
         LookupKey = lookupKey;
         Entries = entries;
         HasResolvedLookup = hasResolvedLookup;
+        SegmentId = segmentId;
     }
 
     /// <summary>The added pre-resolution metadata does not change the token+union-bounds value-equality semantics.</summary>

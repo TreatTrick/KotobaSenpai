@@ -16,6 +16,7 @@ public sealed class WordOverlayApplicationService
     private readonly IDiagnosticReporter? _diagnostics;
     private readonly PhraseAnalysisOrchestrator? _phraseOrchestrator;
     private readonly ISettingsService? _settings;
+    private int _recognitionGeneration;
 
     public WordOverlayApplicationService(
         IWindowWordRecognizer recognizer,
@@ -37,6 +38,7 @@ public sealed class WordOverlayApplicationService
         WindowTarget target,
         CancellationToken cancellationToken = default)
     {
+        var generation = Interlocked.Increment(ref _recognitionGeneration);
         var regionPixels = ReadRegionPixels(target);
         var result = await _recognizer.RecognizeAsync(target, cancellationToken, regionPixels).ConfigureAwait(false);
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
@@ -46,27 +48,55 @@ public sealed class WordOverlayApplicationService
                 .ToArray()))
             .ToArray();
 
-        // After local recognition, run phrase analysis per the settings toggle; failure only produces a warning, and local words/spans remain usable.
-        PhraseAnalysisRun? phraseRun = null;
-        if (_phraseOrchestrator is not null && IsPhraseEnabled())
+        _diagnostics?.RecordTokens(target, screenWords);
+
+        // Publish local furigana before the optional provider call. The empty set intentionally suppresses underlines
+        // only while phrase analysis is enabled; the disabled path below keeps the legacy all-local overlay.
+        var phraseEnabled = _phraseOrchestrator is not null && IsPhraseEnabled();
+        if (phraseEnabled)
         {
-            phraseRun = await _phraseOrchestrator
+            if (!IsCurrent(generation))
+                return result;
+            _overlay.Show(WordOverlaySession.Start(
+                target,
+                screenWords,
+                underlineSegmentIds: Array.Empty<string>()));
+
+            var phraseRun = await _phraseOrchestrator!
                 .AnalyzeAsync(result.Lines, cancellationToken)
                 .ConfigureAwait(false);
+
+            if (!IsCurrent(generation))
+                return result;
+
+            var phraseGroups = phraseRun.Groups
+                .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, target.Bounds))
+                .ToArray();
+            _diagnostics?.RecordPhraseAnalysis(phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
+            _overlay.Show(WordOverlaySession.Start(
+                target,
+                screenWords,
+                phraseGroups,
+                phraseRun.Warning,
+                phraseRun.Words,
+                phraseRun.SuccessfulSegmentIds));
+            return result;
         }
 
-        var phraseGroups = phraseRun?.Groups
-            .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, target.Bounds))
-            .ToArray() ?? [];
-
-        if (phraseRun is not null)
-            _diagnostics?.RecordPhraseAnalysis(phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
-        _diagnostics?.RecordTokens(target, screenWords);
-        _overlay.Show(WordOverlaySession.Start(target, screenWords, phraseGroups, phraseRun?.Warning, phraseRun?.Words));
+        if (!IsCurrent(generation))
+            return result;
+        _overlay.Show(WordOverlaySession.Start(target, screenWords));
         return result;
     }
 
-    public void Hide() => _overlay.Hide();
+    public void Hide()
+    {
+        Interlocked.Increment(ref _recognitionGeneration);
+        _overlay.Hide();
+    }
+
+    private bool IsCurrent(int generation)
+        => Volatile.Read(ref _recognitionGeneration) == generation;
 
     /// <summary>Reads the saved recognition region and converts it to a window/frame pixel rect; null when unset or invalid (=> full window).</summary>
     private ScreenRect? ReadRegionPixels(WindowTarget target)

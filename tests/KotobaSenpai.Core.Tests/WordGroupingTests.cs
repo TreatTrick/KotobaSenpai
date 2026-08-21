@@ -81,6 +81,19 @@ public sealed class WordGroupingTests
         Assert.True(word.HasResolvedLookup);
     }
 
+    [Fact]
+    public void Carries_sentence_segment_id_on_grouped_words()
+    {
+        var service = new WordGroupingService(
+            new StubTokenizer(new TokenSpec("彼", 0)),
+            new SentenceSegmenter(),
+            new StubSpanResolver(new LookupSpan([Token("彼", 0)], "彼", [])));
+
+        var grouped = service.Group([Line("彼")]);
+
+        Assert.Equal("s0-0", Assert.Single(grouped).SegmentId);
+    }
+
     private static Token Token(string surface, int start)
         => new(surface, surface, surface, surface, surface, surface,
             new PartsOfSpeech("", "", "", ""), "", "", "", start);

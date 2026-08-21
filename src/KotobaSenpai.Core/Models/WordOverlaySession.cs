@@ -11,6 +11,7 @@ public sealed class WordOverlaySession
     private readonly List<GroupedWord> _words;
     private readonly List<PhraseGroupView> _phraseGroups;
     private readonly IReadOnlyDictionary<(string Surface, string Reading), WordMeaningView> _meaningByWord;
+    private readonly IReadOnlySet<string>? _underlineSegmentIds;
 
     private WordOverlaySession(
         Guid id,
@@ -18,13 +19,15 @@ public sealed class WordOverlaySession
         IReadOnlyList<GroupedWord> words,
         IReadOnlyList<PhraseGroupView> phraseGroups,
         string? phraseWarning,
-        IReadOnlyList<WordMeaningView> wordMeanings)
+        IReadOnlyList<WordMeaningView> wordMeanings,
+        IReadOnlySet<string>? underlineSegmentIds)
     {
         Id = id;
         Target = target;
         _words = words.ToList();
         _phraseGroups = phraseGroups.ToList();
         PhraseWarning = phraseWarning;
+        _underlineSegmentIds = underlineSegmentIds;
         // ponytail: keyed by merged surface+reading — both come from the same span resolver, so this matches reliably. A word can appear multiple times (same surface+reading); keep the first rather than throwing on a duplicate.
         var meaningByWord = new Dictionary<(string Surface, string Reading), WordMeaningView>();
         foreach (var meaning in wordMeanings)
@@ -43,6 +46,9 @@ public sealed class WordOverlaySession
 
     /// <summary>A retryable warning from phrase analysis; null when there was no failure.</summary>
     public string? PhraseWarning { get; }
+
+    /// <summary>Successful sentence segments eligible for underlines; null preserves legacy all-word behavior.</summary>
+    public IReadOnlySet<string>? UnderlineSegmentIds => _underlineSegmentIds;
 
     /// <summary>All validated word meanings, for diagnostics and group-detail rendering.</summary>
     public IReadOnlyList<WordMeaningView> WordMeanings => _meaningByWord.Values.ToArray();
@@ -69,6 +75,7 @@ public sealed class WordOverlaySession
 
     /// <summary>One underline at the bottom inside of each word rect (a cross-line word has one per line); replaced wholesale on refresh, leaving no residue.</summary>
     public IReadOnlyList<OverlayLine> Lines => _words
+        .Where(ShouldUnderline)
         .SelectMany(word => word.Rects.Select(rect => new OverlayLine(
             rect.X,
             Math.Max(rect.Y, rect.Bottom - 2),
@@ -81,7 +88,8 @@ public sealed class WordOverlaySession
         IEnumerable<GroupedWord> words,
         IEnumerable<PhraseGroupView>? phraseGroups = null,
         string? phraseWarning = null,
-        IEnumerable<WordMeaningView>? wordMeanings = null)
+        IEnumerable<WordMeaningView>? wordMeanings = null,
+        IEnumerable<string>? underlineSegmentIds = null)
     {
         ArgumentNullException.ThrowIfNull(words);
 
@@ -96,6 +104,17 @@ public sealed class WordOverlaySession
             validWords,
             (phraseGroups ?? Array.Empty<PhraseGroupView>()).ToArray(),
             phraseWarning,
-            (wordMeanings ?? Array.Empty<WordMeaningView>()).ToArray());
+            (wordMeanings ?? Array.Empty<WordMeaningView>()).ToArray(),
+            underlineSegmentIds is null
+                ? null
+                : new HashSet<string>(underlineSegmentIds, StringComparer.Ordinal));
+    }
+
+    /// <summary>Returns whether a word's underline should be included in this session.</summary>
+    public bool ShouldUnderline(GroupedWord word)
+    {
+        ArgumentNullException.ThrowIfNull(word);
+        return _underlineSegmentIds is null
+            || (word.SegmentId is not null && _underlineSegmentIds.Contains(word.SegmentId));
     }
 }
