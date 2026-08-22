@@ -60,6 +60,10 @@ public sealed record GroupedWord
     /// <summary>Distinguishes "pre-resolved but not matched" from legacy callers that haven't performed pre-resolution.</summary>
     public bool HasResolvedLookup { get; }
 
+    /// <summary>Pitch data for the original source tokens, in merged-word surface order.</summary>
+    public IReadOnlyList<PitchAccentSummary> PitchAccents
+        => BuildPitchAccents(SourceTokens);
+
     /// <summary>Replaces only the rects (e.g. frame -&gt; screen), reusing the already-resolved token/span/entries references.</summary>
     public GroupedWord WithRects(IReadOnlyList<ScreenRect> rects)
         => new(Token, rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, SegmentId);
@@ -91,6 +95,18 @@ public sealed record GroupedWord
             || (other is not null && Token == other.Token && Bounds == other.Bounds);
 
     public override int GetHashCode() => HashCode.Combine(Token, Bounds);
+
+    private static IReadOnlyList<PitchAccentSummary> BuildPitchAccents(IReadOnlyList<Token> tokens)
+    {
+        var offset = 0;
+        var result = new List<PitchAccentSummary>(tokens.Count);
+        foreach (var token in tokens)
+        {
+            result.Add(PitchAccentSummary.FromToken(token, offset));
+            offset += token.Surface.Length;
+        }
+        return result;
+    }
 
     private static ScreenRect Union(IReadOnlyList<ScreenRect> rects)
     {

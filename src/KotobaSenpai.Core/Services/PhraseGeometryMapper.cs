@@ -16,7 +16,19 @@ public static class PhraseGeometryMapper
             .GroupBy(item => item.LineId)
             .Select(group => Union(group.Select(item => item.Box)))
             .ToArray();
-        return new PhrasePartView(rects);
+        var offset = 0;
+        var pitchAccents = new List<PitchAccentSummary>(part.Tokens.Count);
+        foreach (var reference in part.Tokens)
+        {
+            pitchAccents.Add(PitchAccentSummary.FromToken(reference.Token, offset));
+            offset += reference.Token.Surface.Length;
+        }
+        return new PhrasePartView(rects)
+        {
+            Surface = part.Surface,
+            Reading = part.Reading,
+            PitchAccents = pitchAccents,
+        };
     }
 
     public static PhraseGroupView MapGroup(PhraseGroup group)

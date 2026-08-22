@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using KotobaSenpai.App.Diagnostics;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Models;
@@ -18,7 +19,7 @@ public sealed class FileDiagnosticReporterTests
 
         reporter.RecordTokens(recognitionId, target, []);
         reporter.RecordPhraseAnalysis(recognitionId, PhraseAnalysisOutcome.Success, [], null);
-        reporter.RecordLlmExchange(recognitionId, "segment:with-invalid", "{}", "{}");
+        reporter.RecordLlmExchange(recognitionId, "segment:with-invalid", "{}", "{}", "[]", "[]");
 
         var names = Directory.GetFiles(dir).Select(Path.GetFileName).OfType<string>().ToArray();
         Assert.Contains($"tokens-{recognitionId:N}.txt", names);
@@ -32,6 +33,30 @@ public sealed class FileDiagnosticReporterTests
     }
 
     [Fact]
+    public void Writes_extracted_groups_and_words_with_the_same_exchange_stamp()
+    {
+        var dir = NewTempDir();
+        var recognitionId = Guid.Parse("0123456789abcdef0123456789abcdef");
+        var reporter = new FileDiagnosticReporter(new FakeSettings(true), dir);
+        var groupsJson = "[{\"modelGroupId\":\"g1\",\"type\":\"grammar\"}]";
+        var wordsJson = "[{\"headword\":\"学校\",\"pos\":\"名詞\"}]";
+
+        reporter.RecordLlmExchange(recognitionId, "s0", "{}", "{}", groupsJson, wordsJson);
+
+        var names = Directory.GetFiles(dir).Select(Path.GetFileName).OfType<string>().ToArray();
+        var response = Assert.Single(names, name => name.StartsWith("llm-resp-", StringComparison.Ordinal));
+        var groups = Assert.Single(names, name => name.StartsWith("llm-groups-", StringComparison.Ordinal));
+        var words = Assert.Single(names, name => name.StartsWith("llm-words-", StringComparison.Ordinal));
+        Assert.Equal(response.Replace("llm-resp-", "llm-groups-", StringComparison.Ordinal), groups);
+        Assert.Equal(response.Replace("llm-resp-", "llm-words-", StringComparison.Ordinal), words);
+
+        using var groupsDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, groups)));
+        using var wordsDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, words)));
+        Assert.Equal("g1", groupsDocument.RootElement[0].GetProperty("modelGroupId").GetString());
+        Assert.Equal("学校", wordsDocument.RootElement[0].GetProperty("headword").GetString());
+    }
+
+    [Fact]
     public void Does_not_write_files_when_diagnostics_are_disabled()
     {
         var dir = NewTempDir();
@@ -41,7 +66,7 @@ public sealed class FileDiagnosticReporterTests
 
         reporter.RecordTokens(id, target, []);
         reporter.RecordPhraseAnalysis(id, PhraseAnalysisOutcome.Success, [], null);
-        reporter.RecordLlmExchange(id, "s0", "{}", "{}");
+        reporter.RecordLlmExchange(id, "s0", "{}", "{}", "[]", "[]");
 
         Assert.False(Directory.Exists(dir));
     }

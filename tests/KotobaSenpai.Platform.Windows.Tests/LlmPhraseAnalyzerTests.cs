@@ -25,6 +25,23 @@ public sealed class PhrasePromptBuilderTests
     }
 
     [Fact]
+    public void Body_does_not_add_local_pitch_metadata_to_provider_content()
+    {
+        var pitch = new PitchAccentSummary("東京", "とうきょう", 0, 2, "[2] LH↓LL");
+        var request = new PhraseAnalysisRequest(
+            Guid.Parse("0123456789abcdef0123456789abcdef"),
+            "s0",
+            "東京",
+            [Ref()],
+            [new LocalSpanSummary("東京", "とうきょう", "東京", [SentenceTokenId.Parse("l0:t0")], [pitch])]);
+
+        var (_, user) = _builder.Build(request);
+
+        Assert.DoesNotContain("pitch", user, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("[2] LH", user, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Prompt_text_is_resolved_through_the_localizer()
     {
         var (system, user) = _builder.Build(Request(Segment("あ")));
@@ -376,6 +393,8 @@ public sealed class LlmPhraseAnalyzerTests
         Assert.DoesNotContain(Request().RecognitionId.ToString("N"), reporter.RequestJson);
         Assert.DoesNotContain("secret-api-key", reporter.RequestJson);
         Assert.Contains("groups", reporter.ResponseJson);        // raw provider envelope saved verbatim
+        Assert.Contains("modelGroupId", reporter.GroupsJson);
+        Assert.Equal("[]", reporter.WordsJson);
     }
 
     [Fact]
@@ -478,14 +497,18 @@ public sealed class LlmPhraseAnalyzerTests
         public string? SegmentId { get; private set; }
         public string? RequestJson { get; private set; }
         public string? ResponseJson { get; private set; }
+        public string GroupsJson { get; private set; } = string.Empty;
+        public string WordsJson { get; private set; } = string.Empty;
         public void RecordTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords) { }
         public void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning) { }
-        public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson)
+        public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson, string groupsJson, string wordsJson)
         {
             RecognitionId = recognitionId;
             SegmentId = segmentId;
             RequestJson = requestJson;
             ResponseJson = responseJson;
+            GroupsJson = groupsJson;
+            WordsJson = wordsJson;
         }
     }
 

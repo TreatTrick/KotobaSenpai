@@ -11,7 +11,7 @@ namespace KotobaSenpai.App.Diagnostics;
 
 /// <summary>
 /// Diagnostics: when the setting <c>DiagEnabled</c> is "true", writes the final lookup phrase groups (source token details + bounding boxes)
-/// to <c>%LocalAppData%/KotobaSenpai/diag/</c>, in the same directory as the screenshots/OCR that the recognizer saves, for offline analysis.
+/// and LLM exchange artifacts to <c>%LocalAppData%/KotobaSenpai/diag/</c>, in the same directory as the screenshots/OCR that the recognizer saves, for offline analysis.
 /// </summary>
 public sealed class FileDiagnosticReporter : IDiagnosticReporter
 {
@@ -70,7 +70,13 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         PruneToLatest(dir, "phrase-");
     }
 
-    public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson)
+    public void RecordLlmExchange(
+        Guid recognitionId,
+        string segmentId,
+        string requestJson,
+        string responseJson,
+        string groupsJson,
+        string wordsJson)
     {
         if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
             return;
@@ -86,6 +92,11 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         File.WriteAllText(Path.Combine(dir, $"llm-resp-{stamp}.json"), FormatJson(responseJson), Utf8Bom);
         PruneToLatest(dir, "llm-req-");
         PruneToLatest(dir, "llm-resp-");
+
+        File.WriteAllText(Path.Combine(dir, $"llm-groups-{stamp}.json"), FormatJson(groupsJson), Utf8Bom);
+        File.WriteAllText(Path.Combine(dir, $"llm-words-{stamp}.json"), FormatJson(wordsJson), Utf8Bom);
+        PruneToLatest(dir, "llm-groups-");
+        PruneToLatest(dir, "llm-words-");
     }
 
     /// <summary>Keeps only the latest <paramref name="max"/> files whose name starts with <paramref name="prefix"/>, deleting older ones so diag never accumulates unboundedly.</summary>

@@ -83,18 +83,34 @@ public sealed class SentenceTokenBuilderTests
     public void Builds_local_span_summaries_from_resolver()
     {
         var builder = new SentenceTokenBuilder(
-            new StubTokenizer(new TokenSpec("で", 0), new TokenSpec("も", 1)),
-            new StubSpanResolver(new LookupSpan([Token("で", 0), Token("も", 1)], "でも", [])));
+            new StubTokenizer(new TokenSpec("で", 0, "1"), new TokenSpec("も", 1, "0")),
+            new StubSpanResolver(new LookupSpan([Token("で", 0, "1"), Token("も", 1, "0")], "でも", [])));
         var built = builder.Build([Line("でも")], new SentenceSegment([0]));
 
         var span = Assert.Single(built.LocalSpans);
         Assert.Equal("でも", span.Surface);
         Assert.Equal([SentenceTokenId.Parse("l0:t0"), SentenceTokenId.Parse("l0:t1")], span.TokenIds);
+        Assert.Equal([1, 0], span.PitchAccents.Select(pitch => pitch.AccentPosition));
+        Assert.Equal([0, 1], span.PitchAccents.Select(pitch => pitch.SurfaceOffset));
     }
 
-    private static Token Token(string surface, int start)
+    [Fact]
+    public void Keeps_pitch_for_a_span_referencing_tokens_on_multiple_lines()
+    {
+        var builder = new SentenceTokenBuilder(
+            new StubTokenizer(new TokenSpec("東", 0, "1"), new TokenSpec("京", 1, "0")),
+            new StubSpanResolver(new LookupSpan([Token("東", 0, "1"), Token("京", 1, "0")], "東京", [])));
+        var built = builder.Build([Line("東"), Line("京")], new SentenceSegment([0, 1]));
+
+        var span = Assert.Single(built.LocalSpans);
+        Assert.Equal([SentenceTokenId.Parse("l0:t0"), SentenceTokenId.Parse("l1:t1")], span.TokenIds);
+        Assert.Equal([1, 0], span.PitchAccents.Select(pitch => pitch.AccentPosition));
+        Assert.Equal([0, 1], span.PitchAccents.Select(pitch => pitch.SurfaceOffset));
+    }
+
+    private static Token Token(string surface, int start, string aType = "")
         => new(surface, surface, surface, surface, surface, surface,
-            new PartsOfSpeech("", "", "", ""), "", "", "", start);
+            new PartsOfSpeech("", "", "", ""), "", "", aType, start);
 }
 
 public sealed class PhraseGeometryTests

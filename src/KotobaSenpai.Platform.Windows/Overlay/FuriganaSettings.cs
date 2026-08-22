@@ -3,11 +3,14 @@ using System.Text.RegularExpressions;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
-/// <summary>settings.json 键、默认值与纯逻辑：振假名字号占 OCR 文字高度（词外接框高度）的比例。</summary>
+/// <summary>Settings key, default value, and pure logic for the furigana size ratio.</summary>
 public static class FuriganaSettings
 {
     public const string FontScaleKey = "FuriganaFontScale";
-    public const double DefaultFontScale = 1.0 / 2.0;
+    public const double DefaultFontScale = 1.0 / 3.0;
+    public const string PitchHighColor = "#FF4444";
+    public const string PitchLowColor = "#4488FF";
+    public const string PitchHeibanColor = "#88FF88";
 
     private static readonly Regex CJKIdeograph = new(@"\p{IsCJKUnifiedIdeographs}", RegexOptions.Compiled);
 
@@ -39,9 +42,49 @@ public static class FuriganaSettings
         return (kanjiChars, kanjiReading);
     }
 
-    /// <summary>Parses a stored font scale; missing/invalid/zero falls back to the default 1/3.</summary>
+    /// <summary>Maps contiguous kana runs in a surface to the mora range used by a full pitch pattern.</summary>
+    public static IReadOnlyList<(int SurfaceStart, int SurfaceLength, int MoraStart, int MoraCount)> GetPitchMoraRanges(
+        string surface,
+        int moraCount)
+    {
+        ArgumentNullException.ThrowIfNull(surface);
+        if (surface.Length == 0 || moraCount <= 0)
+            return Array.Empty<(int, int, int, int)>();
+
+        var ranges = new List<(int, int, int, int)>();
+        for (var start = 0; start < surface.Length;)
+        {
+            if (!IsKana(surface[start]))
+            {
+                start++;
+                continue;
+            }
+
+            var end = start + 1;
+            while (end < surface.Length && IsKana(surface[end]))
+                end++;
+
+            var moraStart = Math.Clamp((int)Math.Round(start * moraCount / (double)surface.Length), 0, moraCount);
+            if (moraStart < moraCount)
+            {
+                var moraEnd = Math.Clamp(
+                    (int)Math.Round(end * moraCount / (double)surface.Length),
+                    moraStart + 1,
+                    moraCount);
+                ranges.Add((start, end - start, moraStart, moraEnd - moraStart));
+            }
+            start = end;
+        }
+        return ranges;
+    }
+
+    /// <summary>Parses a stored font scale; missing, invalid, or zero values fall back to the default 1/3.</summary>
     public static double ResolveFontScale(string? raw)
         => double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale) && scale > 0
             ? scale
             : DefaultFontScale;
+
+    private static bool IsKana(char character)
+        => (character >= '\u3040' && character <= '\u30ff')
+            || (character >= '\u31f0' && character <= '\u31ff');
 }

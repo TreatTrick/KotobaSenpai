@@ -124,6 +124,11 @@ public sealed class WordOverlayApplicationService
             group.DistinctTokenCount,
             group.Parts
                 .Select(part => new PhrasePartView(
-                    part.Rects.Select(rect => CoordinateMapper.ToScreen(rect, frameWidth, frameHeight, windowBounds)).ToArray()))
+                    part.Rects.Select(rect => CoordinateMapper.ToScreen(rect, frameWidth, frameHeight, windowBounds)).ToArray())
+                {
+                    Surface = part.Surface,
+                    Reading = part.Reading,
+                    PitchAccents = part.PitchAccents,
+                })
                 .ToArray());
 }

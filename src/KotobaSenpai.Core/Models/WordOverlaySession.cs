@@ -57,6 +57,12 @@ public sealed class WordOverlaySession
     public WordMeaningView? TryGetMeaning(GroupedWord word)
         => _meaningByWord.TryGetValue((word.Surface, word.Reading), out var meaning) ? meaning : null;
 
+    public IReadOnlyList<WordMeaningView> GetCoveredWordMeanings(PhraseGroupView group)
+        => GetCoveredWordIndices(group)
+            .Select(index => _words[index])
+            .Select(word => TryGetMeaning(word) ?? WordMeaningView.FromWord(word))
+            .ToArray();
+
     /// <summary>Returns the indices of the local merged words whose bounds overlap a phrase group's part rects (group membership signal).</summary>
     public IReadOnlyList<int> GetCoveredWordIndices(PhraseGroupView group)
     {

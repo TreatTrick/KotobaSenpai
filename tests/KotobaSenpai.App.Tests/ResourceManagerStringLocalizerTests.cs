@@ -25,6 +25,20 @@ public sealed class ResourceManagerStringLocalizerTests
     }
 
     [Fact]
+    public void Resolves_pitch_popup_labels_in_supported_cultures()
+    {
+        var localizer = LocalizerFactory.Create(new CultureInfo("en"));
+
+        Assert.Equal("Pitch", localizer.Get("Llm.WordPitchLabel"));
+        Assert.Equal("pitch unknown", localizer.Get("Llm.WordPitchUnknown"));
+
+        localizer.ApplyCulture(new CultureInfo("zh-CN"));
+
+        Assert.Equal("音调", localizer.Get("Llm.WordPitchLabel"));
+        Assert.Equal("音调未知", localizer.Get("Llm.WordPitchUnknown"));
+    }
+
+    [Fact]
     public void Falls_back_to_english_neutral_when_active_culture_has_no_resource()
     {
         // fr-FR has no satellite assembly; the ResourceManager fallback chain lands on neutral English (same mechanism as "a culture lacking that key").

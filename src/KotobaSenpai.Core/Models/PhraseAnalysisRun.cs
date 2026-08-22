@@ -28,4 +28,9 @@ public sealed record PhraseGroupView(
     IReadOnlyList<PhrasePartView> Parts);
 
 /// <summary>A part's drawable geometry: split into multiple rectangles by line, never spanning blank regions.</summary>
-public sealed record PhrasePartView(IReadOnlyList<ScreenRect> Rects);
+public sealed record PhrasePartView(IReadOnlyList<ScreenRect> Rects)
+{
+    public string Surface { get; init; } = string.Empty;
+    public string Reading { get; init; } = string.Empty;
+    public IReadOnlyList<PitchAccentSummary> PitchAccents { get; init; } = Array.Empty<PitchAccentSummary>();
+}

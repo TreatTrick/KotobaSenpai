@@ -206,6 +206,12 @@
   <data name="Llm.WordPosLabel" xml:space="preserve">
     <value>Pos</value>
   </data>
+  <data name="Llm.WordPitchLabel" xml:space="preserve">
+    <value>Pitch</value>
+  </data>
+  <data name="Llm.WordPitchUnknown" xml:space="preserve">
+    <value>pitch unknown</value>
+  </data>
   <data name="Llm.WordNoMeaning" xml:space="preserve">
     <value>no meaning</value>
   </data>

@@ -1,9 +1,7 @@
-# furigana-overlay Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-furigana-overlay. Update Purpose after archive.
-## Requirements
 ### Requirement: 汉字词上方显示振假名
+
 系统 SHALL 对每个表面文本包含至少一个 CJK 表意字符的本地分词词，把其合并读音转为平假名，水平居中绘制在词外接框正上方。读音取词的合并 UniDic 读音转平假名；当源 token 有有效音调时，振假名 SHALL 按拍绘制，高音拍使用红色、低音拍使用蓝色，并沿用现有文字描边。表面不含汉字的纯平假名/片假名词，以及含汉字词中的送假名，SHALL 不显示重复的振假名文字，但 SHALL 在对应假名拍上方绘制红/蓝音调小点。没有有效音调时，汉字词 SHALL 回退为现有单色振假名，纯假名/送假名 SHALL 不绘制小点。振假名字号 SHALL 默认取词 OCR 文字高度（词外接框高度）的 1/3，以 DIP 计，且 SHALL 可通过设置项 `FuriganaFontScale`（比例值）配置；设置缺失或非法时 SHALL 回退到默认 1/3。振假名和音调标记 SHALL 为静态：不随悬停变化，不影响命中测试，也不破坏点击穿透。
 
 #### Scenario: 为汉字词显示按拍着色的振假名

@@ -133,6 +133,7 @@ public sealed class UniDicTokenizerTests
 
         // The strongly-typed property decodes the aType multi-value field (with quotes/commas), keeping it as the original string.
         Assert.Equal("0,2", cover.AType);
+        Assert.Equal(0, cover.PitchAccentPosition);
     }
 
     [Fact]

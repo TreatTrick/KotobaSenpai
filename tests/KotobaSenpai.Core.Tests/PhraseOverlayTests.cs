@@ -75,6 +75,22 @@ public sealed class WordMeaningValidatorTests
     }
 
     [Fact]
+    public void Accepts_valid_word_and_carries_local_pitch_summaries()
+    {
+        var pitch = new PitchAccentSummary("食べる", "たべる", 0, 2, "[2] LH↓L");
+        var spans = new[]
+        {
+            new LocalSpanSummary("食べる", "たべる", "食べる", [SentenceTokenId.Parse("l0:t0")], [pitch]),
+        };
+
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [Word("食べる", "verb", "eat", "transitive")], spans);
+
+        var word = Assert.Single(result.ValidWords);
+        Assert.Equal([pitch], word.PitchAccents);
+    }
+
+    [Fact]
     public void Drops_word_with_unmatched_headword()
     {
         var result = WordMeaningValidator.ValidateAndBuild(
@@ -178,6 +194,22 @@ public sealed class PhraseSessionTests
     }
 
     [Fact]
+    public void Covered_word_meanings_fall_back_to_local_reading_and_pitch()
+    {
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        var word = new GroupedWord(TokenOf("東京", "とうきょう", "2"), new ScreenRect(0, 0, 20, 20));
+        var group = new PhraseGroupView(Guid.NewGuid(), "label", "type", "m", "g", 0, 1,
+            [new PhrasePartView([word.Bounds])]);
+        var session = WordOverlaySession.Start(target, [word]);
+
+        var meaning = Assert.Single(session.GetCoveredWordMeanings(group));
+        Assert.Equal("東京", meaning.Headword);
+        Assert.Equal("とうきょう", meaning.Reading);
+        Assert.Equal("[2] LH↓LL", meaning.PitchAccentText);
+        Assert.Empty(meaning.Meaning);
+    }
+
+    [Fact]
     public void Session_lines_emit_one_per_rect_for_a_cross_line_word()
     {
         var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
@@ -255,9 +287,9 @@ public sealed class PhraseSessionTests
         Assert.Equal([1], covered);
     }
 
-    private static Token TokenOf(string surface, string reading)
+    private static Token TokenOf(string surface, string reading, string aType = "")
         => new(surface, reading, surface, reading, surface, reading,
-            new PartsOfSpeech("", "", "", ""), "", "", "", 0);
+            new PartsOfSpeech("", "", "", ""), "", "", aType, 0);
 }
 
 public sealed class PhraseFallbackTests
@@ -586,7 +618,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
         public void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning)
             => PhraseRecognitionIds.Add(recognitionId);
 
-        public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson) { }
+        public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson, string groupsJson, string wordsJson) { }
     }
 
     /// <summary>Keeps every candidate word as its own span so grouping preserves the recognizer's words in this integration test.</summary>

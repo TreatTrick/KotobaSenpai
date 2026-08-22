@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Platform.Windows.Overlay;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
@@ -23,6 +24,49 @@ public class FuriganaSettingsTests
     [InlineData("0.5", 0.5)]
     public void ResolveFontScale_falls_back_on_missing_invalid_and_uses_valid(string? raw, double expected)
         => Assert.Equal(expected, FuriganaSettings.ResolveFontScale(raw));
+
+    [Fact]
+    public void Default_font_scale_matches_the_overlay_specification()
+        => Assert.Equal(1.0 / 3.0, FuriganaSettings.DefaultFontScale);
+
+    [Fact]
+    public void Known_pitch_pattern_has_one_color_state_per_mora()
+    {
+        var pattern = PitchAccent.CreatePattern("きょう", 0);
+
+        Assert.NotNull(pattern);
+        Assert.Equal(["きょ", "う"], pattern!.Morae);
+        Assert.Equal([false, true], pattern.HighMorae);
+    }
+
+    [Fact]
+    public void Unknown_pitch_pattern_does_not_produce_renderable_morae()
+        => Assert.Null(PitchAccent.CreatePattern("たべる", null));
+
+    [Fact]
+    public void Pitch_mora_ranges_preserve_small_kana_and_okurigana_offsets()
+    {
+        var smallKana = Assert.Single(FuriganaSettings.GetPitchMoraRanges("きょ", 1));
+        Assert.Equal((0, 2, 0, 1), smallKana);
+
+        var okurigana = Assert.Single(FuriganaSettings.GetPitchMoraRanges("食べる", 3));
+        Assert.Equal((1, 2, 1, 2), okurigana);
+    }
+
+    [Fact]
+    public void Pitch_mora_ranges_ignore_surfaces_without_kana()
+        => Assert.Empty(FuriganaSettings.GetPitchMoraRanges("東京", 4));
+
+    [Fact]
+    public void Pitch_colors_match_dokidokidict_defaults()
+    {
+        Assert.Equal("#FF4444", typeof(FuriganaSettings)
+            .GetField("PitchHighColor")?.GetValue(null));
+        Assert.Equal("#4488FF", typeof(FuriganaSettings)
+            .GetField("PitchLowColor")?.GetValue(null));
+        Assert.Equal("#88FF88", typeof(FuriganaSettings)
+            .GetField("PitchHeibanColor")?.GetValue(null));
+    }
 
     [Theory]
     [InlineData("同じ", "おなじ", 1, "おな")]      // 送假名「じ」不标注

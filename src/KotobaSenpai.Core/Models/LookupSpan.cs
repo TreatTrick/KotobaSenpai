@@ -29,6 +29,7 @@ public sealed record LookupSpan
         StartOffset = Tokens[0].StartOffset;
         EndOffset = Tokens[^1].StartOffset + Tokens[^1].Surface.Length;
         Token = CreateDisplayToken(Tokens, lookupKey, Surface, Reading);
+        PitchAccents = BuildPitchAccents(Tokens);
     }
 
     /// <summary>The original UniDic tokens composing this span, in input order.</summary>
@@ -53,6 +54,21 @@ public sealed record LookupSpan
 
     /// <summary>The dictionary results this span obtained during recognition; empty when nothing matched.</summary>
     public IReadOnlyList<DictionaryEntry> Entries { get; }
+
+    /// <summary>Pitch data aligned with each source token, in source order.</summary>
+    public IReadOnlyList<PitchAccentSummary> PitchAccents { get; }
+
+    private static IReadOnlyList<PitchAccentSummary> BuildPitchAccents(IReadOnlyList<Token> tokens)
+    {
+        var offset = 0;
+        var result = new List<PitchAccentSummary>(tokens.Count);
+        foreach (var token in tokens)
+        {
+            result.Add(PitchAccentSummary.FromToken(token, offset));
+            offset += token.Surface.Length;
+        }
+        return result;
+    }
 
     private static Token CreateDisplayToken(
         IReadOnlyList<Token> tokens,

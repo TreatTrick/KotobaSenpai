@@ -56,7 +56,7 @@ public sealed class PhrasePopup : Window
         ShowAndPosition(anchor);
     }
 
-    private static UIElement RenderWords(IReadOnlyList<WordMeaningView> meanings)
+    private UIElement RenderWords(IReadOnlyList<WordMeaningView> meanings)
     {
         var panel = new StackPanel();
         foreach (var m in meanings)
@@ -75,6 +75,11 @@ public sealed class PhrasePopup : Window
                     Text = $" [{Kana.ToHiragana(m.Reading)}]",
                     Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0xD8, 0xFF)),
                 });
+            header.Children.Add(new TextBlock
+            {
+                Text = $" ({PitchText(m)})",
+                Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0x88)),
+            });
             if (!string.IsNullOrEmpty(m.Pos))
                 header.Children.Add(new TextBlock
                 {
@@ -101,6 +106,7 @@ public sealed class PhrasePopup : Window
         _panel.Children.Add(Heading($"{meaning.Headword} [{Kana.ToHiragana(meaning.Reading)}]"));
         if (!string.IsNullOrEmpty(meaning.Pos))
             _panel.Children.Add(Block(_localizer?.Get("Llm.WordPosLabel") ?? "Pos", meaning.Pos));
+        _panel.Children.Add(Block(_localizer?.Get("Llm.WordPitchLabel") ?? "Pitch", PitchText(meaning)));
         if (!string.IsNullOrEmpty(meaning.Meaning))
             _panel.Children.Add(Block(_localizer?.Get("Llm.WordMeaningLabel") ?? "Meaning", meaning.Meaning));
         if (!string.IsNullOrEmpty(meaning.Grammar))
@@ -109,10 +115,11 @@ public sealed class PhrasePopup : Window
     }
 
     /// <summary>Shows a word that has no LLM meaning: headword + reading + a "no meaning" hint.</summary>
-    public void ShowWordWithoutMeaning(string headword, string reading, ScreenRect anchor)
+    public void ShowWordWithoutMeaning(WordMeaningView meaning, ScreenRect anchor)
     {
         _panel.Children.Clear();
-        _panel.Children.Add(Heading($"{headword} [{Kana.ToHiragana(reading)}]"));
+        _panel.Children.Add(Heading($"{meaning.Headword} [{Kana.ToHiragana(meaning.Reading)}]"));
+        _panel.Children.Add(Block(_localizer?.Get("Llm.WordPitchLabel") ?? "Pitch", PitchText(meaning)));
         _panel.Children.Add(new TextBlock
         {
             Text = _localizer?.Get("Llm.WordNoMeaning") ?? "no meaning",
@@ -122,6 +129,11 @@ public sealed class PhrasePopup : Window
         });
         ShowAndPosition(anchor);
     }
+
+    private string PitchText(WordMeaningView meaning)
+        => string.IsNullOrEmpty(meaning.PitchAccentText)
+            ? _localizer?.Get("Llm.WordPitchUnknown") ?? "pitch unknown"
+            : meaning.PitchAccentText;
 
     public void HidePopup()
     {

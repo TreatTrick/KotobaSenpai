@@ -99,7 +99,7 @@ public sealed class WordGroupingTests
             new PartsOfSpeech("", "", "", ""), "", "", "", start);
 }
 
-internal sealed record TokenSpec(string Surface, int StartOffset);
+internal sealed record TokenSpec(string Surface, int StartOffset, string AType = "");
 
 /// <summary>Splits on explicit spans so grouping tests can control the tokenization result precisely.</summary>
 internal sealed class StubTokenizer : ITokenizer
@@ -110,7 +110,7 @@ internal sealed class StubTokenizer : ITokenizer
     public IReadOnlyList<Token> Tokenize(string? text)
         => _specs.Select(s => new Token(
             s.Surface, s.Surface, s.Surface, s.Surface, s.Surface, s.Surface,
-            new PartsOfSpeech("", "", "", ""), "", "", "", s.StartOffset)).ToArray();
+            new PartsOfSpeech("", "", "", ""), "", "", s.AType, s.StartOffset)).ToArray();
 }
 
 internal sealed class StubSpanResolver : ITokenSpanResolver

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Japanese;
@@ -56,6 +57,16 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     {
         private static readonly Brush DefaultLineBrush = Brushes.DeepSkyBlue;
         private static readonly Brush HoverLineBrush = Brushes.OrangeRed;
+        private static readonly Brush PitchHighBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x44, 0x44));
+        private static readonly Brush PitchLowBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x88, 0xFF));
+        private static readonly Brush PitchHeibanBrush = new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0x88));
+        private static readonly Effect FuriganaOutline = new DropShadowEffect
+        {
+            Color = Colors.Black,
+            BlurRadius = 1,
+            ShadowDepth = 0,
+            Opacity = 1,
+        };
 
         private const int HoverPollMs = 50;
 
@@ -132,8 +143,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     }
                 }
 
-                if (FuriganaSettings.ContainsKanji(word.Surface) && !string.IsNullOrEmpty(word.Reading))
-                    AddFurigana(word, scale, fontScale);
+                if (!string.IsNullOrEmpty(word.Reading))
+                    AddPitchAnnotations(word, scale, fontScale);
             }
             _hoverTimer.Start();
         }
@@ -144,31 +155,175 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         /// ratio because Japanese full-width glyphs (kanji and kana) are ~1em wide, so the leading kanji occupy
         /// (kanjiCharCount / surface.Length) of the word's width. // ponytail: multi-em-width edge cases (e.g. 全角・記号) are ignored.
         /// </summary>
-        private void AddFurigana(GroupedWord word, double scale, double fontScale)
+        private void AddPitchAnnotations(GroupedWord word, double scale, double fontScale)
         {
-            var (kanjiChars, kanjiReading) = FuriganaSettings.OkuriganaTrim(word.Surface, word.Reading);
+            if (word.PitchAccents.Count == 0)
+            {
+                AddMonochromeFurigana(word.Surface, word.Reading, 0, word, scale, fontScale);
+                return;
+            }
+
+            foreach (var segment in word.PitchAccents)
+            {
+                var pattern = PitchAccent.CreatePattern(Kana.ToHiragana(segment.Reading), segment.AccentPosition);
+                if (FuriganaSettings.ContainsKanji(segment.Surface) && !string.IsNullOrEmpty(segment.Reading))
+                {
+                    if (pattern is null)
+                        AddMonochromeFurigana(segment.Surface, segment.Reading, segment.SurfaceOffset, word, scale, fontScale);
+                    else
+                        AddColoredFurigana(segment, pattern, word, scale, fontScale);
+                }
+
+                if (pattern is not null)
+                    AddPitchDots(segment, pattern, word, scale, fontScale);
+            }
+        }
+
+        private void AddMonochromeFurigana(
+            string surface,
+            string reading,
+            int surfaceOffset,
+            GroupedWord word,
+            double scale,
+            double fontScale)
+        {
+            var (kanjiChars, kanjiReading) = FuriganaSettings.OkuriganaTrim(surface, reading);
             if (kanjiChars == 0 || string.IsNullOrEmpty(kanjiReading))
                 return;
 
-            var bounds = word.Bounds;
+            var bounds = SegmentBounds(word, surfaceOffset, surface.Length);
             var fontSize = (bounds.Height / scale) * fontScale;
-            var gap = 2.0;
-            var topDip = (bounds.Y - _session!.Target.Bounds.Y) / scale - fontSize - gap;
-            if (topDip < 0)
-                topDip = 0; // clamp to overlay top so it never draws off-window
-
             var text = new TextBlock
             {
                 Text = Kana.ToHiragana(kanjiReading),
                 FontSize = fontSize,
-                Foreground = DefaultLineBrush, // 天蓝色，与下划线一致
+                Foreground = DefaultLineBrush,
+                Effect = FuriganaOutline,
             };
+            AddTextCentered(text, bounds, kanjiChars, surface.Length, scale, fontSize);
+        }
+
+        private void AddColoredFurigana(
+            PitchAccentSummary segment,
+            PitchAccentPattern pattern,
+            GroupedWord word,
+            double scale,
+            double fontScale)
+        {
+            var (kanjiChars, kanjiReading) = FuriganaSettings.OkuriganaTrim(segment.Surface, segment.Reading);
+            var kanjiMorae = PitchAccent.SplitMorae(Kana.ToHiragana(kanjiReading));
+            if (kanjiChars == 0 || kanjiMorae.Count == 0)
+                return;
+
+            var bounds = SegmentBounds(word, segment.SurfaceOffset, segment.Surface.Length);
+            var fontSize = (bounds.Height / scale) * fontScale;
+            var fontMorae = pattern.Morae.Take(kanjiMorae.Count).ToArray();
+            var highMorae = pattern.HighMorae.Take(fontMorae.Length).ToArray();
+            var textBlocks = new List<TextBlock>(fontMorae.Length);
+            var totalWidth = 0d;
+            foreach (var mora in fontMorae)
+            {
+                var block = new TextBlock { Text = mora, FontSize = fontSize, Effect = FuriganaOutline };
+                block.Measure(new Size(double.PositiveInfinity, fontSize));
+                textBlocks.Add(block);
+                totalWidth += block.DesiredSize.Width;
+            }
+
+            var startX = (bounds.X - _session!.Target.Bounds.X) / scale
+                + (bounds.Width / scale - totalWidth) / 2;
+            var top = TopDip(bounds, scale, fontSize);
+            var cursor = startX;
+            for (var i = 0; i < textBlocks.Count; i++)
+            {
+                var block = textBlocks[i];
+                block.Foreground = highMorae[i] ? PitchHighBrush : PitchLowBrush;
+                _canvas.Children.Add(block);
+                Canvas.SetLeft(block, Math.Max(0, cursor));
+                Canvas.SetTop(block, top);
+                cursor += block.DesiredSize.Width;
+            }
+
+            if (segment.AccentPosition == 0 && pattern.Morae.Count > 1)
+                AddHeibanMarker(cursor, top + fontSize / 2, fontSize);
+        }
+
+        private void AddPitchDots(
+            PitchAccentSummary segment,
+            PitchAccentPattern pattern,
+            GroupedWord word,
+            double scale,
+            double fontScale)
+        {
+            var kanaRuns = FuriganaSettings.GetPitchMoraRanges(segment.Surface, pattern.Morae.Count);
+            if (kanaRuns.Count == 0)
+                return;
+
+            var bounds = SegmentBounds(word, segment.SurfaceOffset, segment.Surface.Length);
+            var fontSize = (bounds.Height / scale) * fontScale;
+            var dotRadius = Math.Max(2d, fontSize / 4d);
+            var centerY = (bounds.Y - _session!.Target.Bounds.Y) / scale - dotRadius - 2;
+            if (centerY < dotRadius)
+                centerY = dotRadius;
+
+            foreach (var (start, length, moraStart, count) in kanaRuns)
+            {
+                var left = bounds.X + bounds.Width * start / segment.Surface.Length;
+                var width = bounds.Width * length / segment.Surface.Length;
+                for (var i = 0; i < count; i++)
+                {
+                    var centerX = (left - _session.Target.Bounds.X) / scale
+                        + width / scale * (i + 0.5) / count;
+                    var dot = new Border
+                    {
+                        Width = dotRadius * 2,
+                        Height = dotRadius * 2,
+                        CornerRadius = new CornerRadius(dotRadius),
+                        Background = pattern.HighMorae[moraStart + i] ? PitchHighBrush : PitchLowBrush,
+                    };
+                    _canvas.Children.Add(dot);
+                    Canvas.SetLeft(dot, centerX - dotRadius);
+                    Canvas.SetTop(dot, centerY - dotRadius);
+                }
+
+                if (segment.AccentPosition == 0 && moraStart + count == pattern.Morae.Count && pattern.Morae.Count > 1)
+                    AddHeibanMarker((left - _session.Target.Bounds.X) / scale + width / scale, centerY, fontSize);
+            }
+        }
+
+        private void AddTextCentered(TextBlock text, ScreenRect bounds, int annotatedChars, int surfaceLength, double scale, double fontSize)
+        {
             _canvas.Children.Add(text);
             text.Measure(new Size(double.PositiveInfinity, fontSize));
-            var kanjiWidthDip = (bounds.Width / scale) * ((double)kanjiChars / word.Surface.Length);
-            var centerDip = (bounds.X - _session.Target.Bounds.X) / scale + kanjiWidthDip / 2;
-            Canvas.SetLeft(text, Math.Max(0, centerDip - text.DesiredSize.Width / 2));
-            Canvas.SetTop(text, topDip);
+            var annotatedWidth = bounds.Width / scale * annotatedChars / surfaceLength;
+            var center = (bounds.X - _session!.Target.Bounds.X) / scale + annotatedWidth / 2;
+            Canvas.SetLeft(text, Math.Max(0, center - text.DesiredSize.Width / 2));
+            Canvas.SetTop(text, TopDip(bounds, scale, fontSize));
+        }
+
+        private void AddHeibanMarker(double x, double y, double fontSize)
+        {
+            var marker = new Border
+            {
+                Width = Math.Max(3, fontSize / 3),
+                Height = Math.Max(1, fontSize / 8),
+                Background = PitchHeibanBrush,
+            };
+            _canvas.Children.Add(marker);
+            Canvas.SetLeft(marker, x + 1);
+            Canvas.SetTop(marker, y);
+        }
+
+        private ScreenRect SegmentBounds(GroupedWord word, int surfaceOffset, int surfaceLength)
+        {
+            var start = word.Bounds.X + word.Bounds.Width * surfaceOffset / Math.Max(1, word.Surface.Length);
+            var width = word.Bounds.Width * surfaceLength / Math.Max(1, word.Surface.Length);
+            return new ScreenRect(start, word.Bounds.Y, Math.Max(1, width), word.Bounds.Height);
+        }
+
+        private double TopDip(ScreenRect bounds, double scale, double fontSize)
+        {
+            var topDip = (bounds.Y - _session!.Target.Bounds.Y) / scale - fontSize - 2;
+            return Math.Max(0, topDip);
         }
 
         public void StopHover()
@@ -281,12 +436,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var session = _session;
             var memberMeanings = session is null
                 ? Array.Empty<WordMeaningView>()
-                : session.GetCoveredWordIndices(group)
-                    .Select(i => session.Words[i])
-                    .Select(session.TryGetMeaning)
-                    .Where(meaning => meaning is not null)
-                    .Cast<WordMeaningView>()
-                    .ToArray();
+                : session.GetCoveredWordMeanings(group);
             _phrasePopup.ShowResult(group.Label, group.Meaning, group.Grammar, anchor, memberMeanings);
         }
 
@@ -305,7 +455,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (meaning is not null)
                 _phrasePopup.ShowWordMeaning(meaning, word.Bounds);
             else
-                _phrasePopup.ShowWordWithoutMeaning(word.Surface, word.Reading, word.Bounds);
+                _phrasePopup.ShowWordWithoutMeaning(WordMeaningView.FromWord(word), word.Bounds);
         }
 
         private static Border MakeBox(double width, double height, Brush background)

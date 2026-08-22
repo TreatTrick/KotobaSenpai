@@ -206,6 +206,12 @@
   <data name="Llm.WordPosLabel" xml:space="preserve">
     <value>词性</value>
   </data>
+  <data name="Llm.WordPitchLabel" xml:space="preserve">
+    <value>音调</value>
+  </data>
+  <data name="Llm.WordPitchUnknown" xml:space="preserve">
+    <value>音调未知</value>
+  </data>
   <data name="Llm.WordNoMeaning" xml:space="preserve">
     <value>无释义</value>
   </data>

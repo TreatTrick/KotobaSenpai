@@ -50,7 +50,7 @@ public static class WordMeaningValidator
             matchedSurfaces.Add(parsed.Headword);
             var span = bySurface[parsed.Headword];
             valid.Add(new WordMeaningView(
-                span.Surface, span.Reading, parsed.Pos, parsed.Meaning, parsed.Grammar));
+                span.Surface, span.Reading, parsed.Pos, parsed.Meaning, parsed.Grammar, span.PitchAccents));
         }
 
         return new ValidationResult(valid, dropped, warnings);

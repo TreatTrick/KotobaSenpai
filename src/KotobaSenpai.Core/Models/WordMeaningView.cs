@@ -9,4 +9,17 @@ public sealed record WordMeaningView(
     string Reading,
     string Pos,
     string Meaning,
-    string Grammar);
+    string Grammar,
+    IReadOnlyList<PitchAccentSummary>? PitchAccents = null)
+{
+    public string PitchAccentText
+        => string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())
+            .Where(pitch => !string.IsNullOrEmpty(pitch.Notation))
+            .Select(pitch => pitch.Notation));
+
+    public static WordMeaningView FromWord(GroupedWord word)
+    {
+        ArgumentNullException.ThrowIfNull(word);
+        return new(word.Surface, word.Reading, string.Empty, string.Empty, string.Empty, word.PitchAccents);
+    }
+}

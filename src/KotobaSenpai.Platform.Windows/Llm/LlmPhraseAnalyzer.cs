@@ -98,20 +98,29 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.TransportError, [], ex.Message);
         }
 
-        // Capture the raw request/response verbatim (request body never contains the API key) for offline inspection.
-        _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope);
-
+        string groupsJson = "[]";
+        string wordsJson = "[]";
+        IReadOnlyList<ParsedPhraseGroup> groups;
+        IReadOnlyList<ParsedWordMeaning> words;
         try
         {
-            var groups = _parser.ParseGroups(_protocol.ExtractGroupsJson(envelope));
-            var words = _parser.ParseWords(_protocol.ExtractWordsJson(envelope));
-            return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words };
+            var groupsPayload = _protocol.ExtractGroupsJson(envelope);
+            groupsJson = groupsPayload.GetRawText();
+            var wordsPayload = _protocol.ExtractWordsJson(envelope);
+            wordsJson = wordsPayload.GetRawText();
+            groups = _parser.ParseGroups(groupsPayload);
+            words = _parser.ParseWords(wordsPayload);
         }
         catch (Exception ex) when (ex is PhraseResponseException or JsonException or KeyNotFoundException or ArgumentNullException)
         {
             // Protocol envelope or group structure mismatch (missing field / null text / non-JSON) → retryable warning, not thrown through the recognition flow.
+            _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.MalformedJson, [], ex.Message);
         }
+
+        // Capture the raw request/response and extracted arrays with one shared exchange stamp for offline inspection.
+        _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
+        return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words };
     }
 }
 

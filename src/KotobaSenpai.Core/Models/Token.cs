@@ -1,3 +1,5 @@
+using KotobaSenpai.Core.Japanese;
+
 namespace KotobaSenpai.Core.Models;
 
 /// <summary>
@@ -51,6 +53,7 @@ public sealed record Token
         ConjugationType = conjugationType;
         ConjugationForm = conjugationForm;
         AType = aType;
+        PitchAccentPosition = PitchAccent.ParsePosition(aType, reading);
         StartOffset = startOffset;
     }
 
@@ -83,6 +86,9 @@ public sealed record Token
 
     /// <summary>UniDic's raw pitch-accent field (aType), not the final pitch.</summary>
     public string AType { get; }
+
+    /// <summary>Normalized UniDic pitch nucleus: 0=heiban, 1=atamadaka, N=drop after mora N.</summary>
+    public int? PitchAccentPosition { get; }
 
     /// <summary>UTF-16 code-unit start offset in the input string.</summary>
     public int StartOffset { get; }
