@@ -1,6 +1,7 @@
+using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.Tokenization;
 using System.Text;
 using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Platform.Windows.Llm;
 

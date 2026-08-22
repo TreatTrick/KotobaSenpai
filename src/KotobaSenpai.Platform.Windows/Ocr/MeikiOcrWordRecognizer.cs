@@ -1,15 +1,16 @@
+using KotobaSenpai.Core.Ocr;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Errors;
+using KotobaSenpai.Core.Geometry;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
-using KotobaSenpai.Core.Models;
-using KotobaSenpai.Core.Services;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Ocr.MeikiOcr;
-using CoreOcrWord = KotobaSenpai.Core.Models.OcrWord;
+using CoreOcrWord = KotobaSenpai.Core.Ocr.OcrWord;
 
 namespace KotobaSenpai.Platform.Windows.Ocr;
 

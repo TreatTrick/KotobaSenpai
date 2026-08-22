@@ -1,7 +1,7 @@
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using System.Runtime.InteropServices;
 using System.Text;
-using KotobaSenpai.Core.Contracts;
-using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Platform.Windows.Capture;
 

@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Errors;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KotobaSenpai.Core.Localization;

@@ -1,3 +1,5 @@
+using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;

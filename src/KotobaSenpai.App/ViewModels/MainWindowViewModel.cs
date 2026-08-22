@@ -1,12 +1,12 @@
+using KotobaSenpai.Core.Workflow;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Errors;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KotobaSenpai.App.Resources;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
-using KotobaSenpai.Core.Models;
-using KotobaSenpai.Core.Services;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.ViewModels;

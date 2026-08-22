@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Errors;
 using System.Globalization;
 using System.IO;
 using System.Text;

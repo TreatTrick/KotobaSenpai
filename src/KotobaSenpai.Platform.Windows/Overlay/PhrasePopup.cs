@@ -1,10 +1,11 @@
+using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.Geometry;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 

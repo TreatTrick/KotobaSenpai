@@ -1,5 +1,6 @@
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Platform.Windows.Overlay;
-using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 

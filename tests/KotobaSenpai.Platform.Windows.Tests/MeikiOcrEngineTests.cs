@@ -1,5 +1,7 @@
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Errors;
+using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Core.Models;
 using KotobaSenpai.Platform.Windows;
 using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Ocr.MeikiOcr;

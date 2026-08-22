@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Errors;
 using KotobaSenpai.Core.Localization;
 
 namespace KotobaSenpai.Platform.Windows;

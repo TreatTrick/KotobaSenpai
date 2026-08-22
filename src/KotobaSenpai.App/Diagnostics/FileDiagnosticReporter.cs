@@ -1,10 +1,13 @@
+using KotobaSenpai.Core.Diagnostics;
+using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.WordGrouping;
+using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.TargetWindow;
 using System.IO;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using KotobaSenpai.Core.Contracts;
-using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.Diagnostics;

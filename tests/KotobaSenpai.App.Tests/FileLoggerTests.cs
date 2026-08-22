@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Errors;
 using System.IO;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.Core.Localization;

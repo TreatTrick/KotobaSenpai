@@ -1,8 +1,9 @@
+using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using System.IO;
 using System.Text.Json;
 using KotobaSenpai.App.Diagnostics;
-using KotobaSenpai.Core.Contracts;
-using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.Tests;

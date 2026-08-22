@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Workflow;
 using System.Reflection;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
@@ -26,7 +27,7 @@ public sealed class DependencyDirectionTests
     /// <summary>The three assemblies under check, marked by a public type from each project so the Assembly is resolved stably.</summary>
     private static readonly Assembly[] Assemblies =
     [
-        typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly, // Core
+        typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly, // Core
         typeof(KotobaSenpai.Platform.Windows.Overlay.WpfOverlayRenderer).Assembly, // Platform.Windows
         typeof(KotobaSenpai.App.App).Assembly,                                      // App
     ];
@@ -75,7 +76,7 @@ public sealed class DependencyDirectionTests
     [Fact]
     public void Localization_Port_ResidesInCore_Implementation_ResidesInApp()
     {
-        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var coreAssembly = typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly;
         var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
 
         Assert.Same(coreAssembly, typeof(IStringLocalizer).Assembly);
@@ -98,7 +99,7 @@ public sealed class DependencyDirectionTests
     [Fact]
     public void Logging_Port_ResidesInCore_Implementation_ResidesInApp()
     {
-        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var coreAssembly = typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly;
         var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
 
         Assert.Same(coreAssembly, typeof(ILogger).Assembly);
@@ -122,7 +123,7 @@ public sealed class DependencyDirectionTests
     [Fact]
     public void WpfUi_Assembly_Referenced_OnlyBy_App()
     {
-        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var coreAssembly = typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly;
         var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Overlay.WpfOverlayRenderer).Assembly;
         var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
 
@@ -157,7 +158,7 @@ public sealed class DependencyDirectionTests
     [Fact]
     public void Settings_Port_ResidesInCore_Implementation_ResidesInApp()
     {
-        var coreAssembly = typeof(KotobaSenpai.Core.Services.WordOverlayApplicationService).Assembly;
+        var coreAssembly = typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly;
         var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
 
         Assert.Same(coreAssembly, typeof(ISettingsService).Assembly);

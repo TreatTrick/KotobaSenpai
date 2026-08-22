@@ -1,7 +1,7 @@
+using KotobaSenpai.Core.Japanese;
+using KotobaSenpai.Core.Dictionary;
 using System.IO;
 using System.Text.Json;
-using KotobaSenpai.Core.Contracts;
-using KotobaSenpai.Core.Models;
 using Microsoft.Data.Sqlite;
 
 namespace KotobaSenpai.Platform.Windows.Dictionary;

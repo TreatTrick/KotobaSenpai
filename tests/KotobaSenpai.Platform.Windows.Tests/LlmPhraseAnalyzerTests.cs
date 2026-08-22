@@ -1,9 +1,13 @@
+using KotobaSenpai.Core.Diagnostics;
+using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.WordGrouping;
+using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Llm;
 

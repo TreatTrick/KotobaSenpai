@@ -1,14 +1,17 @@
+using KotobaSenpai.Core.Overlay;
+using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.WordGrouping;
+using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Core.Models;
-using KotobaSenpai.Core.Services;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
@@ -526,7 +529,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (meaning is not null)
                 _phrasePopup.ShowWordMeaning(meaning, word.Bounds);
             else
-                _phrasePopup.ShowWordWithoutMeaning(WordMeaningView.FromWord(word), word.Bounds);
+                _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), word.Bounds);
         }
 
         private static Border MakeBox(double width, double height, Brush background)

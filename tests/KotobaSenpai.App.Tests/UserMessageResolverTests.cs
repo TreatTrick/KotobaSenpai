@@ -1,7 +1,7 @@
+using KotobaSenpai.Core.Errors;
 using System.Globalization;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Core.Models;
 using KotobaSenpai.Platform.Windows;
 
 namespace KotobaSenpai.App.Tests;

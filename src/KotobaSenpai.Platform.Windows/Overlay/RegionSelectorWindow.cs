@@ -1,11 +1,11 @@
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;

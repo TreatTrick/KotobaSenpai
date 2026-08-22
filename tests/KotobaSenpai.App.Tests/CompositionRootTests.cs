@@ -1,5 +1,5 @@
+using KotobaSenpai.Core.Dictionary;
 using System.Reflection;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.App;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,6 +24,6 @@ public sealed class CompositionRootTests
         var resolver = provider.GetRequiredService<ITokenSpanResolver>();
 
         Assert.Same(single, batch);
-        Assert.IsType<KotobaSenpai.Core.Services.TokenBoundarySpanResolver>(resolver);
+        Assert.IsType<KotobaSenpai.Core.Dictionary.TokenBoundarySpanResolver>(resolver);
     }
 }

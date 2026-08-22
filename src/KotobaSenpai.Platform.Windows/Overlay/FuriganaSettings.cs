@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Japanese;
 using System.Globalization;
 using System.Text.RegularExpressions;
 

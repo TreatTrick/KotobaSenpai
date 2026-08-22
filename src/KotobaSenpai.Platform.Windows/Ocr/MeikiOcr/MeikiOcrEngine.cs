@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Errors;
 using System.Globalization;
 using System.IO;
 using Microsoft.ML.OnnxRuntime;

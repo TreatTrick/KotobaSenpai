@@ -1,8 +1,8 @@
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Logging;
-using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 

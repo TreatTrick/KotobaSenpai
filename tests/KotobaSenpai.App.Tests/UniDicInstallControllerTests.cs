@@ -1,8 +1,8 @@
+using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.Net.Http;
 using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
 

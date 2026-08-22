@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Errors;
 namespace KotobaSenpai.App.Resources;
 
 /// <summary>

@@ -1,12 +1,12 @@
+using KotobaSenpai.Core.Diagnostics;
+using KotobaSenpai.Core.PhraseAnalysis;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using KotobaSenpai.Core.Contracts;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
-using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.Platform.Windows.Llm;

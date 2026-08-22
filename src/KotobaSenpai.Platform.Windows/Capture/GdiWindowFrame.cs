@@ -1,8 +1,8 @@
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Geometry;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
-using KotobaSenpai.Core.Contracts;
-using KotobaSenpai.Core.Models;
 
 namespace KotobaSenpai.Platform.Windows.Capture;
 
