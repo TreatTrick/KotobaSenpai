@@ -134,6 +134,7 @@ public partial class App : Application
         services.AddSingleton<IWindowCatalog, Win32WindowCatalog>();
         services.AddSingleton<IWindowFrameCapture, GdiWindowFrameCapture>();
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
+        services.AddSingleton<ITargetWindowTracker, WinEventTargetWindowTracker>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
         services.AddSingleton<IRegionSelector, RegionSelectorWindow>();
 

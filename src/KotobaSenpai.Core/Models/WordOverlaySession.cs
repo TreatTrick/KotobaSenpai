@@ -12,6 +12,8 @@ public sealed class WordOverlaySession
     private readonly List<PhraseGroupView> _phraseGroups;
     private readonly IReadOnlyDictionary<(string Surface, string Reading), WordMeaningView> _meaningByWord;
     private readonly IReadOnlySet<string>? _underlineSegmentIds;
+    private readonly IReadOnlyList<NormalizedWordGeometry> _wordGeometry;
+    private readonly IReadOnlyList<NormalizedPhraseGroupGeometry> _phraseGeometry;
 
     private WordOverlaySession(
         Guid id,
@@ -20,7 +22,9 @@ public sealed class WordOverlaySession
         IReadOnlyList<PhraseGroupView> phraseGroups,
         string? phraseWarning,
         IReadOnlyList<WordMeaningView> wordMeanings,
-        IReadOnlySet<string>? underlineSegmentIds)
+        IReadOnlySet<string>? underlineSegmentIds,
+        IReadOnlyList<NormalizedWordGeometry> wordGeometry,
+        IReadOnlyList<NormalizedPhraseGroupGeometry> phraseGeometry)
     {
         Id = id;
         Target = target;
@@ -28,6 +32,8 @@ public sealed class WordOverlaySession
         _phraseGroups = phraseGroups.ToList();
         PhraseWarning = phraseWarning;
         _underlineSegmentIds = underlineSegmentIds;
+        _wordGeometry = wordGeometry;
+        _phraseGeometry = phraseGeometry;
         // ponytail: keyed by merged surface+reading — both come from the same span resolver, so this matches reliably. A word can appear multiple times (same surface+reading); keep the first rather than throwing on a duplicate.
         var meaningByWord = new Dictionary<(string Surface, string Reading), WordMeaningView>();
         foreach (var meaning in wordMeanings)
@@ -52,6 +58,39 @@ public sealed class WordOverlaySession
 
     /// <summary>All validated word meanings, for diagnostics and group-detail rendering.</summary>
     public IReadOnlyList<WordMeaningView> WordMeanings => _meaningByWord.Values.ToArray();
+
+    /// <summary>Reprojects the stable recognition geometry into a current target client rectangle.</summary>
+    public WordOverlaySession Reproject(WindowTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        var words = _words
+            .Select((word, index) => word.WithRects(_wordGeometry[index].ToScreen(target.Bounds)))
+            .ToArray();
+        var phraseGroups = _phraseGroups
+            .Select((group, groupIndex) => group with
+            {
+                Parts = group.Parts
+                    .Select((part, partIndex) => new PhrasePartView(
+                        _phraseGeometry[groupIndex].Parts[partIndex].ToScreen(target.Bounds))
+                    {
+                        Surface = part.Surface,
+                        Reading = part.Reading,
+                        PitchAccents = part.PitchAccents,
+                    })
+                    .ToArray(),
+            })
+            .ToArray();
+        return new WordOverlaySession(
+            Id,
+            target,
+            words,
+            phraseGroups,
+            PhraseWarning,
+            _meaningByWord.Values.ToArray(),
+            _underlineSegmentIds,
+            _wordGeometry,
+            _phraseGeometry);
+    }
 
     /// <summary>Looks up the LLM meaning for a local merged word (by its merged surface+reading), or null when none was returned.</summary>
     public WordMeaningView? TryGetMeaning(GroupedWord word)
@@ -104,16 +143,29 @@ public sealed class WordOverlaySession
             throw new BusinessRuleValidationException(
                 ErrorCodes.OverlayTargetNotSpecified,
                 "Overlay session target must be specified.");
+        var wordGeometry = validWords
+            .Select(word => new NormalizedWordGeometry(
+                word.Rects.Select(rect => NormalizedRect.FromScreen(rect, target.Bounds))))
+            .ToArray();
+        var groups = (phraseGroups ?? Array.Empty<PhraseGroupView>()).ToArray();
+        var phraseGeometry = groups
+            .Select(group => new NormalizedPhraseGroupGeometry(
+                group.Parts
+                    .Select(part => new NormalizedPhrasePartGeometry(
+                        part.Rects.Select(rect => NormalizedRect.FromScreen(rect, target.Bounds))))))
+            .ToArray();
         return new WordOverlaySession(
             Guid.NewGuid(),
             target,
             validWords,
-            (phraseGroups ?? Array.Empty<PhraseGroupView>()).ToArray(),
+            groups,
             phraseWarning,
             (wordMeanings ?? Array.Empty<WordMeaningView>()).ToArray(),
             underlineSegmentIds is null
                 ? null
-                : new HashSet<string>(underlineSegmentIds, StringComparer.Ordinal));
+                : new HashSet<string>(underlineSegmentIds, StringComparer.Ordinal),
+            wordGeometry,
+            phraseGeometry);
     }
 
     /// <summary>Returns whether a word's underline should be included in this session.</summary>

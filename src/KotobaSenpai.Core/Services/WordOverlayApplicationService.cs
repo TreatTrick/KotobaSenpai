@@ -1,4 +1,5 @@
 using KotobaSenpai.Core.Contracts;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Models;
 using KotobaSenpai.Core.Settings;
 
@@ -16,6 +17,7 @@ public sealed class WordOverlayApplicationService
     private readonly IDiagnosticReporter? _diagnostics;
     private readonly PhraseAnalysisOrchestrator? _phraseOrchestrator;
     private readonly ISettingsService? _settings;
+    private readonly ITargetWindowTracker? _tracker;
     private int _recognitionGeneration;
 
     public WordOverlayApplicationService(
@@ -24,7 +26,8 @@ public sealed class WordOverlayApplicationService
         IOverlayRenderer overlay,
         IDiagnosticReporter? diagnostics = null,
         PhraseAnalysisOrchestrator? phraseOrchestrator = null,
-        ISettingsService? settings = null)
+        ISettingsService? settings = null,
+        ITargetWindowTracker? tracker = null)
     {
         _recognizer = recognizer;
         _grouping = grouping;
@@ -32,6 +35,7 @@ public sealed class WordOverlayApplicationService
         _diagnostics = diagnostics;
         _phraseOrchestrator = phraseOrchestrator;
         _settings = settings;
+        _tracker = tracker;
     }
 
     public async Task<WordRecognitionResult> RecognizeAndShowAsync(
@@ -40,16 +44,33 @@ public sealed class WordOverlayApplicationService
     {
         var recognitionId = Guid.NewGuid();
         var generation = Interlocked.Increment(ref _recognitionGeneration);
-        var regionPixels = ReadRegionPixels(target);
-        var result = await _recognizer.RecognizeAsync(recognitionId, target, cancellationToken, regionPixels).ConfigureAwait(false);
+        var activeTarget = target;
+        if (_tracker is not null)
+        {
+            var current = _tracker.Current;
+            if (current is null || current.Handle != target.Handle)
+                throw new BusinessRuleValidationException(
+                    ErrorCodes.TargetWindowUnavailable,
+                    "The selected target window is not currently tracked.");
+
+            var snapshot = _tracker.Refresh();
+            if (!snapshot.IsCapturable)
+                throw new BusinessRuleValidationException(
+                    ErrorCodes.TargetWindowUnavailable,
+                    "The target window must be visible, restored, and unobstructed before recognition.");
+            activeTarget = snapshot.Target;
+        }
+
+        var regionPixels = ReadRegionPixels(activeTarget);
+        var result = await _recognizer.RecognizeAsync(recognitionId, activeTarget, cancellationToken, regionPixels).ConfigureAwait(false);
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
             .Select(word => word.WithRects(word.Rects
-                .Select(rect => CoordinateMapper.ToScreen(rect, result.FrameWidth, result.FrameHeight, target.Bounds))
+                .Select(rect => CoordinateMapper.ToScreen(rect, result.FrameWidth, result.FrameHeight, activeTarget.Bounds))
                 .ToArray()))
             .ToArray();
 
-        _diagnostics?.RecordTokens(recognitionId, target, screenWords);
+        _diagnostics?.RecordTokens(recognitionId, activeTarget, screenWords);
 
         // Publish local furigana before the optional provider call. The empty set intentionally suppresses underlines
         // only while phrase analysis is enabled; the disabled path below keeps the legacy all-local overlay.
@@ -59,7 +80,7 @@ public sealed class WordOverlayApplicationService
             if (!IsCurrent(generation))
                 return result;
             _overlay.Show(WordOverlaySession.Start(
-                target,
+                activeTarget,
                 screenWords,
                 underlineSegmentIds: Array.Empty<string>()));
 
@@ -71,11 +92,11 @@ public sealed class WordOverlayApplicationService
                 return result;
 
             var phraseGroups = phraseRun.Groups
-                .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, target.Bounds))
+                .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds))
                 .ToArray();
             _diagnostics?.RecordPhraseAnalysis(recognitionId, phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
             _overlay.Show(WordOverlaySession.Start(
-                target,
+                activeTarget,
                 screenWords,
                 phraseGroups,
                 phraseRun.Warning,
@@ -86,7 +107,7 @@ public sealed class WordOverlayApplicationService
 
         if (!IsCurrent(generation))
             return result;
-        _overlay.Show(WordOverlaySession.Start(target, screenWords));
+        _overlay.Show(WordOverlaySession.Start(activeTarget, screenWords));
         return result;
     }
 

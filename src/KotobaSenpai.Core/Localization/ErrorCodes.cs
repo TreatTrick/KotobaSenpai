@@ -25,6 +25,9 @@ public static class ErrorCodes
     /// <summary>Recognition failed (fallback code when the ViewModel recognizes).</summary>
     public const string RecognitionFailed = nameof(RecognitionFailed);
 
+    /// <summary>Selected target is not currently capturable from the screen.</summary>
+    public const string TargetWindowUnavailable = nameof(TargetWindowUnavailable);
+
     /// <summary>UniDic dictionary missing (UniDicTokenizer / UniDicDictionaryInstaller).</summary>
     public const string UniDicDictionaryMissing = nameof(UniDicDictionaryMissing);
 

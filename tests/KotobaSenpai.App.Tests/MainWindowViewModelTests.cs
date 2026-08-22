@@ -80,6 +80,21 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Selecting_window_attaches_tracker_and_clearing_selection_detaches_it()
+    {
+        var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
+        var tracker = new FakeTargetWindowTracker();
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(), tracker);
+
+        vm.SelectedWindow = target;
+        vm.SelectedWindow = null;
+
+        Assert.Equal(1, tracker.AttachCount);
+        Assert.Equal(1, tracker.DetachCount);
+        Assert.Null(tracker.Current);
+    }
+
+    [Fact]
     public void Set_recognition_region_shows_selector_for_selected_window()
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
@@ -117,7 +132,9 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(ErrorCodes.WindowEnumerationFailed, vm.Status);
     }
 
-    private static (MainWindowViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(IWindowCatalog catalog)
+    private static (MainWindowViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(
+        IWindowCatalog catalog,
+        ITargetWindowTracker? tracker = null)
     {
         var overlay = new FakeOverlay();
         var workflow = new WordOverlayApplicationService(
@@ -127,7 +144,7 @@ public sealed class MainWindowViewModelTests
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
-        return (new MainWindowViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger), overlay, localizer, logger);
+        return (new MainWindowViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger, tracker), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowCatalog : IWindowCatalog
@@ -186,6 +203,34 @@ public sealed class MainWindowViewModelTests
         }
 
         public void Hide() => HideCount++;
+    }
+
+    private sealed class FakeTargetWindowTracker : ITargetWindowTracker
+    {
+        public event EventHandler<TargetWindowSnapshot>? Changed;
+
+        public int AttachCount { get; private set; }
+        public int DetachCount { get; private set; }
+        public TargetWindowSnapshot? Current { get; private set; }
+
+        public TargetWindowSnapshot Attach(WindowTarget target)
+        {
+            AttachCount++;
+            Current = new TargetWindowSnapshot(target.Handle, target.Title, target.Bounds, 1, true, false, true);
+            Changed?.Invoke(this, Current);
+            return Current;
+        }
+
+        public TargetWindowSnapshot Refresh()
+            => Current ?? throw new InvalidOperationException("No target attached.");
+
+        public void Detach()
+        {
+            DetachCount++;
+            Current = null;
+        }
+
+        public void Dispose() { }
     }
 
     /// <summary>Localization fake: returns a recognizable string per key (including Suffix so culture-switch re-rendering can be tested).</summary>

@@ -26,6 +26,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IStringLocalizer _localizer;
     private readonly IUserMessageResolver _messageResolver;
     private readonly ILogger _logger;
+    private readonly ITargetWindowTracker? _tracker;
 
     /// <summary>A delegate that renders the localized Status from the current state; re-invoked on culture switch to refresh in place.</summary>
     private Func<string> _renderStatus = () => string.Empty;
@@ -37,7 +38,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ISettingsService settings,
         IStringLocalizer localizer,
         IUserMessageResolver messageResolver,
-        ILogger logger)
+        ILogger logger,
+        ITargetWindowTracker? tracker = null)
     {
         _catalog = catalog;
         _workflow = workflow;
@@ -46,6 +48,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _localizer = localizer;
         _messageResolver = messageResolver;
         _logger = logger;
+        _tracker = tracker;
 
         _localizer.CultureChanged += OnCultureChanged;
         SetStatus(ResourceKeys.Status_SelectTarget);
@@ -70,8 +73,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <summary>Updates the status prompt after a window is selected.</summary>
     partial void OnSelectedWindowChanged(WindowTarget? value)
-        => SetStatus(value is null ? ResourceKeys.Status_SelectTarget : ResourceKeys.Status_Selected,
-                     value?.Title ?? string.Empty);
+    {
+        try
+        {
+            if (value is null)
+                _tracker?.Detach();
+            else
+                _tracker?.Attach(value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to attach the selected target window");
+        }
+
+        SetStatus(value is null ? ResourceKeys.Status_SelectTarget : ResourceKeys.Status_Selected,
+                  value?.Title ?? string.Empty);
+    }
 
     /// <summary>Re-enumerates visible windows and refreshes the candidate list.</summary>
     [RelayCommand]

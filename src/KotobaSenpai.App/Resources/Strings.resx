@@ -78,6 +78,9 @@
   <data name="RecognitionFailed" xml:space="preserve">
     <value>Recognition failed.</value>
   </data>
+  <data name="TargetWindowUnavailable" xml:space="preserve">
+    <value>The target window must be visible, restored, and unobstructed before recognition.</value>
+  </data>
   <!-- XAML labels -->
   <data name="MainWindow_Title" xml:space="preserve">
     <value>KotobaSenpai · Phase 1</value>

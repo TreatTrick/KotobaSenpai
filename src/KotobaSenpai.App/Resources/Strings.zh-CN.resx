@@ -78,6 +78,9 @@
   <data name="RecognitionFailed" xml:space="preserve">
     <value>识别失败。</value>
   </data>
+  <data name="TargetWindowUnavailable" xml:space="preserve">
+    <value>识别前请先显示并恢复目标窗口，且不要让其他窗口遮挡它。</value>
+  </data>
   <!-- XAML labels -->
   <data name="MainWindow_Title" xml:space="preserve">
     <value>KotobaSenpai · 第一阶段</value>

@@ -10,7 +10,7 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
 /// Detail popup for both phrase groups and LLM word meanings: shows the group's label/meaning/grammar (plus per-word
-/// meanings) or a single word's headword/pos/reading/meaning/grammar. Click-through, non-activating, topmost; updated by
+/// meanings) or a single word's headword/pos/reading/meaning/grammar. Click-through and non-activating; updated by
 /// the overlay when the hovered group or word changes and hidden when it leaves.
 /// </summary>
 public sealed class PhrasePopup : Window
@@ -29,7 +29,7 @@ public sealed class PhrasePopup : Window
         AllowsTransparency = true;
         Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x1B, 0x1B, 0x1B));
         ShowInTaskbar = false;
-        Topmost = true;
+        Topmost = false;
         ShowActivated = false;
         ResizeMode = ResizeMode.NoResize;
         Content = new ScrollViewer

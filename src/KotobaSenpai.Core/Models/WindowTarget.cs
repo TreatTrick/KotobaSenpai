@@ -18,4 +18,7 @@ public sealed record WindowTarget
     public string Title { get; }
 
     public ScreenRect Bounds { get; }
+
+    public WindowTarget WithBounds(ScreenRect bounds)
+        => new(Handle, Title, bounds);
 }

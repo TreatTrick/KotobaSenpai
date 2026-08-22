@@ -14,7 +14,7 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
-/// WPF implementation of the <see cref="IOverlayRenderer"/> port: a transparent, topmost, non-activating, click-through
+/// WPF implementation of the <see cref="IOverlayRenderer"/> port: a transparent, target-relative, non-activating, click-through
 /// tool window that draws one underline for each local merged word. Hovering a local word recolors its underline and shows
 /// its LLM meaning popup; hovering a group recolors the underlines of its member words and shows the group detail popup.
 /// Clicks always pass through to the window below.
@@ -23,19 +23,24 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 {
     private readonly IStringLocalizer? _localizer;
     private readonly ISettingsService? _settings;
+    private readonly ITargetWindowTracker? _tracker;
     private OverlayWindow? _window;
 
-    public WpfOverlayRenderer(IStringLocalizer? localizer = null, ISettingsService? settings = null)
+    public WpfOverlayRenderer(
+        IStringLocalizer? localizer = null,
+        ISettingsService? settings = null,
+        ITargetWindowTracker? tracker = null)
     {
         _localizer = localizer;
         _settings = settings;
+        _tracker = tracker;
     }
 
     public void Show(WordOverlaySession session)
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            _window ??= new OverlayWindow(_localizer);
+            _window ??= new OverlayWindow(_localizer, _tracker);
             _window.Render(session, ResolveFontScale());
         });
     }
@@ -48,7 +53,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            _window?.StopHover();
+            _window?.ClearSession();
             _window?.Hide();
         });
     }
@@ -75,20 +80,31 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private readonly List<int> _lineOwner = new(); // parallel to _lineElements: the word index each line belongs to
         private readonly DispatcherTimer _hoverTimer;
         private readonly PhrasePopup _phrasePopup;
+        private readonly ITargetWindowTracker? _tracker;
         private WordOverlaySession? _session;
+        private double _fontScale;
         private int _hoverIndex = -1;
         private int _hoveredGroup = -1;
         private IReadOnlyList<int> _hoveredGroupLines = Array.Empty<int>();
 
-        public OverlayWindow(IStringLocalizer? localizer = null)
+        public OverlayWindow(IStringLocalizer? localizer = null, ITargetWindowTracker? tracker = null)
         {
             _phrasePopup = new PhrasePopup(localizer);
+            _tracker = tracker;
+
+            if (_tracker is not null)
+                _tracker.Changed += OnTargetChanged;
+            Closed += (_, _) =>
+            {
+                if (_tracker is not null)
+                    _tracker.Changed -= OnTargetChanged;
+            };
 
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = Brushes.Transparent;
             ShowInTaskbar = false;
-            Topmost = true;
+            Topmost = false;
             ShowActivated = false;
             IsHitTestVisible = false;
             Content = _canvas;
@@ -100,6 +116,51 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         public void Render(WordOverlaySession session, double fontScale)
         {
+            _fontScale = fontScale;
+            _session = session;
+            if (_tracker is not null)
+            {
+                var snapshot = _tracker.Current;
+                if (snapshot is null || snapshot.Handle != session.Target.Handle)
+                {
+                    ClearSession();
+                    Hide();
+                    return;
+                }
+                if (!snapshot.IsRenderable)
+                {
+                    StopHover();
+                    Hide();
+                    return;
+                }
+                session = session.Reproject(snapshot.Target);
+            }
+
+            RenderCurrent(session, fontScale);
+        }
+
+        private void OnTargetChanged(object? sender, TargetWindowSnapshot snapshot)
+        {
+            if (_session is null)
+                return;
+            if (snapshot.Handle != _session.Target.Handle)
+            {
+                ClearSession();
+                Hide();
+                return;
+            }
+            if (!snapshot.IsRenderable)
+            {
+                StopHover();
+                Hide();
+                return;
+            }
+
+            RenderCurrent(_session.Reproject(snapshot.Target), _fontScale);
+        }
+
+        private void RenderCurrent(WordOverlaySession session, double fontScale)
+        {
             if (!IsVisible)
                 Show();
 
@@ -109,7 +170,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _hoveredGroupLines = Array.Empty<int>();
 
             var handle = new WindowInteropHelper(this).Handle;
-            var scale = NativeMethods.GetDpiForWindow(handle) / 96d;
+            var dpi = NativeMethods.GetDpiForWindow(handle);
+            var scale = (dpi == 0 ? 96 : dpi) / 96d;
             Width = session.Target.Bounds.Width / scale;
             Height = session.Target.Bounds.Height / scale;
             NativeMethods.SetWindowPos(
@@ -147,6 +209,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     AddPitchAnnotations(word, scale, fontScale);
             }
             _hoverTimer.Start();
+        }
+
+        public void ClearSession()
+        {
+            _session = null;
+            StopHover();
+            _canvas.Children.Clear();
+            _lineElements.Clear();
+            _lineOwner.Clear();
         }
 
         /// <summary>
