@@ -1,5 +1,7 @@
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Models;
 using KotobaSenpai.Platform.Windows;
+using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Ocr.MeikiOcr;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -38,6 +40,32 @@ public sealed class MeikiOcrEngineTests
             File.WriteAllText(Path.Combine(dir, "meiki.text.detect.v0.1.960x544.onnx"), "not-a-model");
             var ex = Assert.Throws<WindowsPlatformException>(() => new MeikiOcrEngine(dir));
             Assert.Equal(ErrorCodes.OcrModelMissing, ex.ErrorCode);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Diagnostic_frame_and_text_files_use_the_recognition_id()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "meiki-diag-" + Guid.NewGuid().ToString("N"));
+        var recognitionId = Guid.Parse("0123456789abcdef0123456789abcdef");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var frame = new CapturedFrame(1, 1, new byte[] { 0, 0, 0, 255 });
+            var lines = new[]
+            {
+                new MeikiLine("日", [new MeikiChar('日', 0, 0, 1, 1, 1f)]),
+            };
+            var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 1, 1));
+
+            MeikiOcrWordRecognizer.DumpDiagnostics(recognitionId, frame, lines, target, dir);
+
+            Assert.True(File.Exists(Path.Combine(dir, $"frame-{recognitionId:N}.png")));
+            Assert.True(File.Exists(Path.Combine(dir, $"ocr-{recognitionId:N}.txt")));
         }
         finally
         {

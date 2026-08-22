@@ -99,7 +99,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         }
 
         // Capture the raw request/response verbatim (request body never contains the API key) for offline inspection.
-        _diagnostics?.RecordLlmExchange(request.SegmentId, body, envelope);
+        _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope);
 
         try
         {

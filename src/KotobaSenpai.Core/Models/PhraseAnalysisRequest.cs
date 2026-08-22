@@ -8,22 +8,29 @@ namespace KotobaSenpai.Core.Models;
 public sealed record PhraseAnalysisRequest
 {
     public PhraseAnalysisRequest(
+        Guid recognitionId,
         string segmentId,
         string segmentText,
         IReadOnlyList<SentenceTokenReference> tokens,
         IReadOnlyList<LocalSpanSummary> localSpans)
     {
+        if (recognitionId == Guid.Empty)
+            throw new ArgumentException("Recognition id must not be empty.", nameof(recognitionId));
         if (string.IsNullOrWhiteSpace(segmentId))
             throw new ArgumentException("Segment id must not be empty.", nameof(segmentId));
         ArgumentNullException.ThrowIfNull(segmentText);
         tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
         localSpans = localSpans ?? throw new ArgumentNullException(nameof(localSpans));
 
+        RecognitionId = recognitionId;
         SegmentId = segmentId;
         SegmentText = segmentText;
         Tokens = tokens.ToArray();
         LocalSpans = localSpans.ToArray();
     }
+
+    /// <summary>Application-owned recognition id used only for local diagnostic correlation.</summary>
+    public Guid RecognitionId { get; }
 
     /// <summary>Request-scoped segment id (unique only within the request).</summary>
     public string SegmentId { get; }

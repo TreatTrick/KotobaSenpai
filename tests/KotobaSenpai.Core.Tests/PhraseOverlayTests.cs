@@ -265,7 +265,7 @@ public sealed class PhraseFallbackTests
     [Fact]
     public async Task App_service_keeps_local_words_when_phrase_disabled()
     {
-        var (service, overlay) = BuildService(analyzer: null, settings: new FakeSettings("false"));
+        var (service, overlay, _) = BuildService(analyzer: null, settings: new FakeSettings("false"));
         await service.RecognizeAndShowAsync(Target());
 
         Assert.Single(overlay.Session!.Words);
@@ -276,7 +276,7 @@ public sealed class PhraseFallbackTests
     [Fact]
     public async Task App_service_keeps_local_words_when_provider_unavailable()
     {
-        var (service, overlay) = BuildService(
+        var (service, overlay, _) = BuildService(
             analyzer: new FakeAnalyzer(PhraseAnalysisOutcome.NoKey),
             settings: new FakeSettings("true"));
         await service.RecognizeAndShowAsync(Target());
@@ -292,7 +292,7 @@ public sealed class PhraseFallbackTests
     {
         var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var analyzer = new BlockingAnalyzer(release);
-        var (service, overlay) = BuildService(analyzer, new FakeSettings("true"));
+        var (service, overlay, _) = BuildService(analyzer, new FakeSettings("true"));
 
         var recognition = service.RecognizeAndShowAsync(Target());
         await overlay.FirstShown.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -311,7 +311,7 @@ public sealed class PhraseFallbackTests
     public async Task App_service_does_not_publish_after_hide_supersedes_pending_analysis()
     {
         var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var (service, overlay) = BuildService(new BlockingAnalyzer(release), new FakeSettings("true"));
+        var (service, overlay, _) = BuildService(new BlockingAnalyzer(release), new FakeSettings("true"));
 
         var recognition = service.RecognizeAndShowAsync(Target());
         await overlay.FirstShown.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -330,7 +330,7 @@ public sealed class PhraseFallbackTests
         var firstRelease = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var secondRelease = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var analyzer = new SequencedBlockingAnalyzer(firstRelease, secondRelease);
-        var (service, overlay) = BuildService(analyzer, new FakeSettings("true"));
+        var (service, overlay, _) = BuildService(analyzer, new FakeSettings("true"));
 
         var first = service.RecognizeAndShowAsync(Target());
         await overlay.FirstShown.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -351,7 +351,7 @@ public sealed class PhraseFallbackTests
     {
         var analyzer = new FakeAnalyzer(PhraseAnalysisOutcome.Success,
             new ParsedPhraseGroup("g1", "grammar", [[SentenceTokenId.Parse("l0:t0")]], "彼は", "他是", "主语助词"));
-        var (service, overlay) = BuildService(analyzer, new FakeSettings("true"));
+        var (service, overlay, _) = BuildService(analyzer, new FakeSettings("true"));
         await service.RecognizeAndShowAsync(Target());
 
         var group = Assert.Single(overlay.Session!.PhraseGroups);
@@ -360,6 +360,35 @@ public sealed class PhraseFallbackTests
         // Frame 100x50 → window 200x100 (2x scale), part box (0,0,10,20) → screen (0,0,20,40).
         var rect = Assert.Single(group.Parts[0].Rects);
         Assert.Equal(new ScreenRect(0, 0, 20, 40), rect);
+    }
+
+    [Fact]
+    public async Task App_service_propagates_one_id_to_local_and_phrase_diagnostics()
+    {
+        var analyzer = new FakeAnalyzer(PhraseAnalysisOutcome.Success);
+        var diagnostics = new FakeDiagnosticReporter();
+        var (service, _, recognizer) = BuildService(analyzer, new FakeSettings("true"), diagnostics);
+
+        await service.RecognizeAndShowAsync(Target());
+
+        var recognitionId = Assert.Single(recognizer.RecognitionIds);
+        Assert.Equal(recognitionId, Assert.Single(analyzer.RecognitionIds));
+        Assert.Equal(recognitionId, Assert.Single(diagnostics.TokenRecognitionIds));
+        Assert.Equal(recognitionId, Assert.Single(diagnostics.PhraseRecognitionIds));
+    }
+
+    [Fact]
+    public async Task Each_recognition_gets_a_distinct_id()
+    {
+        var diagnostics = new FakeDiagnosticReporter();
+        var (service, _, recognizer) = BuildService(null, new FakeSettings("false"), diagnostics);
+
+        await service.RecognizeAndShowAsync(Target());
+        await service.RecognizeAndShowAsync(Target());
+
+        Assert.Equal(2, recognizer.RecognitionIds.Count);
+        Assert.NotEqual(recognizer.RecognitionIds[0], recognizer.RecognitionIds[1]);
+        Assert.Equal(recognizer.RecognitionIds, diagnostics.TokenRecognitionIds);
     }
 
     private static WindowTarget Target() => new((nint)42, "VN", new ScreenRect(0, 0, 200, 100));
@@ -379,7 +408,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
         var orchestrator = new PhraseAnalysisOrchestrator(
             analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
 
-        var run = await orchestrator.AnalyzeAsync(FourSegments);
+        var run = await orchestrator.AnalyzeAsync(Guid.NewGuid(), FourSegments);
 
         Assert.Equal(4, run.Groups.Count);
         // Order matches segment order (Task.WhenAll preserves order).
@@ -398,7 +427,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
         var orchestrator = new PhraseAnalysisOrchestrator(
             analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
 
-        var run = await orchestrator.AnalyzeAsync(FourSegments);
+        var run = await orchestrator.AnalyzeAsync(Guid.NewGuid(), FourSegments);
 
         Assert.Equal(PhraseAnalysisOutcome.Success, run.Outcome);
         Assert.Equal(3, run.Groups.Count);
@@ -414,7 +443,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
         var orchestrator = new PhraseAnalysisOrchestrator(
             analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
 
-        var run = await orchestrator.AnalyzeAsync([Line("ご。")]);
+        var run = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("ご。")]);
 
         Assert.Equal(["s0-0"], run.SuccessfulSegmentIds);
     }
@@ -428,7 +457,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
-        var run = await orchestrator.AnalyzeAsync(FourSegments, cts.Token);
+        var run = await orchestrator.AnalyzeAsync(Guid.NewGuid(), FourSegments, cts.Token);
 
         Assert.Equal(PhraseAnalysisOutcome.Cancelled, run.Outcome);
         Assert.Empty(run.Groups);
@@ -469,21 +498,24 @@ public sealed class PhraseOrchestratorConcurrencyTests
     }
 }
 
-    private static (WordOverlayApplicationService Service, FakeOverlay Overlay) BuildService(
+    private static (WordOverlayApplicationService Service, FakeOverlay Overlay, FakeRecognizer Recognizer) BuildService(
         ILlmPhraseAnalyzer? analyzer,
-        ISettingsService settings)
+        ISettingsService settings,
+        FakeDiagnosticReporter? diagnostics = null)
     {
         var phraseOrchestrator = analyzer is null
             ? null
             : new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
         var overlay = new FakeOverlay();
+        var recognizer = new FakeRecognizer();
         var service = new WordOverlayApplicationService(
-            new FakeRecognizer(),
+            recognizer,
             new WordGroupingService(new CharTokenizer(), new SentenceSegmenter(), new IdentitySpanResolver()),
             overlay,
+            diagnostics: diagnostics,
             phraseOrchestrator: phraseOrchestrator,
             settings: settings);
-        return (service, overlay);
+        return (service, overlay, recognizer);
     }
 
     private sealed class FakeSettings : ISettingsService
@@ -498,11 +530,15 @@ public sealed class PhraseOrchestratorConcurrencyTests
     {
         private readonly PhraseAnalysisOutcome _outcome;
         private readonly ParsedPhraseGroup[] _groups;
+        public List<Guid> RecognitionIds { get; } = [];
         public FakeAnalyzer(PhraseAnalysisOutcome outcome, params ParsedPhraseGroup[] groups)
             => (_outcome, _groups) = (outcome, groups);
 
         public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken ct = default)
-            => Task.FromResult(new PhraseAnalysisResult(_outcome, _groups));
+        {
+            RecognitionIds.Add(request.RecognitionId);
+            return Task.FromResult(new PhraseAnalysisResult(_outcome, _groups));
+        }
     }
 
     private sealed class BlockingAnalyzer : ILlmPhraseAnalyzer
@@ -529,9 +565,28 @@ public sealed class PhraseOrchestratorConcurrencyTests
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
     {
-        public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
-            Task.FromResult(new WordRecognitionResult(100, 50,
+        public List<Guid> RecognitionIds { get; } = [];
+
+        public Task<WordRecognitionResult> RecognizeAsync(Guid recognitionId, WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null)
+        {
+            RecognitionIds.Add(recognitionId);
+            return Task.FromResult(new WordRecognitionResult(100, 50,
                 [new OcrLine([new OcrWord("彼", new ScreenRect(0, 0, 10, 20))])]));
+        }
+    }
+
+    private sealed class FakeDiagnosticReporter : IDiagnosticReporter
+    {
+        public List<Guid> TokenRecognitionIds { get; } = [];
+        public List<Guid> PhraseRecognitionIds { get; } = [];
+
+        public void RecordTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords)
+            => TokenRecognitionIds.Add(recognitionId);
+
+        public void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning)
+            => PhraseRecognitionIds.Add(recognitionId);
+
+        public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson) { }
     }
 
     /// <summary>Keeps every candidate word as its own span so grouping preserves the recognizer's words in this integration test.</summary>

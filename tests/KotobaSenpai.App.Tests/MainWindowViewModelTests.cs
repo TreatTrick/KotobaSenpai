@@ -144,7 +144,7 @@ public sealed class MainWindowViewModelTests
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
     {
-        public Task<WordRecognitionResult> RecognizeAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
+        public Task<WordRecognitionResult> RecognizeAsync(Guid recognitionId, WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
             Task.FromResult(new WordRecognitionResult(100, 50,
                 [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]));
     }

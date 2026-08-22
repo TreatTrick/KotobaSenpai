@@ -29,13 +29,16 @@ public sealed class PhraseAnalysisOrchestrator
     }
 
     public async Task<PhraseAnalysisRun> AnalyzeAsync(
+        Guid recognitionId,
         IReadOnlyList<OcrLine> lines,
         CancellationToken cancellationToken = default)
     {
+        if (recognitionId == Guid.Empty)
+            throw new ArgumentException("Recognition id must not be empty.", nameof(recognitionId));
         ArgumentNullException.ThrowIfNull(lines);
 
         // First build the requests purely locally (fast, zero I/O), preserving segment order; Task.WhenAll returns results in input order, so no re-sorting is needed.
-        var requests = BuildRequests(lines);
+        var requests = BuildRequests(recognitionId, lines);
         if (requests.Count == 0)
             return new PhraseAnalysisRun(PhraseAnalysisOutcome.Success, [], null);
 
@@ -95,7 +98,7 @@ public sealed class PhraseAnalysisOrchestrator
         };
     }
 
-    private IReadOnlyList<PhraseAnalysisRequest> BuildRequests(IReadOnlyList<OcrLine> lines)
+    private IReadOnlyList<PhraseAnalysisRequest> BuildRequests(Guid recognitionId, IReadOnlyList<OcrLine> lines)
     {
         var requests = new List<PhraseAnalysisRequest>();
         foreach (var segment in _segmenter.Segment(lines))
@@ -105,6 +108,7 @@ public sealed class PhraseAnalysisOrchestrator
                 continue;
 
             requests.Add(new PhraseAnalysisRequest(
+                recognitionId,
                 segment.SegmentId,
                 string.Concat(segment.LineIndices.Select(i => lines[i].Text)),
                 segmentTokens.References,

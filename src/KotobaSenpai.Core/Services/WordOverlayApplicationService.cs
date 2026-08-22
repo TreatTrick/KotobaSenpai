@@ -38,9 +38,10 @@ public sealed class WordOverlayApplicationService
         WindowTarget target,
         CancellationToken cancellationToken = default)
     {
+        var recognitionId = Guid.NewGuid();
         var generation = Interlocked.Increment(ref _recognitionGeneration);
         var regionPixels = ReadRegionPixels(target);
-        var result = await _recognizer.RecognizeAsync(target, cancellationToken, regionPixels).ConfigureAwait(false);
+        var result = await _recognizer.RecognizeAsync(recognitionId, target, cancellationToken, regionPixels).ConfigureAwait(false);
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
             .Select(word => word.WithRects(word.Rects
@@ -48,7 +49,7 @@ public sealed class WordOverlayApplicationService
                 .ToArray()))
             .ToArray();
 
-        _diagnostics?.RecordTokens(target, screenWords);
+        _diagnostics?.RecordTokens(recognitionId, target, screenWords);
 
         // Publish local furigana before the optional provider call. The empty set intentionally suppresses underlines
         // only while phrase analysis is enabled; the disabled path below keeps the legacy all-local overlay.
@@ -63,7 +64,7 @@ public sealed class WordOverlayApplicationService
                 underlineSegmentIds: Array.Empty<string>()));
 
             var phraseRun = await _phraseOrchestrator!
-                .AnalyzeAsync(result.Lines, cancellationToken)
+                .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
                 .ConfigureAwait(false);
 
             if (!IsCurrent(generation))
@@ -72,7 +73,7 @@ public sealed class WordOverlayApplicationService
             var phraseGroups = phraseRun.Groups
                 .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, target.Bounds))
                 .ToArray();
-            _diagnostics?.RecordPhraseAnalysis(phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
+            _diagnostics?.RecordPhraseAnalysis(recognitionId, phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
             _overlay.Show(WordOverlaySession.Start(
                 target,
                 screenWords,

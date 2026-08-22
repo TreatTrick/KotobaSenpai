@@ -35,6 +35,7 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
     }
 
     public async Task<WordRecognitionResult> RecognizeAsync(
+        Guid recognitionId,
         WindowTarget target,
         CancellationToken cancellationToken = default,
         ScreenRect? region = null)
@@ -67,7 +68,7 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         }
 
         if (IsDiagEnabled())
-            DumpDiagnostics(frame, lines, target);
+            DumpDiagnostics(recognitionId, frame, lines, target);
 
         // Preserve line structure: one OcrLine per line, so the tokenizer service can re-assemble words line by line.
         // Boxes from a region OCR are offset back to full-frame coordinates by the crop origin.
@@ -95,21 +96,26 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
     /// Writes diagnostics to disk: saves the captured frame PNG and the OCR-recognized text to a fixed directory, so you can
     /// verify what was captured and what was recognized.
     /// </summary>
-    private static void DumpDiagnostics(CapturedFrame frame, IReadOnlyList<MeikiLine> lines, WindowTarget target)
+    internal static void DumpDiagnostics(
+        Guid recognitionId,
+        CapturedFrame frame,
+        IReadOnlyList<MeikiLine> lines,
+        WindowTarget target,
+        string? diagnosticDirectory = null)
     {
-        var dir = Path.Combine(
+        var dir = diagnosticDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KotobaSenpai", "diag");
         Directory.CreateDirectory(dir);
-        var stamp = DateTime.Now.ToString("HHmmss-fff");
-        SavePng(Path.Combine(dir, $"frame-{stamp}.png"), frame);
+        var runId = recognitionId.ToString("N");
+        SavePng(Path.Combine(dir, $"frame-{runId}.png"), frame);
         var text = new List<string>
     {
         $"target={target.Title} bounds={target.Bounds}",
         $"frame={frame.Width}x{frame.Height} lines={lines.Count}",
-    };
+        };
         text.AddRange(lines.Select(l => $"[{l.Text}] chars={l.Chars.Count}"));
-        File.WriteAllLines(Path.Combine(dir, $"ocr-{stamp}.txt"), text);
+        File.WriteAllLines(Path.Combine(dir, $"ocr-{runId}.txt"), text);
         PruneToLatest(dir, "frame-");
         PruneToLatest(dir, "ocr-");
     }

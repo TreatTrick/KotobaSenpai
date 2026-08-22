@@ -18,6 +18,7 @@ public interface IWindowWordRecognizer
     /// full frame; otherwise the whole window is recognized.
     /// </summary>
     Task<WordRecognitionResult> RecognizeAsync(
+        Guid recognitionId,
         WindowTarget target,
         CancellationToken cancellationToken = default,
         ScreenRect? region = null);

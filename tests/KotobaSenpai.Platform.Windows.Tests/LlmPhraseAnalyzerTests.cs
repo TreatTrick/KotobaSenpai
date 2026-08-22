@@ -118,7 +118,7 @@ public sealed class PhrasePromptBuilderTests
             new PartsOfSpeech("pos1", "", "", ""), "cType", "cForm", "", 0);
 
     private static PhraseAnalysisRequest Request(string text)
-        => new("s0", text, [Ref()], [new LocalSpanSummary(text, text, text, [SentenceTokenId.Parse("l0:t0")])]);
+        => new(Guid.Parse("0123456789abcdef0123456789abcdef"), "s0", text, [Ref()], [new LocalSpanSummary(text, text, text, [SentenceTokenId.Parse("l0:t0")])]);
 
     private static string Segment(string text) => text;
 }
@@ -364,13 +364,17 @@ public sealed class LlmPhraseAnalyzerTests
     {
         var reporter = new FakeDiagnosticReporter();
         var analyzer = new LlmPhraseAnalyzer(
-            new FakeSettings(apiKey: "k"), new HttpClient(new StubHandler(HttpStatusCode.OK, GroupEnvelope)),
+            new FakeSettings(apiKey: "secret-api-key"), new HttpClient(new StubHandler(HttpStatusCode.OK, GroupEnvelope)),
             diagnostics: reporter);
         await analyzer.AnalyzeAsync(Request());
 
         Assert.NotNull(reporter.RequestJson);
         Assert.NotNull(reporter.ResponseJson);
+        Assert.Equal(Request().RecognitionId, reporter.RecognitionId);
+        Assert.Equal("s0", reporter.SegmentId);
         Assert.Contains("test-model", reporter.RequestJson); // model name in the request body
+        Assert.DoesNotContain(Request().RecognitionId.ToString("N"), reporter.RequestJson);
+        Assert.DoesNotContain("secret-api-key", reporter.RequestJson);
         Assert.Contains("groups", reporter.ResponseJson);        // raw provider envelope saved verbatim
     }
 
@@ -448,7 +452,7 @@ public sealed class LlmPhraseAnalyzerTests
     }
 
     private static PhraseAnalysisRequest Request()
-        => new("s0", "あ", [new SentenceTokenReference(0, 0, 0, 0, Token(), [new ScreenRect(0, 0, 10, 20)])], []);
+        => new(Guid.Parse("0123456789abcdef0123456789abcdef"), "s0", "あ", [new SentenceTokenReference(0, 0, 0, 0, Token(), [new ScreenRect(0, 0, 10, 20)])], []);
 
     private static Token Token()
         => new("あ", "あ", "あ", "あ", "あ", "あ",
@@ -470,12 +474,16 @@ public sealed class LlmPhraseAnalyzerTests
 
     private sealed class FakeDiagnosticReporter : IDiagnosticReporter
     {
+        public Guid RecognitionId { get; private set; }
+        public string? SegmentId { get; private set; }
         public string? RequestJson { get; private set; }
         public string? ResponseJson { get; private set; }
-        public void RecordTokens(WindowTarget target, IReadOnlyList<GroupedWord> groupedWords) { }
-        public void RecordPhraseAnalysis(PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning) { }
-        public void RecordLlmExchange(string segmentId, string requestJson, string responseJson)
+        public void RecordTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords) { }
+        public void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning) { }
+        public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson)
         {
+            RecognitionId = recognitionId;
+            SegmentId = segmentId;
             RequestJson = requestJson;
             ResponseJson = responseJson;
         }

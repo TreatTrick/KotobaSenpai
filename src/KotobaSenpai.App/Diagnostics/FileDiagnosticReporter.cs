@@ -18,21 +18,23 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
     private const string DiagEnabledKey = "DiagEnabled";
 
     private readonly ISettingsService _settings;
+    private readonly string _diagnosticDirectory;
     private static int _seq;
 
-    public FileDiagnosticReporter(ISettingsService settings)
+    public FileDiagnosticReporter(ISettingsService settings, string? diagnosticDirectory = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _diagnosticDirectory = diagnosticDirectory ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KotobaSenpai", "diag");
     }
 
-    public void RecordTokens(WindowTarget target, IReadOnlyList<GroupedWord> groupedWords)
+    public void RecordTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords)
     {
         if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
             return;
 
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "KotobaSenpai", "diag");
+        var dir = _diagnosticDirectory;
         Directory.CreateDirectory(dir);
 
         var lines = new List<string>
@@ -49,40 +51,36 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
             var source = string.Join("+", word.SourceTokens.Select(sourceToken => sourceToken.Surface));
             lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={token.Reading} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}");
         }
-        File.WriteAllLines(Path.Combine(dir, $"tokens-{DateTime.Now:HHmmss-fff}.txt"), lines, Utf8Bom);
+        File.WriteAllLines(Path.Combine(dir, $"tokens-{recognitionId:N}.txt"), lines, Utf8Bom);
         PruneToLatest(dir, "tokens-");
     }
 
-    public void RecordPhraseAnalysis(PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning)
+    public void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning)
     {
         if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
             return;
 
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "KotobaSenpai", "diag");
+        var dir = _diagnosticDirectory;
         Directory.CreateDirectory(dir);
 
         var flags = new[] { "## phrase analysis", $"outcome={outcome}", $"groups={groups.Count}" };
         if (!string.IsNullOrEmpty(warning))
             flags = flags.Append($"warning={warning}").ToArray();
-        File.WriteAllLines(Path.Combine(dir, $"phrase-{DateTime.Now:HHmmss-fff}.txt"), flags, Utf8Bom);
+        File.WriteAllLines(Path.Combine(dir, $"phrase-{recognitionId:N}.txt"), flags, Utf8Bom);
         PruneToLatest(dir, "phrase-");
     }
 
-    public void RecordLlmExchange(string segmentId, string requestJson, string responseJson)
+    public void RecordLlmExchange(Guid recognitionId, string segmentId, string requestJson, string responseJson)
     {
         if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
             return;
 
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "KotobaSenpai", "diag");
+        var dir = _diagnosticDirectory;
         Directory.CreateDirectory(dir);
 
         var seq = Interlocked.Increment(ref _seq);
         var safe = Sanitize(segmentId);
-        var stamp = $"{DateTime.Now:HHmmss-fff}-{seq:D3}-{safe}";
+        var stamp = $"{recognitionId:N}-{safe}-{seq:D3}";
         // Indented + UTF-8 with BOM so each file opens correctly in a Chinese-locale editor/JSON viewer; the request body never contains the API key (it lives in the Authorization header).
         File.WriteAllText(Path.Combine(dir, $"llm-req-{stamp}.json"), FormatJson(requestJson), Utf8Bom);
         File.WriteAllText(Path.Combine(dir, $"llm-resp-{stamp}.json"), FormatJson(responseJson), Utf8Bom);
