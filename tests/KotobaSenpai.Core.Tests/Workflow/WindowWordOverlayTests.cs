@@ -74,6 +74,7 @@ public sealed class WindowWordOverlayTests
         Assert.NotNull(overlay.Session);
         Assert.Equal("日", overlay.Session!.Words[0].Token.Surface);
         Assert.Equal(new ScreenRect(20, 10, 20, 20), overlay.Session.Words[0].Bounds);
+        Assert.Equal([new ScreenRect(20, 10, 20, 20)], overlay.Session.Words[0].GetSourceTokenBounds(0));
     }
 
     [Fact]

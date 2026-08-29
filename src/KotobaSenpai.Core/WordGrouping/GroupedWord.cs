@@ -3,6 +3,13 @@ using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Geometry;
 namespace KotobaSenpai.Core.WordGrouping;
 
+/// <summary>Geometry for one contiguous source-token range on one OCR line.</summary>
+public sealed record SourceTokenLineGeometry(
+    int LineIndex,
+    int SurfaceOffset,
+    int SurfaceLength,
+    ScreenRect Bounds);
+
 /// <summary>A grouped word produced by mapping OCR characters onto a token (or merged span). A word spanning multiple lines carries one rect per line.</summary>
 public sealed record GroupedWord
 {
@@ -17,6 +24,7 @@ public sealed record GroupedWord
         LookupKey = Token.Lemma;
         Entries = Array.Empty<DictionaryEntry>();
         HasResolvedLookup = false;
+        SourceTokenLines = CreateFallbackSourceTokenLines([Token], Rects, Bounds);
     }
 
     public GroupedWord(Token token, ScreenRect bounds)
@@ -25,12 +33,23 @@ public sealed record GroupedWord
     }
 
     public GroupedWord(LookupSpan span, IReadOnlyList<ScreenRect> rects)
+        : this(span, rects, null)
+    {
+    }
+
+    public GroupedWord(
+        LookupSpan span,
+        IReadOnlyList<ScreenRect> rects,
+        IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>>? sourceTokenLines)
         : this((span ?? throw new ArgumentNullException(nameof(span))).Token, rects)
     {
         SourceTokens = span.Tokens;
         LookupKey = span.LookupKey;
         Entries = span.Entries;
         HasResolvedLookup = true;
+        SourceTokenLines = sourceTokenLines is null
+            ? CreateFallbackSourceTokenLines(SourceTokens, Rects, Bounds)
+            : ValidateSourceTokenLines(sourceTokenLines, SourceTokens.Count);
     }
 
     public GroupedWord(LookupSpan span, ScreenRect bounds)
@@ -45,6 +64,9 @@ public sealed record GroupedWord
 
     /// <summary>One rect per line the word spans; a single-line word has exactly one.</summary>
     public IReadOnlyList<ScreenRect> Rects { get; }
+
+    /// <summary>Per-source-token line ranges retained for rendering annotations on wrapped words.</summary>
+    public IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> SourceTokenLines { get; }
 
     /// <summary>The sentence segment that produced this word, when available.</summary>
     public string? SegmentId { get; }
@@ -67,13 +89,24 @@ public sealed record GroupedWord
     public IReadOnlyList<PitchAccentSummary> PitchAccents
         => BuildPitchAccents(SourceTokens);
 
-    /// <summary>Replaces only the rects (e.g. frame -&gt; screen), reusing the already-resolved token/span/entries references.</summary>
-    public GroupedWord WithRects(IReadOnlyList<ScreenRect> rects)
-        => new(Token, rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, SegmentId);
+    /// <summary>Returns the screen bounds for one source token, split by OCR line.</summary>
+    public IReadOnlyList<ScreenRect> GetSourceTokenBounds(int sourceTokenIndex)
+    {
+        if (sourceTokenIndex < 0 || sourceTokenIndex >= SourceTokenLines.Count)
+            throw new ArgumentOutOfRangeException(nameof(sourceTokenIndex));
+        return SourceTokenLines[sourceTokenIndex].Select(line => line.Bounds).ToArray();
+    }
+
+    /// <summary>Replaces rects and, when supplied, their source-token line geometry; otherwise rebuilds a safe fallback.</summary>
+    public GroupedWord WithRects(
+        IReadOnlyList<ScreenRect> rects,
+        IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>>? sourceTokenLines = null)
+        => new(Token, rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, SegmentId,
+            sourceTokenLines ?? CreateFallbackSourceTokenLines(SourceTokens, rects, Union(rects)));
 
     /// <summary>Associates the word with its sentence segment for staged overlay publication.</summary>
     public GroupedWord WithSegmentId(string? segmentId)
-        => new(Token, Rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, segmentId);
+        => new(Token, Rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, segmentId, SourceTokenLines);
 
     private GroupedWord(
         Token token,
@@ -82,7 +115,8 @@ public sealed record GroupedWord
         string lookupKey,
         IReadOnlyList<DictionaryEntry> entries,
         bool hasResolvedLookup,
-        string? segmentId)
+        string? segmentId,
+        IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> sourceTokenLines)
         : this(token, rects)
     {
         SourceTokens = sourceTokens;
@@ -90,6 +124,7 @@ public sealed record GroupedWord
         Entries = entries;
         HasResolvedLookup = hasResolvedLookup;
         SegmentId = segmentId;
+        SourceTokenLines = ValidateSourceTokenLines(sourceTokenLines, SourceTokens.Count);
     }
 
     /// <summary>The added pre-resolution metadata does not change the token+union-bounds value-equality semantics.</summary>
@@ -122,5 +157,49 @@ public sealed record GroupedWord
             y2 = Math.Max(y2, r.Bottom);
         }
         return new ScreenRect(x1, y1, x2 - x1, y2 - y1);
+    }
+
+    private static IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> ValidateSourceTokenLines(
+        IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> sourceTokenLines,
+        int tokenCount)
+    {
+        ArgumentNullException.ThrowIfNull(sourceTokenLines);
+        if (sourceTokenLines.Count != tokenCount)
+            throw new ArgumentException("Source-token line geometry must align with source tokens.", nameof(sourceTokenLines));
+        return sourceTokenLines.Select(lines => (IReadOnlyList<SourceTokenLineGeometry>)lines.ToArray()).ToArray();
+    }
+
+    private static IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> CreateFallbackSourceTokenLines(
+        IReadOnlyList<Token> tokens,
+        IReadOnlyList<ScreenRect> rects,
+        ScreenRect bounds)
+    {
+        var result = new List<IReadOnlyList<SourceTokenLineGeometry>>(tokens.Count);
+        if (tokens.Count == rects.Count)
+        {
+            for (var i = 0; i < tokens.Count; i++)
+            {
+                result.Add([
+                    new SourceTokenLineGeometry(i, 0, tokens[i].Surface.Length, rects[i])]);
+            }
+            return result;
+        }
+
+        var totalLength = Math.Max(1, tokens.Sum(token => token.Surface.Length));
+        var offset = 0;
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            var length = tokens[i].Surface.Length;
+            var left = bounds.X + bounds.Width * offset / totalLength;
+            var right = bounds.X + bounds.Width * (offset + length) / totalLength;
+            result.Add([
+                new SourceTokenLineGeometry(
+                    0,
+                    0,
+                    length,
+                    new ScreenRect(left, bounds.Y, Math.Max(1, right - left), bounds.Height))]);
+            offset += length;
+        }
+        return result;
     }
 }

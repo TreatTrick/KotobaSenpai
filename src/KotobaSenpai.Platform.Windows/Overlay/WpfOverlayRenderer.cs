@@ -413,26 +413,26 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 return;
             }
 
-            foreach (var segment in word.PitchAccents)
+            foreach (var (segment, sourceTokenIndex) in word.PitchAccents.Select((segment, index) => (segment, index)))
             {
                 var pattern = PitchAccent.CreatePattern(Kana.ToHiragana(segment.Reading), segment.AccentPosition);
                 if (FuriganaSettings.ContainsKanji(segment.Surface) && !string.IsNullOrEmpty(segment.Reading))
                 {
                     if (pattern is null)
-                        AddMonochromeFurigana(segment.Surface, segment.Reading, segment.SurfaceOffset, word, scale, fontScale);
+                        AddMonochromeFurigana(segment.Surface, segment.Reading, sourceTokenIndex, word, scale, fontScale);
                     else
-                        AddColoredFurigana(segment, pattern, word, scale, fontScale);
+                        AddColoredFurigana(segment, pattern, sourceTokenIndex, word, scale, fontScale);
                 }
 
                 if (pattern is not null)
-                    AddPitchDots(segment, pattern, word, scale, fontScale);
+                    AddPitchDots(segment, pattern, sourceTokenIndex, word, scale, fontScale);
             }
         }
 
         private void AddMonochromeFurigana(
             string surface,
             string reading,
-            int surfaceOffset,
+            int sourceTokenIndex,
             GroupedWord word,
             double scale,
             double fontScale)
@@ -441,7 +441,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (kanjiChars == 0 || string.IsNullOrEmpty(kanjiReading))
                 return;
 
-            var bounds = SegmentBounds(word, surfaceOffset, surface.Length);
+            var bounds = SegmentBounds(word, sourceTokenIndex, 0, surface.Length);
             var fontSize = (bounds.Height / scale) * fontScale;
             var text = new TextBlock
             {
@@ -456,6 +456,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private void AddColoredFurigana(
             PitchAccentSummary segment,
             PitchAccentPattern pattern,
+            int sourceTokenIndex,
             GroupedWord word,
             double scale,
             double fontScale)
@@ -465,7 +466,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (kanjiChars == 0 || kanjiMorae.Count == 0)
                 return;
 
-            var bounds = SegmentBounds(word, segment.SurfaceOffset, segment.Surface.Length);
+            var bounds = SegmentBounds(word, sourceTokenIndex, 0, segment.Surface.Length);
             var fontSize = (bounds.Height / scale) * fontScale;
             var fontMorae = pattern.Morae.Take(kanjiMorae.Count).ToArray();
             var highMorae = pattern.HighMorae.Take(fontMorae.Length).ToArray();
@@ -500,6 +501,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private void AddPitchDots(
             PitchAccentSummary segment,
             PitchAccentPattern pattern,
+            int sourceTokenIndex,
             GroupedWord word,
             double scale,
             double fontScale)
@@ -508,7 +510,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (kanaRuns.Count == 0)
                 return;
 
-            var bounds = SegmentBounds(word, segment.SurfaceOffset, segment.Surface.Length);
+            var bounds = SegmentBounds(word, sourceTokenIndex, 0, segment.Surface.Length);
             var fontSize = (bounds.Height / scale) * fontScale;
             var dotRadius = Math.Max(2d, fontSize / 4d);
             var centerY = (bounds.Y - _session!.Target.Bounds.Y) / scale - dotRadius - 2;
@@ -563,11 +565,33 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             Canvas.SetTop(marker, y);
         }
 
-        private ScreenRect SegmentBounds(GroupedWord word, int surfaceOffset, int surfaceLength)
+        private ScreenRect SegmentBounds(GroupedWord word, int sourceTokenIndex, int surfaceOffset, int surfaceLength)
         {
-            var start = word.Bounds.X + word.Bounds.Width * surfaceOffset / Math.Max(1, word.Surface.Length);
-            var width = word.Bounds.Width * surfaceLength / Math.Max(1, word.Surface.Length);
-            return new ScreenRect(start, word.Bounds.Y, Math.Max(1, width), word.Bounds.Height);
+            if (sourceTokenIndex < 0 || sourceTokenIndex >= word.SourceTokenLines.Count)
+                return word.Bounds;
+
+            var end = surfaceOffset + surfaceLength;
+            var matching = word.SourceTokenLines[sourceTokenIndex]
+                .Where(line => line.SurfaceOffset < end
+                    && line.SurfaceOffset + line.SurfaceLength > surfaceOffset)
+                .Select(line => line.Bounds)
+                .ToArray();
+            if (matching.Length == 0)
+                return word.Bounds;
+            return Union(matching);
+        }
+
+        private static ScreenRect Union(IReadOnlyList<ScreenRect> rects)
+        {
+            int x1 = int.MaxValue, y1 = int.MaxValue, x2 = 0, y2 = 0;
+            foreach (var rect in rects)
+            {
+                x1 = Math.Min(x1, rect.X);
+                y1 = Math.Min(y1, rect.Y);
+                x2 = Math.Max(x2, rect.Right);
+                y2 = Math.Max(y2, rect.Bottom);
+            }
+            return new ScreenRect(x1, y1, x2 - x1, y2 - y1);
         }
 
         private double TopDip(ScreenRect bounds, double scale, double fontSize)

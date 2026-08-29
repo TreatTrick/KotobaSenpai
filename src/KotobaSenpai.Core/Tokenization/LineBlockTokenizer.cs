@@ -14,8 +14,13 @@ public static class LineBlockTokenizer
     /// <summary>One token and the character boxes it covers, split per line (a cross-line token has &gt;1 segment).</summary>
     public sealed record SplitToken(Token Token, IReadOnlyList<LineSegment> Segments);
 
-    /// <summary>The boxes a token covers on a single line (the line's union of those chars).</summary>
-    public sealed record LineSegment(int LineIndex, IReadOnlyList<ScreenRect> Boxes);
+    /// <summary>The boxes a token covers on a single line, including their offset within the token surface.</summary>
+    public sealed record LineSegment(int LineIndex, IReadOnlyList<ScreenRect> Boxes)
+    {
+        public int SurfaceOffset { get; init; }
+
+        public int SurfaceLength { get; init; }
+    }
 
     public static IReadOnlyList<SplitToken> Tokenize(ITokenizer tokenizer, IReadOnlyList<OcrLine> lines)
     {
@@ -47,7 +52,14 @@ public static class LineBlockTokenizer
                 var boxes = lines[li].Words.Skip(localStart).Take(localEnd - localStart)
                     .Select(word => word.FrameBounds).ToArray();
                 if (boxes.Length > 0)
-                    segments.Add(new LineSegment(li, boxes));
+                {
+                    var surfaceOffset = Math.Max(start, lineStarts[li]) - token.StartOffset;
+                    segments.Add(new LineSegment(li, boxes)
+                    {
+                        SurfaceOffset = surfaceOffset,
+                        SurfaceLength = localEnd - localStart,
+                    });
+                }
             }
             if (segments.Count > 0)
                 result.Add(new SplitToken(token, segments));

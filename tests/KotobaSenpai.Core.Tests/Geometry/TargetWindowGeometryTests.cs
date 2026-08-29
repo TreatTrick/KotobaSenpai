@@ -1,6 +1,7 @@
 using KotobaSenpai.Core.Workflow;
 using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Ocr;
@@ -60,6 +61,28 @@ public sealed class TargetWindowGeometryTests
     }
 
     [Fact]
+    public void Session_reprojects_source_token_line_geometry_with_the_word()
+    {
+        var original = new WindowTarget((nint)42, "target", new ScreenRect(100, 50, 1000, 500));
+        var first = Token("困っ", 0);
+        var second = Token("ちゃう", 2);
+        var span = new LookupSpan([first, second], "困っちゃう", []);
+        var word = new GroupedWord(
+            span,
+            [new ScreenRect(300, 100, 100, 20), new ScreenRect(200, 200, 150, 20)],
+            [
+                [new SourceTokenLineGeometry(0, 0, 2, new ScreenRect(300, 100, 100, 20))],
+                [new SourceTokenLineGeometry(1, 0, 3, new ScreenRect(200, 200, 150, 20))],
+            ]);
+
+        var moved = WordOverlaySession.Start(original, [word])
+            .Reproject(original.WithBounds(new ScreenRect(200, 100, 2000, 1000)));
+
+        Assert.Equal([new ScreenRect(600, 200, 200, 40)], moved.Words[0].GetSourceTokenBounds(0));
+        Assert.Equal([new ScreenRect(400, 400, 300, 40)], moved.Words[0].GetSourceTokenBounds(1));
+    }
+
+    [Fact]
     public void Session_reprojects_phrase_parts_with_the_same_baseline()
     {
         var original = new WindowTarget((nint)42, "target", new ScreenRect(100, 50, 1000, 500));
@@ -92,9 +115,9 @@ public sealed class TargetWindowGeometryTests
         Assert.Equal(0, recognizer.CallCount);
     }
 
-    private static Token Token(string surface)
+    private static Token Token(string surface, int start = 0)
         => new(surface, surface, surface, surface, surface, surface,
-            new PartsOfSpeech("", "", "", ""), "", "", "", 0);
+            new PartsOfSpeech("", "", "", ""), "", "", "", start);
 
     private sealed class CountingRecognizer : IWindowWordRecognizer
     {

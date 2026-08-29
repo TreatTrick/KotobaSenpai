@@ -69,7 +69,24 @@ public sealed class WordOverlaySession
     {
         ArgumentNullException.ThrowIfNull(target);
         var words = _words
-            .Select((word, index) => word.WithRects(_wordGeometry[index].ToScreen(target.Bounds)))
+            .Select((word, index) =>
+            {
+                var geometry = _wordGeometry[index];
+                var rects = geometry.ToScreen(target.Bounds);
+                if (geometry.SourceTokenLines.Count != word.SourceTokens.Count)
+                    return word.WithRects(rects);
+
+                var sourceTokenLines = geometry.SourceTokenLines
+                    .Select(lines => (IReadOnlyList<SourceTokenLineGeometry>)lines
+                        .Select(line => new SourceTokenLineGeometry(
+                            line.LineIndex,
+                            line.SurfaceOffset,
+                            line.SurfaceLength,
+                            line.Bounds.ToScreen(target.Bounds)))
+                        .ToArray())
+                    .ToArray();
+                return word.WithRects(rects, sourceTokenLines);
+            })
             .ToArray();
         var phraseGroups = _phraseGroups
             .Select((group, groupIndex) => group with
@@ -153,7 +170,16 @@ public sealed class WordOverlaySession
                 "Overlay session target must be specified.");
         var wordGeometry = validWords
             .Select(word => new NormalizedWordGeometry(
-                word.Rects.Select(rect => NormalizedRect.FromScreen(rect, target.Bounds))))
+                word.Rects.Select(rect => NormalizedRect.FromScreen(rect, target.Bounds)),
+                word.SourceTokenLines
+                    .Select(lines => (IReadOnlyList<NormalizedSourceTokenLineGeometry>)lines
+                        .Select(line => new NormalizedSourceTokenLineGeometry(
+                            line.LineIndex,
+                            line.SurfaceOffset,
+                            line.SurfaceLength,
+                            NormalizedRect.FromScreen(line.Bounds, target.Bounds)))
+                        .ToArray())
+                    .ToArray()))
             .ToArray();
         var groups = (phraseGroups ?? Array.Empty<PhraseGroupView>()).ToArray();
         var phraseGeometry = groups

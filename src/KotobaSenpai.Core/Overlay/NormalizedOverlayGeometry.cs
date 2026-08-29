@@ -1,16 +1,30 @@
 using KotobaSenpai.Core.Geometry;
 namespace KotobaSenpai.Core.Overlay;
 
+/// <summary>Stable target-relative geometry for one source-token range on one OCR line.</summary>
+public sealed record NormalizedSourceTokenLineGeometry(
+    int LineIndex,
+    int SurfaceOffset,
+    int SurfaceLength,
+    NormalizedRect Bounds);
+
 /// <summary>Stable target-relative geometry for one recognized word, including one rect per line.</summary>
 public sealed class NormalizedWordGeometry
 {
-    public NormalizedWordGeometry(IEnumerable<NormalizedRect> rects)
+    public NormalizedWordGeometry(
+        IEnumerable<NormalizedRect> rects,
+        IReadOnlyList<IReadOnlyList<NormalizedSourceTokenLineGeometry>>? sourceTokenLines = null)
     {
         ArgumentNullException.ThrowIfNull(rects);
         Rects = rects.ToArray();
+        SourceTokenLines = sourceTokenLines is null
+            ? Array.Empty<IReadOnlyList<NormalizedSourceTokenLineGeometry>>()
+            : sourceTokenLines.Select(lines => (IReadOnlyList<NormalizedSourceTokenLineGeometry>)lines.ToArray()).ToArray();
     }
 
     public IReadOnlyList<NormalizedRect> Rects { get; }
+
+    public IReadOnlyList<IReadOnlyList<NormalizedSourceTokenLineGeometry>> SourceTokenLines { get; }
 
     public IReadOnlyList<ScreenRect> ToScreen(ScreenRect targetBounds)
         => Rects.Select(rect => rect.ToScreen(targetBounds)).ToArray();

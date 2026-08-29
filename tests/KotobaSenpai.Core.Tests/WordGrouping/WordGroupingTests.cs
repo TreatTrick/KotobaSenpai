@@ -49,6 +49,42 @@ public sealed class WordGroupingTests
     }
 
     [Fact]
+    public void Keeps_source_token_line_geometry_for_cross_line_span()
+    {
+        var service = new WordGroupingService(
+            new StubTokenizer(new TokenSpec("困っ", 0), new TokenSpec("ちゃう", 2)),
+            new SentenceSegmenter(),
+            new StubSpanResolver(new LookupSpan(
+                [Token("困っ", 0), Token("ちゃう", 2)],
+                "困っちゃう",
+                [])));
+
+        var word = Assert.Single(service.Group([Line("困っ", 0), Line("ちゃう", 30)]));
+
+        Assert.Equal([new ScreenRect(0, 0, 20, 20)], word.GetSourceTokenBounds(0));
+        Assert.Equal([new ScreenRect(0, 30, 30, 20)], word.GetSourceTokenBounds(1));
+        Assert.Equal(50, word.Bounds.Height);
+    }
+
+    [Fact]
+    public void Keeps_surface_offsets_when_one_token_crosses_lines()
+    {
+        var service = new WordGroupingService(
+            new StubTokenizer(new TokenSpec("あい", 0)),
+            new SentenceSegmenter(),
+            new StubSpanResolver(new LookupSpan([Token("あい", 0)], "あい", [])));
+
+        var word = Assert.Single(service.Group([Line("あ", 0), Line("い", 30)]));
+
+        Assert.Equal(
+            [
+                new SourceTokenLineGeometry(0, 0, 1, new ScreenRect(0, 0, 10, 20)),
+                new SourceTokenLineGeometry(1, 1, 1, new ScreenRect(0, 30, 10, 20)),
+            ],
+            word.SourceTokenLines[0]);
+    }
+
+    [Fact]
     public void Reports_empty_for_no_lines()
     {
         var service = new WordGroupingService(
