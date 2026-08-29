@@ -39,7 +39,12 @@ public sealed class PhrasePopup : Window
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Content = _panel,
         };
-        SourceInitialized += (_, _) => SetClickThrough();
+        SourceInitialized += (_, _) =>
+        {
+            SetClickThrough();
+            OverlayWindowRegistry.Register(new WindowInteropHelper(this).Handle);
+        };
+        Closed += (_, _) => OverlayWindowRegistry.Unregister(new WindowInteropHelper(this).Handle);
     }
 
     public void ShowResult(

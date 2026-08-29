@@ -10,11 +10,12 @@ public sealed record TargetWindowSnapshot(
     bool IsVisible,
     bool IsMinimized,
     bool IsForeground,
-    bool IsOccluded = false)
+    bool IsOccluded = false,
+    bool IsValid = true)
 {
     public WindowTarget Target => new(Handle, Title, Bounds);
 
-    public bool IsCapturable => IsVisible && !IsMinimized && !IsOccluded;
+    public bool IsCapturable => IsValid && IsVisible && !IsMinimized && !IsOccluded;
 
-    public bool IsRenderable => IsCapturable && IsForeground;
+    public bool IsRenderable => IsCapturable;
 }

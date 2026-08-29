@@ -31,6 +31,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private readonly Canvas _canvas = new();
 
     private WindowTarget? _target;
+    private nint _ownerHandle;
     private RecognitionRegion _normalizedRegion = RecognitionRegion.Full;
     private ScreenRect _region;   // window-relative pixels
     private double _scale = 1.0;
@@ -53,13 +54,19 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         ShowActivated = false;
         ResizeMode = ResizeMode.NoResize;
         Content = _canvas;
-        SourceInitialized += (_, _) => SetNoActivate();
+        SourceInitialized += (_, _) =>
+        {
+            SetOwnerHandle();
+            SetNoActivate();
+            OverlayWindowRegistry.Register(new WindowInteropHelper(this).Handle);
+        };
         if (_tracker is not null)
             _tracker.Changed += OnTargetChanged;
         Closed += (_, _) =>
         {
             if (_tracker is not null)
                 _tracker.Changed -= OnTargetChanged;
+            OverlayWindowRegistry.Unregister(new WindowInteropHelper(this).Handle);
         };
         // NOTE: intentionally NOT click-through — this window must capture mouse for dragging and the confirm button.
     }
@@ -81,6 +88,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         }
 
         _target = activeTarget;
+        _ownerHandle = activeTarget.Handle;
+        SetOwnerHandle();
         _normalizedRegion = initial ?? RecognitionRegion.Full;
         _region = _normalizedRegion.ToPixelRect(activeTarget.Bounds.Width, activeTarget.Bounds.Height);
 
@@ -99,6 +108,12 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             Hide();
             return;
         }
+        if (!snapshot.IsValid)
+        {
+            ClearSelection();
+            Hide();
+            return;
+        }
         if (!snapshot.IsRenderable)
         {
             _dragCorner = -1;
@@ -110,6 +125,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         }
 
         _target = snapshot.Target;
+        _ownerHandle = snapshot.Handle;
+        SetOwnerHandle();
         _region = _normalizedRegion.ToPixelRect(_target.Bounds.Width, _target.Bounds.Height);
         if (!IsVisible)
             Show();
@@ -161,14 +178,21 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _scale = (dpi == 0 ? 96 : dpi) / 96d;
         Width = _target!.Bounds.Width / _scale;
         Height = _target.Bounds.Height / _scale;
+        var insertAfter = NativeMethods.GetWindow(_target!.Handle, NativeMethods.GwHwndPrev);
+        var flags = NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow;
+        if (insertAfter == handle)
+        {
+            insertAfter = nint.Zero;
+            flags |= NativeMethods.SwpNoZOrder;
+        }
         NativeMethods.SetWindowPos(
             handle,
-            nint.Zero,
+            insertAfter,
             _target.Bounds.X,
             _target.Bounds.Y,
             0,
             0,
-            NativeMethods.SwpNoActivate | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
+            flags | NativeMethods.SwpNoSize);
         Redraw();
     }
 
@@ -296,13 +320,24 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             new nint(style | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
     }
 
+    private void SetOwnerHandle()
+    {
+        if (_ownerHandle == nint.Zero)
+            return;
+        var helper = new WindowInteropHelper(this);
+        if (helper.Handle != nint.Zero)
+            helper.Owner = _ownerHandle;
+    }
+
     private static class NativeMethods
     {
         public const int GwlExStyle = -20;
         public const long WsExNoActivate = 0x08000000;
         public const long WsExToolWindow = 0x80;
+        public const uint GwHwndPrev = 3;
         public const uint SwpNoSize = 0x0001;
         public const uint SwpNoActivate = 0x0010;
+        public const uint SwpNoZOrder = 0x0004;
         public const uint SwpShowWindow = 0x0040;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
@@ -310,6 +345,9 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern bool SetWindowPos(nint hWnd, nint insertAfter, int x, int y, int width, int height, uint flags);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern nint GetWindow(nint hWnd, uint command);
 
         [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         public static extern nint GetWindowLongPtr(nint hWnd, int index);

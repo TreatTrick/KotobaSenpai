@@ -6,6 +6,34 @@ using KotobaSenpai.Core.Logging;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
+internal static class OverlayWindowRegistry
+{
+    private static readonly object Gate = new();
+    private static readonly HashSet<nint> Handles = new();
+
+    public static void Register(nint handle)
+    {
+        if (handle == nint.Zero)
+            return;
+        lock (Gate)
+            Handles.Add(handle);
+    }
+
+    public static void Unregister(nint handle)
+    {
+        if (handle == nint.Zero)
+            return;
+        lock (Gate)
+            Handles.Remove(handle);
+    }
+
+    public static IReadOnlySet<nint> Snapshot()
+    {
+        lock (Gate)
+            return Handles.ToHashSet();
+    }
+}
+
 /// <summary>Win32 event-driven tracker for one target window.</summary>
 public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 {
@@ -13,11 +41,12 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private const uint EventSystemMinimizeStart = 0x0016;
     private const uint EventSystemMinimizeEnd = 0x0017;
     private const uint EventObjectDestroy = 0x8001;
+    private const uint EventObjectShow = 0x8002;
+    private const uint EventObjectHide = 0x8003;
     private const uint EventObjectLocationChange = 0x800B;
     private const int ObjectIdWindow = 0;
     private const int ChildIdSelf = 0;
     private const uint WineventOutOfContext = 0;
-    private const uint WineventSkipOwnProcess = 2;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpShowWindow = 0x0040;
@@ -31,6 +60,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private nint _locationHook;
     private nint _systemHook;
     private nint _destroyHook;
+    private nint _visibilityHook;
     private nint _foregroundHook;
     private nint _targetHandle;
     private bool _refreshPosted;
@@ -154,7 +184,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             {
                 if (_disposed || _targetHandle == nint.Zero)
                     return;
-                if (!IsRelevantEvent(eventType, hwnd, _targetHandle, idObject, idChild))
+                if (!IsRelevantEvent(eventType, hwnd, _targetHandle, idObject, idChild, OverlayWindowRegistry.Snapshot()))
                     return;
                 if (_refreshPosted)
                     return;
@@ -176,12 +206,26 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         }
     }
 
-    internal static bool IsRelevantEvent(uint eventType, nint hwnd, nint targetHandle, int idObject, int idChild)
-        => eventType == EventSystemForeground
-            || (hwnd != nint.Zero
-                && hwnd == targetHandle
-                && idObject == ObjectIdWindow
-                && idChild == ChildIdSelf);
+    internal static bool IsRelevantEvent(
+        uint eventType,
+        nint hwnd,
+        nint targetHandle,
+        int idObject,
+        int idChild,
+        IReadOnlySet<nint>? auxiliaryWindowHandles = null)
+    {
+        if (targetHandle == nint.Zero)
+            return false;
+        if (eventType == EventSystemForeground)
+            return true;
+        if (hwnd == nint.Zero || auxiliaryWindowHandles?.Contains(hwnd) == true)
+            return false;
+        if (eventType is EventSystemMinimizeStart or EventSystemMinimizeEnd)
+            return true;
+        return eventType is EventObjectDestroy or EventObjectShow or EventObjectHide or EventObjectLocationChange
+            && idObject == ObjectIdWindow
+            && idChild == ChildIdSelf;
+    }
 
     private void RefreshFromEvent()
     {
@@ -195,7 +239,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
                 return;
             var snapshot = RefreshCore(current.Title, current.Bounds);
             Publish(snapshot);
-            if (!NativeMethods.IsWindow(_targetHandle))
+            if (!snapshot.IsValid)
                 DetachCore();
         }
         catch (Exception ex)
@@ -207,7 +251,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private TargetWindowSnapshot RefreshCore(string title, ScreenRect fallbackBounds)
     {
         if (!NativeMethods.IsWindow(_targetHandle))
-            return new TargetWindowSnapshot(_targetHandle, title, fallbackBounds, 1, false, true, false);
+            return new TargetWindowSnapshot(_targetHandle, title, fallbackBounds, 1, false, true, false, false, false);
 
         var visible = NativeMethods.IsWindowVisible(_targetHandle);
         var minimized = NativeMethods.IsIconic(_targetHandle);
@@ -231,26 +275,33 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
     private static bool IsOccluded(ScreenRect targetBounds, nint targetHandle)
     {
+        var auxiliaryWindowHandles = OverlayWindowRegistry.Snapshot();
         for (var above = NativeMethods.GetWindow(targetHandle, GwHwndPrev);
              above != nint.Zero;
              above = NativeMethods.GetWindow(above, GwHwndPrev))
         {
-            if (NativeMethods.GetWindowThreadProcessId(above, out var processId) == 0
-                || processId == Environment.ProcessId
+            if (auxiliaryWindowHandles.Contains(above)
                 || !NativeMethods.IsWindowVisible(above)
                 || NativeMethods.IsIconic(above)
-                || !NativeMethods.GetWindowRect(above, out var rect))
+                || !NativeMethods.GetWindowRect(above, out var rect)
+                || rect.Right <= rect.Left
+                || rect.Bottom <= rect.Top)
                 continue;
 
-            if (rect.Left < targetBounds.Right
-                && rect.Right > targetBounds.X
-                && rect.Top < targetBounds.Bottom
-                && rect.Bottom > targetBounds.Y)
+            if (HasPositiveAreaIntersection(
+                targetBounds,
+                new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top)))
                 return true;
         }
 
         return false;
     }
+
+    internal static bool HasPositiveAreaIntersection(ScreenRect first, ScreenRect second)
+        => first.X < second.Right
+            && first.Right > second.X
+            && first.Y < second.Bottom
+            && first.Bottom > second.Y;
 
     private double ReadDpiScale()
     {
@@ -295,7 +346,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             _callback,
             0,
             0,
-            WineventOutOfContext | WineventSkipOwnProcess);
+            WineventOutOfContext);
         _systemHook = NativeMethods.SetWinEventHook(
             EventSystemMinimizeStart,
             EventSystemMinimizeEnd,
@@ -303,7 +354,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             _callback,
             0,
             0,
-            WineventOutOfContext | WineventSkipOwnProcess);
+            WineventOutOfContext);
         _destroyHook = NativeMethods.SetWinEventHook(
             EventObjectDestroy,
             EventObjectDestroy,
@@ -311,7 +362,15 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             _callback,
             0,
             0,
-            WineventOutOfContext | WineventSkipOwnProcess);
+            WineventOutOfContext);
+        _visibilityHook = NativeMethods.SetWinEventHook(
+            EventObjectShow,
+            EventObjectHide,
+            nint.Zero,
+            _callback,
+            0,
+            0,
+            WineventOutOfContext);
         _foregroundHook = NativeMethods.SetWinEventHook(
             EventSystemForeground,
             EventSystemForeground,
@@ -319,19 +378,24 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             _callback,
             0,
             0,
-            WineventOutOfContext | WineventSkipOwnProcess);
+            WineventOutOfContext);
 
-        if (_locationHook == nint.Zero || _systemHook == nint.Zero || _destroyHook == nint.Zero || _foregroundHook == nint.Zero)
+        if (_locationHook == nint.Zero
+            || _systemHook == nint.Zero
+            || _destroyHook == nint.Zero
+            || _visibilityHook == nint.Zero
+            || _foregroundHook == nint.Zero)
             throw new InvalidOperationException("Failed to register one or more WinEvent hooks.");
 
         _logger?.Log(
             LogLevel.Debug,
             null,
-            "[DEBUG-TRACKER] WinEvent hooks registered: targetHandle={0}, locationHook={1}, systemHook={2}, destroyHook={3}, foregroundHook={4}.",
+            "[DEBUG-TRACKER] WinEvent hooks registered: targetHandle={0}, locationHook={1}, systemHook={2}, destroyHook={3}, visibilityHook={4}, foregroundHook={5}.",
             _targetHandle,
             _locationHook,
             _systemHook,
             _destroyHook,
+            _visibilityHook,
             _foregroundHook);
     }
 
@@ -339,6 +403,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         => _locationHook != nint.Zero
             && _systemHook != nint.Zero
             && _destroyHook != nint.Zero
+            && _visibilityHook != nint.Zero
             && _foregroundHook != nint.Zero;
 
     private void DetachCore()
@@ -355,6 +420,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         Unhook(ref _locationHook, "location");
         Unhook(ref _systemHook, "system");
         Unhook(ref _destroyHook, "destroy");
+        Unhook(ref _visibilityHook, "visibility");
         Unhook(ref _foregroundHook, "foreground");
         lock (_gate)
         {
@@ -475,7 +541,5 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetWindowRect(nint hwnd, out Rect rect);
 
-        [DllImport("user32.dll")]
-        public static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
     }
 }

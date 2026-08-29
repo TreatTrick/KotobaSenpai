@@ -101,6 +101,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private readonly ITargetWindowTracker? _tracker;
         private readonly ILogger? _logger;
         private WordOverlaySession? _session;
+        private nint _ownerHandle;
         private double _fontScale;
         private int _hoverIndex = -1;
         private int _hoveredGroup = -1;
@@ -121,17 +122,23 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             {
                 if (_tracker is not null)
                     _tracker.Changed -= OnTargetChanged;
+                OverlayWindowRegistry.Unregister(new WindowInteropHelper(this).Handle);
             };
 
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Background = Brushes.Transparent;
             ShowInTaskbar = false;
-            Topmost = true;
+            Topmost = false;
             ShowActivated = false;
             IsHitTestVisible = false;
             Content = _canvas;
-            SourceInitialized += (_, _) => SetClickThrough();
+            SourceInitialized += (_, _) =>
+            {
+                SetOwnerHandle();
+                SetClickThrough();
+                OverlayWindowRegistry.Register(new WindowInteropHelper(this).Handle);
+            };
 
             _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(HoverPollMs) };
             _hoverTimer.Tick += (_, _) => PollHover();
@@ -150,6 +157,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         {
             _fontScale = fontScale;
             _session = session;
+            _ownerHandle = session.Target.Handle;
             _logger?.Log(
                 LogLevel.Debug,
                 null,
@@ -173,6 +181,17 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                         session.Id,
                         session.Target.Handle,
                         snapshot?.Handle.ToString() ?? "<none>");
+                    ClearSession();
+                    Hide();
+                    return;
+                }
+                if (!snapshot.IsValid)
+                {
+                    _logger?.Log(
+                        LogLevel.Debug,
+                        null,
+                        "[DEBUG-OVERLAY] Render skipped and session cleared: targetHandle={0}, target is invalid.",
+                        snapshot.Handle);
                     ClearSession();
                     Hide();
                     return;
@@ -245,6 +264,17 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 Hide();
                 return;
             }
+            if (!snapshot.IsValid)
+            {
+                _logger?.Log(
+                    LogLevel.Debug,
+                    null,
+                    "[DEBUG-OVERLAY] Tracker change cleared overlay session because target is invalid: handle={0}.",
+                    snapshot.Handle);
+                ClearSession();
+                Hide();
+                return;
+            }
             if (!snapshot.IsRenderable)
             {
                 _logger?.Log(
@@ -259,11 +289,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 return;
             }
 
+            _ownerHandle = snapshot.Handle;
             RenderCurrent(_session.Reproject(snapshot.Target), _fontScale);
         }
 
         private void RenderCurrent(WordOverlaySession session, double fontScale)
         {
+            _ownerHandle = session.Target.Handle;
+            SetOwnerHandle();
+            StopHover();
             var wasVisible = IsVisible;
             if (!IsVisible)
                 Show();
@@ -278,14 +312,21 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var scale = (dpi == 0 ? 96 : dpi) / 96d;
             Width = session.Target.Bounds.Width / scale;
             Height = session.Target.Bounds.Height / scale;
+            var insertAfter = NativeMethods.GetWindow(session.Target.Handle, NativeMethods.GwHwndPrev);
+            var flags = NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow;
+            if (insertAfter == handle)
+            {
+                insertAfter = nint.Zero;
+                flags |= NativeMethods.SwpNoZOrder;
+            }
             NativeMethods.SetWindowPos(
                 handle,
-                nint.Zero,
+                insertAfter,
                 session.Target.Bounds.X,
                 session.Target.Bounds.Y,
                 0,
                 0,
-                NativeMethods.SwpNoActivate | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
+                flags | NativeMethods.SwpNoSize);
             _canvas.Children.Clear();
             _lineElements.Clear();
             _lineOwner.Clear();
@@ -347,6 +388,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _canvas.Children.Clear();
             _lineElements.Clear();
             _lineOwner.Clear();
+        }
+
+        private void SetOwnerHandle()
+        {
+            if (_ownerHandle == nint.Zero)
+                return;
+            var helper = new WindowInteropHelper(this);
+            if (helper.Handle != nint.Zero)
+                helper.Owner = _ownerHandle;
         }
 
         /// <summary>
@@ -685,14 +735,16 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         }
     }
 
-    private static class NativeMethods
-    {
+        private static class NativeMethods
+        {
         public const int GwlExStyle = -20;
         public const long WsExTransparent = 0x20;
         public const long WsExNoActivate = 0x08000000;
         public const long WsExToolWindow = 0x80;
+        public const uint GwHwndPrev = 3;
         public const uint SwpNoSize = 0x0001;
         public const uint SwpNoActivate = 0x0010;
+        public const uint SwpNoZOrder = 0x0004;
         public const uint SwpShowWindow = 0x0040;
 
         [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
@@ -706,6 +758,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern bool SetWindowPos(nint hWnd, nint insertAfter, int x, int y, int width, int height, uint flags);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern nint GetWindow(nint hWnd, uint command);
 
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
         public struct POINT
