@@ -66,6 +66,19 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     private double ResolveFontScale()
         => FuriganaSettings.ResolveFontScale(_settings?.GetValue(FuriganaSettings.FontScaleKey));
 
+    internal static IReadOnlyList<int> GetLineIndicesForWords(
+        IEnumerable<int> wordIndices,
+        IReadOnlyList<int> lineOwners)
+    {
+        ArgumentNullException.ThrowIfNull(wordIndices);
+        ArgumentNullException.ThrowIfNull(lineOwners);
+
+        var words = wordIndices.ToHashSet();
+        return Enumerable.Range(0, lineOwners.Count)
+            .Where(lineIndex => words.Contains(lineOwners[lineIndex]))
+            .ToArray();
+    }
+
     public void Hide()
     {
         Application.Current.Dispatcher.Invoke(() =>
@@ -635,7 +648,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _hoveredGroup = groupHit;
                 if (groupHit >= 0)
                 {
-                    _hoveredGroupLines = session.GetCoveredWordIndices(session.PhraseGroups[groupHit]);
+                    _hoveredGroupLines = GetLineIndicesForWords(
+                        session.GetCoveredWordIndices(session.PhraseGroups[groupHit]),
+                        _lineOwner);
                     foreach (var i in _hoveredGroupLines)
                         if (i >= 0 && i < _lineElements.Count)
                             _lineElements[i].Background = HoverLineBrush;
