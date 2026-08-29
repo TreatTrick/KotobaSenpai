@@ -68,6 +68,7 @@ public sealed class WordOverlayApplicationService
         }
 
         var regionPixels = ReadRegionPixels(activeTarget);
+        _overlay.Hide();
         var result = await _recognizer.RecognizeAsync(recognitionId, activeTarget, cancellationToken, regionPixels).ConfigureAwait(false);
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)

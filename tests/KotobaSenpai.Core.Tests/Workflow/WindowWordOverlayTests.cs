@@ -100,6 +100,24 @@ public sealed class WindowWordOverlayTests
         Assert.Equal(new ScreenRect(20, 10, 20, 20), word.Bounds);
     }
 
+    [Fact]
+    public async Task Application_service_hides_previous_overlay_before_recognition()
+    {
+        var events = new List<string>();
+        var target = new WindowTarget((nint)42, "VN", new ScreenRect(0, 0, 200, 100));
+        var service = new WordOverlayApplicationService(
+            new RecordingRecognizer(events),
+            new WordGroupingService(
+                new StubTokenizer(new TokenSpec("日", 0)),
+                new SentenceSegmenter(),
+                new StubSpanResolver(new LookupSpan([Token("日")], "日", []))),
+            new RecordingOverlay(events));
+
+        await service.RecognizeAndShowAsync(target);
+
+        Assert.Equal(["hide", "recognize", "show"], events);
+    }
+
     private static Token Token(string surface)
         => new(surface, surface, surface, surface, surface, surface,
             new PartsOfSpeech("", "", "", ""), "", "", "", 0);
@@ -116,5 +134,30 @@ public sealed class WindowWordOverlayTests
         public WordOverlaySession? Session { get; private set; }
         public void Show(WordOverlaySession session) => Session = session;
         public void Hide() => Session = null;
+    }
+
+    private sealed class RecordingRecognizer : IWindowWordRecognizer
+    {
+        private readonly IList<string> _events;
+
+        public RecordingRecognizer(IList<string> events) => _events = events;
+
+        public Task<WordRecognitionResult> RecognizeAsync(Guid recognitionId, WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null)
+        {
+            _events.Add("recognize");
+            return Task.FromResult(new WordRecognitionResult(100, 50,
+                [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]));
+        }
+    }
+
+    private sealed class RecordingOverlay : IOverlayRenderer
+    {
+        private readonly IList<string> _events;
+
+        public RecordingOverlay(IList<string> events) => _events = events;
+
+        public void Show(WordOverlaySession session) => _events.Add("show");
+
+        public void Hide() => _events.Add("hide");
     }
 }
