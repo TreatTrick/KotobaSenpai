@@ -58,11 +58,23 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     public TargetWindowSnapshot Attach(WindowTarget target)
     {
         ArgumentNullException.ThrowIfNull(target);
+        _logger?.Log(
+            LogLevel.Debug,
+            null,
+            "[DEBUG-TRACKER] Attach requested: handle={0}, title='{1}', bounds={2}",
+            target.Handle,
+            target.Title,
+            target.Bounds);
         return InvokeOnDispatcher(() =>
         {
             ThrowIfDisposed();
             if (_targetHandle == target.Handle && HooksRegistered())
             {
+                _logger?.Log(
+                    LogLevel.Debug,
+                    null,
+                    "[DEBUG-TRACKER] Reusing registered hooks for handle={0}; refreshing snapshot.",
+                    target.Handle);
                 var currentSnapshot = RefreshCore(target.Title, target.Bounds);
                 Publish(currentSnapshot);
                 return currentSnapshot;
@@ -91,6 +103,12 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         {
             ThrowIfDisposed();
             var current = Current ?? throw new InvalidOperationException("No target window is attached.");
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-TRACKER] Explicit refresh requested: handle={0}, title='{1}'.",
+                current.Handle,
+                current.Title);
             var snapshot = RefreshCore(current.Title, current.Bounds);
             Publish(snapshot);
             return snapshot;
@@ -143,6 +161,13 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
                 _refreshPosted = true;
             }
 
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-TRACKER] WinEvent accepted: eventType=0x{0:X8}, hwnd={1}, targetHandle={2}; refresh posted.",
+                eventType,
+                hwnd,
+                _targetHandle);
             _dispatcher.BeginInvoke(RefreshFromEvent, DispatcherPriority.DataBind);
         }
         catch (Exception ex)
@@ -237,6 +262,20 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     {
         lock (_gate)
             _current = snapshot;
+        _logger?.Log(
+            LogLevel.Debug,
+            null,
+            "[DEBUG-TRACKER] Snapshot published: handle={0}, title='{1}', bounds={2}, dpi={3:0.###}, visible={4}, minimized={5}, foreground={6}, occluded={7}, capturable={8}, renderable={9}.",
+            snapshot.Handle,
+            snapshot.Title,
+            snapshot.Bounds,
+            snapshot.DpiScale,
+            snapshot.IsVisible,
+            snapshot.IsMinimized,
+            snapshot.IsForeground,
+            snapshot.IsOccluded,
+            snapshot.IsCapturable,
+            snapshot.IsRenderable);
         try
         {
             Changed?.Invoke(this, snapshot);
@@ -284,6 +323,16 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
         if (_locationHook == nint.Zero || _systemHook == nint.Zero || _destroyHook == nint.Zero || _foregroundHook == nint.Zero)
             throw new InvalidOperationException("Failed to register one or more WinEvent hooks.");
+
+        _logger?.Log(
+            LogLevel.Debug,
+            null,
+            "[DEBUG-TRACKER] WinEvent hooks registered: targetHandle={0}, locationHook={1}, systemHook={2}, destroyHook={3}, foregroundHook={4}.",
+            _targetHandle,
+            _locationHook,
+            _systemHook,
+            _destroyHook,
+            _foregroundHook);
     }
 
     private bool HooksRegistered()
@@ -294,6 +343,15 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
     private void DetachCore()
     {
+        if (_targetHandle != nint.Zero || HooksRegistered())
+        {
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-TRACKER] Detaching target: handle={0}, hooksRegistered={1}.",
+                _targetHandle,
+                HooksRegistered());
+        }
         Unhook(ref _locationHook, "location");
         Unhook(ref _systemHook, "system");
         Unhook(ref _destroyHook, "destroy");

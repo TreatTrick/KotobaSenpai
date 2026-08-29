@@ -11,6 +11,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Japanese;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
 
@@ -27,23 +28,36 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     private readonly IStringLocalizer? _localizer;
     private readonly ISettingsService? _settings;
     private readonly ITargetWindowTracker? _tracker;
+    private readonly ILogger? _logger;
     private OverlayWindow? _window;
 
     public WpfOverlayRenderer(
         IStringLocalizer? localizer = null,
         ISettingsService? settings = null,
-        ITargetWindowTracker? tracker = null)
+        ITargetWindowTracker? tracker = null,
+        ILogger? logger = null)
     {
         _localizer = localizer;
         _settings = settings;
         _tracker = tracker;
+        _logger = logger;
     }
 
     public void Show(WordOverlaySession session)
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            _window ??= new OverlayWindow(_localizer, _tracker);
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-OVERLAY] Show requested: sessionId={0}, targetHandle={1}, words={2}, underlines={3}, phraseGroups={4}, trackerAttached={5}.",
+                session.Id,
+                session.Target.Handle,
+                session.Words.Count,
+                session.Lines.Count,
+                session.PhraseGroups.Count,
+                _tracker is not null);
+            _window ??= new OverlayWindow(_localizer, _tracker, _logger);
             _window.Render(session, ResolveFontScale());
         });
     }
@@ -56,6 +70,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
+            _logger?.Log(LogLevel.Debug, null, "[DEBUG-OVERLAY] Hide requested.");
             _window?.ClearSession();
             _window?.Hide();
         });
@@ -84,16 +99,21 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private readonly DispatcherTimer _hoverTimer;
         private readonly PhrasePopup _phrasePopup;
         private readonly ITargetWindowTracker? _tracker;
+        private readonly ILogger? _logger;
         private WordOverlaySession? _session;
         private double _fontScale;
         private int _hoverIndex = -1;
         private int _hoveredGroup = -1;
         private IReadOnlyList<int> _hoveredGroupLines = Array.Empty<int>();
 
-        public OverlayWindow(IStringLocalizer? localizer = null, ITargetWindowTracker? tracker = null)
+        public OverlayWindow(
+            IStringLocalizer? localizer = null,
+            ITargetWindowTracker? tracker = null,
+            ILogger? logger = null)
         {
             _phrasePopup = new PhrasePopup(localizer);
             _tracker = tracker;
+            _logger = logger;
 
             if (_tracker is not null)
                 _tracker.Changed += OnTargetChanged;
@@ -107,7 +127,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             AllowsTransparency = true;
             Background = Brushes.Transparent;
             ShowInTaskbar = false;
-            Topmost = false;
+            Topmost = true;
             ShowActivated = false;
             IsHitTestVisible = false;
             Content = _canvas;
@@ -115,23 +135,63 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
             _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(HoverPollMs) };
             _hoverTimer.Tick += (_, _) => PollHover();
+
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-OVERLAY] Overlay window configured: topmost={0}, showActivated={1}, hitTestVisible={2}, trackerAttached={3}.",
+                Topmost,
+                ShowActivated,
+                IsHitTestVisible,
+                _tracker is not null);
         }
 
         public void Render(WordOverlaySession session, double fontScale)
         {
             _fontScale = fontScale;
             _session = session;
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-OVERLAY] Render requested: sessionId={0}, targetHandle={1}, visible={2}, topmost={3}, words={4}, underlines={5}, phraseGroups={6}.",
+                session.Id,
+                session.Target.Handle,
+                IsVisible,
+                Topmost,
+                session.Words.Count,
+                session.Lines.Count,
+                session.PhraseGroups.Count);
             if (_tracker is not null)
             {
                 var snapshot = _tracker.Current;
                 if (snapshot is null || snapshot.Handle != session.Target.Handle)
                 {
+                    _logger?.Log(
+                        LogLevel.Debug,
+                        null,
+                        "[DEBUG-OVERLAY] Render skipped: tracker snapshot missing or handle mismatch. sessionId={0}, sessionTargetHandle={1}, snapshotHandle={2}.",
+                        session.Id,
+                        session.Target.Handle,
+                        snapshot?.Handle.ToString() ?? "<none>");
                     ClearSession();
                     Hide();
                     return;
                 }
                 if (!snapshot.IsRenderable)
                 {
+                    _logger?.Log(
+                        LogLevel.Debug,
+                        null,
+                        "[DEBUG-OVERLAY] Render skipped and window hidden: targetHandle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, capturable={5}, renderable={6}, overlayVisible={7}, topmost={8}.",
+                        snapshot.Handle,
+                        snapshot.IsVisible,
+                        snapshot.IsMinimized,
+                        snapshot.IsForeground,
+                        snapshot.IsOccluded,
+                        snapshot.IsCapturable,
+                        snapshot.IsRenderable,
+                        IsVisible,
+                        Topmost);
                     StopHover();
                     Hide();
                     return;
@@ -145,15 +205,55 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private void OnTargetChanged(object? sender, TargetWindowSnapshot snapshot)
         {
             if (_session is null)
+            {
+                _logger?.Log(
+                    LogLevel.Debug,
+                    null,
+                    "[DEBUG-OVERLAY] Tracker change ignored: no active overlay session. handle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, renderable={5}.",
+                    snapshot.Handle,
+                    snapshot.IsVisible,
+                    snapshot.IsMinimized,
+                    snapshot.IsForeground,
+                    snapshot.IsOccluded,
+                    snapshot.IsRenderable);
                 return;
+            }
+
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-OVERLAY] Tracker change received: sessionId={0}, handle={1}, visible={2}, minimized={3}, foreground={4}, occluded={5}, capturable={6}, renderable={7}, overlayVisible={8}, topmost={9}.",
+                _session.Id,
+                snapshot.Handle,
+                snapshot.IsVisible,
+                snapshot.IsMinimized,
+                snapshot.IsForeground,
+                snapshot.IsOccluded,
+                snapshot.IsCapturable,
+                snapshot.IsRenderable,
+                IsVisible,
+                Topmost);
             if (snapshot.Handle != _session.Target.Handle)
             {
+                _logger?.Log(
+                    LogLevel.Debug,
+                    null,
+                    "[DEBUG-OVERLAY] Tracker change caused overlay hide: sessionTargetHandle={0}, snapshotHandle={1}.",
+                    _session.Target.Handle,
+                    snapshot.Handle);
                 ClearSession();
                 Hide();
                 return;
             }
             if (!snapshot.IsRenderable)
             {
+                _logger?.Log(
+                    LogLevel.Debug,
+                    null,
+                    "[DEBUG-OVERLAY] Tracker change caused overlay hide because target is not renderable: handle={0}, foreground={1}, occluded={2}.",
+                    snapshot.Handle,
+                    snapshot.IsForeground,
+                    snapshot.IsOccluded);
                 StopHover();
                 Hide();
                 return;
@@ -164,6 +264,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         private void RenderCurrent(WordOverlaySession session, double fontScale)
         {
+            var wasVisible = IsVisible;
             if (!IsVisible)
                 Show();
 
@@ -212,10 +313,35 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     AddPitchAnnotations(word, scale, fontScale);
             }
             _hoverTimer.Start();
+
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-OVERLAY] Overlay rendered: hwnd={0}, wasVisible={1}, visible={2}, topmost={3}, targetHandle={4}, targetBounds={5}, words={6}, underlines={7}, phraseGroups={8}, canvasChildren={9}.",
+                handle,
+                wasVisible,
+                IsVisible,
+                Topmost,
+                session.Target.Handle,
+                session.Target.Bounds,
+                session.Words.Count,
+                _lineElements.Count,
+                session.PhraseGroups.Count,
+                _canvas.Children.Count);
         }
 
         public void ClearSession()
         {
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-OVERLAY] Session cleared: sessionId={0}, overlayVisible={1}, topmost={2}, words={3}, underlines={4}, phraseGroups={5}.",
+                _session?.Id.ToString() ?? "<none>",
+                IsVisible,
+                Topmost,
+                _session?.Words.Count ?? 0,
+                _lineElements.Count,
+                _session?.PhraseGroups.Count ?? 0);
             _session = null;
             StopHover();
             _canvas.Children.Clear();
@@ -547,6 +673,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var style = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
             NativeMethods.SetWindowLongPtr(handle, NativeMethods.GwlExStyle,
                 new nint(style | NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
+            var actualStyle = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
+            _logger?.Log(
+                LogLevel.Debug,
+                null,
+                "[DEBUG-OVERLAY] Native overlay window configured: hwnd={0}, visible={1}, topmost={2}, exStyle=0x{3:X}.",
+                handle,
+                IsVisible,
+                Topmost,
+                actualStyle);
         }
     }
 
