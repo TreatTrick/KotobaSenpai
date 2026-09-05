@@ -104,7 +104,8 @@ public sealed class MainWindowViewModelTests
     public void Set_recognition_region_shows_selector_for_selected_window()
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target));
+        var tracker = new FakeTargetWindowTracker();
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), tracker);
         vm.RefreshCommand.Execute(null);
         vm.SelectedWindow = vm.Windows[0];
         FakeRegionSelector.ShowCount = 0;
@@ -113,6 +114,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal(1, FakeRegionSelector.ShowCount);
         Assert.Equal("Other", FakeRegionSelector.LastTarget?.Title);
+        Assert.Equal(1, tracker.RefreshCount);
     }
 
     [Fact]
@@ -123,6 +125,23 @@ public sealed class MainWindowViewModelTests
         vm.SetRecognitionRegionCommand.Execute(null);
 
         Assert.Equal(ResourceKeys.Status_SelectTargetFirst, vm.Status);
+    }
+
+    [Fact]
+    public void Set_recognition_region_refresh_failure_logs_and_reports_target_error()
+    {
+        var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
+        var tracker = new FakeTargetWindowTracker { ThrowOnRefresh = true };
+        var (vm, _, _, logger) = CreateVm(new FakeWindowCatalog(target), tracker);
+        vm.RefreshCommand.Execute(null);
+        vm.SelectedWindow = vm.Windows[0];
+        FakeRegionSelector.ShowCount = 0;
+
+        vm.SetRecognitionRegionCommand.Execute(null);
+
+        Assert.Equal(1, logger.ErrorCount);
+        Assert.Equal(ErrorCodes.TargetWindowUnavailable, vm.Status);
+        Assert.Equal(0, FakeRegionSelector.ShowCount);
     }
 
     [Fact]
@@ -217,6 +236,8 @@ public sealed class MainWindowViewModelTests
 
         public int AttachCount { get; private set; }
         public int DetachCount { get; private set; }
+        public int RefreshCount { get; private set; }
+        public bool ThrowOnRefresh { get; set; }
         public TargetWindowSnapshot? Current { get; private set; }
 
         public TargetWindowSnapshot Attach(WindowTarget target)
@@ -228,7 +249,12 @@ public sealed class MainWindowViewModelTests
         }
 
         public TargetWindowSnapshot Refresh()
-            => Current ?? throw new InvalidOperationException("No target attached.");
+        {
+            RefreshCount++;
+            if (ThrowOnRefresh)
+                throw new InvalidOperationException("refresh failed");
+            return Current ?? throw new InvalidOperationException("No target attached.");
+        }
 
         public void Detach()
         {

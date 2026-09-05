@@ -43,6 +43,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private const uint EventObjectDestroy = 0x8001;
     private const uint EventObjectShow = 0x8002;
     private const uint EventObjectHide = 0x8003;
+    private const uint EventObjectReorder = 0x8004;
     private const uint EventObjectLocationChange = 0x800B;
     private const int ObjectIdWindow = 0;
     private const int ChildIdSelf = 0;
@@ -61,6 +62,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private nint _systemHook;
     private nint _destroyHook;
     private nint _visibilityHook;
+    private nint _reorderHook;
     private nint _foregroundHook;
     private nint _targetHandle;
     private bool _refreshPosted;
@@ -222,7 +224,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             return false;
         if (eventType is EventSystemMinimizeStart or EventSystemMinimizeEnd)
             return true;
-        return eventType is EventObjectDestroy or EventObjectShow or EventObjectHide or EventObjectLocationChange
+        return eventType is EventObjectDestroy or EventObjectShow or EventObjectHide or EventObjectReorder or EventObjectLocationChange
             && idObject == ObjectIdWindow
             && idChild == ChildIdSelf;
     }
@@ -371,6 +373,14 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             0,
             0,
             WineventOutOfContext);
+        _reorderHook = NativeMethods.SetWinEventHook(
+            EventObjectReorder,
+            EventObjectReorder,
+            nint.Zero,
+            _callback,
+            0,
+            0,
+            WineventOutOfContext);
         _foregroundHook = NativeMethods.SetWinEventHook(
             EventSystemForeground,
             EventSystemForeground,
@@ -384,18 +394,20 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             || _systemHook == nint.Zero
             || _destroyHook == nint.Zero
             || _visibilityHook == nint.Zero
+            || _reorderHook == nint.Zero
             || _foregroundHook == nint.Zero)
             throw new InvalidOperationException("Failed to register one or more WinEvent hooks.");
 
         _logger?.Log(
             LogLevel.Debug,
             null,
-            "[DEBUG-TRACKER] WinEvent hooks registered: targetHandle={0}, locationHook={1}, systemHook={2}, destroyHook={3}, visibilityHook={4}, foregroundHook={5}.",
+            "[DEBUG-TRACKER] WinEvent hooks registered: targetHandle={0}, locationHook={1}, systemHook={2}, destroyHook={3}, visibilityHook={4}, reorderHook={5}, foregroundHook={6}.",
             _targetHandle,
             _locationHook,
             _systemHook,
             _destroyHook,
             _visibilityHook,
+            _reorderHook,
             _foregroundHook);
     }
 
@@ -404,6 +416,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             && _systemHook != nint.Zero
             && _destroyHook != nint.Zero
             && _visibilityHook != nint.Zero
+            && _reorderHook != nint.Zero
             && _foregroundHook != nint.Zero;
 
     private void DetachCore()
@@ -421,6 +434,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         Unhook(ref _systemHook, "system");
         Unhook(ref _destroyHook, "destroy");
         Unhook(ref _visibilityHook, "visibility");
+        Unhook(ref _reorderHook, "reorder");
         Unhook(ref _foregroundHook, "foreground");
         lock (_gate)
         {

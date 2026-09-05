@@ -31,6 +31,14 @@ public sealed class TargetWindowTrackerTests
     }
 
     [Fact]
+    public void Reorder_events_are_relevant_for_z_order_changes()
+    {
+        Assert.True(WinEventTargetWindowTracker.IsRelevantEvent(0x8004, (nint)2, (nint)1, 0, 0));
+        Assert.False(WinEventTargetWindowTracker.IsRelevantEvent(0x8004, (nint)2, (nint)1, 1, 0));
+        Assert.False(WinEventTargetWindowTracker.IsRelevantEvent(0x8004, (nint)2, (nint)1, 0, 1));
+    }
+
+    [Fact]
     public void Invalid_target_is_reported_uncapturable_and_can_be_detached()
     {
         using var tracker = new WinEventTargetWindowTracker();

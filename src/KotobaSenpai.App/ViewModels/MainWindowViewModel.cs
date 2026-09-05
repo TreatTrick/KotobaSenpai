@@ -158,8 +158,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
             SetStatus(ResourceKeys.Status_SelectTargetFirst);
             return;
         }
-        _regionSelector.Show(SelectedWindow, ReadSavedRegion());
-        SetStatus(ResourceKeys.Status_RegionSelecting);
+        try
+        {
+            _tracker?.Refresh();
+            _regionSelector.Show(SelectedWindow, ReadSavedRegion());
+            SetStatus(ResourceKeys.Status_RegionSelecting);
+        }
+        catch (Exception ex)
+        {
+            SetError(ex, ErrorCodes.TargetWindowUnavailable);
+        }
     }
 
     private RecognitionRegion? ReadSavedRegion()
