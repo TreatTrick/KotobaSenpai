@@ -80,4 +80,59 @@ public class FuriganaSettingsTests
         Assert.Equal(kanjiChars, count);
         Assert.Equal(kanjiReading, trimmed);
     }
+
+    [Fact]
+    public void Distributes_interleaved_kanji_and_kana_reading_without_merging_segments()
+    {
+        var segments = FuriganaSettings.GetFuriganaSegments("受け入れ", "うけいれ");
+
+        Assert.Equal(
+            [
+                new FuriganaSegment(0, 1, "う", false),
+                new FuriganaSegment(1, 1, "", true),
+                new FuriganaSegment(2, 1, "い", false),
+                new FuriganaSegment(3, 1, "", true),
+            ],
+            segments);
+    }
+
+    [Fact]
+    public void Maps_pitch_mora_ranges_to_only_okurigana_surface_ranges()
+    {
+        var ranges = FuriganaSettings.GetPitchMoraRanges("受け入れ", "うけいれ", 4);
+
+        Assert.Equal(
+            [
+                (1, 1, 1, 1),
+                (3, 1, 3, 1),
+            ],
+            ranges);
+    }
+
+    [Fact]
+    public void Maps_trailing_okurigana_after_multimora_kanji_reading()
+    {
+        var ranges = FuriganaSettings.GetPitchMoraRanges("養う", "やしなう", 4);
+
+        Assert.Equal([(1, 1, 3, 1)], ranges);
+    }
+
+    [Fact]
+    public void Keeps_kana_only_segments_out_of_furigana_text_for_trailing_okurigana()
+    {
+        Assert.Equal(
+            [
+                new FuriganaSegment(0, 1, "やしな", false),
+                new FuriganaSegment(1, 1, "", true),
+            ],
+            FuriganaSettings.GetFuriganaSegments("養う", "やしなう"));
+    }
+
+    [Fact]
+    public void Preserves_internal_okurigana_offsets_when_a_later_kanji_has_reading()
+    {
+        Assert.Equal(
+            [(1, 1, 1, 1)],
+            FuriganaSettings.GetPitchMoraRanges("買い物", "かいもの", 4));
+    }
 }

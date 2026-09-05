@@ -4,6 +4,9 @@ using System.Text.RegularExpressions;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
+/// <summary>A surface range and the reading assigned to it.</summary>
+public sealed record FuriganaSegment(int SurfaceStart, int SurfaceLength, string Reading, bool IsKana);
+
 /// <summary>Settings key, default value, and pure logic for the furigana size ratio.</summary>
 public static class FuriganaSettings
 {
@@ -43,6 +46,108 @@ public static class FuriganaSettings
         return (kanjiChars, kanjiReading);
     }
 
+    /// <summary>
+    /// Distributes a reading over alternating kana and non-kana surface runs. Kana runs that match the reading are
+    /// returned without a reading so callers can render pitch markers instead of duplicate furigana text.
+    /// </summary>
+    public static IReadOnlyList<FuriganaSegment> GetFuriganaSegments(string surface, string reading)
+    {
+        if (surface == "受け入れ")
+        {
+            Console.WriteLine($"Surface: {surface}, Reading: {reading}");
+        }
+        ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(reading);
+        if (surface.Length == 0)
+            return Array.Empty<FuriganaSegment>();
+        if (surface == reading)
+            return [new FuriganaSegment(0, surface.Length, string.Empty, surface.All(IsKana))];
+
+        var groups = new List<(string Text, bool IsKana)>();
+        for (var i = 0; i < surface.Length;)
+        {
+            var isKana = IsKana(surface[i]);
+            var start = i++;
+            while (i < surface.Length && IsKana(surface[i]) == isKana)
+                i++;
+            groups.Add((surface[start..i], isKana));
+        }
+
+        var normalizedReading = Kana.ToHiragana(reading);
+        var normalizedGroups = groups
+            .Select(group => (group.Text, group.IsKana, NormalizedText: group.IsKana ? Kana.ToHiragana(group.Text) : null))
+            .ToArray();
+        var distributed = Distribute(normalizedReading, reading, normalizedGroups, 0);
+        if (distributed is null)
+            return [new FuriganaSegment(0, surface.Length, reading, false)];
+
+        var result = new List<FuriganaSegment>(distributed.Count);
+        var surfaceOffset = 0;
+        foreach (var segment in distributed)
+        {
+            result.Add(new FuriganaSegment(
+                surfaceOffset,
+                segment.Text.Length,
+                segment.Reading,
+                segment.IsKana));
+            surfaceOffset += segment.Text.Length;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Maps surface kana runs to the corresponding mora ranges in a complete reading. Only runs that are not
+    /// annotated with furigana are returned, keeping pitch dots mutually exclusive with furigana text.
+    /// </summary>
+    public static IReadOnlyList<(int SurfaceStart, int SurfaceLength, int MoraStart, int MoraCount)> GetPitchMoraRanges(
+        string surface,
+        string reading,
+        int moraCount)
+    {
+        ArgumentNullException.ThrowIfNull(surface);
+        ArgumentNullException.ThrowIfNull(reading);
+        if (surface.Length == 0 || moraCount <= 0)
+            return Array.Empty<(int, int, int, int)>();
+
+        var segments = GetFuriganaSegments(surface, reading);
+        var normalizedReading = Kana.ToHiragana(reading);
+        var readingOffset = 0;
+        var moraOffset = 0;
+        var ranges = new List<(int SurfaceStart, int SurfaceLength, int MoraStart, int MoraCount)>();
+        foreach (var segment in segments)
+        {
+            var text = surface.Substring(segment.SurfaceStart, segment.SurfaceLength);
+            var normalizedText = Kana.ToHiragana(segment.IsKana ? text : segment.Reading);
+            var segmentMoraCount = PitchAccent.SplitMorae(normalizedText).Count;
+            if (segmentMoraCount == 0)
+                continue;
+
+            if (segment.IsKana
+                && readingOffset + normalizedText.Length <= normalizedReading.Length
+                && normalizedReading.AsSpan(readingOffset, normalizedText.Length).SequenceEqual(normalizedText.AsSpan()))
+            {
+                ranges.Add((segment.SurfaceStart, segment.SurfaceLength, moraOffset, segmentMoraCount));
+            }
+
+            readingOffset += normalizedText.Length;
+            moraOffset += segmentMoraCount;
+        }
+
+        return ranges
+            .Where(range => range.MoraStart < moraCount)
+            .Select(range =>
+            {
+                var count = Math.Min(range.MoraCount, moraCount - range.MoraStart);
+                return (
+                    SurfaceStart: range.SurfaceStart,
+                    SurfaceLength: range.SurfaceLength,
+                    MoraStart: range.MoraStart,
+                    MoraCount: count);
+            })
+            .Where(range => range.MoraCount > 0)
+            .ToArray();
+    }
+
     /// <summary>Maps contiguous kana runs in a surface to the mora range used by a full pitch pattern.</summary>
     public static IReadOnlyList<(int SurfaceStart, int SurfaceLength, int MoraStart, int MoraCount)> GetPitchMoraRanges(
         string surface,
@@ -52,7 +157,7 @@ public static class FuriganaSettings
         if (surface.Length == 0 || moraCount <= 0)
             return Array.Empty<(int, int, int, int)>();
 
-        var ranges = new List<(int, int, int, int)>();
+        var ranges = new List<(int SurfaceStart, int SurfaceLength, int MoraStart, int MoraCount)>();
         for (var start = 0; start < surface.Length;)
         {
             if (!IsKana(surface[start]))
@@ -77,6 +182,49 @@ public static class FuriganaSettings
             start = end;
         }
         return ranges;
+    }
+
+    private static IReadOnlyList<(string Text, string Reading, bool IsKana)>? Distribute(
+        string normalizedReading,
+        string originalReading,
+        IReadOnlyList<(string Text, bool IsKana, string? NormalizedText)> groups,
+        int groupStart)
+    {
+        if (groupStart >= groups.Count)
+            return normalizedReading.Length == 0 ? Array.Empty<(string, string, bool)>() : null;
+
+        var group = groups[groupStart];
+        if (group.IsKana)
+        {
+            if (group.NormalizedText is null || !normalizedReading.StartsWith(group.NormalizedText, StringComparison.Ordinal))
+                return null;
+            var next = Distribute(
+                normalizedReading[group.NormalizedText.Length..],
+                originalReading[group.NormalizedText.Length..],
+                groups,
+                groupStart + 1);
+            if (next is null)
+                return null;
+            return [(group.Text, string.Empty, true), .. next];
+        }
+
+        IReadOnlyList<(string Text, string Reading, bool IsKana)>? result = null;
+        for (var i = normalizedReading.Length; i >= group.Text.Length; i--)
+        {
+            var next = Distribute(
+                normalizedReading[i..],
+                originalReading[i..],
+                groups,
+                groupStart + 1);
+            if (next is null)
+                continue;
+            if (result is not null)
+                return null;
+            result = [(group.Text, originalReading[..i], false), .. next];
+            if (groups.Count - groupStart == 1)
+                break;
+        }
+        return result;
     }
 
     /// <summary>Parses a stored font scale; missing, invalid, or zero values fall back to the default 1/3.</summary>

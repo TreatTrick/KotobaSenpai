@@ -413,10 +413,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         }
 
         /// <summary>
-        /// Adds the hiragana reading for just the word's kanji portion, centered above the leading kanji run
-        /// (okurigana is left as normal text, not annotated), clamped to the overlay top. It positions by character
-        /// ratio because Japanese full-width glyphs (kanji and kana) are ~1em wide, so the leading kanji occupy
-        /// (kanjiCharCount / surface.Length) of the word's width. // ponytail: multi-em-width edge cases (e.g. 全角・記号) are ignored.
+        /// Adds furigana and pitch markers for each source token. Surface kana that already has a matching reading
+        /// is represented by dots; only reading assigned to a kanji segment is rendered as furigana text.
         /// </summary>
         private void AddPitchAnnotations(GroupedWord word, double scale, double fontScale)
         {
@@ -429,16 +427,55 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             foreach (var (segment, sourceTokenIndex) in word.PitchAccents.Select((segment, index) => (segment, index)))
             {
                 var pattern = PitchAccent.CreatePattern(Kana.ToHiragana(segment.Reading), segment.AccentPosition);
-                if (FuriganaSettings.ContainsKanji(segment.Surface) && !string.IsNullOrEmpty(segment.Reading))
+                if (pattern is null)
                 {
-                    if (pattern is null)
-                        AddMonochromeFurigana(segment.Surface, segment.Reading, sourceTokenIndex, word, scale, fontScale);
-                    else
-                        AddColoredFurigana(segment, pattern, sourceTokenIndex, word, scale, fontScale);
+                    AddMonochromeFurigana(segment.Surface, segment.Reading, sourceTokenIndex, word, scale, fontScale);
+                    continue;
                 }
 
-                if (pattern is not null)
-                    AddPitchDots(segment, pattern, sourceTokenIndex, word, scale, fontScale);
+                var furiganaSegments = FuriganaSettings.GetFuriganaSegments(segment.Surface, segment.Reading);
+                var moraOffset = 0;
+                for (var furiganaSegmentIndex = 0; furiganaSegmentIndex < furiganaSegments.Count; furiganaSegmentIndex++)
+                {
+                    var furiganaSegment = furiganaSegments[furiganaSegmentIndex];
+                    var surface = segment.Surface.Substring(furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength);
+                    var reading = furiganaSegment.IsKana ? surface : furiganaSegment.Reading;
+                    var moraCount = PitchAccent.SplitMorae(Kana.ToHiragana(reading)).Count;
+                    if (moraCount == 0)
+                        continue;
+
+                    if (furiganaSegment.IsKana)
+                    {
+                        AddPitchDots(
+                            segment,
+                            furiganaSegment,
+                            pattern,
+                            moraOffset,
+                            moraCount,
+                            sourceTokenIndex,
+                            word,
+                            scale,
+                            fontScale);
+                    }
+                    else if (FuriganaSettings.ContainsKanji(surface) && !string.IsNullOrEmpty(furiganaSegment.Reading))
+                    {
+                        AddColoredFurigana(
+                            furiganaSegment,
+                            pattern,
+                            moraOffset,
+                            moraCount,
+                            sourceTokenIndex,
+                            word,
+                            scale,
+                            fontScale,
+                            addHeibanMarker: furiganaSegmentIndex == furiganaSegments.Count - 1);
+                    }
+
+                    moraOffset += moraCount;
+                }
+
+                // A malformed or ambiguous distribution can produce no kana segment; the colored furigana path
+                // adds the heiban marker for an all-kanji token, while kana segments add it after their final dots.
             }
         }
 
@@ -450,39 +487,47 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             double scale,
             double fontScale)
         {
-            var (kanjiChars, kanjiReading) = FuriganaSettings.OkuriganaTrim(surface, reading);
-            if (kanjiChars == 0 || string.IsNullOrEmpty(kanjiReading))
-                return;
-
-            var bounds = SegmentBounds(word, sourceTokenIndex, 0, surface.Length);
-            var fontSize = (bounds.Height / scale) * fontScale;
-            var text = new TextBlock
+            foreach (var segment in FuriganaSettings.GetFuriganaSegments(surface, reading))
             {
-                Text = Kana.ToHiragana(kanjiReading),
-                FontSize = fontSize,
-                Foreground = DefaultLineBrush,
-                Effect = FuriganaOutline,
-            };
-            AddTextCentered(text, bounds, kanjiChars, surface.Length, scale, fontSize);
+                var surfaceText = surface.Substring(segment.SurfaceStart, segment.SurfaceLength);
+                if (segment.IsKana || !FuriganaSettings.ContainsKanji(surfaceText) || string.IsNullOrEmpty(segment.Reading))
+                    continue;
+
+                var bounds = SegmentBounds(word, sourceTokenIndex, segment.SurfaceStart, segment.SurfaceLength);
+                var fontSize = (bounds.Height / scale) * fontScale;
+                var text = new TextBlock
+                {
+                    Text = Kana.ToHiragana(segment.Reading),
+                    FontSize = fontSize,
+                    Foreground = DefaultLineBrush,
+                    Effect = FuriganaOutline,
+                };
+                AddTextCentered(text, bounds, segment.SurfaceLength, segment.SurfaceLength, scale, fontSize);
+            }
         }
 
         private void AddColoredFurigana(
-            PitchAccentSummary segment,
+            FuriganaSegment furiganaSegment,
             PitchAccentPattern pattern,
+            int moraOffset,
+            int moraCount,
             int sourceTokenIndex,
             GroupedWord word,
             double scale,
-            double fontScale)
+            double fontScale,
+            bool addHeibanMarker)
         {
-            var (kanjiChars, kanjiReading) = FuriganaSettings.OkuriganaTrim(segment.Surface, segment.Reading);
-            var kanjiMorae = PitchAccent.SplitMorae(Kana.ToHiragana(kanjiReading));
-            if (kanjiChars == 0 || kanjiMorae.Count == 0)
+            if (string.IsNullOrEmpty(furiganaSegment.Reading) || moraCount <= 0)
                 return;
 
-            var bounds = SegmentBounds(word, sourceTokenIndex, 0, segment.Surface.Length);
+            var bounds = SegmentBounds(
+                word,
+                sourceTokenIndex,
+                furiganaSegment.SurfaceStart,
+                furiganaSegment.SurfaceLength);
             var fontSize = (bounds.Height / scale) * fontScale;
-            var fontMorae = pattern.Morae.Take(kanjiMorae.Count).ToArray();
-            var highMorae = pattern.HighMorae.Take(fontMorae.Length).ToArray();
+            var fontMorae = pattern.Morae.Skip(moraOffset).Take(moraCount).ToArray();
+            var highMorae = pattern.HighMorae.Skip(moraOffset).Take(fontMorae.Length).ToArray();
             var textBlocks = new List<TextBlock>(fontMorae.Length);
             var totalWidth = 0d;
             foreach (var mora in fontMorae)
@@ -507,23 +552,31 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 cursor += block.DesiredSize.Width;
             }
 
-            if (segment.AccentPosition == 0 && pattern.Morae.Count > 1)
+            if (addHeibanMarker && pattern.AccentPosition == 0 && pattern.Morae.Count > 1)
                 AddHeibanMarker(cursor, top + fontSize / 2, fontSize);
         }
 
         private void AddPitchDots(
             PitchAccentSummary segment,
+            FuriganaSegment furiganaSegment,
             PitchAccentPattern pattern,
+            int moraOffset,
+            int moraCount,
             int sourceTokenIndex,
             GroupedWord word,
             double scale,
             double fontScale)
         {
-            var kanaRuns = FuriganaSettings.GetPitchMoraRanges(segment.Surface, pattern.Morae.Count);
+            var kanaSurface = segment.Surface.Substring(furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength);
+            var kanaRuns = FuriganaSettings.GetPitchMoraRanges(kanaSurface, kanaSurface, moraCount);
             if (kanaRuns.Count == 0)
                 return;
 
-            var bounds = SegmentBounds(word, sourceTokenIndex, 0, segment.Surface.Length);
+            var bounds = SegmentBounds(
+                word,
+                sourceTokenIndex,
+                furiganaSegment.SurfaceStart,
+                furiganaSegment.SurfaceLength);
             var fontSize = (bounds.Height / scale) * fontScale;
             var dotRadius = Math.Max(2d, fontSize / 4d);
             var centerY = (bounds.Y - _session!.Target.Bounds.Y) / scale - dotRadius - 2;
@@ -532,8 +585,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
             foreach (var (start, length, moraStart, count) in kanaRuns)
             {
-                var left = bounds.X + bounds.Width * start / segment.Surface.Length;
-                var width = bounds.Width * length / segment.Surface.Length;
+                var left = bounds.X + bounds.Width * start / furiganaSegment.SurfaceLength;
+                var width = bounds.Width * length / furiganaSegment.SurfaceLength;
                 for (var i = 0; i < count; i++)
                 {
                     var centerX = (left - _session.Target.Bounds.X) / scale
@@ -543,14 +596,16 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                         Width = dotRadius * 2,
                         Height = dotRadius * 2,
                         CornerRadius = new CornerRadius(dotRadius),
-                        Background = pattern.HighMorae[moraStart + i] ? PitchHighBrush : PitchLowBrush,
+                        Background = pattern.HighMorae[moraOffset + moraStart + i] ? PitchHighBrush : PitchLowBrush,
                     };
                     _canvas.Children.Add(dot);
                     Canvas.SetLeft(dot, centerX - dotRadius);
                     Canvas.SetTop(dot, centerY - dotRadius);
                 }
 
-                if (segment.AccentPosition == 0 && moraStart + count == pattern.Morae.Count && pattern.Morae.Count > 1)
+                if (segment.AccentPosition == 0
+                    && moraOffset + moraStart + count == pattern.Morae.Count
+                    && pattern.Morae.Count > 1)
                     AddHeibanMarker((left - _session.Target.Bounds.X) / scale + width / scale, centerY, fontSize);
             }
         }
@@ -587,7 +642,14 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var matching = word.SourceTokenLines[sourceTokenIndex]
                 .Where(line => line.SurfaceOffset < end
                     && line.SurfaceOffset + line.SurfaceLength > surfaceOffset)
-                .Select(line => line.Bounds)
+                .Select(line =>
+                {
+                    var start = Math.Max(surfaceOffset, line.SurfaceOffset) - line.SurfaceOffset;
+                    var finish = Math.Min(end, line.SurfaceOffset + line.SurfaceLength) - line.SurfaceOffset;
+                    var left = line.Bounds.X + line.Bounds.Width * start / line.SurfaceLength;
+                    var right = line.Bounds.X + line.Bounds.Width * finish / line.SurfaceLength;
+                    return new ScreenRect(left, line.Bounds.Y, Math.Max(1, right - left), line.Bounds.Height);
+                })
                 .ToArray();
             if (matching.Length == 0)
                 return word.Bounds;
