@@ -8,15 +8,22 @@ namespace KotobaSenpai.Core.PhraseAnalysis;
 /// the provider concurrently (one independent request per sentence, concurrency-limited), validates groups,
 /// assigns session ids, maps geometry, and preserves provider order. Any failure only produces a retryable
 /// warning and never throws through the recognition flow; local words/spans remain usable.
+/// Supports sentence-level LLM result caching: unchanged sentences reuse cached results across incremental recognition cycles.
 /// </summary>
 public sealed class PhraseAnalysisOrchestrator
 {
     // ponytail: concurrency cap of 4 — a typical VN dialogue box has 2~5 sentences, capping beyond that is gentle on the LLM provider; tune if 429s occur or higher throughput is needed.
     private const int MaxConcurrency = 4;
+    // ponytail: cache cap of 50 — enough for typical VN sessions; FIFO eviction keeps memory bounded.
+    private const int MaxCacheSize = 50;
 
     private readonly ILlmPhraseAnalyzer _analyzer;
     private readonly SentenceSegmenter _segmenter;
     private readonly SentenceTokenBuilder _tokenBuilder;
+    private readonly object _cacheGate = new();
+    private readonly Dictionary<string, PhraseAnalysisResult> _cache = new(StringComparer.Ordinal);
+    private readonly LinkedList<string> _cacheOrder = new();
+    private readonly Dictionary<(string SegmentText, string ModelGroupId), Guid> _sessionGroupIds = new();
 
     public PhraseAnalysisOrchestrator(
         ILlmPhraseAnalyzer analyzer,
@@ -45,7 +52,29 @@ public sealed class PhraseAnalysisOrchestrator
         PhraseAnalysisResult[] results;
         try
         {
-            results = await RunThrottledAsync(requests, cancellationToken).ConfigureAwait(false);
+            var (cached, uncached) = SplitByCache(requests);
+            var freshResults = uncached.Count > 0
+                ? await RunThrottledAsync(uncached, cancellationToken).ConfigureAwait(false)
+                : Array.Empty<PhraseAnalysisResult>();
+            // Write successful fresh results to cache
+            for (int i = 0; i < uncached.Count; i++)
+            {
+                if (freshResults[i].Succeeded)
+                    CacheResult(uncached[i].SegmentText, freshResults[i]);
+            }
+            // Merge: build a lookup for fresh results by request index in the uncached list
+            var freshByIndex = new Dictionary<int, PhraseAnalysisResult>();
+            for (int i = 0; i < uncached.Count; i++)
+                freshByIndex[uncached[i].OriginalIndex] = freshResults[i];
+            // Assemble final results array in original request order
+            results = new PhraseAnalysisResult[requests.Count];
+            for (int i = 0; i < requests.Count; i++)
+            {
+                if (freshByIndex.TryGetValue(i, out var fresh))
+                    results[i] = fresh;
+                else
+                    results[i] = cached[i];
+            }
         }
         catch (OperationCanceledException)
         {
@@ -76,7 +105,8 @@ public sealed class PhraseAnalysisOrchestrator
             var tokenById = requests[i].Tokens.ToDictionary(reference => reference.Id);
             var validation = PhraseGroupValidator.ValidateAndBuild(result.Groups, tokenById);
             warnings.AddRange(validation.Warnings);
-            groups.AddRange(validation.ValidGroups.Select(group => group.WithSessionId(Guid.NewGuid())));
+            groups.AddRange(validation.ValidGroups.Select(group => group.WithSessionId(
+                GetSessionGroupId(requests[i].SegmentText, group.ModelGroupId))));
 
             var wordValidation = WordMeaningValidator.ValidateAndBuild(result.Words, requests[i].LocalSpans);
             warnings.AddRange(wordValidation.Warnings);
@@ -119,16 +149,16 @@ public sealed class PhraseAnalysisOrchestrator
 
     // ponytail: throttle logic folded into a private method so the main flow stays flat and readable.
     private async Task<PhraseAnalysisResult[]> RunThrottledAsync(
-        IReadOnlyList<PhraseAnalysisRequest> requests,
+        IReadOnlyList<CacheableRequest> requests,
         CancellationToken cancellationToken)
     {
         using var throttler = new SemaphoreSlim(MaxConcurrency);
-        var tasks = requests.Select(async request =>
+        var tasks = requests.Select(async cacheableRequest =>
         {
             await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await _analyzer.AnalyzeAsync(request, cancellationToken).ConfigureAwait(false);
+                return await _analyzer.AnalyzeAsync(cacheableRequest.Request, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
@@ -157,5 +187,79 @@ public sealed class PhraseAnalysisOrchestrator
         PhraseAnalysisOutcome.TransportError => "Phrase analysis provider transport error.",
         PhraseAnalysisOutcome.InvalidResponse => "Phrase analysis provider returned an invalid response.",
         _ => "Phrase analysis failed.",
+    };
+
+    private (Dictionary<int, PhraseAnalysisResult> cached, List<CacheableRequest> uncached) SplitByCache(
+        IReadOnlyList<PhraseAnalysisRequest> requests)
+    {
+        var cached = new Dictionary<int, PhraseAnalysisResult>();
+        var uncached = new List<CacheableRequest>();
+        for (int i = 0; i < requests.Count; i++)
+        {
+            if (TryGetCached(requests[i].SegmentText, out var result))
+                cached[i] = result;
+            else
+                uncached.Add(new CacheableRequest(requests[i], i));
+        }
+        return (cached, uncached);
+    }
+
+    private void CacheResult(string segmentText, PhraseAnalysisResult result)
+    {
+        lock (_cacheGate)
+        {
+            if (_cache.ContainsKey(segmentText))
+            {
+                _cache[segmentText] = result;
+                return;
+            }
+
+            if (_cache.Count >= MaxCacheSize)
+            {
+                var oldest = _cacheOrder.First!;
+                _cache.Remove(oldest.Value);
+                _cacheOrder.RemoveFirst();
+                foreach (var key in _sessionGroupIds.Keys
+                    .Where(key => string.Equals(key.SegmentText, oldest.Value, StringComparison.Ordinal))
+                    .ToArray())
+                    _sessionGroupIds.Remove(key);
+            }
+            _cache[segmentText] = result;
+            _cacheOrder.AddLast(segmentText);
+        }
+    }
+
+    public void ClearCache()
+    {
+        lock (_cacheGate)
+        {
+            _cache.Clear();
+            _cacheOrder.Clear();
+            _sessionGroupIds.Clear();
+        }
+    }
+
+    private bool TryGetCached(string segmentText, out PhraseAnalysisResult result)
+    {
+        lock (_cacheGate)
+            return _cache.TryGetValue(segmentText, out result!);
+    }
+
+    private Guid GetSessionGroupId(string segmentText, string modelGroupId)
+    {
+        lock (_cacheGate)
+        {
+            var key = (segmentText, modelGroupId);
+            if (_sessionGroupIds.TryGetValue(key, out var id))
+                return id;
+            id = Guid.NewGuid();
+            _sessionGroupIds[key] = id;
+            return id;
+        }
+    }
+
+    private sealed record CacheableRequest(PhraseAnalysisRequest Request, int OriginalIndex)
+    {
+        public string SegmentText => Request.SegmentText;
     };
 }

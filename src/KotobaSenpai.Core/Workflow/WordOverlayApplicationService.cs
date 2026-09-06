@@ -25,6 +25,7 @@ public sealed class WordOverlayApplicationService
     private readonly ISettingsService? _settings;
     private readonly ITargetWindowTracker? _tracker;
     private int _recognitionGeneration;
+    private string? _lastRecognizedText;
 
     public WordOverlayApplicationService(
         IWindowWordRecognizer recognizer,
@@ -50,26 +51,68 @@ public sealed class WordOverlayApplicationService
     {
         var recognitionId = Guid.NewGuid();
         var generation = Interlocked.Increment(ref _recognitionGeneration);
-        var activeTarget = target;
-        if (_tracker is not null)
-        {
-            var current = _tracker.Current;
-            if (current is null || current.Handle != target.Handle)
-                throw new BusinessRuleValidationException(
-                    ErrorCodes.TargetWindowUnavailable,
-                    "The selected target window is not currently tracked.");
+        var activeTarget = ValidateTarget(target);
+        _phraseOrchestrator?.ClearCache();
+        _overlay.Hide();
+        var result = await RecognizeCoreAsync(recognitionId, activeTarget, cancellationToken).ConfigureAwait(false);
+        if (!IsCurrent(generation))
+            return result;
 
-            var snapshot = _tracker.Refresh();
-            if (!snapshot.IsCapturable)
-                throw new BusinessRuleValidationException(
-                    ErrorCodes.TargetWindowUnavailable,
-                    "The target window must be visible, restored, and unobstructed before recognition.");
-            activeTarget = snapshot.Target;
+        _lastRecognizedText = GetRecognizedText(result.Lines);
+        await PublishAsync(recognitionId, generation, activeTarget, result, incremental: false, cancellationToken)
+            .ConfigureAwait(false);
+        return result;
+    }
+
+    /// <summary>Recognizes a changed frame and chooses incremental or full replacement from the OCR text relationship.</summary>
+    public async Task<WordRecognitionResult?> RecognizeChangedAndShowAsync(
+        WindowTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        var observedGeneration = Volatile.Read(ref _recognitionGeneration);
+        var activeTarget = ValidateTarget(target);
+        var recognitionId = Guid.NewGuid();
+        var result = await RecognizeCoreAsync(recognitionId, activeTarget, cancellationToken).ConfigureAwait(false);
+        if (!IsCurrent(observedGeneration))
+            return result;
+
+        var newText = GetRecognizedText(result.Lines);
+        if (string.Equals(_lastRecognizedText, newText, StringComparison.Ordinal))
+            return result;
+
+        var incremental = !string.IsNullOrEmpty(_lastRecognizedText)
+            && newText.Contains(_lastRecognizedText, StringComparison.Ordinal);
+        var generation = Interlocked.Increment(ref _recognitionGeneration);
+        if (!incremental)
+        {
+            _phraseOrchestrator?.ClearCache();
+            _overlay.Hide();
         }
 
+        _lastRecognizedText = newText;
+        await PublishAsync(recognitionId, generation, activeTarget, result, incremental, cancellationToken)
+            .ConfigureAwait(false);
+        return result;
+    }
+
+    private async Task<WordRecognitionResult> RecognizeCoreAsync(
+        Guid recognitionId,
+        WindowTarget activeTarget,
+        CancellationToken cancellationToken)
+    {
         var regionPixels = ReadRegionPixels(activeTarget);
-        _overlay.Hide();
-        var result = await _recognizer.RecognizeAsync(recognitionId, activeTarget, cancellationToken, regionPixels).ConfigureAwait(false);
+        return await _recognizer.RecognizeAsync(recognitionId, activeTarget, cancellationToken, regionPixels)
+            .ConfigureAwait(false);
+    }
+
+    private async Task PublishAsync(
+        Guid recognitionId,
+        int generation,
+        WindowTarget activeTarget,
+        WordRecognitionResult result,
+        bool incremental,
+        CancellationToken cancellationToken)
+    {
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
             .Select(word =>
@@ -94,18 +137,19 @@ public sealed class WordOverlayApplicationService
         if (phraseEnabled)
         {
             if (!IsCurrent(generation))
-                return result;
-            _overlay.Show(WordOverlaySession.Start(
-                activeTarget,
-                screenWords,
-                underlineSegmentIds: Array.Empty<string>()));
+                return;
+            if (!incremental)
+                _overlay.Show(WordOverlaySession.Start(
+                    activeTarget,
+                    screenWords,
+                    underlineSegmentIds: Array.Empty<string>()));
 
             var phraseRun = await _phraseOrchestrator!
                 .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
                 .ConfigureAwait(false);
 
             if (!IsCurrent(generation))
-                return result;
+                return;
 
             var phraseGroups = phraseRun.Groups
                 .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds))
@@ -118,23 +162,46 @@ public sealed class WordOverlayApplicationService
                 phraseRun.Warning,
                 phraseRun.Words,
                 phraseRun.SuccessfulSegmentIds));
-            return result;
+            return;
         }
 
         if (!IsCurrent(generation))
-            return result;
+            return;
         _overlay.Show(WordOverlaySession.Start(activeTarget, screenWords));
-        return result;
     }
 
     public void Hide()
     {
         Interlocked.Increment(ref _recognitionGeneration);
+        _lastRecognizedText = null;
         _overlay.Hide();
     }
 
     private bool IsCurrent(int generation)
         => Volatile.Read(ref _recognitionGeneration) == generation;
+
+    private WindowTarget ValidateTarget(WindowTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (_tracker is null)
+            return target;
+
+        var current = _tracker.Current;
+        if (current is null || current.Handle != target.Handle)
+            throw new BusinessRuleValidationException(
+                ErrorCodes.TargetWindowUnavailable,
+                "The selected target window is not currently tracked.");
+
+        var snapshot = _tracker.Refresh();
+        if (!snapshot.IsCapturable)
+            throw new BusinessRuleValidationException(
+                ErrorCodes.TargetWindowUnavailable,
+                "The target window must be visible, restored, and unobstructed before recognition.");
+        return snapshot.Target;
+    }
+
+    private static string GetRecognizedText(IReadOnlyList<OcrLine> lines)
+        => string.Concat(lines.Select(line => line.Text));
 
     /// <summary>Reads the saved recognition region and converts it to a window/frame pixel rect; null when unset or invalid (=> full window).</summary>
     private ScreenRect? ReadRegionPixels(WindowTarget target)

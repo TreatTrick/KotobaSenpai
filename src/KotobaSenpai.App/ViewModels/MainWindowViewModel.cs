@@ -27,6 +27,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IUserMessageResolver _messageResolver;
     private readonly ILogger _logger;
     private readonly ITargetWindowTracker? _tracker;
+    private readonly IAutoRecognitionController? _autoRecognitionController;
+    private bool _recognitionSessionActive;
 
     /// <summary>A delegate that renders the localized Status from the current state; re-invoked on culture switch to refresh in place.</summary>
     private Func<string> _renderStatus = () => string.Empty;
@@ -39,7 +41,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IStringLocalizer localizer,
         IUserMessageResolver messageResolver,
         ILogger logger,
-        ITargetWindowTracker? tracker = null)
+        ITargetWindowTracker? tracker = null,
+        IAutoRecognitionController? autoRecognitionController = null)
     {
         _catalog = catalog;
         _workflow = workflow;
@@ -49,6 +52,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _messageResolver = messageResolver;
         _logger = logger;
         _tracker = tracker;
+        _autoRecognitionController = autoRecognitionController;
+        _autoRecognitionEnabled = IsEnabled(_settings.GetValue(AutoRecognitionSettings.EnabledKey));
 
         _localizer.CultureChanged += OnCultureChanged;
         SetStatus(ResourceKeys.Status_SelectTarget);
@@ -60,6 +65,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>The currently selected target window.</summary>
     [ObservableProperty]
     private WindowTarget? _selectedWindow;
+
+    /// <summary>Whether polling recognition is enabled for the current recognition session.</summary>
+    [ObservableProperty]
+    private bool _autoRecognitionEnabled;
 
     /// <summary>User-visible status text.</summary>
     [ObservableProperty]
@@ -74,6 +83,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Updates the status prompt after a window is selected.</summary>
     partial void OnSelectedWindowChanged(WindowTarget? value)
     {
+        _autoRecognitionController?.Stop();
+        _recognitionSessionActive = false;
         try
         {
             if (value is null)
@@ -126,8 +137,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         try
         {
+            _autoRecognitionController?.Stop();
+            _recognitionSessionActive = false;
             SetStatus(ResourceKeys.Status_Recognizing);
             var result = await _workflow.RecognizeAndShowAsync(SelectedWindow);
+            _recognitionSessionActive = true;
+            StartAutoRecognitionIfEnabled();
             var wordCount = result.Lines.Sum(line => line.Words.Count);
             SetStatus(wordCount == 0
                 ? ResourceKeys.Status_NoWords
@@ -136,6 +151,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            _autoRecognitionController?.Stop();
             _workflow.Hide();
             SetError(ex, ErrorCodes.RecognitionFailed);
         }
@@ -145,9 +161,47 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void Hide()
     {
+        _autoRecognitionController?.Stop();
+        _recognitionSessionActive = false;
         _workflow.Hide();
         SetStatus(ResourceKeys.Status_Hidden);
     }
+
+    partial void OnAutoRecognitionEnabledChanged(bool value)
+    {
+        _settings.SetValue(AutoRecognitionSettings.EnabledKey, value ? "true" : "false");
+        if (value)
+            StartAutoRecognitionIfEnabled();
+        else
+            _autoRecognitionController?.Stop();
+    }
+
+    private void StartAutoRecognitionIfEnabled()
+    {
+        if (!_recognitionSessionActive || !AutoRecognitionEnabled || SelectedWindow is null || _autoRecognitionController is null)
+            return;
+
+        var target = SelectedWindow;
+        _autoRecognitionController.Start(target, cancellationToken => RecognizeChangedAsync(target, cancellationToken));
+    }
+
+    private async Task RecognizeChangedAsync(WindowTarget target, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _workflow.RecognizeChangedAndShowAsync(target, cancellationToken).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Automatic recognition failed.");
+        }
+    }
+
+    private static bool IsEnabled(string? value)
+        => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Opens the interactive region selector over the selected window to set the recognition sub-region.</summary>
     [RelayCommand]

@@ -106,6 +106,9 @@
   <data name="Button_SetRecognitionRegion" xml:space="preserve">
     <value>Set recognition region</value>
   </data>
+  <data name="Label_AutoRecognition" xml:space="preserve">
+    <value>Automatically recognize when the text changes</value>
+  </data>
   <data name="Label_Description" xml:space="preserve">
     <value>Instructions: After selecting a window, the app captures the current screen, recognizes Japanese words, and draws a line beneath each word.</value>
   </data>

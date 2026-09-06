@@ -45,6 +45,9 @@
           <ui:Button Content="{loc:Loc Key=Button_SetRecognitionRegion}" Command="{Binding SetRecognitionRegionCommand}" Appearance="Secondary" Margin="8,0,0,0" />
           <ui:Button Content="{loc:Loc Key=Button_Hide}" Command="{Binding HideCommand}" Appearance="Secondary" Margin="8,0,0,0" />
         </StackPanel>
+        <CheckBox Content="{loc:Loc Key=Label_AutoRecognition}"
+                  IsChecked="{Binding AutoRecognitionEnabled, Mode=TwoWay}"
+                  Margin="0,10,0,0" />
         <TextBlock Text="{loc:Loc Key=Label_Description}" TextWrapping="Wrap" Margin="0,12,0,0" Opacity="0.7" />
 
         <!-- 外观 -->

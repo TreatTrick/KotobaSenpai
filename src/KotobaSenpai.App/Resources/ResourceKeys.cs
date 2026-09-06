@@ -18,6 +18,7 @@ public static class ResourceKeys
     public const string Button_Recognize = nameof(Button_Recognize);
     public const string Button_Hide = nameof(Button_Hide);
     public const string Button_SetRecognitionRegion = nameof(Button_SetRecognitionRegion);
+    public const string Label_AutoRecognition = nameof(Label_AutoRecognition);
     public const string Label_Description = nameof(Label_Description);
 
     // --- ViewModel status text ({0} is a placeholder) ---

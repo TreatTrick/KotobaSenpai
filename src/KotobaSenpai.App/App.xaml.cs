@@ -28,6 +28,7 @@ using KotobaSenpai.Platform.Windows.Dictionary;
 using KotobaSenpai.Platform.Windows.Japanese;
 using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Platform.Windows.AutoRecognition;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KotobaSenpai.App;
@@ -142,6 +143,7 @@ public partial class App : Application
         services.AddSingleton<IWindowFrameCapture, GdiWindowFrameCapture>();
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<ITargetWindowTracker, WinEventTargetWindowTracker>();
+        services.AddSingleton<IAutoRecognitionController, AutoRecognitionController>();
         services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
         services.AddSingleton<IRegionSelector, RegionSelectorWindow>();
 

@@ -106,6 +106,9 @@
   <data name="Button_SetRecognitionRegion" xml:space="preserve">
     <value>设置识别区域</value>
   </data>
+  <data name="Label_AutoRecognition" xml:space="preserve">
+    <value>文字变化时自动识别</value>
+  </data>
   <data name="Label_Description" xml:space="preserve">
     <value>说明：选择一个窗口后，应用会抓取当前画面，识别日语词并在每个词下方绘制横线。</value>
   </data>
