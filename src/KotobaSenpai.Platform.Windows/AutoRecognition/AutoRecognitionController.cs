@@ -22,11 +22,13 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
     private CancellationTokenSource? _cancellation;
     private WindowTarget? _target;
     private Func<CancellationToken, Task>? _onChange;
-    private CapturedFrame? _previousFrame;
+    private Baseline? _baseline;
     private double _differenceThreshold;
     private int _polling;
     private bool _running;
     private bool _disposed;
+
+    private sealed record Baseline(nint Handle, ScreenRect? Region, int ClientWidth, int ClientHeight, CapturedFrame Frame);
 
     public AutoRecognitionController(
         IWindowFrameCapture capture,
@@ -64,7 +66,7 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
             {
                 _target = target;
                 _onChange = onChange;
-                _previousFrame = null;
+                _baseline = null;
                 _differenceThreshold = ReadDifferenceThreshold();
                 _cancellation = new CancellationTokenSource();
                 _running = true;
@@ -111,11 +113,11 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
         if (!IsRunning || Interlocked.Exchange(ref _polling, 1) != 0)
             return;
 
+        var cancellationToken = new CancellationToken(true);
         try
         {
             WindowTarget? target;
             Func<CancellationToken, Task>? onChange;
-            CancellationToken cancellationToken;
             double threshold;
             lock (_gate)
             {
@@ -130,7 +132,10 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
 
             var snapshot = _tracker.Current;
             if (snapshot is null || snapshot.Handle != target.Handle || !snapshot.IsCapturable)
+            {
+                ClearBaseline(cancellationToken);
                 return;
+            }
 
             var region = ReadRegionPixels(snapshot.Target);
             var frame = await _capture.CaptureAsync(snapshot.Target, cancellationToken, region);
@@ -140,8 +145,16 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
             CapturedFrame? previous;
             lock (_gate)
             {
-                previous = _previousFrame;
-                _previousFrame = frame;
+                if (_cancellation?.Token != cancellationToken || cancellationToken.IsCancellationRequested)
+                    return;
+                var baseline = _baseline;
+                previous = baseline is not null
+                    && baseline.Handle == snapshot.Handle && baseline.Region == region
+                    && baseline.ClientWidth == snapshot.Bounds.Width && baseline.ClientHeight == snapshot.Bounds.Height
+                    && baseline.Frame.Width == frame.Width && baseline.Frame.Height == frame.Height
+                    && baseline.Frame.CaptureGeneration == frame.CaptureGeneration
+                    ? baseline.Frame : null;
+                _baseline = new Baseline(snapshot.Handle, region, snapshot.Bounds.Width, snapshot.Bounds.Height, frame);
             }
 
             if (!FrameDifference.Exceeds(previous, frame, threshold) || onChange is null)
@@ -151,15 +164,23 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
         }
         catch (OperationCanceledException)
         {
+            ClearBaseline(cancellationToken);
         }
         catch (Exception ex)
         {
+            ClearBaseline(cancellationToken);
             _logger?.LogError(ex, "Auto-recognition polling failed.");
         }
         finally
         {
             Interlocked.Exchange(ref _polling, 0);
         }
+    }
+
+    private void ClearBaseline(CancellationToken cancellationToken)
+    {
+        lock (_gate)
+            if (_cancellation?.Token == cancellationToken) _baseline = null;
     }
 
     private int ReadIntervalMilliseconds()
@@ -193,7 +214,7 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
             _running = false;
             _target = null;
             _onChange = null;
-            _previousFrame = null;
+            _baseline = null;
             _cancellation?.Cancel();
             _cancellation?.Dispose();
             _cancellation = null;

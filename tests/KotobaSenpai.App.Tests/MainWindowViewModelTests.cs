@@ -13,11 +13,60 @@ using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Platform.Windows;
 
 namespace KotobaSenpai.App.Tests;
 
 public sealed class MainWindowViewModelTests
 {
+    [Theory]
+    [InlineData("hide")]
+    [InlineData("switch")]
+    [InlineData("clear")]
+    [InlineData("dispose")]
+    public async Task Ending_a_session_stops_capture_and_rejects_late_manual_results(string action)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var recognizer = new DeferredRecognizer();
+        var capture = new RecordingCapture();
+        var controller = new RecordingAutoController();
+        var (vm, overlay, _, logger) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer, capture: capture, controller: controller);
+        vm.SelectedWindow = target;
+        vm.AutoRecognitionEnabled = true;
+        var stoppedBefore = capture.StopCount;
+        var pending = vm.RecognizeCommand.ExecuteAsync(null);
+        if (action == "hide") vm.HideCommand.Execute(null);
+        if (action == "switch") vm.SelectedWindow = new WindowTarget((nint)3, "Other", target.Bounds);
+        if (action == "clear") vm.SelectedWindow = null;
+        if (action == "dispose") { vm.Dispose(); vm.Dispose(); }
+        var status = vm.Status;
+        recognizer.Completion.SetResult(new WordRecognitionResult(100, 100, []));
+        await pending;
+        Assert.True(recognizer.CancellationToken.IsCancellationRequested);
+        Assert.Equal(stoppedBefore + 1, capture.StopCount);
+        Assert.Equal(0, controller.StartCount);
+        Assert.Equal(0, overlay.ShowCount);
+        Assert.Equal(status, vm.Status);
+        Assert.Equal(0, logger.ErrorCount);
+    }
+
+    [Fact]
+    public async Task Manual_capture_failure_stops_capture_and_reports_its_stable_error_code()
+    {
+        var recognizer = new DeferredRecognizer();
+        var capture = new RecordingCapture();
+        var (vm, overlay, _, logger) = CreateVm(new FakeWindowCatalog(), recognizer: recognizer, capture: capture);
+        vm.SelectedWindow = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var stoppedBefore = capture.StopCount;
+        var pending = vm.RecognizeCommand.ExecuteAsync(null);
+        recognizer.Completion.SetException(new WindowsPlatformException(ErrorCodes.WindowCaptureTimedOut, "Native capture timed out."));
+        await pending;
+        Assert.Equal(stoppedBefore + 1, capture.StopCount);
+        Assert.Equal(ErrorCodes.WindowCaptureTimedOut, vm.Status);
+        Assert.Equal(0, overlay.ShowCount);
+        Assert.Equal(1, logger.ErrorCount);
+    }
+
     [Fact]
     public void Refresh_lists_windows_excluding_self()
     {
@@ -159,17 +208,20 @@ public sealed class MainWindowViewModelTests
 
     private static (MainWindowViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(
         IWindowCatalog catalog,
-        ITargetWindowTracker? tracker = null)
+        ITargetWindowTracker? tracker = null,
+        IWindowWordRecognizer? recognizer = null,
+        IWindowFrameCapture? capture = null,
+        IAutoRecognitionController? controller = null)
     {
         var overlay = new FakeOverlay();
         var workflow = new WordOverlayApplicationService(
-            new FakeRecognizer(),
+            recognizer ?? new FakeRecognizer(),
             new WordGroupingService(new StubTokenizer(), new SentenceSegmenter(), new StubSpanResolver()),
             overlay);
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
-        return (new MainWindowViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger, tracker), overlay, localizer, logger);
+        return (new MainWindowViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowCatalog : IWindowCatalog
@@ -189,6 +241,34 @@ public sealed class MainWindowViewModelTests
         public Task<WordRecognitionResult> RecognizeAsync(Guid recognitionId, WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null) =>
             Task.FromResult(new WordRecognitionResult(100, 50,
                 [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]));
+    }
+
+    private sealed class DeferredRecognizer : IWindowWordRecognizer
+    {
+        public TaskCompletionSource<WordRecognitionResult> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationToken CancellationToken { get; private set; }
+        public Task<WordRecognitionResult> RecognizeAsync(Guid recognitionId, WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null)
+        {
+            CancellationToken = cancellationToken;
+            return Completion.Task;
+        }
+    }
+
+    private sealed class RecordingCapture : IWindowFrameCapture
+    {
+        public int StopCount { get; private set; }
+        public void Stop() => StopCount++;
+        public Task<CapturedFrame> CaptureAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingAutoController : IAutoRecognitionController
+    {
+        public int StartCount { get; private set; }
+        public bool IsRunning { get; private set; }
+        public void Start(WindowTarget target, Func<CancellationToken, Task>? onChange = null) { StartCount++; IsRunning = true; }
+        public void Stop() => IsRunning = false;
+        public void Dispose() => Stop();
     }
 
     private sealed class FakeRegionSelector : IRegionSelector
@@ -221,7 +301,7 @@ public sealed class MainWindowViewModelTests
         public int HideCount { get; private set; }
         public WordOverlaySession? LastSession { get; private set; }
 
-        public void Show(WordOverlaySession session)
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null)
         {
             ShowCount++;
             LastSession = session;

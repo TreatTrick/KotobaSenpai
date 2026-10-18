@@ -2,7 +2,7 @@ using KotobaSenpai.Core.Geometry;
 
 namespace KotobaSenpai.Core.TargetWindow;
 
-/// <summary>Resolves the region to pass to the frame capture for region-limited OCR: clamps it to the window and falls back to the full window for a too-small region. The physical screen-copy of just the region happens in the capture layer.</summary>
+/// <summary>Clamps an OCR region to the client area and falls back to the full client area for a too-small region.</summary>
 public static class CropRegion
 {
     /// <summary>Returns the window-relative pixel rect to capture, or null (full window) when unset or too small to matter.</summary>

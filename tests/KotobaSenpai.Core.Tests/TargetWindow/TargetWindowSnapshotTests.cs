@@ -6,7 +6,7 @@ namespace KotobaSenpai.Core.Tests.TargetWindow;
 public sealed class TargetWindowSnapshotTests
 {
     [Fact]
-    public void Snapshot_is_capturable_when_visible_restored_and_unobstructed()
+    public void Snapshot_separates_capture_from_overlay_visibility()
     {
         var bounds = new ScreenRect(0, 0, 100, 100);
 
@@ -15,7 +15,8 @@ public sealed class TargetWindowSnapshotTests
         Assert.True(new TargetWindowSnapshot((nint)1, "target", bounds, 1, true, false, false).IsRenderable);
         Assert.False(new TargetWindowSnapshot((nint)1, "target", bounds, 1, false, false, true).IsCapturable);
         Assert.False(new TargetWindowSnapshot((nint)1, "target", bounds, 1, true, true, true).IsCapturable);
-        Assert.False(new TargetWindowSnapshot((nint)1, "target", bounds, 1, true, false, true, true).IsCapturable);
+        Assert.True(new TargetWindowSnapshot((nint)1, "target", bounds, 1, true, false, true, true).IsCapturable);
+        Assert.False(new TargetWindowSnapshot((nint)1, "target", bounds, 1, true, false, true, true).IsRenderable);
         Assert.False(new TargetWindowSnapshot((nint)1, "target", bounds, 1, true, false, true, false, false).IsCapturable);
     }
 }

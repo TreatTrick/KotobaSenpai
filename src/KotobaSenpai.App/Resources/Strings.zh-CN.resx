@@ -79,7 +79,16 @@
     <value>识别失败。</value>
   </data>
   <data name="TargetWindowUnavailable" xml:space="preserve">
-    <value>识别前请先显示并恢复目标窗口，且不要让其他窗口遮挡它。</value>
+    <value>识别前请确认目标窗口有效、可见且未最小化。</value>
+  </data>
+  <data name="WindowCaptureNotSupported" xml:space="preserve">
+    <value>当前设备或 Windows 会话不支持窗口捕获。</value>
+  </data>
+  <data name="WindowCaptureFailed" xml:space="preserve">
+    <value>无法捕获所选窗口，请重试或选择其他窗口。</value>
+  </data>
+  <data name="WindowCaptureTimedOut" xml:space="preserve">
+    <value>等待窗口画面超时，请保持窗口未最小化后重试。</value>
   </data>
   <!-- XAML labels -->
   <data name="MainWindow_Title" xml:space="preserve">

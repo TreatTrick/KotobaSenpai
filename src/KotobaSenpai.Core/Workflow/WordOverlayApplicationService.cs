@@ -55,6 +55,7 @@ public sealed class WordOverlayApplicationService
         _phraseOrchestrator?.ClearCache();
         _overlay.Hide();
         var result = await RecognizeCoreAsync(recognitionId, activeTarget, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!IsCurrent(generation))
             return result;
 
@@ -73,6 +74,7 @@ public sealed class WordOverlayApplicationService
         var activeTarget = ValidateTarget(target);
         var recognitionId = Guid.NewGuid();
         var result = await RecognizeCoreAsync(recognitionId, activeTarget, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!IsCurrent(observedGeneration))
             return result;
 
@@ -113,6 +115,8 @@ public sealed class WordOverlayApplicationService
         bool incremental,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        bool CanRender() => !cancellationToken.IsCancellationRequested && IsCurrent(generation);
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
             .Select(word =>
@@ -142,12 +146,13 @@ public sealed class WordOverlayApplicationService
                 _overlay.Show(WordOverlaySession.Start(
                     activeTarget,
                     screenWords,
-                    underlineSegmentIds: Array.Empty<string>()));
+                    underlineSegmentIds: Array.Empty<string>()), CanRender);
 
             var phraseRun = await _phraseOrchestrator!
                 .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
                 .ConfigureAwait(false);
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (!IsCurrent(generation))
                 return;
 
@@ -161,13 +166,13 @@ public sealed class WordOverlayApplicationService
                 phraseGroups,
                 phraseRun.Warning,
                 phraseRun.Words,
-                phraseRun.SuccessfulSegmentIds));
+                phraseRun.SuccessfulSegmentIds), CanRender);
             return;
         }
 
         if (!IsCurrent(generation))
             return;
-        _overlay.Show(WordOverlaySession.Start(activeTarget, screenWords));
+        _overlay.Show(WordOverlaySession.Start(activeTarget, screenWords), CanRender);
     }
 
     public void Hide()
@@ -196,7 +201,7 @@ public sealed class WordOverlayApplicationService
         if (!snapshot.IsCapturable)
             throw new BusinessRuleValidationException(
                 ErrorCodes.TargetWindowUnavailable,
-                "The target window must be visible, restored, and unobstructed before recognition.");
+                "The target window must be visible and restored before recognition.");
         return snapshot.Target;
     }
 

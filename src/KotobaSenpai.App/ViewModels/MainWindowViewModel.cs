@@ -17,7 +17,7 @@ namespace KotobaSenpai.App.ViewModels;
 /// and <see cref="IUserMessageResolver"/>), and references no WPF or platform implementation, so it can be tested headlessly.
 /// All user-visible text is resolved through <see cref="IStringLocalizer"/>; on culture switch <see cref="Status"/> is recomputed from the current state.
 /// </summary>
-public sealed partial class MainWindowViewModel : ObservableObject
+public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 {
     private readonly IWindowCatalog _catalog;
     private readonly WordOverlayApplicationService _workflow;
@@ -28,7 +28,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ILogger _logger;
     private readonly ITargetWindowTracker? _tracker;
     private readonly IAutoRecognitionController? _autoRecognitionController;
+    private readonly IWindowFrameCapture? _capture;
     private bool _recognitionSessionActive;
+    private CancellationTokenSource? _manualRecognition;
+    private int _sessionVersion;
+    private bool _disposed;
 
     /// <summary>A delegate that renders the localized Status from the current state; re-invoked on culture switch to refresh in place.</summary>
     private Func<string> _renderStatus = () => string.Empty;
@@ -42,7 +46,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IUserMessageResolver messageResolver,
         ILogger logger,
         ITargetWindowTracker? tracker = null,
-        IAutoRecognitionController? autoRecognitionController = null)
+        IAutoRecognitionController? autoRecognitionController = null,
+        IWindowFrameCapture? capture = null)
     {
         _catalog = catalog;
         _workflow = workflow;
@@ -53,6 +58,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _logger = logger;
         _tracker = tracker;
         _autoRecognitionController = autoRecognitionController;
+        _capture = capture;
         _autoRecognitionEnabled = IsEnabled(_settings.GetValue(AutoRecognitionSettings.EnabledKey));
 
         _localizer.CultureChanged += OnCultureChanged;
@@ -83,8 +89,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// <summary>Updates the status prompt after a window is selected.</summary>
     partial void OnSelectedWindowChanged(WindowTarget? value)
     {
-        _autoRecognitionController?.Stop();
-        _recognitionSessionActive = false;
+        EndRecognitionSession();
         try
         {
             if (value is null)
@@ -135,12 +140,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return;
         }
 
+        var target = SelectedWindow;
+        var version = ++_sessionVersion;
+        using var cancellation = new CancellationTokenSource();
+        _manualRecognition = cancellation;
         try
         {
             _autoRecognitionController?.Stop();
             _recognitionSessionActive = false;
             SetStatus(ResourceKeys.Status_Recognizing);
-            var result = await _workflow.RecognizeAndShowAsync(SelectedWindow);
+            var result = await _workflow.RecognizeAndShowAsync(target, cancellation.Token);
+            if (cancellation.IsCancellationRequested || version != _sessionVersion) return;
             _recognitionSessionActive = true;
             StartAutoRecognitionIfEnabled();
             var wordCount = result.Lines.Sum(line => line.Words.Count);
@@ -149,11 +159,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 : ResourceKeys.Status_WordsRecognized,
                 wordCount);
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || version != _sessionVersion)
+        {
+        }
         catch (Exception ex)
         {
-            _autoRecognitionController?.Stop();
-            _workflow.Hide();
+            if (version != _sessionVersion) return;
+            EndRecognitionSession();
             SetError(ex, ErrorCodes.RecognitionFailed);
+        }
+        finally
+        {
+            if (ReferenceEquals(_manualRecognition, cancellation)) _manualRecognition = null;
         }
     }
 
@@ -161,10 +178,26 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void Hide()
     {
+        EndRecognitionSession();
+        SetStatus(ResourceKeys.Status_Hidden);
+    }
+
+    private void EndRecognitionSession()
+    {
+        _sessionVersion++;
+        _manualRecognition?.Cancel();
         _autoRecognitionController?.Stop();
         _recognitionSessionActive = false;
+        _capture?.Stop();
         _workflow.Hide();
-        SetStatus(ResourceKeys.Status_Hidden);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _localizer.CultureChanged -= OnCultureChanged;
+        EndRecognitionSession();
     }
 
     partial void OnAutoRecognitionEnabledChanged(bool value)
@@ -196,7 +229,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Automatic recognition failed.");
+            if (!cancellationToken.IsCancellationRequested)
+                _logger.LogError(ex, "Automatic recognition failed.");
         }
     }
 

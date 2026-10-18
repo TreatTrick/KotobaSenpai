@@ -14,17 +14,36 @@ namespace KotobaSenpai.Core.Tests.Workflow;
 public sealed class AutoRecognitionWorkflowTests
 {
     [Fact]
+    public async Task Cancelled_automatic_analysis_cannot_publish_a_late_result()
+    {
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var overlay = new RecordingOverlay();
+        var service = CreateService(new SequencedRecognizer([Line("旧句。")], [Line("旧句。新句。")]),
+            overlay, phraseAnalysisEnabled: true, new SequencedAnalyzer(release));
+        await service.RecognizeAndShowAsync(Target());
+        var previous = overlay.LastSession;
+        using var cancellation = new CancellationTokenSource();
+        var pending = service.RecognizeChangedAndShowAsync(Target(), cancellation.Token);
+        cancellation.Cancel();
+        release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        Assert.Same(previous, overlay.LastSession);
+    }
+
+    [Fact]
     public async Task Unchanged_ocr_text_does_not_refresh_the_overlay()
     {
         var overlay = new RecordingOverlay();
         var recognizer = new SequencedRecognizer([Line("同じ。")], [Line("同じ。")]);
-        var service = CreateService(recognizer, overlay, phraseAnalysisEnabled: false);
+        var analyzer = new CountingAnalyzer();
+        var service = CreateService(recognizer, overlay, phraseAnalysisEnabled: true, analyzer);
 
         await service.RecognizeAndShowAsync(Target());
         await service.RecognizeChangedAndShowAsync(Target());
 
-        Assert.Equal(1, overlay.ShowCount);
+        Assert.Equal(2, overlay.ShowCount);
         Assert.Equal(1, overlay.HideCount);
+        Assert.Equal(1, analyzer.CallCount);
     }
 
     [Fact]
@@ -109,7 +128,7 @@ public sealed class AutoRecognitionWorkflowTests
         public int HideCount { get; private set; }
         public WordOverlaySession? LastSession { get; private set; }
 
-        public void Show(WordOverlaySession session)
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null)
         {
             ShowCount++;
             LastSession = session;

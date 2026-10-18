@@ -10,6 +10,24 @@ public sealed class UserMessageResolverTests
 {
     private readonly UserMessageResolver _resolver = new(LocalizerFactory.Create(new CultureInfo("zh-CN")));
 
+    [Theory]
+    [InlineData("en", "WindowCaptureNotSupported")]
+    [InlineData("en", "WindowCaptureFailed")]
+    [InlineData("en", "WindowCaptureTimedOut")]
+    [InlineData("zh-CN", "WindowCaptureNotSupported")]
+    [InlineData("zh-CN", "WindowCaptureFailed")]
+    [InlineData("zh-CN", "WindowCaptureTimedOut")]
+    public void Capture_errors_have_localized_messages_without_native_details(string culture, string code)
+    {
+        var localizer = LocalizerFactory.Create(new CultureInfo(culture));
+        var resolver = new UserMessageResolver(localizer);
+        var message = resolver.Resolve(new WindowsPlatformException(code, "native detail"), ErrorCodes.RecognitionFailed);
+
+        Assert.NotEqual(code, message);
+        Assert.NotEqual(localizer.Get(ErrorCodes.RecognitionFailed), message);
+        Assert.DoesNotContain("native detail", message);
+    }
+
     [Fact]
     public void Maps_ocr_model_missing_code_to_localized_message()
     {

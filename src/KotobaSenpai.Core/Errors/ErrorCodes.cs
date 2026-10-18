@@ -25,8 +25,17 @@ public static class ErrorCodes
     /// <summary>Recognition failed (fallback code when the ViewModel recognizes).</summary>
     public const string RecognitionFailed = nameof(RecognitionFailed);
 
-    /// <summary>Selected target is not currently capturable from the screen.</summary>
+    /// <summary>Selected target is invalid, hidden, minimized, or has no client area.</summary>
     public const string TargetWindowUnavailable = nameof(TargetWindowUnavailable);
+
+    /// <summary>Windows Graphics Capture is unavailable on this device.</summary>
+    public const string WindowCaptureNotSupported = nameof(WindowCaptureNotSupported);
+
+    /// <summary>The selected window could not be captured.</summary>
+    public const string WindowCaptureFailed = nameof(WindowCaptureFailed);
+
+    /// <summary>No valid frame arrived before the capture deadline.</summary>
+    public const string WindowCaptureTimedOut = nameof(WindowCaptureTimedOut);
 
     /// <summary>UniDic dictionary missing (UniDicTokenizer / UniDicDictionaryInstaller).</summary>
     public const string UniDicDictionaryMissing = nameof(UniDicDictionaryMissing);

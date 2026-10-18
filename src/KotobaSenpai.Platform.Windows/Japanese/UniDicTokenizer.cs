@@ -52,6 +52,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
         // Parse and node projection run under the same sync guard, so concurrent calls on the singleton adapter don't pollute each other's results.
         lock (_gate)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             try
             {
                 var nodes = _tagger.Parse(text).ToArray();
@@ -99,10 +100,12 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-        _tagger.Dispose();
-        _disposed = true;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _tagger.Dispose();
+            _disposed = true;
+        }
     }
 
     private MeCabUniDic22Tagger CreateTagger()

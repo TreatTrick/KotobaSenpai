@@ -112,7 +112,7 @@ public sealed class AutoRecognitionSettingsTests
 
     private sealed class FakeOverlay : IOverlayRenderer
     {
-        public void Show(WordOverlaySession session) { }
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null) { }
 
         public void Hide() { }
     }

@@ -6,6 +6,24 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class TargetWindowTrackerTests
 {
+    [Theory]
+    [InlineData(0x2800A8L)]
+    [InlineData(0x80020L)]
+    public void Click_through_layered_helper_bounds_are_not_solid_occluders(long extendedStyle)
+    {
+        Assert.False(WinEventTargetWindowTracker.CanOcclude(extendedStyle));
+    }
+
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(0x200100L)]
+    [InlineData(0x80000L)]
+    [InlineData(0x80L)]
+    public void Normal_layered_and_tool_windows_still_occlude(long extendedStyle)
+    {
+        Assert.True(WinEventTargetWindowTracker.CanOcclude(extendedStyle));
+    }
+
     [Fact]
     public void Foreground_events_are_relevant_even_when_the_event_hwnd_is_another_window()
     {

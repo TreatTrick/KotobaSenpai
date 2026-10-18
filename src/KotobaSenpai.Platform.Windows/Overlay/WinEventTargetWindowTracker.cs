@@ -1,6 +1,7 @@
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Geometry;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Logging;
 
@@ -53,6 +54,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private const uint SwpShowWindow = 0x0040;
     private const uint SwpHideWindow = 0x0080;
     private const uint GwHwndPrev = 3;
+    private const int GwlExStyle = -20;
+    private const long WsExLayered = 0x00080000;
+    private const long WsExTransparent = 0x00000020;
 
     private readonly object _gate = new();
     private readonly Dispatcher _dispatcher;
@@ -65,6 +69,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private nint _reorderHook;
     private nint _foregroundHook;
     private nint _targetHandle;
+    private nint _lastOccludingHandle;
     private bool _refreshPosted;
     private bool _disposed;
     private TargetWindowSnapshot? _current;
@@ -275,7 +280,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             IsOccluded(bounds, _targetHandle));
     }
 
-    private static bool IsOccluded(ScreenRect targetBounds, nint targetHandle)
+    private bool IsOccluded(ScreenRect targetBounds, nint targetHandle)
     {
         var auxiliaryWindowHandles = OverlayWindowRegistry.Snapshot();
         for (var above = NativeMethods.GetWindow(targetHandle, GwHwndPrev);
@@ -285,6 +290,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             if (auxiliaryWindowHandles.Contains(above)
                 || !NativeMethods.IsWindowVisible(above)
                 || NativeMethods.IsIconic(above)
+                || !CanOcclude(NativeMethods.GetWindowLong(above, GwlExStyle))
                 || !NativeMethods.GetWindowRect(above, out var rect)
                 || rect.Right <= rect.Left
                 || rect.Bottom <= rect.Top)
@@ -293,9 +299,22 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             if (HasPositiveAreaIntersection(
                 targetBounds,
                 new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top)))
+            {
+                if (_lastOccludingHandle != above)
+                {
+                    var className = new StringBuilder(256);
+                    NativeMethods.GetClassName(above, className, className.Capacity);
+                    _logger?.LogInformation("[OVERLAY] Target considered occluded: targetHandle={0}, occluderHandle={1}, className={2}, occluderBounds={3}.",
+                        targetHandle, above, className.ToString(), new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top));
+                }
+                _lastOccludingHandle = above;
                 return true;
+            }
         }
 
+        if (_lastOccludingHandle != nint.Zero)
+            _logger?.LogInformation("[OVERLAY] Target occlusion cleared: targetHandle={0}, previousOccluderHandle={1}.", targetHandle, _lastOccludingHandle);
+        _lastOccludingHandle = nint.Zero;
         return false;
     }
 
@@ -304,6 +323,13 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             && first.Right > second.X
             && first.Y < second.Bottom
             && first.Bottom > second.Y;
+
+    internal static bool CanOcclude(long extendedStyle)
+    {
+        // A layered click-through helper can span transparent desktop areas; its outer rectangle is not a solid occluder.
+        const long clickThroughLayered = WsExLayered | WsExTransparent;
+        return (extendedStyle & clickThroughLayered) != clickThroughLayered;
+    }
 
     private double ReadDpiScale()
     {
@@ -439,6 +465,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         lock (_gate)
         {
             _targetHandle = nint.Zero;
+            _lastOccludingHandle = nint.Zero;
             _current = null;
             _refreshPosted = false;
         }
@@ -554,6 +581,12 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetWindowRect(nint hwnd, out Rect rect);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern int GetClassName(nint hwnd, StringBuilder className, int maximumCount);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+        public static extern int GetWindowLong(nint hwnd, int index);
 
     }
 }

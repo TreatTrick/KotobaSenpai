@@ -642,7 +642,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
         public List<WordOverlaySession> Sessions { get; } = new();
         public TaskCompletionSource<bool> FirstShown { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<bool> SecondShown { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public void Show(WordOverlaySession session)
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null)
         {
             Session = session;
             Sessions.Add(session);

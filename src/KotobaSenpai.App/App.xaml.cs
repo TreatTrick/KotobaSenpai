@@ -45,6 +45,7 @@ public partial class App : Application
 {
     private ServiceProvider? _services;
     private FileLogger? _logger;
+    private MainWindowViewModel? _mainViewModel;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -113,7 +114,8 @@ public partial class App : Application
         {
             // Resolving these singletons now constructs the OCR model and UniDic tagger during startup.
             _services.GetRequiredService<IWindowWordRecognizer>();
-            window.DataContext = _services.GetRequiredService<MainWindowViewModel>();
+            _mainViewModel = _services.GetRequiredService<MainWindowViewModel>();
+            window.DataContext = _mainViewModel;
         }
         catch (Exception ex)
         {
@@ -123,9 +125,18 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _logger?.Dispose();
-        _services?.Dispose();
-        base.OnExit(e);
+        try
+        {
+            _mainViewModel?.Dispose();
+            _services?.GetService<IAutoRecognitionController>()?.Stop();
+            _services?.GetService<IWindowFrameCapture>()?.Stop();
+            _services?.Dispose();
+        }
+        finally
+        {
+            _logger?.Dispose();
+            base.OnExit(e);
+        }
     }
 
     /// <summary>HttpClient for the dictionary download: a 502MB archive download needs a long timeout to avoid failing mid-way on the default 100s.</summary>
@@ -140,7 +151,7 @@ public partial class App : Application
     private static void ConfigureServices(IServiceCollection services)
     {
         services.AddSingleton<IWindowCatalog, Win32WindowCatalog>();
-        services.AddSingleton<IWindowFrameCapture, GdiWindowFrameCapture>();
+        services.AddSingleton<IWindowFrameCapture, WgcWindowFrameCapture>();
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<ITargetWindowTracker, WinEventTargetWindowTracker>();
         services.AddSingleton<IAutoRecognitionController, AutoRecognitionController>();

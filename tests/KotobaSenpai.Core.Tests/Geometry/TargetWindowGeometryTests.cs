@@ -96,23 +96,34 @@ public sealed class TargetWindowGeometryTests
         Assert.Equal(new ScreenRect(700, 350, 400, 200), moved.PhraseGroups[0].Parts[0].Rects[0]);
     }
 
-    [Fact]
-    public async Task Application_service_rejects_occluded_target_before_ocr()
+    [Theory]
+    [InlineData(true, false, true, true)]
+    [InlineData(false, false, true, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(true, false, false, false)]
+    public async Task Application_service_allows_occlusion_but_rejects_unavailable_targets(bool visible, bool minimized, bool valid, bool expectedCapture)
     {
         var recognizer = new CountingRecognizer();
         var target = new WindowTarget((nint)42, "target", new ScreenRect(0, 0, 100, 100));
         var tracker = new FakeTracker(new TargetWindowSnapshot(
-            target.Handle, target.Title, target.Bounds, 1, true, false, false, true));
+            target.Handle, target.Title, target.Bounds, 1, visible, minimized, false, true, valid));
         var service = new WordOverlayApplicationService(
             recognizer,
             new EmptyGroupingService(),
             new NullOverlay(),
             tracker: tracker);
 
-        var ex = await Assert.ThrowsAsync<BusinessRuleValidationException>(() => service.RecognizeAndShowAsync(target));
-
-        Assert.Equal(ErrorCodes.TargetWindowUnavailable, ex.ErrorCode);
-        Assert.Equal(0, recognizer.CallCount);
+        if (expectedCapture)
+        {
+            await service.RecognizeAndShowAsync(target);
+            Assert.Equal(1, recognizer.CallCount);
+        }
+        else
+        {
+            var ex = await Assert.ThrowsAsync<BusinessRuleValidationException>(() => service.RecognizeAndShowAsync(target));
+            Assert.Equal(ErrorCodes.TargetWindowUnavailable, ex.ErrorCode);
+            Assert.Equal(0, recognizer.CallCount);
+        }
     }
 
     private static Token Token(string surface, int start = 0)
@@ -141,7 +152,7 @@ public sealed class TargetWindowGeometryTests
 
     private sealed class NullOverlay : IOverlayRenderer
     {
-        public void Show(WordOverlaySession session) { }
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null) { }
 
         public void Hide() { }
     }

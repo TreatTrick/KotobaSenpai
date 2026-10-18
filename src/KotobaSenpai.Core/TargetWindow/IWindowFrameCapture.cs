@@ -6,8 +6,11 @@ namespace KotobaSenpai.Core.TargetWindow;
 public interface IWindowFrameCapture
 {
     /// <summary>
-    /// Captures the target window. When <paramref name="region"/> (window-relative pixels) is provided, only that
-    /// sub-rectangle of the screen is captured directly (no whole-window grab then crop); otherwise the whole window.
+    /// Returns owned BGRA pixels from the target client area, optionally restricted to a client-relative region.
+    /// Pixels must come from the selected window independently of other windows covering it.
     /// </summary>
     Task<CapturedFrame> CaptureAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null);
+
+    /// <summary>Cancels outstanding capture and releases the current session. A later request can start a new session.</summary>
+    void Stop();
 }

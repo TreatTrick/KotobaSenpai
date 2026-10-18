@@ -14,6 +14,23 @@ namespace KotobaSenpai.Core.Tests.Workflow;
 
 public sealed class WindowWordOverlayTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Queued_overlay_publication_is_rejected_after_hide_or_cancellation(bool hide)
+    {
+        var overlay = new DeferredOverlay();
+        var service = new WordOverlayApplicationService(new FakeRecognizer(),
+            new WordGroupingService(new StubTokenizer(new TokenSpec("日", 0)), new SentenceSegmenter(),
+                new StubSpanResolver(new LookupSpan([Token("日")], "日", []))), overlay);
+        using var cancellation = new CancellationTokenSource();
+        await service.RecognizeAndShowAsync(new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 200, 100)), cancellation.Token);
+        if (hide) service.Hide();
+        else cancellation.Cancel();
+        overlay.Commit();
+        Assert.Null(overlay.Session);
+    }
+
     [Fact]
     public void Captured_frame_rejects_short_pixel_buffer()
     {
@@ -132,8 +149,18 @@ public sealed class WindowWordOverlayTests
     private sealed class FakeOverlay : IOverlayRenderer
     {
         public WordOverlaySession? Session { get; private set; }
-        public void Show(WordOverlaySession session) => Session = session;
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null) => Session = session;
         public void Hide() => Session = null;
+    }
+
+    private sealed class DeferredOverlay : IOverlayRenderer
+    {
+        private Action? _pending;
+        public WordOverlaySession? Session { get; private set; }
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null)
+            => _pending = () => { if (canRender?.Invoke() != false) Session = session; };
+        public void Hide() => Session = null;
+        public void Commit() => _pending?.Invoke();
     }
 
     private sealed class RecordingRecognizer : IWindowWordRecognizer
@@ -156,7 +183,7 @@ public sealed class WindowWordOverlayTests
 
         public RecordingOverlay(IList<string> events) => _events = events;
 
-        public void Show(WordOverlaySession session) => _events.Add("show");
+        public void Show(WordOverlaySession session, Func<bool>? canRender = null) => _events.Add("show");
 
         public void Hide() => _events.Add("hide");
     }

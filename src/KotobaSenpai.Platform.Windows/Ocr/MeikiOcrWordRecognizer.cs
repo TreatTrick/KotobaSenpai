@@ -44,10 +44,11 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         cancellationToken.ThrowIfCancellationRequested();
 
         int frameWidth = target.Bounds.Width, frameHeight = target.Bounds.Height;
-        // The capture layer grabs only the region's screen rectangle directly (no whole-window grab then crop). A
-        // degenerate region falls back to the full window. Boxes from a region OCR are offset back to full-frame coords.
+        // The capture layer reads only the resolved client-relative region from the selected window.
+        // A degenerate region falls back to the full client area; OCR boxes retain full-client coordinates.
         var crop = CropRegion.Resolve(region, frameWidth, frameHeight);
         var frame = await _capture.CaptureAsync(target, cancellationToken, crop).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var offsetX = crop?.X ?? 0;
         var offsetY = crop?.Y ?? 0;
 

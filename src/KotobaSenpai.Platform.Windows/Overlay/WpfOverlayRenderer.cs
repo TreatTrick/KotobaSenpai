@@ -43,14 +43,20 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         _logger = logger;
     }
 
-    public void Show(WordOverlaySession session)
+    public void Show(WordOverlaySession session, Func<bool>? canRender = null)
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
+            if (canRender?.Invoke() == false)
+            {
+                _logger?.LogInformation("[OVERLAY] Publication rejected because recognition was cancelled or superseded: sessionId={0}, targetHandle={1}.",
+                    session.Id, session.Target.Handle);
+                return;
+            }
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Information,
                 null,
-                "[DEBUG-OVERLAY] Show requested: sessionId={0}, targetHandle={1}, words={2}, underlines={3}, phraseGroups={4}, trackerAttached={5}.",
+                "[OVERLAY] Show requested: sessionId={0}, targetHandle={1}, words={2}, underlines={3}, phraseGroups={4}, trackerAttached={5}.",
                 session.Id,
                 session.Target.Handle,
                 session.Words.Count,
@@ -79,13 +85,19 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             .ToArray();
     }
 
+    internal static bool RequiresGeometryRender(TargetWindowSnapshot? rendered, TargetWindowSnapshot current, bool isVisible)
+        => !isVisible || rendered is null
+            || rendered.Handle != current.Handle
+            || rendered.Bounds != current.Bounds
+            || rendered.DpiScale != current.DpiScale;
+
     public void Hide()
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
             _logger?.Log(LogLevel.Debug, null, "[DEBUG-OVERLAY] Hide requested.");
             _window?.ClearSession();
-            _window?.Hide();
+            if (_window?.IsVisible == true) _window.Hide();
         });
     }
 
@@ -114,6 +126,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private readonly ITargetWindowTracker? _tracker;
         private readonly ILogger? _logger;
         private WordOverlaySession? _session;
+        private TargetWindowSnapshot? _renderedSnapshot;
         private nint _ownerHandle;
         private double _fontScale;
         private int _hoverIndex = -1;
@@ -188,9 +201,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (snapshot is null || snapshot.Handle != session.Target.Handle)
                 {
                     _logger?.Log(
-                        LogLevel.Debug,
+                        LogLevel.Information,
                         null,
-                        "[DEBUG-OVERLAY] Render skipped: tracker snapshot missing or handle mismatch. sessionId={0}, sessionTargetHandle={1}, snapshotHandle={2}.",
+                        "[OVERLAY] Render skipped: tracker snapshot missing or handle mismatch. sessionId={0}, sessionTargetHandle={1}, snapshotHandle={2}.",
                         session.Id,
                         session.Target.Handle,
                         snapshot?.Handle.ToString() ?? "<none>");
@@ -201,9 +214,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (!snapshot.IsValid)
                 {
                     _logger?.Log(
-                        LogLevel.Debug,
+                        LogLevel.Information,
                         null,
-                        "[DEBUG-OVERLAY] Render skipped and session cleared: targetHandle={0}, target is invalid.",
+                        "[OVERLAY] Render skipped and session cleared: targetHandle={0}, target is invalid.",
                         snapshot.Handle);
                     ClearSession();
                     Hide();
@@ -212,9 +225,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (!snapshot.IsRenderable)
                 {
                     _logger?.Log(
-                        LogLevel.Debug,
+                        LogLevel.Information,
                         null,
-                        "[DEBUG-OVERLAY] Render skipped and window hidden: targetHandle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, capturable={5}, renderable={6}, overlayVisible={7}, topmost={8}.",
+                        "[OVERLAY] Render skipped and window hidden: targetHandle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, capturable={5}, renderable={6}, overlayVisible={7}, topmost={8}.",
                         snapshot.Handle,
                         snapshot.IsVisible,
                         snapshot.IsMinimized,
@@ -291,9 +304,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (!snapshot.IsRenderable)
             {
                 _logger?.Log(
-                    LogLevel.Debug,
+                    IsVisible ? LogLevel.Information : LogLevel.Debug,
                     null,
-                    "[DEBUG-OVERLAY] Tracker change caused overlay hide because target is not renderable: handle={0}, foreground={1}, occluded={2}.",
+                    "[OVERLAY] Tracker change caused overlay hide because target is not renderable: handle={0}, foreground={1}, occluded={2}.",
                     snapshot.Handle,
                     snapshot.IsForeground,
                     snapshot.IsOccluded);
@@ -303,7 +316,11 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             }
 
             _ownerHandle = snapshot.Handle;
-            RenderCurrent(_session.Reproject(snapshot.Target), _fontScale);
+            // Reordering an unchanged window must not close and reopen the active hover popup.
+            if (RequiresGeometryRender(_renderedSnapshot, snapshot, IsVisible))
+                RenderCurrent(_session.Reproject(snapshot.Target), _fontScale);
+            else
+                PositionAboveTarget(snapshot.Target);
         }
 
         private void RenderCurrent(WordOverlaySession session, double fontScale)
@@ -325,21 +342,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var scale = (dpi == 0 ? 96 : dpi) / 96d;
             Width = session.Target.Bounds.Width / scale;
             Height = session.Target.Bounds.Height / scale;
-            var insertAfter = NativeMethods.GetWindow(session.Target.Handle, NativeMethods.GwHwndPrev);
-            var flags = NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow;
-            if (insertAfter == handle)
-            {
-                insertAfter = nint.Zero;
-                flags |= NativeMethods.SwpNoZOrder;
-            }
-            NativeMethods.SetWindowPos(
-                handle,
-                insertAfter,
-                session.Target.Bounds.X,
-                session.Target.Bounds.Y,
-                0,
-                0,
-                flags | NativeMethods.SwpNoSize);
+            PositionAboveTarget(session.Target);
             _canvas.Children.Clear();
             _lineElements.Clear();
             _lineOwner.Clear();
@@ -366,12 +369,13 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (!string.IsNullOrEmpty(word.Reading))
                     AddPitchAnnotations(word, scale, fontScale);
             }
+            _renderedSnapshot = _tracker?.Current;
             _hoverTimer.Start();
 
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Information,
                 null,
-                "[DEBUG-OVERLAY] Overlay rendered: hwnd={0}, wasVisible={1}, visible={2}, topmost={3}, targetHandle={4}, targetBounds={5}, words={6}, underlines={7}, phraseGroups={8}, canvasChildren={9}.",
+                "[OVERLAY] Overlay rendered: hwnd={0}, wasVisible={1}, visible={2}, topmost={3}, targetHandle={4}, targetBounds={5}, words={6}, underlines={7}, phraseGroups={8}, canvasChildren={9}.",
                 handle,
                 wasVisible,
                 IsVisible,
@@ -382,6 +386,22 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _lineElements.Count,
                 session.PhraseGroups.Count,
                 _canvas.Children.Count);
+        }
+
+        private void PositionAboveTarget(WindowTarget target)
+        {
+            var handle = new WindowInteropHelper(this).Handle;
+            var insertAfter = NativeMethods.GetWindow(target.Handle, NativeMethods.GwHwndPrev);
+            var flags = NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow;
+            if (insertAfter == handle)
+            {
+                insertAfter = nint.Zero;
+                flags |= NativeMethods.SwpNoZOrder;
+            }
+            if (!NativeMethods.SetWindowPos(handle, insertAfter, target.Bounds.X, target.Bounds.Y, 0, 0,
+                flags | NativeMethods.SwpNoSize))
+                _logger?.LogWarning("[OVERLAY] SetWindowPos failed: hwnd={0}, targetHandle={1}, insertAfter={2}, error={3}.",
+                    handle, target.Handle, insertAfter, System.Runtime.InteropServices.Marshal.GetLastWin32Error());
         }
 
         public void ClearSession()
@@ -397,6 +417,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _lineElements.Count,
                 _session?.PhraseGroups.Count ?? 0);
             _session = null;
+            _renderedSnapshot = null;
             StopHover();
             _canvas.Children.Clear();
             _lineElements.Clear();
@@ -857,7 +878,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern uint GetDpiForWindow(nint hWnd);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
         public static extern bool SetWindowPos(nint hWnd, nint insertAfter, int x, int y, int width, int height, uint flags);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]

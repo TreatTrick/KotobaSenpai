@@ -79,7 +79,16 @@
     <value>Recognition failed.</value>
   </data>
   <data name="TargetWindowUnavailable" xml:space="preserve">
-    <value>The target window must be visible, restored, and unobstructed before recognition.</value>
+    <value>The target window must exist, be visible, and be restored before recognition.</value>
+  </data>
+  <data name="WindowCaptureNotSupported" xml:space="preserve">
+    <value>Window capture is not supported on this device or Windows session.</value>
+  </data>
+  <data name="WindowCaptureFailed" xml:space="preserve">
+    <value>Unable to capture the selected window. Retry or select another window.</value>
+  </data>
+  <data name="WindowCaptureTimedOut" xml:space="preserve">
+    <value>No window frame arrived in time. Keep the window restored and retry.</value>
   </data>
   <!-- XAML labels -->
   <data name="MainWindow_Title" xml:space="preserve">
