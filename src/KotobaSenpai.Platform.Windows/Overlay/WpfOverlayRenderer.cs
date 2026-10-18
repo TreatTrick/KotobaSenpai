@@ -355,7 +355,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _lineOwner.Clear();
 
             // One underline per word rect (a cross-line word has one per line); kanji words get hiragana
-            // furigana centered above the word's union bounds. Furigana is cleared with the underlines on
+            // furigana centered above each source-token line fragment. Furigana is cleared with the underlines on
             // refresh, and the click-through window never receives mouse events, so hover logic stays untouched.
             for (int wordIndex = 0; wordIndex < session.Words.Count; wordIndex++)
             {
@@ -589,16 +589,19 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (segment.IsKana || !FuriganaSettings.ContainsKanji(surfaceText) || string.IsNullOrEmpty(segment.Reading))
                     continue;
 
-                var bounds = SegmentBounds(word, sourceTokenIndex, segment.SurfaceStart, segment.SurfaceLength);
-                var fontSize = (bounds.Height / scale) * fontScale;
-                var text = new TextBlock
+                var morae = PitchAccent.SplitMorae(Kana.ToHiragana(segment.Reading));
+                foreach (var part in FuriganaLayout.GetParts(word, sourceTokenIndex, segment.SurfaceStart, segment.SurfaceLength, morae.Count))
                 {
-                    Text = Kana.ToHiragana(segment.Reading),
-                    FontSize = fontSize,
-                    Foreground = DefaultLineBrush,
-                    Effect = FuriganaOutline,
-                };
-                AddTextCentered(text, bounds, segment.SurfaceLength, segment.SurfaceLength, scale, fontSize);
+                    var fontSize = (part.Bounds.Height / scale) * fontScale;
+                    var text = new TextBlock
+                    {
+                        Text = string.Concat(morae.Skip(part.MoraStart).Take(part.MoraCount)),
+                        FontSize = fontSize,
+                        Foreground = DefaultLineBrush,
+                        Effect = FuriganaOutline,
+                    };
+                    AddTextCentered(text, part.Bounds, scale, fontSize);
+                }
             }
         }
 
@@ -616,40 +619,41 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (string.IsNullOrEmpty(furiganaSegment.Reading) || moraCount <= 0)
                 return;
 
-            var bounds = SegmentBounds(
-                word,
-                sourceTokenIndex,
-                furiganaSegment.SurfaceStart,
-                furiganaSegment.SurfaceLength);
-            var fontSize = (bounds.Height / scale) * fontScale;
-            var fontMorae = pattern.Morae.Skip(moraOffset).Take(moraCount).ToArray();
-            var highMorae = pattern.HighMorae.Skip(moraOffset).Take(fontMorae.Length).ToArray();
-            var textBlocks = new List<TextBlock>(fontMorae.Length);
-            var totalWidth = 0d;
-            foreach (var mora in fontMorae)
+            foreach (var part in FuriganaLayout.GetParts(word, sourceTokenIndex,
+                furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength, moraCount))
             {
-                var block = new TextBlock { Text = mora, FontSize = fontSize, Effect = FuriganaOutline };
-                block.Measure(new Size(double.PositiveInfinity, fontSize));
-                textBlocks.Add(block);
-                totalWidth += block.DesiredSize.Width;
-            }
+                var bounds = part.Bounds;
+                var fontSize = (bounds.Height / scale) * fontScale;
+                var readingStart = moraOffset + part.MoraStart;
+                var fontMorae = pattern.Morae.Skip(readingStart).Take(part.MoraCount).ToArray();
+                var highMorae = pattern.HighMorae.Skip(readingStart).Take(fontMorae.Length).ToArray();
+                var textBlocks = new List<TextBlock>(fontMorae.Length);
+                var totalWidth = 0d;
+                foreach (var mora in fontMorae)
+                {
+                    var block = new TextBlock { Text = mora, FontSize = fontSize, Effect = FuriganaOutline };
+                    block.Measure(new Size(double.PositiveInfinity, fontSize));
+                    textBlocks.Add(block);
+                    totalWidth += block.DesiredSize.Width;
+                }
 
-            var startX = (bounds.X - _session!.Target.Bounds.X) / scale
-                + (bounds.Width / scale - totalWidth) / 2;
-            var top = TopDip(bounds, scale, fontSize);
-            var cursor = startX;
-            for (var i = 0; i < textBlocks.Count; i++)
-            {
-                var block = textBlocks[i];
-                block.Foreground = highMorae[i] ? PitchHighBrush : PitchLowBrush;
-                _canvas.Children.Add(block);
-                Canvas.SetLeft(block, Math.Max(0, cursor));
-                Canvas.SetTop(block, top);
-                cursor += block.DesiredSize.Width;
-            }
+                var cursor = (bounds.X - _session!.Target.Bounds.X) / scale
+                    + (bounds.Width / scale - totalWidth) / 2;
+                var top = TopDip(bounds, scale, fontSize);
+                for (var i = 0; i < textBlocks.Count; i++)
+                {
+                    var block = textBlocks[i];
+                    block.Foreground = highMorae[i] ? PitchHighBrush : PitchLowBrush;
+                    _canvas.Children.Add(block);
+                    Canvas.SetLeft(block, Math.Max(0, cursor));
+                    Canvas.SetTop(block, top);
+                    cursor += block.DesiredSize.Width;
+                }
 
-            if (addHeibanMarker && pattern.AccentPosition == 0 && pattern.Morae.Count > 1)
-                AddHeibanMarker(cursor, top + fontSize / 2, fontSize);
+                if (addHeibanMarker && part.MoraStart + part.MoraCount == moraCount
+                    && pattern.AccentPosition == 0 && pattern.Morae.Count > 1)
+                    AddHeibanMarker(cursor, top + fontSize / 2, fontSize);
+            }
         }
 
         private void AddPitchDots(
@@ -664,54 +668,40 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             double fontScale)
         {
             var kanaSurface = segment.Surface.Substring(furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength);
-            var kanaRuns = FuriganaSettings.GetPitchMoraRanges(kanaSurface, kanaSurface, moraCount);
-            if (kanaRuns.Count == 0)
-                return;
-
-            var bounds = SegmentBounds(
-                word,
-                sourceTokenIndex,
-                furiganaSegment.SurfaceStart,
-                furiganaSegment.SurfaceLength);
-            var fontSize = (bounds.Height / scale) * fontScale;
-            var dotRadius = Math.Max(2d, fontSize / 4d);
-            var centerY = (bounds.Y - _session!.Target.Bounds.Y) / scale - dotRadius - 2;
-            if (centerY < dotRadius)
-                centerY = dotRadius;
-
-            foreach (var (start, length, moraStart, count) in kanaRuns)
+            var kanaMorae = PitchAccent.SplitMorae(kanaSurface);
+            var surfaceOffset = furiganaSegment.SurfaceStart;
+            for (var i = 0; i < Math.Min(kanaMorae.Count, moraCount); i++)
             {
-                var left = bounds.X + bounds.Width * start / furiganaSegment.SurfaceLength;
-                var width = bounds.Width * length / furiganaSegment.SurfaceLength;
-                for (var i = 0; i < count; i++)
+                foreach (var part in FuriganaLayout.GetParts(word, sourceTokenIndex, surfaceOffset, kanaMorae[i].Length, 1))
                 {
-                    var centerX = (left - _session.Target.Bounds.X) / scale
-                        + width / scale * (i + 0.5) / count;
+                    var bounds = part.Bounds;
+                    var fontSize = (bounds.Height / scale) * fontScale;
+                    var dotRadius = Math.Max(2d, fontSize / 4d);
+                    var centerY = Math.Max(dotRadius, (bounds.Y - _session!.Target.Bounds.Y) / scale - dotRadius - 2);
+                    var centerX = (bounds.X - _session.Target.Bounds.X + bounds.Width / 2d) / scale;
                     var dot = new Border
                     {
                         Width = dotRadius * 2,
                         Height = dotRadius * 2,
                         CornerRadius = new CornerRadius(dotRadius),
-                        Background = pattern.HighMorae[moraOffset + moraStart + i] ? PitchHighBrush : PitchLowBrush,
+                        Background = pattern.HighMorae[moraOffset + i] ? PitchHighBrush : PitchLowBrush,
                     };
                     _canvas.Children.Add(dot);
                     Canvas.SetLeft(dot, centerX - dotRadius);
                     Canvas.SetTop(dot, centerY - dotRadius);
-                }
 
-                if (segment.AccentPosition == 0
-                    && moraOffset + moraStart + count == pattern.Morae.Count
-                    && pattern.Morae.Count > 1)
-                    AddHeibanMarker((left - _session.Target.Bounds.X) / scale + width / scale, centerY, fontSize);
+                    if (segment.AccentPosition == 0 && moraOffset + i + 1 == pattern.Morae.Count && pattern.Morae.Count > 1)
+                        AddHeibanMarker((bounds.Right - _session.Target.Bounds.X) / scale, centerY, fontSize);
+                }
+                surfaceOffset += kanaMorae[i].Length;
             }
         }
 
-        private void AddTextCentered(TextBlock text, ScreenRect bounds, int annotatedChars, int surfaceLength, double scale, double fontSize)
+        private void AddTextCentered(TextBlock text, ScreenRect bounds, double scale, double fontSize)
         {
             _canvas.Children.Add(text);
             text.Measure(new Size(double.PositiveInfinity, fontSize));
-            var annotatedWidth = bounds.Width / scale * annotatedChars / surfaceLength;
-            var center = (bounds.X - _session!.Target.Bounds.X) / scale + annotatedWidth / 2;
+            var center = (bounds.X - _session!.Target.Bounds.X + bounds.Width / 2d) / scale;
             Canvas.SetLeft(text, Math.Max(0, center - text.DesiredSize.Width / 2));
             Canvas.SetTop(text, TopDip(bounds, scale, fontSize));
         }
@@ -727,42 +717,6 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _canvas.Children.Add(marker);
             Canvas.SetLeft(marker, x + 1);
             Canvas.SetTop(marker, y);
-        }
-
-        private ScreenRect SegmentBounds(GroupedWord word, int sourceTokenIndex, int surfaceOffset, int surfaceLength)
-        {
-            if (sourceTokenIndex < 0 || sourceTokenIndex >= word.SourceTokenLines.Count)
-                return word.Bounds;
-
-            var end = surfaceOffset + surfaceLength;
-            var matching = word.SourceTokenLines[sourceTokenIndex]
-                .Where(line => line.SurfaceOffset < end
-                    && line.SurfaceOffset + line.SurfaceLength > surfaceOffset)
-                .Select(line =>
-                {
-                    var start = Math.Max(surfaceOffset, line.SurfaceOffset) - line.SurfaceOffset;
-                    var finish = Math.Min(end, line.SurfaceOffset + line.SurfaceLength) - line.SurfaceOffset;
-                    var left = line.Bounds.X + line.Bounds.Width * start / line.SurfaceLength;
-                    var right = line.Bounds.X + line.Bounds.Width * finish / line.SurfaceLength;
-                    return new ScreenRect(left, line.Bounds.Y, Math.Max(1, right - left), line.Bounds.Height);
-                })
-                .ToArray();
-            if (matching.Length == 0)
-                return word.Bounds;
-            return Union(matching);
-        }
-
-        private static ScreenRect Union(IReadOnlyList<ScreenRect> rects)
-        {
-            int x1 = int.MaxValue, y1 = int.MaxValue, x2 = 0, y2 = 0;
-            foreach (var rect in rects)
-            {
-                x1 = Math.Min(x1, rect.X);
-                y1 = Math.Min(y1, rect.Y);
-                x2 = Math.Max(x2, rect.Right);
-                y2 = Math.Max(y2, rect.Bottom);
-            }
-            return new ScreenRect(x1, y1, x2 - x1, y2 - y1);
         }
 
         private double TopDip(ScreenRect bounds, double scale, double fontSize)
