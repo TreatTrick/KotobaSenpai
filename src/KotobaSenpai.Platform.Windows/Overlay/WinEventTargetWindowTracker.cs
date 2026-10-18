@@ -57,6 +57,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private const int GwlExStyle = -20;
     private const long WsExLayered = 0x00080000;
     private const long WsExTransparent = 0x00000020;
+    private const double OcclusionHideThreshold = 0.30;
 
     private readonly object _gate = new();
     private readonly Dispatcher _dispatcher;
@@ -69,7 +70,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private nint _reorderHook;
     private nint _foregroundHook;
     private nint _targetHandle;
-    private nint _lastOccludingHandle;
+    private string? _lastOcclusionDiagnosticState;
     private bool _refreshPosted;
     private bool _disposed;
     private TargetWindowSnapshot? _current;
@@ -79,6 +80,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         _logger = logger;
         _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
         _callback = OnWinEvent;
+        var assembly = typeof(WinEventTargetWindowTracker).Assembly;
+        _logger?.LogInformation("[OVERLAY] Diagnostics initialized: diagnosticsVersion=coverage30-v2, processId={0}, assemblyPath={1}, moduleVersionId={2}, occlusionRule=client-union-area, hideAboveRatio={3:R}.",
+            Environment.ProcessId, assembly.Location, assembly.ManifestModule.ModuleVersionId, OcclusionHideThreshold);
     }
 
     public event EventHandler<TargetWindowSnapshot>? Changed;
@@ -283,39 +287,57 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private bool IsOccluded(ScreenRect targetBounds, nint targetHandle)
     {
         var auxiliaryWindowHandles = OverlayWindowRegistry.Snapshot();
+        var occluders = new List<ScreenRect>();
+        var candidates = new List<(nint Handle, ScreenRect Bounds, int ExtendedStyle, string Exclusion)>();
         for (var above = NativeMethods.GetWindow(targetHandle, GwHwndPrev);
              above != nint.Zero;
              above = NativeMethods.GetWindow(above, GwHwndPrev))
         {
-            if (auxiliaryWindowHandles.Contains(above)
-                || !NativeMethods.IsWindowVisible(above)
+            if (!NativeMethods.IsWindowVisible(above)
                 || NativeMethods.IsIconic(above)
-                || !CanOcclude(NativeMethods.GetWindowLong(above, GwlExStyle))
                 || !NativeMethods.GetWindowRect(above, out var rect)
                 || rect.Right <= rect.Left
                 || rect.Bottom <= rect.Top)
                 continue;
 
-            if (HasPositiveAreaIntersection(
-                targetBounds,
-                new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top)))
-            {
-                if (_lastOccludingHandle != above)
-                {
-                    var className = new StringBuilder(256);
-                    NativeMethods.GetClassName(above, className, className.Capacity);
-                    _logger?.LogInformation("[OVERLAY] Target considered occluded: targetHandle={0}, occluderHandle={1}, className={2}, occluderBounds={3}.",
-                        targetHandle, above, className.ToString(), new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top));
-                }
-                _lastOccludingHandle = above;
-                return true;
-            }
+            var occluderBounds = new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
+            if (!HasPositiveAreaIntersection(targetBounds, occluderBounds))
+                continue;
+            var extendedStyle = NativeMethods.GetWindowLong(above, GwlExStyle);
+            var exclusion = auxiliaryWindowHandles.Contains(above) ? "auxiliary"
+                : !CanOcclude(extendedStyle) ? "layered-click-through" : "none";
+            candidates.Add((above, occluderBounds, extendedStyle, exclusion));
+            if (exclusion == "none")
+                occluders.Add(occluderBounds);
         }
 
-        if (_lastOccludingHandle != nint.Zero)
-            _logger?.LogInformation("[OVERLAY] Target occlusion cleared: targetHandle={0}, previousOccluderHandle={1}.", targetHandle, _lastOccludingHandle);
-        _lastOccludingHandle = nint.Zero;
-        return false;
+        var occluded = ExceedsOcclusionThreshold(targetBounds, occluders, out var occlusionRatio);
+        LogOcclusionEvaluation(targetHandle, targetBounds, candidates, occluders.Count, occlusionRatio, occluded);
+        return occluded;
+    }
+
+    private void LogOcclusionEvaluation(nint targetHandle, ScreenRect targetBounds,
+        IReadOnlyList<(nint Handle, ScreenRect Bounds, int ExtendedStyle, string Exclusion)> candidates,
+        int occluderCount, double ratio, bool occluded)
+    {
+        if (_logger is null)
+            return;
+        var state = $"{targetBounds}|{string.Join(";", candidates.Select(window => $"{window.Handle}:{window.Bounds}:{window.ExtendedStyle:X}:{window.Exclusion}"))}";
+        if (state == _lastOcclusionDiagnosticState)
+            return;
+        _lastOcclusionDiagnosticState = state;
+        _logger.LogInformation("[OVERLAY] Occlusion evaluated: targetHandle={0}, targetBounds={1}, occlusionRatio={2:R}, hideAboveRatio={3:R}, occluded={4}, occluderCount={5}, intersectingWindowCount={6}.",
+            targetHandle, targetBounds, ratio, OcclusionHideThreshold, occluded, occluderCount, candidates.Count);
+        foreach (var window in candidates)
+        {
+            var className = new StringBuilder(256);
+            NativeMethods.GetClassName(window.Handle, className, className.Capacity);
+            NativeMethods.GetWindowThreadProcessId(window.Handle, out var processId);
+            var cloakResult = NativeMethods.DwmGetWindowAttribute(window.Handle, 14, out var cloaked, sizeof(uint));
+            _logger.LogInformation("[OVERLAY] Occlusion candidate: hwnd={0}, processId={1}, className={2}, exStyle=0x{3:X}, bounds={4}, clientIntersection={5}, exclusion={6}, cloaked={7}.",
+                window.Handle, processId, className.ToString(), window.ExtendedStyle, window.Bounds,
+                window.Bounds.ClampTo(targetBounds), window.Exclusion, cloakResult >= 0 ? cloaked.ToString() : "unknown");
+        }
     }
 
     internal static bool HasPositiveAreaIntersection(ScreenRect first, ScreenRect second)
@@ -323,6 +345,30 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             && first.Right > second.X
             && first.Y < second.Bottom
             && first.Bottom > second.Y;
+
+    internal static bool ExceedsOcclusionThreshold(ScreenRect targetBounds, IEnumerable<ScreenRect> occluders, out double occlusionRatio)
+    {
+        var clipped = occluders.Where(bounds => HasPositiveAreaIntersection(targetBounds, bounds))
+            .Select(bounds => bounds.ClampTo(targetBounds)).ToArray();
+        var edges = clipped.SelectMany(bounds => new[] { bounds.X, bounds.Right }).Distinct().Order().ToArray();
+        long coveredArea = 0;
+        // ponytail: O(n^2 log n) for a small overlapping window set; use a region index only if profiling shows a bottleneck.
+        for (var i = 1; i < edges.Length; i++)
+        {
+            long coveredHeight = 0;
+            var bottom = int.MinValue;
+            foreach (var bounds in clipped.Where(bounds => bounds.X < edges[i] && bounds.Right > edges[i - 1]).OrderBy(bounds => bounds.Y))
+            {
+                var top = Math.Max(bounds.Y, bottom);
+                if (bounds.Bottom > top)
+                    coveredHeight += (long)bounds.Bottom - top;
+                bottom = Math.Max(bottom, bounds.Bottom);
+            }
+            coveredArea += (long)(edges[i] - edges[i - 1]) * coveredHeight;
+        }
+        occlusionRatio = coveredArea / ((double)targetBounds.Width * targetBounds.Height);
+        return occlusionRatio > OcclusionHideThreshold;
+    }
 
     internal static bool CanOcclude(long extendedStyle)
     {
@@ -339,8 +385,16 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
     private void Publish(TargetWindowSnapshot snapshot)
     {
+        TargetWindowSnapshot? previous;
         lock (_gate)
+        {
+            previous = _current;
             _current = snapshot;
+        }
+        if (previous != snapshot)
+            _logger?.LogInformation("[OVERLAY] Target snapshot changed: handle={0}, bounds={1}, dpi={2:0.###}, valid={3}, visible={4}, minimized={5}, foreground={6}, occluded={7}, capturable={8}, renderable={9}.",
+                snapshot.Handle, snapshot.Bounds, snapshot.DpiScale, snapshot.IsValid, snapshot.IsVisible, snapshot.IsMinimized,
+                snapshot.IsForeground, snapshot.IsOccluded, snapshot.IsCapturable, snapshot.IsRenderable);
         _logger?.Log(
             LogLevel.Debug,
             null,
@@ -465,7 +519,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         lock (_gate)
         {
             _targetHandle = nint.Zero;
-            _lastOccludingHandle = nint.Zero;
+            _lastOcclusionDiagnosticState = null;
             _current = null;
             _refreshPosted = false;
         }
@@ -587,6 +641,12 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
         public static extern int GetWindowLong(nint hwnd, int index);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(nint hwnd, int attribute, out uint value, int size);
 
     }
 }

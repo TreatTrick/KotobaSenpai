@@ -56,13 +56,14 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _logger?.Log(
                 LogLevel.Information,
                 null,
-                "[OVERLAY] Show requested: sessionId={0}, targetHandle={1}, words={2}, underlines={3}, phraseGroups={4}, trackerAttached={5}.",
+                "[OVERLAY] Show requested: sessionId={0}, targetHandle={1}, words={2}, underlines={3}, phraseGroups={4}, trackerAttached={5}, sourceTargetBounds={6}.",
                 session.Id,
                 session.Target.Handle,
                 session.Words.Count,
                 session.Lines.Count,
                 session.PhraseGroups.Count,
-                _tracker is not null);
+                _tracker is not null,
+                session.Target.Bounds);
             _window ??= new OverlayWindow(_localizer, _tracker, _logger);
             _window.Render(session, ResolveFontScale());
         });
@@ -95,7 +96,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     {
         Application.Current.Dispatcher.Invoke(() =>
         {
-            _logger?.Log(LogLevel.Debug, null, "[DEBUG-OVERLAY] Hide requested.");
+            _logger?.LogInformation("[OVERLAY] Explicit Hide requested.");
             _window?.ClearSession();
             if (_window?.IsVisible == true) _window.Hide();
         });
@@ -127,6 +128,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private readonly ILogger? _logger;
         private WordOverlaySession? _session;
         private TargetWindowSnapshot? _renderedSnapshot;
+        private int _renderDiagnosticGeneration;
         private nint _ownerHandle;
         private double _fontScale;
         private int _hoverIndex = -1;
@@ -165,6 +167,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 SetClickThrough();
                 OverlayWindowRegistry.Register(new WindowInteropHelper(this).Handle);
             };
+            IsVisibleChanged += (_, _) => LogWindowDiagnostics("visibility-changed");
+            StateChanged += (_, _) => LogWindowDiagnostics("window-state-changed");
 
             _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(HoverPollMs) };
             _hoverTimer.Tick += (_, _) => PollHover();
@@ -227,7 +231,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     _logger?.Log(
                         LogLevel.Information,
                         null,
-                        "[OVERLAY] Render skipped and window hidden: targetHandle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, capturable={5}, renderable={6}, overlayVisible={7}, topmost={8}.",
+                        "[OVERLAY] Render skipped and window hidden: targetHandle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, capturable={5}, renderable={6}, overlayVisible={7}, topmost={8}, sessionId={9}, targetBounds={10}, dpi={11:0.###}.",
                         snapshot.Handle,
                         snapshot.IsVisible,
                         snapshot.IsMinimized,
@@ -236,7 +240,10 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                         snapshot.IsCapturable,
                         snapshot.IsRenderable,
                         IsVisible,
-                        Topmost);
+                        Topmost,
+                        session.Id,
+                        snapshot.Bounds,
+                        snapshot.DpiScale);
                     StopHover();
                     Hide();
                     return;
@@ -281,9 +288,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (snapshot.Handle != _session.Target.Handle)
             {
                 _logger?.Log(
-                    LogLevel.Debug,
+                    LogLevel.Information,
                     null,
-                    "[DEBUG-OVERLAY] Tracker change caused overlay hide: sessionTargetHandle={0}, snapshotHandle={1}.",
+                    "[OVERLAY] Tracker change caused overlay hide: sessionTargetHandle={0}, snapshotHandle={1}.",
                     _session.Target.Handle,
                     snapshot.Handle);
                 ClearSession();
@@ -293,9 +300,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (!snapshot.IsValid)
             {
                 _logger?.Log(
-                    LogLevel.Debug,
+                    LogLevel.Information,
                     null,
-                    "[DEBUG-OVERLAY] Tracker change cleared overlay session because target is invalid: handle={0}.",
+                    "[OVERLAY] Tracker change cleared overlay session because target is invalid: handle={0}.",
                     snapshot.Handle);
                 ClearSession();
                 Hide();
@@ -386,6 +393,73 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _lineElements.Count,
                 session.PhraseGroups.Count,
                 _canvas.Children.Count);
+            if (_logger is not null)
+            {
+                var generation = ++_renderDiagnosticGeneration;
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (generation == _renderDiagnosticGeneration)
+                    {
+                        LogWindowDiagnostics("after-layout");
+                        LogCanvasDiagnostics();
+                    }
+                }, DispatcherPriority.ContextIdle);
+            }
+        }
+
+        private void LogWindowDiagnostics(string reason)
+        {
+            if (_logger is null)
+                return;
+            var handle = new WindowInteropHelper(this).Handle;
+            var hasBounds = NativeMethods.GetWindowRect(handle, out var bounds);
+            var hasClient = NativeMethods.GetClientRect(handle, out var client);
+            _logger.LogInformation("[OVERLAY] Window state: reason={0}, sessionId={1}, hwnd={2}, targetHandle={3}, wpfVisible={4}, visibility={5}, windowState={6}, nativeVisible={7}, nativeMinimized={8}, nativeBoundsKnown={9}, nativeBounds={10}, nativeClientKnown={11}, nativeClient={12}, dpi={13}.",
+                reason, _session?.Id.ToString() ?? "<none>", handle, _ownerHandle, IsVisible, Visibility, WindowState,
+                NativeMethods.IsWindowVisible(handle), NativeMethods.IsIconic(handle), hasBounds, bounds,
+                hasClient, client, NativeMethods.GetDpiForWindow(handle));
+            _logger.LogInformation("[OVERLAY] Z order: reason={0}, hwnd={1}, nativeOwner={2}, expectedOwner={3}, overlayAbove={4}, overlayBelow={5}, targetAbove={6}, targetBelow={7}, foreground={8}, style=0x{9:X}, exStyle=0x{10:X}, targetStyle=0x{11:X}, targetExStyle=0x{12:X}.",
+                reason, handle, NativeMethods.GetWindow(handle, NativeMethods.GwOwner), _ownerHandle,
+                NativeMethods.GetWindow(handle, NativeMethods.GwHwndPrev), NativeMethods.GetWindow(handle, NativeMethods.GwHwndNext),
+                NativeMethods.GetWindow(_ownerHandle, NativeMethods.GwHwndPrev), NativeMethods.GetWindow(_ownerHandle, NativeMethods.GwHwndNext),
+                NativeMethods.GetForegroundWindow(), NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlStyle).ToInt64(),
+                NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64(),
+                NativeMethods.GetWindowLongPtr(_ownerHandle, NativeMethods.GwlStyle).ToInt64(),
+                NativeMethods.GetWindowLongPtr(_ownerHandle, NativeMethods.GwlExStyle).ToInt64());
+        }
+
+        private void LogCanvasDiagnostics()
+        {
+            if (_logger is null)
+                return;
+            var canvasBounds = new Rect(0, 0, _canvas.ActualWidth, _canvas.ActualHeight);
+            var contentBounds = Rect.Empty;
+            var outside = 0;
+            var clipped = 0;
+            var unmeasured = 0;
+            foreach (var child in _canvas.Children.OfType<FrameworkElement>())
+            {
+                if (child.RenderSize.Width <= 0 || child.RenderSize.Height <= 0)
+                {
+                    unmeasured++;
+                    continue;
+                }
+                var left = Canvas.GetLeft(child);
+                var top = Canvas.GetTop(child);
+                var childBounds = new Rect(double.IsNaN(left) ? 0 : left, double.IsNaN(top) ? 0 : top,
+                    child.RenderSize.Width, child.RenderSize.Height);
+                contentBounds.Union(childBounds);
+                var intersection = Rect.Intersect(canvasBounds, childBounds);
+                if (intersection.IsEmpty || intersection.Width <= 0 || intersection.Height <= 0)
+                    outside++;
+                else if (!canvasBounds.Contains(childBounds))
+                    clipped++;
+            }
+            var dpi = VisualTreeHelper.GetDpi(this);
+            _logger.LogInformation("[OVERLAY] Canvas layout: sessionId={0}, widthDip={1:0.###}, heightDip={2:0.###}, actualWidthDip={3:0.###}, actualHeightDip={4:0.###}, dpiScaleX={5:0.###}, dpiScaleY={6:0.###}, opacity={7:0.###}, canvasOpacity={8:0.###}, canvasVisible={9}, canvasBoundsDip={10}, contentBoundsDip={11}, childCount={12}, outsideChildren={13}, clippedChildren={14}, unmeasuredChildren={15}, underlineCount={16}, fontScale={17:0.###}.",
+                _session?.Id.ToString() ?? "<none>", Width, Height, ActualWidth, ActualHeight, dpi.DpiScaleX, dpi.DpiScaleY,
+                Opacity, _canvas.Opacity, _canvas.IsVisible, canvasBounds, contentBounds, _canvas.Children.Count,
+                outside, clipped, unmeasured, _lineElements.Count, _fontScale);
         }
 
         private void PositionAboveTarget(WindowTarget target)
@@ -407,9 +481,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         public void ClearSession()
         {
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Information,
                 null,
-                "[DEBUG-OVERLAY] Session cleared: sessionId={0}, overlayVisible={1}, topmost={2}, words={3}, underlines={4}, phraseGroups={5}.",
+                "[OVERLAY] Session cleared: sessionId={0}, overlayVisible={1}, topmost={2}, words={3}, underlines={4}, phraseGroups={5}.",
                 _session?.Id.ToString() ?? "<none>",
                 IsVisible,
                 Topmost,
@@ -417,6 +491,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _lineElements.Count,
                 _session?.PhraseGroups.Count ?? 0);
             _session = null;
+            _renderDiagnosticGeneration++;
             _renderedSnapshot = null;
             StopHover();
             _canvas.Children.Clear();
@@ -847,9 +922,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 new nint(style | NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
             var actualStyle = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Information,
                 null,
-                "[DEBUG-OVERLAY] Native overlay window configured: hwnd={0}, visible={1}, topmost={2}, exStyle=0x{3:X}.",
+                "[OVERLAY] Native overlay window configured: hwnd={0}, visible={1}, topmost={2}, exStyle=0x{3:X}.",
                 handle,
                 IsVisible,
                 Topmost,
@@ -859,11 +934,14 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         private static class NativeMethods
         {
+        public const int GwlStyle = -16;
         public const int GwlExStyle = -20;
         public const long WsExTransparent = 0x20;
         public const long WsExNoActivate = 0x08000000;
         public const long WsExToolWindow = 0x80;
         public const uint GwHwndPrev = 3;
+        public const uint GwHwndNext = 2;
+        public const uint GwOwner = 4;
         public const uint SwpNoSize = 0x0001;
         public const uint SwpNoActivate = 0x0010;
         public const uint SwpNoZOrder = 0x0004;
@@ -883,6 +961,33 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         public static extern nint GetWindow(nint hWnd, uint command);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern nint GetForegroundWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        public static extern bool GetWindowRect(nint hWnd, out RECT rect);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        public static extern bool GetClientRect(nint hWnd, out RECT rect);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        public static extern bool IsWindowVisible(nint hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        public static extern bool IsIconic(nint hWnd);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        public struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+
+            public override readonly string ToString() => $"({Left},{Top})-({Right},{Bottom})";
+        }
 
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
         public struct POINT

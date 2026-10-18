@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Failure reporting
-系统 SHALL 将目标窗口不可见、最小化、销毁、捕获不受支持、捕获失败或超时、OCR 不可用、覆盖层创建失败和实时跟踪失败转换为用户可理解的错误状态，并允许用户重新选择窗口或重试当前窗口。有效、可见且已恢复的目标 SHALL 不因遮挡或失去前台焦点而被拒绝 WGC/OCR；目标不可见、最小化、无效或没有有效客户区时显式识别 SHALL 被拒绝。覆盖层显示不要求目标处于前台，但仍要求目标处于可见、已恢复且未被遮挡状态。窗口状态事件本身 SHALL NOT 自动重新 OCR；独立启用的自动识别 SHALL 按其像素变化规则执行。
+系统 SHALL 将目标窗口不可见、最小化、销毁、捕获不受支持、捕获失败或超时、OCR 不可用、覆盖层创建失败和实时跟踪失败转换为用户可理解的错误状态，并允许用户重新选择窗口或重试当前窗口。有效、可见且已恢复的目标 SHALL 不因遮挡或失去前台焦点而被拒绝 WGC/OCR；目标不可见、最小化、无效或没有有效客户区时显式识别 SHALL 被拒绝。覆盖层显示不要求目标处于前台，但仍要求目标处于可见、已恢复且客户区合并遮挡比例不超过 30% 的状态。窗口状态事件本身 SHALL NOT 自动重新 OCR；独立启用的自动识别 SHALL 按其像素变化规则执行。
 
 #### Scenario: Capture failure
 - **WHEN** 目标窗口被最小化、销毁或 WGC 返回失败
@@ -9,7 +9,7 @@
 
 #### Scenario: Recognize a covered target
 - **WHEN** 用户请求识别有效、可见、已恢复且可由 WGC 捕获的目标，但另一个窗口部分或完全遮挡它
-- **THEN** 系统识别目标自身画面，不要求用户移除遮挡，识别结果在遮挡期间保存而不显示浮层
+- **THEN** 系统识别目标自身画面，不要求用户移除遮挡；合并遮挡比例超过 30% 时仅保存结果并隐藏浮层，30% 及以下仍可显示
 
 #### Scenario: Reject an unavailable target
 - **WHEN** 用户请求识别但目标不可见、已最小化、已销毁或没有有效客户区
@@ -27,17 +27,36 @@
 - **WHEN** 目标窗口可见、已恢复且未被遮挡，但目标没有获得前台焦点
 - **THEN** 系统仍可显示当前有效覆盖层会话，不因 `IsForeground` 为 false 而拒绝渲染
 
+### Requirement: Use an owned target-relative overlay window
+系统 SHALL 将覆盖层创建为透明、点击穿透、不可激活的 Win32 owned top-level WPF 窗口，其 owner SHALL 为当前 Aokana 目标 HWND，且 SHALL 使用 `Topmost = false`。覆盖层 SHALL 跟随 owner 的生命周期和目标相邻的 Z 顺序，不得浮在遮挡目标的其他窗口之上。目标失去前台焦点但仍可见且客户区合并遮挡比例不超过 30% 时，覆盖层 SHALL 继续允许显示。
+
+#### Scenario: Attach overlay to selected target
+- **WHEN** 用户为有效的 Aokana HWND 显示一个识别会话
+- **THEN** 系统将 overlay HWND 的 owner 设置为该目标 HWND，关闭全局置顶，并在目标客户区上方以非激活、点击穿透方式显示词线和假名
+
+#### Scenario: Aokana loses foreground focus
+- **WHEN** Aokana 仍可见且合并遮挡比例不超过 30%，但 KotobaSenpai 或其他窗口获得焦点
+- **THEN** 覆盖层不因目标失去前台状态而清空或隐藏当前会话
+
+#### Scenario: Another window occludes Aokana
+- **WHEN** 位于 Aokana 上方的有效遮挡窗口在客户区内的并集面积严格超过完整客户区的 30%
+- **THEN** 系统将目标视为遮挡并隐藏整个覆盖层，继续保留当前识别会话
+
+#### Scenario: Small overlap keeps annotations available
+- **WHEN** 客户区合并遮挡比例为 30% 或更少，目标仍有效、可见且已恢复
+- **THEN** 覆盖层仍允许显示，保持目标相邻的非置顶 Z 顺序，不在遮挡窗口上方绘制目标标记
+
 ## ADDED Requirements
 
 ### Requirement: Keep the latest recognition session while occluded
-系统 SHALL 允许遮挡期间完成的手动或自动识别更新当前目标保存的识别会话，并保留最新词线、振假名和短语结果。遮挡期间 overlay、popup 和区域选择 UI SHALL 保持隐藏且不接收 hover；解除遮挡时 SHALL 使用最新会话及最新客户区几何恢复显示。显式结束会话或切换目标后，晚到的捕获/OCR/分析结果 SHALL NOT 恢复旧浮层。
+系统 SHALL 允许遮挡期间完成的手动或自动识别更新当前目标保存的识别会话，并保留最新词线、振假名和短语结果。合并遮挡比例超过 30% 期间 overlay、popup 和区域选择 UI SHALL 保持隐藏且不接收 hover；比例回到 30% 及以下时 SHALL 使用最新会话及最新客户区几何恢复显示。显式结束会话或切换目标后，晚到的捕获/OCR/分析结果 SHALL NOT 恢复旧浮层。
 
 #### Scenario: Finish recognition behind another window
-- **WHEN** 目标仍被遮挡时识别或短语分析完成
+- **WHEN** 目标合并遮挡比例仍超过 30% 时识别或短语分析完成
 - **THEN** 系统保存当前目标的最新有效结果，不在遮挡窗口上方绘制任何标记或释义弹窗
 
 #### Scenario: Restore the latest background result
-- **WHEN** 目标解除遮挡且遮挡期间已经完成新一轮有效识别
+- **WHEN** 目标合并遮挡比例回到 30% 及以下且隐藏期间已经完成新一轮有效识别
 - **THEN** 系统显示最新会话而不是遮挡前旧会话，恢复动作本身不发起 OCR 或 LLM 请求
 
 #### Scenario: Discard a result after explicit stop
