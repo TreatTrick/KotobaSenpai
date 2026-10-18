@@ -4,7 +4,7 @@
 TBD - created by archiving change add-llm-phrase-groups. Update Purpose after archive.
 ## Requirements
 ### Requirement: Analyze grounded sentence segments with an LLM
-The system SHALL submit one locally segmented OCR sentence segment at a time to a provider-neutral phrase analysis port. The request SHALL include the segment text, stable token references with UniDic metadata, and locally resolved continuous JMdict span summaries. The request SHALL NOT include screenshots, window coordinates, window titles, or API keys. The provider transport SHALL be wire-protocol-pluggable: the same semantic request SHALL be deliverable over OpenAI Chat Completions, Anthropic Messages, or OpenAI Responses wire formats, selected by configuration, without changing the port contract.
+The system SHALL submit one locally segmented OCR sentence segment at a time to a provider-neutral phrase analysis port. The request SHALL include the segment text, stable token references with UniDic metadata, and locally resolved continuous JMdict span summaries. The request SHALL NOT include screenshots, window coordinates, window titles, or API keys. The provider transport SHALL be wire-protocol-pluggable: the same semantic request SHALL be deliverable over OpenAI Chat Completions, Anthropic Messages, or OpenAI Responses wire formats, selected by configuration, without changing the port contract. 在增量识别场景中，系统 SHALL 在发送 LLM 请求前检查该分段的 `SegmentText` 是否命中 LLM 结果缓存；命中时 SHALL NOT 发送请求，而是直接使用缓存结果。
 
 #### Scenario: Build a grounded phrase request
 - **WHEN** a sentence segment has UniDic tokens and local continuous spans
@@ -17,6 +17,14 @@ The system SHALL submit one locally segmented OCR sentence segment at a time to 
 #### Scenario: Deliver the request over any supported protocol
 - **WHEN** the configured protocol is OpenAI Chat Completions, Anthropic Messages, or OpenAI Responses
 - **THEN** the same semantic request is serialized into that protocol's wire envelope and delivered to that protocol's endpoint path
+
+#### Scenario: Cache hit bypasses LLM call
+- **WHEN** a sentence segment's `SegmentText` matches a cached LLM result
+- **THEN** the system SHALL NOT send a provider request and SHALL use the cached `PhraseAnalysisResult` as if it were freshly returned
+
+#### Scenario: Cache miss still calls LLM
+- **WHEN** a sentence segment's `SegmentText` does not match any cached entry
+- **THEN** the system SHALL send a provider request and cache the result on success
 
 ### Requirement: Return only combination groups
 The LLM response SHALL contain zero or more meaningful combination groups and SHALL NOT be required to repeat ordinary tokens or continuous spans already supplied by local analysis. The response SHALL include a request-local model group ID, group type, one or more parts, a label, a Chinese meaning, and a Chinese grammar explanation.

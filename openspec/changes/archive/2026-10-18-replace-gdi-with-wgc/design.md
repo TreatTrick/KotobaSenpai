@@ -8,7 +8,7 @@
 
 `TargetWindowSnapshot.IsCapturable` 目前排除遮挡，`IsRenderable` 又直接复用它。手动识别刷新 tracker 后检查该属性，自动轮询也检查它。仅替换截图实现不会启用遮挡识别。
 
-历史第一阶段将 GDI 定位为兼容路径并预留 WGC；`follow-target-window` 和 `owned-overlay-window-lifecycle` 明确排除后台捕获。本次修改的是截图来源和截图资格，继续保留浮层的 owner、非置顶和遮挡隐藏规则。依据见 [可行性调研](../../../docs/research/window-capture-occlusion-feasibility.md)。
+历史第一阶段将 GDI 定位为兼容路径并预留 WGC；`follow-target-window` 和 `owned-overlay-window-lifecycle` 明确排除后台捕获。本次修改的是截图来源和截图资格，继续保留浮层的 owner、非置顶和遮挡隐藏规则。依据见 [可行性调研](../../../../docs/research/window-capture-occlusion-feasibility.md)。
 
 已完成但未归档的 `auto-text-change-detection` 提供了当前自动识别实现，其 `auto-recognition` 规范尚未进入 `openspec/specs`。本次该能力的 MODIFIED delta 以那份已完成规范为基线；将来合并规范时先同步旧基线，再应用本次 delta，不能反向覆盖。此次规划不修改或归档那个变更。
 

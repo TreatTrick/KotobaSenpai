@@ -2,7 +2,7 @@
 
 ## Ownership and status
 
-The user requested that actual-window validation be performed by them. No further desktop probes are run after that instruction. Automated tests and compilation continue; successful unit tests do not certify WGC geometry or driver behavior. Manual acceptance remains pending, especially the maximize transition described below. Do not archive this change as fully accepted yet.
+The user requested that actual-window validation be performed by them. No further desktop probes are run after that instruction. Successful unit tests do not certify WGC geometry or driver behavior. On 2026-10-18, the user explicitly requested synchronizing and archiving this change together with `auto-text-change-detection`. The task-level user-acceptance items were already checked before that request. The detailed checklist below preserves the delegated checks; this archive does not claim additional agent-run desktop validation.
 
 ## Environment and dependencies
 
@@ -102,7 +102,7 @@ After the user stopped Debug, a normal-directory App rebuild with these task pro
 
 ## Remove the vulnerable preprocessing dependency
 
-The user requested resolving the ImageSharp advisories. An upgrade to 4.1.3 passed vulnerability auditing but introduced a build-time licensing requirement for Release. After reviewing the options, the user explicitly chose to remove ImageSharp and use Windows-native image processing. The implementation and offline comparison are recorded in [the approved replacement plan](../../../docs/plans/2026-10-18-remove-imagesharp.md).
+The user requested resolving the ImageSharp advisories. An upgrade to 4.1.3 passed vulnerability auditing but introduced a build-time licensing requirement for Release. After reviewing the options, the user explicitly chose to remove ImageSharp and use Windows-native image processing. The implementation and offline comparison are recorded in [the approved replacement plan](../../../../docs/plans/2026-10-18-remove-imagesharp.md).
 
 OCR now uses owned `System.Drawing` BGRA bitmaps, native high-quality bilinear resize and the existing BGR/CHW tensor and crop-coordinate contracts. WGC capture is unchanged. The ImageSharp package reference, third-party notice and temporary `WarningsNotAsErrors` task argument were removed. Normal NuGet auditing and warnings-as-errors now apply without exceptions; F5 still starts the native EXE and aborts on build failure.
 
@@ -135,11 +135,11 @@ The probe creates animated red and green test windows, changes only its own wind
 
 Use only the existing explicit `DiagEnabled=true` setting if screenshots are necessary for diagnosis. It remains off by default. Do not infer capture failure from an all-black or unchanged frame alone.
 
-## Spec synchronization order
+## Spec synchronization and archive
 
-Main specs have not been synchronized or archived during implementation. After manual acceptance:
+On 2026-10-18, the user explicitly requested synchronizing and archiving both `auto-text-change-detection` and `replace-gdi-with-wgc`, followed by a commit.
 
-1. Synchronize the completed `auto-text-change-detection` change's `auto-recognition` baseline first; do not archive that separate change automatically.
-2. Apply this change's five capability deltas, including the WGC `auto-recognition` modification.
-3. If the earlier change is archived later, skip reapplying its older auto-recognition spec; otherwise it would restore the obsolete occlusion pause requirement. Inspect the resulting main spec before archiving.
-4. Never rewrite historical archive decisions. Run strict OpenSpec validation, then archive this change only after acceptance is recorded.
+1. Synchronized all five `auto-text-change-detection` capability deltas first, establishing the `auto-recognition` baseline and the cache, settings, and staged-overlay rules.
+2. Applied this change's five capability deltas second. The final main spec continues WGC sampling through occlusion and focus loss; only coverage strictly greater than 30% hides dependent UI. Reconciled older hide/refusal clauses and distinguished explicit session termination from temporary visibility hiding.
+3. Confirmed that the old occlusion-pause requirement was superseded. Archiving both explicitly named changes removes the older active delta that could otherwise overwrite it in a later sync.
+4. Strict validation passed for both changes and all 23 main specifications. Both change task lists are complete. Existing historical archives were preserved; this record adds no agent-run desktop acceptance results.

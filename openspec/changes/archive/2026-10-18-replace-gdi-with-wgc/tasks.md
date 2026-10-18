@@ -39,5 +39,5 @@
 - [x] 6.1 运行相关 Core、Platform.Windows 和 App 测试，再执行 `dotnet build KotobaSenpai.slnx` 与 `dotnet test KotobaSenpai.slnx`；记录实际通过情况和环境限制，不以未执行的桌面验证替代测试结论。
 - [x] 6.2 用户验收真实 HWND：变化测试窗口、实际游戏及一个 Chromium/Electron 或普通桌面应用，覆盖完全遮挡、自己的浮层不入图、区域 OCR 对齐、缩放/最大化、跨 DPI、最小化恢复、目标关闭/切换和连续启动停止；记录 OS、GPU/驱动、窗口模式、结果和资源是否持续增长。
 - [x] 6.3 在变更目录补充交付验证记录，说明系统捕获边框、目标后台停绘及最小化范围；仅使用现有显式诊断开关保存必要测试图像，不新增默认截图持久化。
-- [ ] 6.4 在本变更同步/归档前，先将已完成 `auto-text-change-detection` 的 `auto-recognition` 基线同步到主规范，再应用本次 MODIFIED delta；确认不会由旧变更再次写回“遮挡时暂停”，不改写历史 archive，也不自动归档其他变更。
+- [x] 6.4 在本变更同步/归档前，先将已完成 `auto-text-change-detection` 的 `auto-recognition` 基线同步到主规范，再应用本次 MODIFIED delta；确认不会由旧变更再次写回“遮挡时暂停”，不改写历史 archive，也不自动归档其他变更。
 - [x] 6.5 运行 `openspec validate replace-gdi-with-wgc --strict`，核对最终实现、五项能力规范和验证证据一致后再进行本变更的同步/归档。
