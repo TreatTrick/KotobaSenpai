@@ -49,12 +49,12 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         {
             if (canRender?.Invoke() == false)
             {
-                _logger?.LogInformation("[OVERLAY] Publication rejected because recognition was cancelled or superseded: sessionId={0}, targetHandle={1}.",
+                _logger?.Log(LogLevel.Debug, null, "[OVERLAY] Publication rejected because recognition was cancelled or superseded: sessionId={0}, targetHandle={1}.",
                     session.Id, session.Target.Handle);
                 return;
             }
             _logger?.Log(
-                LogLevel.Information,
+                LogLevel.Debug,
                 null,
                 "[OVERLAY] Show requested: sessionId={0}, targetHandle={1}, words={2}, underlines={3}, phraseGroups={4}, trackerAttached={5}, sourceTargetBounds={6}.",
                 session.Id,
@@ -174,9 +174,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _hoverTimer.Tick += (_, _) => PollHover();
 
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Trace,
                 null,
-                "[DEBUG-OVERLAY] Overlay window configured: topmost={0}, showActivated={1}, hitTestVisible={2}, trackerAttached={3}.",
+                "[OVERLAY] Overlay window configured: topmost={0}, showActivated={1}, hitTestVisible={2}, trackerAttached={3}.",
                 Topmost,
                 ShowActivated,
                 IsHitTestVisible,
@@ -189,9 +189,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _session = session;
             _ownerHandle = session.Target.Handle;
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Trace,
                 null,
-                "[DEBUG-OVERLAY] Render requested: sessionId={0}, targetHandle={1}, visible={2}, topmost={3}, words={4}, underlines={5}, phraseGroups={6}.",
+                "[OVERLAY] Render requested: sessionId={0}, targetHandle={1}, visible={2}, topmost={3}, words={4}, underlines={5}, phraseGroups={6}.",
                 session.Id,
                 session.Target.Handle,
                 IsVisible,
@@ -205,7 +205,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (snapshot is null || snapshot.Handle != session.Target.Handle)
                 {
                     _logger?.Log(
-                        LogLevel.Information,
+                        LogLevel.Debug,
                         null,
                         "[OVERLAY] Render skipped: tracker snapshot missing or handle mismatch. sessionId={0}, sessionTargetHandle={1}, snapshotHandle={2}.",
                         session.Id,
@@ -218,7 +218,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (!snapshot.IsValid)
                 {
                     _logger?.Log(
-                        LogLevel.Information,
+                        LogLevel.Debug,
                         null,
                         "[OVERLAY] Render skipped and session cleared: targetHandle={0}, target is invalid.",
                         snapshot.Handle);
@@ -229,7 +229,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 if (!snapshot.IsRenderable)
                 {
                     _logger?.Log(
-                        LogLevel.Information,
+                        LogLevel.Trace,
                         null,
                         "[OVERLAY] Render skipped and window hidden: targetHandle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, capturable={5}, renderable={6}, overlayVisible={7}, topmost={8}, sessionId={9}, targetBounds={10}, dpi={11:0.###}.",
                         snapshot.Handle,
@@ -259,9 +259,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (_session is null)
             {
                 _logger?.Log(
-                    LogLevel.Debug,
+                    LogLevel.Trace,
                     null,
-                    "[DEBUG-OVERLAY] Tracker change ignored: no active overlay session. handle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, renderable={5}.",
+                    "[OVERLAY] Tracker change ignored: no active overlay session. handle={0}, visible={1}, minimized={2}, foreground={3}, occluded={4}, renderable={5}.",
                     snapshot.Handle,
                     snapshot.IsVisible,
                     snapshot.IsMinimized,
@@ -272,9 +272,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             }
 
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Trace,
                 null,
-                "[DEBUG-OVERLAY] Tracker change received: sessionId={0}, handle={1}, visible={2}, minimized={3}, foreground={4}, occluded={5}, capturable={6}, renderable={7}, overlayVisible={8}, topmost={9}.",
+                "[OVERLAY] Tracker change received: sessionId={0}, handle={1}, visible={2}, minimized={3}, foreground={4}, occluded={5}, capturable={6}, renderable={7}, overlayVisible={8}, topmost={9}.",
                 _session.Id,
                 snapshot.Handle,
                 snapshot.IsVisible,
@@ -288,7 +288,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (snapshot.Handle != _session.Target.Handle)
             {
                 _logger?.Log(
-                    LogLevel.Information,
+                    LogLevel.Debug,
                     null,
                     "[OVERLAY] Tracker change caused overlay hide: sessionTargetHandle={0}, snapshotHandle={1}.",
                     _session.Target.Handle,
@@ -300,7 +300,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (!snapshot.IsValid)
             {
                 _logger?.Log(
-                    LogLevel.Information,
+                    LogLevel.Debug,
                     null,
                     "[OVERLAY] Tracker change cleared overlay session because target is invalid: handle={0}.",
                     snapshot.Handle);
@@ -311,7 +311,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (!snapshot.IsRenderable)
             {
                 _logger?.Log(
-                    IsVisible ? LogLevel.Information : LogLevel.Debug,
+                    IsVisible ? LogLevel.Debug : LogLevel.Trace,
                     null,
                     "[OVERLAY] Tracker change caused overlay hide because target is not renderable: handle={0}, foreground={1}, occluded={2}.",
                     snapshot.Handle,
@@ -380,7 +380,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _hoverTimer.Start();
 
             _logger?.Log(
-                LogLevel.Information,
+                LogLevel.Trace,
                 null,
                 "[OVERLAY] Overlay rendered: hwnd={0}, wasVisible={1}, visible={2}, topmost={3}, targetHandle={4}, targetBounds={5}, words={6}, underlines={7}, phraseGroups={8}, canvasChildren={9}.",
                 handle,
@@ -414,11 +414,11 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var handle = new WindowInteropHelper(this).Handle;
             var hasBounds = NativeMethods.GetWindowRect(handle, out var bounds);
             var hasClient = NativeMethods.GetClientRect(handle, out var client);
-            _logger.LogInformation("[OVERLAY] Window state: reason={0}, sessionId={1}, hwnd={2}, targetHandle={3}, wpfVisible={4}, visibility={5}, windowState={6}, nativeVisible={7}, nativeMinimized={8}, nativeBoundsKnown={9}, nativeBounds={10}, nativeClientKnown={11}, nativeClient={12}, dpi={13}.",
+            _logger.Log(LogLevel.Trace, null, "[OVERLAY] Window state: reason={0}, sessionId={1}, hwnd={2}, targetHandle={3}, wpfVisible={4}, visibility={5}, windowState={6}, nativeVisible={7}, nativeMinimized={8}, nativeBoundsKnown={9}, nativeBounds={10}, nativeClientKnown={11}, nativeClient={12}, dpi={13}.",
                 reason, _session?.Id.ToString() ?? "<none>", handle, _ownerHandle, IsVisible, Visibility, WindowState,
                 NativeMethods.IsWindowVisible(handle), NativeMethods.IsIconic(handle), hasBounds, bounds,
                 hasClient, client, NativeMethods.GetDpiForWindow(handle));
-            _logger.LogInformation("[OVERLAY] Z order: reason={0}, hwnd={1}, nativeOwner={2}, expectedOwner={3}, overlayAbove={4}, overlayBelow={5}, targetAbove={6}, targetBelow={7}, foreground={8}, style=0x{9:X}, exStyle=0x{10:X}, targetStyle=0x{11:X}, targetExStyle=0x{12:X}.",
+            _logger.Log(LogLevel.Trace, null, "[OVERLAY] Z order: reason={0}, hwnd={1}, nativeOwner={2}, expectedOwner={3}, overlayAbove={4}, overlayBelow={5}, targetAbove={6}, targetBelow={7}, foreground={8}, style=0x{9:X}, exStyle=0x{10:X}, targetStyle=0x{11:X}, targetExStyle=0x{12:X}.",
                 reason, handle, NativeMethods.GetWindow(handle, NativeMethods.GwOwner), _ownerHandle,
                 NativeMethods.GetWindow(handle, NativeMethods.GwHwndPrev), NativeMethods.GetWindow(handle, NativeMethods.GwHwndNext),
                 NativeMethods.GetWindow(_ownerHandle, NativeMethods.GwHwndPrev), NativeMethods.GetWindow(_ownerHandle, NativeMethods.GwHwndNext),
@@ -456,7 +456,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     clipped++;
             }
             var dpi = VisualTreeHelper.GetDpi(this);
-            _logger.LogInformation("[OVERLAY] Canvas layout: sessionId={0}, widthDip={1:0.###}, heightDip={2:0.###}, actualWidthDip={3:0.###}, actualHeightDip={4:0.###}, dpiScaleX={5:0.###}, dpiScaleY={6:0.###}, opacity={7:0.###}, canvasOpacity={8:0.###}, canvasVisible={9}, canvasBoundsDip={10}, contentBoundsDip={11}, childCount={12}, outsideChildren={13}, clippedChildren={14}, unmeasuredChildren={15}, underlineCount={16}, fontScale={17:0.###}.",
+            _logger.Log(LogLevel.Trace, null, "[OVERLAY] Canvas layout: sessionId={0}, widthDip={1:0.###}, heightDip={2:0.###}, actualWidthDip={3:0.###}, actualHeightDip={4:0.###}, dpiScaleX={5:0.###}, dpiScaleY={6:0.###}, opacity={7:0.###}, canvasOpacity={8:0.###}, canvasVisible={9}, canvasBoundsDip={10}, contentBoundsDip={11}, childCount={12}, outsideChildren={13}, clippedChildren={14}, unmeasuredChildren={15}, underlineCount={16}, fontScale={17:0.###}.",
                 _session?.Id.ToString() ?? "<none>", Width, Height, ActualWidth, ActualHeight, dpi.DpiScaleX, dpi.DpiScaleY,
                 Opacity, _canvas.Opacity, _canvas.IsVisible, canvasBounds, contentBounds, _canvas.Children.Count,
                 outside, clipped, unmeasured, _lineElements.Count, _fontScale);
@@ -481,7 +481,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         public void ClearSession()
         {
             _logger?.Log(
-                LogLevel.Information,
+                LogLevel.Debug,
                 null,
                 "[OVERLAY] Session cleared: sessionId={0}, overlayVisible={1}, topmost={2}, words={3}, underlines={4}, phraseGroups={5}.",
                 _session?.Id.ToString() ?? "<none>",
@@ -876,7 +876,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 new nint(style | NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
             var actualStyle = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
             _logger?.Log(
-                LogLevel.Information,
+                LogLevel.Trace,
                 null,
                 "[OVERLAY] Native overlay window configured: hwnd={0}, visible={1}, topmost={2}, exStyle=0x{3:X}.",
                 handle,

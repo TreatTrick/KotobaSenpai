@@ -145,9 +145,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             ThrowIfDisposed();
             var current = Current ?? throw new InvalidOperationException("No target window is attached.");
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Trace,
                 null,
-                "[DEBUG-TRACKER] Explicit refresh requested: handle={0}, title='{1}'.",
+                "[TRACKER] Explicit refresh requested: handle={0}, title='{1}'.",
                 current.Handle,
                 current.Title);
             var snapshot = RefreshCore(current.Title, current.Bounds);
@@ -203,9 +203,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             }
 
             _logger?.Log(
-                LogLevel.Debug,
+                LogLevel.Trace,
                 null,
-                "[DEBUG-TRACKER] WinEvent accepted: eventType=0x{0:X8}, hwnd={1}, targetHandle={2}; refresh posted.",
+                "[TRACKER] WinEvent accepted: eventType=0x{0:X8}, hwnd={1}, targetHandle={2}; refresh posted.",
                 eventType,
                 hwnd,
                 _targetHandle);
@@ -326,7 +326,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         if (state == _lastOcclusionDiagnosticState)
             return;
         _lastOcclusionDiagnosticState = state;
-        _logger.LogInformation("[OVERLAY] Occlusion evaluated: targetHandle={0}, targetBounds={1}, occlusionRatio={2:R}, hideAboveRatio={3:R}, occluded={4}, occluderCount={5}, intersectingWindowCount={6}.",
+        _logger.Log(LogLevel.Trace, null, "[OVERLAY] Occlusion evaluated: targetHandle={0}, targetBounds={1}, occlusionRatio={2:R}, hideAboveRatio={3:R}, occluded={4}, occluderCount={5}, intersectingWindowCount={6}.",
             targetHandle, targetBounds, ratio, OcclusionHideThreshold, occluded, occluderCount, candidates.Count);
         foreach (var window in candidates)
         {
@@ -334,7 +334,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             NativeMethods.GetClassName(window.Handle, className, className.Capacity);
             NativeMethods.GetWindowThreadProcessId(window.Handle, out var processId);
             var cloakResult = NativeMethods.DwmGetWindowAttribute(window.Handle, 14, out var cloaked, sizeof(uint));
-            _logger.LogInformation("[OVERLAY] Occlusion candidate: hwnd={0}, processId={1}, className={2}, exStyle=0x{3:X}, bounds={4}, clientIntersection={5}, exclusion={6}, cloaked={7}.",
+            _logger.Log(LogLevel.Trace, null, "[OVERLAY] Occlusion candidate: hwnd={0}, processId={1}, className={2}, exStyle=0x{3:X}, bounds={4}, clientIntersection={5}, exclusion={6}, cloaked={7}.",
                 window.Handle, processId, className.ToString(), window.ExtendedStyle, window.Bounds,
                 window.Bounds.ClampTo(targetBounds), window.Exclusion, cloakResult >= 0 ? cloaked.ToString() : "unknown");
         }
@@ -392,13 +392,13 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             _current = snapshot;
         }
         if (previous != snapshot)
-            _logger?.LogInformation("[OVERLAY] Target snapshot changed: handle={0}, bounds={1}, dpi={2:0.###}, valid={3}, visible={4}, minimized={5}, foreground={6}, occluded={7}, capturable={8}, renderable={9}.",
+            _logger?.Log(LogLevel.Trace, null, "[OVERLAY] Target snapshot changed: handle={0}, bounds={1}, dpi={2:0.###}, valid={3}, visible={4}, minimized={5}, foreground={6}, occluded={7}, capturable={8}, renderable={9}.",
                 snapshot.Handle, snapshot.Bounds, snapshot.DpiScale, snapshot.IsValid, snapshot.IsVisible, snapshot.IsMinimized,
                 snapshot.IsForeground, snapshot.IsOccluded, snapshot.IsCapturable, snapshot.IsRenderable);
         _logger?.Log(
-            LogLevel.Debug,
+            LogLevel.Trace,
             null,
-            "[DEBUG-TRACKER] Snapshot published: handle={0}, title='{1}', bounds={2}, dpi={3:0.###}, visible={4}, minimized={5}, foreground={6}, occluded={7}, capturable={8}, renderable={9}.",
+            "[TRACKER] Snapshot published: handle={0}, title='{1}', bounds={2}, dpi={3:0.###}, visible={4}, minimized={5}, foreground={6}, occluded={7}, capturable={8}, renderable={9}.",
             snapshot.Handle,
             snapshot.Title,
             snapshot.Bounds,
