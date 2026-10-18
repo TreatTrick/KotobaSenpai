@@ -6,6 +6,8 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Logging;
+using System.Runtime.InteropServices;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
@@ -22,10 +24,12 @@ public sealed class PhrasePopup : Window
 
     private readonly StackPanel _panel = new();
     private readonly IStringLocalizer? _localizer;
+    private readonly ILogger? _logger;
 
-    public PhrasePopup(IStringLocalizer? localizer = null)
+    public PhrasePopup(IStringLocalizer? localizer = null, ILogger? logger = null)
     {
         _localizer = localizer;
+        _logger = logger;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x1B, 0x1B, 0x1B));
@@ -152,21 +156,62 @@ public sealed class PhrasePopup : Window
         _panel.Measure(new Size(FieldMaxWidth, FieldMaxHeight));
         Width = Math.Min(FieldMaxWidth, Math.Max(200, _panel.DesiredSize.Width + Pad * 2));
         Height = Math.Min(FieldMaxHeight, _panel.DesiredSize.Height + Pad * 2);
-        Position(anchor);
         if (!IsVisible)
             Show();
+        Position(anchor);
     }
 
     private void Position(ScreenRect anchor)
     {
-        var wa = SystemParameters.WorkArea;
-        double x = anchor.X;
-        double y = anchor.Bottom + 4;
-        if (y + Height > wa.Bottom)
-            y = Math.Max(wa.Top, anchor.Y - Height - 4);
-        x = Math.Max(wa.Left, Math.Min(x, wa.Right - Width));
-        Left = x;
-        Top = y;
+        var anchorRect = new Native.Rect { Left = anchor.X, Top = anchor.Y, Right = anchor.Right, Bottom = anchor.Bottom };
+        var monitor = Native.MonitorFromRect(in anchorRect, Native.MonitorDefaultToNearest);
+        var info = new Native.MonitorInfo { Size = Marshal.SizeOf<Native.MonitorInfo>() };
+        if (!Native.GetMonitorInfo(monitor, ref info))
+        {
+            _logger?.LogWarning("[OVERLAY] Popup monitor work area is unavailable: error={0}.", Marshal.GetLastWin32Error());
+            HidePopup();
+            return;
+        }
+
+        var workArea = info.WorkArea.ToScreenRect();
+        var handle = new WindowInteropHelper(this).Handle;
+        // Native bounds and anchors share physical pixels; WPF Left/Top use DIPs.
+        // A move to another monitor may change the popup's DPI and native size once.
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var dpi = Native.GetDpiForWindow(handle);
+            if (!Native.GetWindowRect(handle, out var window))
+            {
+                _logger?.LogWarning("[OVERLAY] Popup window bounds are unavailable: error={0}.", Marshal.GetLastWin32Error());
+                HidePopup();
+                return;
+            }
+            var gap = (int)Math.Ceiling(4 * (dpi == 0 ? 1 : dpi / 96d));
+            var placement = CalculatePlacement(anchor, workArea, window.Right - window.Left, window.Bottom - window.Top, gap);
+            if (!Native.SetWindowPos(handle, nint.Zero, placement.X, placement.Y, placement.Width, placement.Height,
+                Native.SwpNoActivate | Native.SwpNoZOrder))
+            {
+                _logger?.LogWarning("[OVERLAY] Popup positioning failed: error={0}.", Marshal.GetLastWin32Error());
+                HidePopup();
+                return;
+            }
+            _logger?.Log(LogLevel.Trace, null, "[OVERLAY] Popup positioned: anchor={0}, workArea={1}, dpi={2}, bounds={3}.",
+                anchor, workArea, dpi, placement);
+            if (Native.GetDpiForWindow(handle) == dpi)
+                break;
+        }
+    }
+
+    internal static ScreenRect CalculatePlacement(ScreenRect anchor, ScreenRect workArea, int width, int height, int gap)
+    {
+        width = Math.Min(width, workArea.Width);
+        height = Math.Min(height, workArea.Height);
+        var x = Math.Clamp(anchor.X, workArea.X, workArea.Right - width);
+        var y = anchor.Bottom + gap;
+        if (y + height > workArea.Bottom)
+            y = anchor.Y - height - gap;
+        y = Math.Clamp(y, workArea.Y, workArea.Bottom - height);
+        return new ScreenRect(x, y, width, height);
     }
 
     private static UIElement Heading(string text)
@@ -216,6 +261,42 @@ public sealed class PhrasePopup : Window
         public const long WsExTransparent = 0x20;
         public const long WsExNoActivate = 0x08000000;
         public const long WsExToolWindow = 0x80;
+        public const uint MonitorDefaultToNearest = 2;
+        public const uint SwpNoActivate = 0x0010;
+        public const uint SwpNoZOrder = 0x0004;
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct Rect
+        {
+            public int Left, Top, Right, Bottom;
+            public readonly ScreenRect ToScreenRect() => new(Left, Top, Right - Left, Bottom - Top);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MonitorInfo
+        {
+            public int Size;
+            public Rect Bounds, WorkArea;
+            public uint Flags;
+        }
+
+        [DllImport("user32.dll")]
+        public static extern nint MonitorFromRect(in Rect rect, uint flags);
+
+        [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetDpiForWindow(nint handle);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetWindowRect(nint handle, out Rect rect);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetWindowPos(nint handle, nint insertAfter, int x, int y, int width, int height, uint flags);
 
         [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         public static extern nint GetWindowLongPtr(nint hWnd, int index);

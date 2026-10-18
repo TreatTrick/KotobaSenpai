@@ -5,7 +5,7 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Platform.Windows;
 using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Ocr.MeikiOcr;
-using SixLabors.ImageSharp.PixelFormats;
+using System.Drawing;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 
@@ -128,17 +128,7 @@ public sealed class MeikiOcrEngineTests
 
     private static (ReadOnlyMemory<byte> Bgra, int Width, int Height) LoadBgra(string path)
     {
-        using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(path);
-        var rgba = new byte[image.Width * image.Height * 4];
-        image.CopyPixelDataTo(rgba);
-        var bgra = new byte[rgba.Length];
-        for (int i = 0; i < rgba.Length; i += 4)
-        {
-            bgra[i + 0] = rgba[i + 2]; // B
-            bgra[i + 1] = rgba[i + 1]; // G
-            bgra[i + 2] = rgba[i + 0]; // R
-            bgra[i + 3] = rgba[i + 3]; // A
-        }
-        return (bgra, image.Width, image.Height);
+        using var image = new Bitmap(path);
+        return (OcrBitmap.CopyPixels(image), image.Width, image.Height);
     }
 }

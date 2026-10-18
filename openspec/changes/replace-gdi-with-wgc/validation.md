@@ -76,6 +76,38 @@ After the user asked how to rebuild, read-only inspection found no application p
 
 Following the user's verbosity report, occlusion evaluations/candidates, target snapshots, WinEvent/refresh notifications, render details, native window/Z-order state and canvas layouts now use Trace (`[TRC]`). They are written only when `MinimumLogLevel=Trace`; Information and Debug filter these details out. Routine publication and lifecycle decisions use Debug; the one-time component/version marker and explicit user Hide remain Information, and warnings/errors retain their severity. No logging configuration or capture/visibility policy was changed.
 
+## Display scale changes during VS Code debugging
+
+The user reported persistent geometrically valid frame timeouts after switching the display from 125% to 200%, including after returning to 100%. The latest OCR diagnostic was a successful `19:47:16` cropped capture; this directory does not record failed acquisition because it is written only after capture and inference complete. The application log was empty. Read-only window metadata identified the running application as process `18352` (`dotnet`), with a system-aware window fixed at DPI `120`, while the game's per-monitor-aware window reported the current DPI (`96` at 100%, then `192` at 200%). No capture session was started by the investigation.
+
+The VS Code launch configuration targeted `KotobaSenpai.App.dll`, bypassing the executable's native application manifest. Reading the existing EXE's embedded manifest as a resource confirmed `PerMonitorV2`. This is a concrete launch-mode defect: system-aware callers can receive DPI-virtualized Win32 geometry while DWM frame bounds remain physical, so a frame can fail the existing client containment/extent checks after a scale change in either direction. See Microsoft's [DPI virtualization guidance](https://learn.microsoft.com/en-us/windows/win32/hidpi/high-dpi-desktop-application-development-on-windows#common-pitfalls-win32) and [GetWindowRect documentation](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect).
+
+Debug now starts `KotobaSenpai.App.exe`, preserving the existing build task and working directory so Windows applies the declared per-monitor DPI mode from process startup. This changes no capture crop, timeout or geometry validation policy. The user must end the existing debug process and start a new one; switching DPI or hot reload cannot replace the host executable of a running process. Actual 125% → 200% → 100% capture/overlay acceptance remains pending with the user.
+
+## Hover popup placement at 200% DPI
+
+The user then reported a hover overlay displaced toward the bottom right and sometimes outside the screen at 200%. Code tracing found a separate defect in `PhrasePopup`: physical screen anchors were assigned directly to WPF `Left`/`Top`, which are DIPs. Its boundary checks also mixed those anchors with DIP dimensions and the primary display's `SystemParameters.WorkArea`. Both group and single-word popup paths used this method.
+
+Popup placement now keeps anchors, native window bounds and the anchor monitor's work area in physical pixels, and moves/resizes its HWND without activation or changing Z order. The existing content measurement stays in WPF DIPs. When there is insufficient room below the anchor, the popup moves above it; both axes and dimensions are limited to the selected display's work area, including negative desktop coordinates. One additional native bounds check handles a DPI/size change when moving to another display. Placement details use Trace; failed native queries or positioning use Warning and hide the popup.
+
+Six pure placement cases pass for 100%/125%/200% popup sizes, bottom/right edges, a negative-coordinate display and a popup larger than its work area. These tests exercise geometry only; they do not launch windows or validate actual WPF DPI transitions. Actual popup alignment after rebuilding remains user acceptance.
+
+## Ensure F5 loads the popup fix
+
+The follow-up screenshot still showed a distant popup, but its running process `7332` loaded the old component with MVID `790b8eec-5995-4061-9d6e-ff928f42b307`. The normal App Debug dependency and Windows project DLL were both still written at `19:22:16`, and metadata inspection found no `CalculatePlacement` method. All four launches recorded through `20:50:36` used that same old MVID. The isolated validation component did contain the fix; the screenshot therefore did not exercise the new positioning path.
+
+Executing the existing F5 build command reproduced a restore failure before compilation: `SixLabors.ImageSharp` 3.1.12 audit warnings `NU1902`/`NU1903` became errors under `TreatWarningsAsErrors`. The local VS Code build task now passes `WarningsNotAsErrors=NU1902%3BNU1903`, following [NuGet guidance](https://learn.microsoft.com/en-us/nuget/reference/errors-and-warnings/nu1901-nu1904). Auditing and warning output remain enabled; this override applies to the local task, not project-wide or release settings. Existing dependency advisories remain unresolved. Workspace `debug.onTaskErrors=abort` also stops F5 on an actual build failure instead of continuing into stale output.
+
+After the user stopped Debug, a normal-directory App rebuild with these task properties passed with zero errors and the existing audit warnings. At `20:53:57`, both normal Debug component copies contained `CalculatePlacement`, had MVID `96187b22-b9e9-418b-83d7-170c3cafbd43`, and matched by SHA-256 (`CFCE7257CF9AA1D0F4227A1F32F6C8537DA1FE5A024E80E44E163F4C4091E0EB`). A subsequent solution test run in the normal output directories passed all **388** tests (Core 124, Windows 144, App 92, Architecture 28) with audit warnings retained. No application or test window was launched; actual popup acceptance remains with the user.
+
+## Remove the vulnerable preprocessing dependency
+
+The user requested resolving the ImageSharp advisories. An upgrade to 4.1.3 passed vulnerability auditing but introduced a build-time licensing requirement for Release. After reviewing the options, the user explicitly chose to remove ImageSharp and use Windows-native image processing. The implementation and offline comparison are recorded in [the approved replacement plan](../../../docs/plans/2026-10-18-remove-imagesharp.md).
+
+OCR now uses owned `System.Drawing` BGRA bitmaps, native high-quality bilinear resize and the existing BGR/CHW tensor and crop-coordinate contracts. WGC capture is unchanged. The ImageSharp package reference, third-party notice and temporary `WarningsNotAsErrors` task argument were removed. Normal NuGet auditing and warnings-as-errors now apply without exceptions; F5 still starts the native EXE and aborts on build failure.
+
+Both normal-directory Debug and Release App rebuilds passed with zero warnings/errors. All **393** solution tests passed (Core 124, Windows 149, App 92, Architecture 28), with local models and a saved two-line diagnostic PNG supplied so the existing OCR inference and batch-chunking checks executed. The dependency audit including transitives reported no known vulnerable packages in any solution project. Actual App Debug output was checked: it matches the rebuilt Windows DLL and contains no Six Labors assembly or runtime dependency. The agent did not launch any application or capture window pixels.
+
 ## User acceptance checklist
 
 Run the app normally with a restored target, or optionally run the checked-in probe:
@@ -88,6 +120,8 @@ The probe creates animated red and green test windows, changes only its own wind
 
 - [ ] First check framed → borderless → maximized → restored transitions. Full-client output must start at the client origin without caption pixels or missing client edges. Recheck the previously observed nine-pixel error at 125% DPI.
 - [ ] Repeat at 100%, 125%, and 150%, then across monitors with different DPI and negative desktop coordinates. Saved normalized regions must remain aligned.
+- [ ] Start VS Code debugging through the EXE and switch 125% → 200% → 100% while the app remains running. Capture must recover, and crop/overlay coordinates must stay aligned.
+- [ ] At 200%, hover a word and a phrase group near each display edge. The meaning popup must stay adjacent to its anchor and inside that display's work area; repeat on a display with different DPI and negative coordinates.
 - [ ] With an actual game and one ordinary desktop/Chromium/Electron window, test partial/full covering and focus loss. Occluder text and the mouse cursor must never enter OCR. Record separately whether the source keeps rendering.
 - [ ] Set a recognition region: OCR must stay inside it; word positions must retain the full-client offset. Test full-client recognition too.
 - [ ] Enable auto recognition after one manual recognition. While coverage exceeds 30%, change source text. Overlay/popups/selector must stay hidden; reducing coverage to 30% or less should reveal the latest recognized result without triggering OCR merely because of the visibility event.

@@ -3,9 +3,8 @@ using System.Globalization;
 using System.IO;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using System.Drawing;
+using System.Drawing.Imaging;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 
@@ -43,15 +42,6 @@ public sealed class MeikiOcrEngine : IDisposable
         ["儡傀"] = "傀儡", ["談冗"] = "冗談", ["汰淘"] = "淘汰", ["沱滂"] = "滂沱",
         ["攣痙"] = "痙攣", ["酊酩"] = "酩酊", ["麭麺"] = "麺麭", ["哭慟"] = "慟哭",
     };
-
-    // Bilinear resizing (the Triangle kernel is OpenCV's INTER_LINEAR).
-    private static Image<Rgba32> ResizeBilinear(Image<Rgba32> image, int width, int height)
-        => image.Clone(c => c.Resize(new ResizeOptions
-        {
-            Mode = ResizeMode.Stretch,
-            Sampler = KnownResamplers.Triangle,
-            Size = new Size(width, height),
-        }));
 
     private readonly InferenceSession _detSession;
     private readonly InferenceSession _recSession;
@@ -95,7 +85,7 @@ public sealed class MeikiOcrEngine : IDisposable
         float recThreshold = 0.1f,
         float punctConfFactor = 0.2f)
     {
-        using var image = MakeRgbaImage(bgra32, width, height);
+        using var image = OcrBitmap.FromBgra(bgra32, width, height);
         var boxes = RunDetection(image, detThreshold);
         _logger?.LogInformation("MeikiOcr: frame {0}x{1}, detected {2} text boxes", width, height, boxes.Count);
         if (boxes.Count == 0)
@@ -136,7 +126,7 @@ public sealed class MeikiOcrEngine : IDisposable
 
     // --- Text detection (corresponding to run_detection in ocr.py) ---
 
-    private List<(int X1, int Y1, int X2, int Y2)> RunDetection(Image<Rgba32> image, float confThreshold)
+    private List<(int X1, int Y1, int X2, int Y2)> RunDetection(Bitmap image, float confThreshold)
     {
         var (tensor, scale) = PreprocessForDetection(image);
 
@@ -171,24 +161,23 @@ public sealed class MeikiOcrEngine : IDisposable
         return list;
     }
 
-    private static (DenseTensor<float> Tensor, float Scale) PreprocessForDetection(Image<Rgba32> image)
+    private static (DenseTensor<float> Tensor, float Scale) PreprocessForDetection(Bitmap image)
     {
         float scale = MathF.Min((float)InputDetWidth / image.Width, (float)InputDetHeight / image.Height);
         int wResized = (int)(image.Width * scale);
         int hResized = (int)(image.Height * scale);
-        using var resized = ResizeBilinear(image, wResized, hResized);
+        using var resized = OcrBitmap.Resize(image, wResized, hResized);
 
         var tensor = new DenseTensor<float>(new[] { 1, 3, InputDetHeight, InputDetWidth });
-        var pixels = new Rgba32[wResized * hResized];
-        resized.CopyPixelDataTo(pixels);
+        var pixels = OcrBitmap.CopyPixels(resized);
         for (int y = 0; y < hResized; y++)
         {
             for (int x = 0; x < wResized; x++)
             {
-                var p = pixels[y * wResized + x];
-                tensor[0, 0, y, x] = p.B / 255f; // B (OpenCV BGR order)
-                tensor[0, 1, y, x] = p.G / 255f; // G
-                tensor[0, 2, y, x] = p.R / 255f; // R
+                var p = (y * wResized + x) * 4;
+                tensor[0, 0, y, x] = pixels[p] / 255f; // B (OpenCV BGR order)
+                tensor[0, 1, y, x] = pixels[p + 1] / 255f; // G
+                tensor[0, 2, y, x] = pixels[p + 2] / 255f; // R
             }
         }
         return (tensor, scale);
@@ -197,7 +186,7 @@ public sealed class MeikiOcrEngine : IDisposable
     // --- Recognition pipeline (corresponding to _process_recognition_pipeline in ocr.py) ---
 
     private void ProcessRecognitionPipeline(
-        Image<Rgba32> image,
+        Bitmap image,
         IReadOnlyList<(int X1, int Y1, int X2, int Y2)> boxes,
         IReadOnlyList<int> indices,
         MeikiLine?[] results,
@@ -229,7 +218,7 @@ public sealed class MeikiOcrEngine : IDisposable
 
     private static (float[][] Tensors, List<int> ValidIndices, List<CropMeta> Metadata)?
         PreprocessForRecognition(
-            Image<Rgba32> image,
+            Bitmap image,
             IReadOnlyList<(int X1, int Y1, int X2, int Y2)> boxes,
             IReadOnlyList<int> indices)
     {
@@ -255,20 +244,19 @@ public sealed class MeikiOcrEngine : IDisposable
                 newH = (int)Math.Round(newH * scaleW);
             }
 
-            using var crop = image.Clone(c => c.Crop(new Rectangle(x1, y1, w, h)));
-            using var resized = ResizeBilinear(crop, newW, newH);
+            using var crop = image.Clone(new Rectangle(x1, y1, w, h), PixelFormat.Format32bppArgb);
+            using var resized = OcrBitmap.Resize(crop, newW, newH);
 
             var tensor = new float[3 * InputRecHeight * InputRecWidth];
-            var pixels = new Rgba32[newW * newH];
-            resized.CopyPixelDataTo(pixels);
+            var pixels = OcrBitmap.CopyPixels(resized);
             for (int y = 0; y < newH; y++)
             {
                 for (int x = 0; x < newW; x++)
                 {
-                    var p = pixels[y * newW + x];
-                    tensor[y * InputRecWidth + x] = p.B / 255f;
-                    tensor[InputRecHeight * InputRecWidth + y * InputRecWidth + x] = p.G / 255f;
-                    tensor[2 * InputRecHeight * InputRecWidth + y * InputRecWidth + x] = p.R / 255f;
+                    var p = (y * newW + x) * 4;
+                    tensor[y * InputRecWidth + x] = pixels[p] / 255f;
+                    tensor[InputRecHeight * InputRecWidth + y * InputRecWidth + x] = pixels[p + 1] / 255f;
+                    tensor[2 * InputRecHeight * InputRecWidth + y * InputRecWidth + x] = pixels[p + 2] / 255f;
                 }
             }
 
@@ -449,21 +437,6 @@ public sealed class MeikiOcrEngine : IDisposable
 
     private static int Clamp(float value, int min, int max)
         => (int)Math.Clamp(value, min, max);
-
-    private static Image<Rgba32> MakeRgbaImage(ReadOnlyMemory<byte> bgra32, int width, int height)
-    {
-        // Bgra32 -> Rgba32 (swap the B/R channels).
-        var rgba = new byte[bgra32.Length];
-        var src = bgra32.Span;
-        for (int i = 0; i < bgra32.Length; i += 4)
-        {
-            rgba[i + 0] = src[i + 2]; // R
-            rgba[i + 1] = src[i + 1]; // G
-            rgba[i + 2] = src[i + 0]; // B
-            rgba[i + 3] = src[i + 3]; // A
-        }
-        return Image.LoadPixelData<Rgba32>(rgba, width, height);
-    }
 
     private sealed record CropMeta(int X1, int Y1, int X2, int Y2, int EffectiveW, int EffectiveH);
 

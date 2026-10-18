@@ -52,12 +52,6 @@ SOFTWARE.
 - 许可：MIT License
 - 说明：通过 `Microsoft.ML.OnnxRuntime.DirectML` 包使用。
 
-## ImageSharp
-
-- 来源：https://github.com/SixLabors/ImageSharp
-- 许可：Apache License 2.0
-- 说明：用于 OCR 前处理的图像缩放（双线性插值）。
-
 ## LibNMeCab
 
 - 来源：https://github.com/komutan/NMeCab；NuGet 包 `LibNMeCab` 0.10.2

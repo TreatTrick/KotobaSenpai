@@ -140,7 +140,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             ITargetWindowTracker? tracker = null,
             ILogger? logger = null)
         {
-            _phrasePopup = new PhrasePopup(localizer);
+            _phrasePopup = new PhrasePopup(localizer, logger);
             _tracker = tracker;
             _logger = logger;
 
