@@ -230,4 +230,25 @@
   <data name="Llm.WordNoMeaning" xml:space="preserve">
     <value>无释义</value>
   </data>
+  <data name="Label_LlmSettings" xml:space="preserve"><value>云端短语分析</value></data>
+  <data name="Label_LlmEnabled" xml:space="preserve"><value>启用云端短语分析</value></data>
+  <data name="Label_LlmProtocol" xml:space="preserve"><value>协议</value></data>
+  <data name="Label_LlmEndpoint" xml:space="preserve"><value>Base URL</value></data>
+  <data name="Label_LlmApiKey" xml:space="preserve"><value>API Key</value></data>
+  <data name="Label_LlmModel" xml:space="preserve"><value>模型</value></data>
+  <data name="Button_LlmFetchModels" xml:space="preserve"><value>获取模型</value></data>
+  <data name="Button_LlmToggleKey" xml:space="preserve"><value>显示 / 隐藏</value></data>
+  <data name="Llm_ProtocolOpenAiChat" xml:space="preserve"><value>OpenAI Chat Completions</value></data>
+  <data name="Llm_ProtocolOpenAiResponses" xml:space="preserve"><value>OpenAI Responses</value></data>
+  <data name="Llm_ProtocolAnthropic" xml:space="preserve"><value>Anthropic Messages</value></data>
+  <data name="Llm_EndpointRequired" xml:space="preserve"><value>请输入 Base URL。</value></data>
+  <data name="Llm_ApiKeyRequired" xml:space="preserve"><value>请输入 API Key。</value></data>
+  <data name="Llm_LoadingModels" xml:space="preserve"><value>正在获取模型……</value></data>
+  <data name="Llm_NoModels" xml:space="preserve"><value>没有返回模型。</value></data>
+  <data name="Llm_ModelsLoaded" xml:space="preserve"><value>已获取 {0} 个模型。</value></data>
+  <data name="Llm_AuthenticationFailed" xml:space="preserve"><value>认证失败，请检查 API Key。</value></data>
+  <data name="Llm_Timeout" xml:space="preserve"><value>获取模型超时。</value></data>
+  <data name="Llm_CatalogUnavailable" xml:space="preserve"><value>该服务没有可用的模型列表接口。你仍可手动输入模型 ID。</value></data>
+  <data name="Llm_FetchFailed" xml:space="preserve"><value>获取模型失败，请检查地址和网络连接。</value></data>
+  <data name="Llm_FetchCancelled" xml:space="preserve"><value>模型请求已取消。</value></data>
 </root>

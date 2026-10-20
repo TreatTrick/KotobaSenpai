@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -12,6 +13,9 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
     public LlmPromptProfile PromptProfile => LlmPromptProfile.OpenAiResponses;
 
     public string Path => "/responses";
+
+    public void ApplyAuthentication(HttpRequestMessage request, string apiKey)
+        => request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
 
     public string BuildBody(string systemPrompt, string userContent, string model)
     {

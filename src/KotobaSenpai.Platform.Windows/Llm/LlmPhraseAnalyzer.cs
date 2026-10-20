@@ -2,7 +2,6 @@ using KotobaSenpai.Core.Diagnostics;
 using KotobaSenpai.Core.PhraseAnalysis;
 using System.Diagnostics;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using KotobaSenpai.Core.Localization;
@@ -13,7 +12,7 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 
 /// <summary>
 /// Protocol-agnostic adapter for <see cref="ILlmPhraseAnalyzer"/>. BYOK settings are read via <see cref="ISettingsService"/>;
-/// transport, Bearer auth, error mapping, cancellation/timeout live here; the request/response envelope is handed to the
+/// transport, protocol resolution, authentication, error mapping, cancellation/timeout live here; the request/response envelope is handed to the
 /// selected <see cref="ILlmProtocol"/>. Skips the call when no key is configured. Cancellation/timeout/transport/refusal/
 /// malformed JSON are all mapped to retryable diagnostics rather than thrown through the recognition flow.
 /// </summary>
@@ -21,7 +20,8 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
 {
     private readonly ISettingsService _settings;
     private readonly HttpClient _http;
-    private readonly ILlmProtocol _protocol;
+    private readonly ILlmProtocol? _fixedProtocol;
+    private readonly LlmProtocolRegistry _protocolRegistry;
     private readonly PhrasePromptBuilder _promptBuilder;
     private readonly PhraseResponseParser _parser;
     private readonly IDiagnosticReporter? _diagnostics;
@@ -35,11 +35,13 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         PhraseResponseParser? parser = null,
         IStringLocalizer? localizer = null,
         IDiagnosticReporter? diagnostics = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        LlmProtocolRegistry? protocolRegistry = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _protocol = protocol ?? new OpenAiChatCompletionsProtocol();
+        _fixedProtocol = protocol;
+        _protocolRegistry = protocolRegistry ?? new LlmProtocolRegistry();
         // ponytail: fallback only serves callers that don't inject a builder (production always injects via DI); returns the key itself when a localizer is missing.
         _promptBuilder = promptBuilder ?? new PhrasePromptBuilder(localizer ?? new KeyReturningLocalizer());
         _parser = parser ?? new PhraseResponseParser();
@@ -54,22 +56,35 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         var apiKey = _settings.GetValue(LlmSettingsKeys.ApiKey);
         var endpoint = _settings.GetValue(LlmSettingsKeys.Endpoint);
         var model = _settings.GetValue(LlmSettingsKeys.Model);
-        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(model))
+        if (!string.Equals(_settings.GetValue(LlmSettingsKeys.Enabled), "true", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(model))
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.NoKey, [], null);
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
+            || (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
+            return new PhraseAnalysisResult(PhraseAnalysisOutcome.NoKey, [], null);
+
+        var protocol = _fixedProtocol ?? _protocolRegistry.Resolve(_settings.GetValue(LlmSettingsKeys.Protocol));
 
         string systemPrompt, userContent;
         try
         {
-            (systemPrompt, userContent) = _promptBuilder.Build(request, _protocol.PromptProfile);
+            (systemPrompt, userContent) = _promptBuilder.Build(request, protocol.PromptProfile);
         }
         catch (RequestTooLargeException ex)
         {
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.InvalidResponse, [], ex.Message);
         }
 
-        var body = _protocol.BuildBody(systemPrompt, userContent, model);
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint.TrimEnd('/') + _protocol.Path);
-        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        var body = protocol.BuildBody(systemPrompt, userContent, model);
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, LlmEndpointHelper.Join(endpoint, protocol.Path));
+        try
+        {
+            protocol.ApplyAuthentication(httpRequest, apiKey);
+        }
+        catch (Exception ex) when (ex is ArgumentException or FormatException)
+        {
+            return new PhraseAnalysisResult(PhraseAnalysisOutcome.TransportError, [], null);
+        }
         httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         string envelope;
@@ -104,9 +119,9 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         IReadOnlyList<ParsedWordMeaning> words;
         try
         {
-            var groupsPayload = _protocol.ExtractGroupsJson(envelope);
+            var groupsPayload = protocol.ExtractGroupsJson(envelope);
             groupsJson = groupsPayload.GetRawText();
-            var wordsPayload = _protocol.ExtractWordsJson(envelope);
+            var wordsPayload = protocol.ExtractWordsJson(envelope);
             wordsJson = wordsPayload.GetRawText();
             groups = _parser.ParseGroups(groupsPayload);
             words = _parser.ParseWords(wordsPayload);

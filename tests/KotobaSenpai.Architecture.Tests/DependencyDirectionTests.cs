@@ -165,6 +165,13 @@ public sealed class DependencyDirectionTests
         Assert.Same(appAssembly, typeof(SettingsService).Assembly);
     }
 
+    [Fact]
+    public void Llm_model_catalog_port_resides_in_core()
+    {
+        var coreAssembly = typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly;
+        Assert.Same(coreAssembly, typeof(KotobaSenpai.Core.Llm.ILlmModelCatalog).Assembly);
+    }
+
     /// <summary>Preference stores and log-level configuration must access settings through the ISettingsService port, not read/write files directly.</summary>
     [Fact]
     public void Settings_Consumers_DependOnCoreSettingsPort()

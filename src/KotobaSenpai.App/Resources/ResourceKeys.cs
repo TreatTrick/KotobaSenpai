@@ -20,6 +20,27 @@ public static class ResourceKeys
     public const string Button_SetRecognitionRegion = nameof(Button_SetRecognitionRegion);
     public const string Label_AutoRecognition = nameof(Label_AutoRecognition);
     public const string Label_Description = nameof(Label_Description);
+    public const string Label_LlmSettings = nameof(Label_LlmSettings);
+    public const string Label_LlmEnabled = nameof(Label_LlmEnabled);
+    public const string Label_LlmProtocol = nameof(Label_LlmProtocol);
+    public const string Label_LlmEndpoint = nameof(Label_LlmEndpoint);
+    public const string Label_LlmApiKey = nameof(Label_LlmApiKey);
+    public const string Label_LlmModel = nameof(Label_LlmModel);
+    public const string Button_LlmFetchModels = nameof(Button_LlmFetchModels);
+    public const string Button_LlmToggleKey = nameof(Button_LlmToggleKey);
+    public const string Llm_ProtocolOpenAiChat = nameof(Llm_ProtocolOpenAiChat);
+    public const string Llm_ProtocolOpenAiResponses = nameof(Llm_ProtocolOpenAiResponses);
+    public const string Llm_ProtocolAnthropic = nameof(Llm_ProtocolAnthropic);
+    public const string Llm_EndpointRequired = nameof(Llm_EndpointRequired);
+    public const string Llm_ApiKeyRequired = nameof(Llm_ApiKeyRequired);
+    public const string Llm_LoadingModels = nameof(Llm_LoadingModels);
+    public const string Llm_NoModels = nameof(Llm_NoModels);
+    public const string Llm_ModelsLoaded = nameof(Llm_ModelsLoaded);
+    public const string Llm_AuthenticationFailed = nameof(Llm_AuthenticationFailed);
+    public const string Llm_Timeout = nameof(Llm_Timeout);
+    public const string Llm_CatalogUnavailable = nameof(Llm_CatalogUnavailable);
+    public const string Llm_FetchFailed = nameof(Llm_FetchFailed);
+    public const string Llm_FetchCancelled = nameof(Llm_FetchCancelled);
 
     // --- ViewModel status text ({0} is a placeholder) ---
     public const string Status_SelectTarget = nameof(Status_SelectTarget);

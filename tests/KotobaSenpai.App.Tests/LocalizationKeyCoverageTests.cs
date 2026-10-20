@@ -73,6 +73,23 @@ public sealed partial class LocalizationKeyCoverageTests
             Assert.Contains(match.Groups[1].Value, neutral);
     }
 
+    [Fact]
+    public void Every_llm_configuration_key_has_a_zh_cn_translation()
+    {
+        var translated = Strings.GetResourceSet(CultureInfo.GetCultureInfo("zh-CN"), true, false);
+        Assert.NotNull(translated);
+        var keys = typeof(ResourceKeys)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string)
+                && (field.Name.StartsWith("Llm_", StringComparison.Ordinal)
+                    || field.Name.StartsWith("Label_Llm", StringComparison.Ordinal)
+                    || field.Name.StartsWith("Button_Llm", StringComparison.Ordinal)))
+            .Select(field => (string)field.GetRawConstantValue()!);
+
+        foreach (var key in keys)
+            Assert.NotNull(translated.GetString(key));
+    }
+
     /// <summary>Searches upward from the test output directory for a source file in the repo, avoiding a hard-coded relative depth.</summary>
     private static string FindSourceFile(string relativePathFromRepo)
     {

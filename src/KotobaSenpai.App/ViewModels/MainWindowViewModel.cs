@@ -47,7 +47,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         ILogger logger,
         ITargetWindowTracker? tracker = null,
         IAutoRecognitionController? autoRecognitionController = null,
-        IWindowFrameCapture? capture = null)
+        IWindowFrameCapture? capture = null,
+        LlmSettingsViewModel? llmSettings = null)
     {
         _catalog = catalog;
         _workflow = workflow;
@@ -59,6 +60,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         _tracker = tracker;
         _autoRecognitionController = autoRecognitionController;
         _capture = capture;
+        LlmSettings = llmSettings;
         _autoRecognitionEnabled = IsEnabled(_settings.GetValue(AutoRecognitionSettings.EnabledKey));
 
         _localizer.CultureChanged += OnCultureChanged;
@@ -67,6 +69,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
 
     /// <summary>List of selectable target windows.</summary>
     public ObservableCollection<WindowTarget> Windows { get; } = new();
+
+    public LlmSettingsViewModel? LlmSettings { get; }
 
     /// <summary>The currently selected target window.</summary>
     [ObservableProperty]
@@ -197,6 +201,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         _localizer.CultureChanged -= OnCultureChanged;
+        LlmSettings?.Dispose();
         EndRecognitionSession();
     }
 

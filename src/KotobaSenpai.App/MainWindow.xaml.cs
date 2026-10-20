@@ -105,7 +105,22 @@ public partial class MainWindow : FluentWindow
             return;
 
         viewModel.ExcludeHandle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        SyncLlmApiKeyPassword();
         viewModel.RefreshCommand.Execute(null);
+    }
+
+    private void LlmApiKeyPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is MainWindowViewModel { LlmSettings: { } settings }
+            && !string.Equals(settings.ApiKey, LlmApiKeyPasswordBox.Password, StringComparison.Ordinal))
+            settings.ApiKey = LlmApiKeyPasswordBox.Password;
+    }
+
+    private void SyncLlmApiKeyPassword()
+    {
+        if (DataContext is MainWindowViewModel { LlmSettings: { } settings }
+            && !string.Equals(settings.ApiKey, LlmApiKeyPasswordBox.Password, StringComparison.Ordinal))
+            LlmApiKeyPasswordBox.Password = settings.ApiKey;
     }
 
     /// <summary>Slider change: writes the furigana font scale to settings (re-entrancy guarded by <see cref="_syncing"/>).</summary>

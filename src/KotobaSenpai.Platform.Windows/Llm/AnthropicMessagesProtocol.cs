@@ -1,4 +1,5 @@
 using KotobaSenpai.Core.Tokenization;
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -14,6 +15,12 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
     public LlmPromptProfile PromptProfile => LlmPromptProfile.AnthropicMessages;
 
     public string Path => "/v1/messages";
+
+    public void ApplyAuthentication(HttpRequestMessage request, string apiKey)
+    {
+        request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+        request.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
+    }
 
     // ponytail: fixed cap — group JSON output is tiny, no need to estimate per request; very long segments are backstopped by the PromptBuilder's size limit.
     private const int MaxTokens = 4096;

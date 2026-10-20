@@ -50,6 +50,62 @@
                   Margin="0,10,0,0" />
         <TextBlock Text="{loc:Loc Key=Label_Description}" TextWrapping="Wrap" Margin="0,12,0,0" Opacity="0.7" />
 
+        <TextBlock Text="{loc:Loc Key=Label_LlmSettings}" FontWeight="SemiBold" Margin="0,20,0,6" />
+        <ui:Card Padding="14">
+          <StackPanel>
+            <CheckBox Content="{loc:Loc Key=Label_LlmEnabled}"
+                      IsChecked="{Binding LlmSettings.Enabled, Mode=TwoWay}" />
+            <TextBlock Text="{loc:Loc Key=Label_LlmProtocol}" Margin="0,12,0,4" />
+            <ComboBox ItemsSource="{Binding LlmSettings.Protocols}"
+                      SelectedValuePath="Id" DisplayMemberPath="Name"
+                      SelectedValue="{Binding LlmSettings.Protocol, Mode=TwoWay}" />
+            <TextBlock Text="{loc:Loc Key=Label_LlmEndpoint}" Margin="0,12,0,4" />
+            <TextBox Text="{Binding LlmSettings.Endpoint, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Text="{loc:Loc Key=Label_LlmApiKey}" Margin="0,12,0,4" />
+            <Grid>
+              <PasswordBox x:Name="LlmApiKeyPasswordBox" PasswordChanged="LlmApiKeyPasswordBox_PasswordChanged">
+                <PasswordBox.Style>
+                  <Style TargetType="PasswordBox">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding LlmSettings.IsApiKeyVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </PasswordBox.Style>
+              </PasswordBox>
+              <TextBox Text="{Binding LlmSettings.ApiKey, UpdateSourceTrigger=PropertyChanged}">
+                <TextBox.Style>
+                  <Style TargetType="TextBox">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding LlmSettings.IsApiKeyVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBox.Style>
+              </TextBox>
+            </Grid>
+            <ui:Button Content="{loc:Loc Key=Button_LlmToggleKey}"
+                       Command="{Binding LlmSettings.ToggleApiKeyVisibilityCommand}"
+                       Appearance="Secondary" HorizontalAlignment="Right" Margin="0,4,0,0" />
+            <TextBlock Text="{loc:Loc Key=Label_LlmModel}" Margin="0,12,0,4" />
+            <ComboBox IsEditable="True" IsTextSearchEnabled="True"
+                      ItemsSource="{Binding LlmSettings.Models}"
+                      DisplayMemberPath="Id"
+                      Text="{Binding LlmSettings.Model, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <ui:Button Content="{loc:Loc Key=Button_LlmFetchModels}"
+                         Command="{Binding LlmSettings.FetchModelsCommand}" Appearance="Primary" />
+              <ProgressBar IsIndeterminate="True" Width="80" Height="4" VerticalAlignment="Center" Margin="12,0,0,0"
+                           Visibility="{Binding LlmSettings.IsFetchingModels, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+            <TextBlock Text="{Binding LlmSettings.ModelStatus}" TextWrapping="Wrap" Margin="0,8,0,0" Opacity="0.75" />
+          </StackPanel>
+        </ui:Card>
+
         <!-- 外观 -->
         <TextBlock Text="{loc:Loc Key=Label_Appearance}" FontWeight="SemiBold" Margin="0,20,0,6" />
         <ui:Card Padding="14">

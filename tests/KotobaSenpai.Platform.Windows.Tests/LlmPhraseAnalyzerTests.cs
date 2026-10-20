@@ -8,8 +8,10 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Llm;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Llm;
+using LlmSettingsKeys = KotobaSenpai.Core.Llm.LlmSettingsKeys;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 
@@ -314,6 +316,28 @@ public sealed class LlmProtocolTests
     }
 
     [Fact]
+    public void Protocols_apply_their_own_authentication_headers()
+    {
+        foreach (var protocol in new ILlmProtocol[]
+        {
+            new OpenAiChatCompletionsProtocol(),
+            new OpenAiResponsesProtocol(),
+        })
+        {
+            using var request = new HttpRequestMessage();
+            protocol.ApplyAuthentication(request, "secret");
+            Assert.Equal("Bearer secret", request.Headers.Authorization!.ToString());
+            Assert.False(request.Headers.Contains("x-api-key"));
+        }
+
+        using var anthropicRequest = new HttpRequestMessage();
+        new AnthropicMessagesProtocol().ApplyAuthentication(anthropicRequest, "secret");
+        Assert.Equal("secret", anthropicRequest.Headers.GetValues("x-api-key").Single());
+        Assert.Equal("2023-06-01", anthropicRequest.Headers.GetValues("anthropic-version").Single());
+        Assert.False(anthropicRequest.Headers.Contains("Authorization"));
+    }
+
+    [Fact]
     public void AnthropicMessages_extracts_groups_from_tool_use_content()
     {
         var protocol = new AnthropicMessagesProtocol();
@@ -368,6 +392,20 @@ public sealed class LlmPhraseAnalyzerTests
         var analyzer = new LlmPhraseAnalyzer(new FakeSettings(), new HttpClient());
         var result = await analyzer.AnalyzeAsync(Request());
         Assert.Equal(PhraseAnalysisOutcome.NoKey, result.Outcome);
+    }
+
+    [Fact]
+    public async Task Disabled_cloud_analysis_does_not_send_a_request()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, GroupEnvelope);
+        var settings = new FakeSettings(apiKey: "secret");
+        settings.SetValue(LlmSettingsKeys.Enabled, "false");
+        var analyzer = new LlmPhraseAnalyzer(settings, new HttpClient(handler));
+
+        var result = await analyzer.AnalyzeAsync(Request());
+
+        Assert.Equal(PhraseAnalysisOutcome.NoKey, result.Outcome);
+        Assert.False(handler.WasCalled);
     }
 
     [Fact]
@@ -474,6 +512,33 @@ public sealed class LlmPhraseAnalyzerTests
         Assert.Equal("Bearer secret", auth);
     }
 
+    [Fact]
+    public async Task Resolves_protocol_and_authentication_from_current_settings_for_each_request()
+    {
+        var settings = new FakeSettings(apiKey: "secret");
+        var requests = new List<(string Path, string? Authorization, string? ApiKey)>();
+        var handler = new StubHandler(HttpStatusCode.InternalServerError, "", captureRequest: request =>
+            requests.Add((request.RequestUri!.AbsolutePath,
+                request.Headers.Authorization?.ToString(),
+                request.Headers.TryGetValues("x-api-key", out var values) ? values.Single() : null)));
+        var analyzer = new LlmPhraseAnalyzer(settings, new HttpClient(handler));
+
+        await analyzer.AnalyzeAsync(Request());
+        settings.SetValue(LlmSettingsKeys.Protocol, LlmProtocolIds.Anthropic);
+        await analyzer.AnalyzeAsync(Request());
+        settings.SetValue(LlmSettingsKeys.Protocol, LlmProtocolIds.OpenAiResponses);
+        settings.SetValue(LlmSettingsKeys.Endpoint, "https://example.com/v1");
+        await analyzer.AnalyzeAsync(Request());
+
+        Assert.Equal("/chat/completions", requests[0].Path);
+        Assert.Equal("Bearer secret", requests[0].Authorization);
+        Assert.Equal("/v1/messages", requests[1].Path);
+        Assert.Null(requests[1].Authorization);
+        Assert.Equal("secret", requests[1].ApiKey);
+        Assert.Equal("/v1/responses", requests[2].Path);
+        Assert.Equal("Bearer secret", requests[2].Authorization);
+    }
+
     private static PhraseAnalysisRequest Request()
         => new(Guid.Parse("0123456789abcdef0123456789abcdef"), "s0", "あ", [new SentenceTokenReference(0, 0, 0, 0, Token(), [new ScreenRect(0, 0, 10, 20)])], []);
 
@@ -483,16 +548,18 @@ public sealed class LlmPhraseAnalyzerTests
 
     private sealed class FakeSettings : ISettingsService
     {
-        private readonly string? _apiKey;
-        public FakeSettings(string? apiKey = null) => _apiKey = apiKey;
-        public string? GetValue(string key) => key switch
+        private readonly Dictionary<string, string?> _values = new()
         {
-            LlmSettingsKeys.ApiKey => _apiKey,
-            LlmSettingsKeys.Endpoint => "https://example.com",
-            LlmSettingsKeys.Model => "test-model",
-            _ => null,
+            [LlmSettingsKeys.ApiKey] = null,
+            [LlmSettingsKeys.Endpoint] = "https://example.com",
+            [LlmSettingsKeys.Model] = "test-model",
+            [LlmSettingsKeys.Protocol] = LlmProtocolIds.OpenAiChat,
+            [LlmSettingsKeys.Enabled] = "true",
         };
-        public void SetValue(string key, string? value) { }
+
+        public FakeSettings(string? apiKey = null) => _values[LlmSettingsKeys.ApiKey] = apiKey;
+        public string? GetValue(string key) => _values.GetValueOrDefault(key);
+        public void SetValue(string key, string? value) => _values[key] = value;
     }
 
     private sealed class FakeDiagnosticReporter : IDiagnosticReporter
@@ -522,9 +589,11 @@ public sealed class LlmPhraseAnalyzerTests
         private readonly string _body;
         private readonly Exception? _throwEx;
         private readonly Action<string>? _captureAuth;
+        private readonly Action<HttpRequestMessage>? _captureRequest;
+        public bool WasCalled { get; private set; }
 
-        public StubHandler(HttpStatusCode status, string body, Action<string>? captureAuth = null)
-            => (_status, _body, _captureAuth) = (status, body, captureAuth);
+        public StubHandler(HttpStatusCode status, string body, Action<string>? captureAuth = null, Action<HttpRequestMessage>? captureRequest = null)
+            => (_status, _body, _captureAuth, _captureRequest) = (status, body, captureAuth, captureRequest);
 
         public StubHandler(Exception throwEx)
             => (_body, _throwEx) = ("", throwEx);
@@ -532,9 +601,11 @@ public sealed class LlmPhraseAnalyzerTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            WasCalled = true;
             if (_throwEx is not null)
                 throw _throwEx;
             _captureAuth?.Invoke(request.Headers.Authorization?.ToString() ?? "");
+            _captureRequest?.Invoke(request);
             return Task.FromResult(new HttpResponseMessage(_status) { Content = new StringContent(_body, Encoding.UTF8) });
         }
     }

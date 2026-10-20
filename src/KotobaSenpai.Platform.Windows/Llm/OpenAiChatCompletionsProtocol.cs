@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -9,6 +10,9 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
     public LlmPromptProfile PromptProfile => LlmPromptProfile.OpenAiChatCompletions;
 
     public string Path => "/chat/completions";
+
+    public void ApplyAuthentication(HttpRequestMessage request, string apiKey)
+        => request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
 
     public string BuildBody(string systemPrompt, string userContent, string model)
     {

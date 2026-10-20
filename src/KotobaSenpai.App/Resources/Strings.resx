@@ -230,4 +230,25 @@
   <data name="Llm.WordNoMeaning" xml:space="preserve">
     <value>no meaning</value>
   </data>
+  <data name="Label_LlmSettings" xml:space="preserve"><value>Cloud phrase analysis</value></data>
+  <data name="Label_LlmEnabled" xml:space="preserve"><value>Enable cloud phrase analysis</value></data>
+  <data name="Label_LlmProtocol" xml:space="preserve"><value>Protocol</value></data>
+  <data name="Label_LlmEndpoint" xml:space="preserve"><value>Base URL</value></data>
+  <data name="Label_LlmApiKey" xml:space="preserve"><value>API Key</value></data>
+  <data name="Label_LlmModel" xml:space="preserve"><value>Model</value></data>
+  <data name="Button_LlmFetchModels" xml:space="preserve"><value>Get models</value></data>
+  <data name="Button_LlmToggleKey" xml:space="preserve"><value>Show / hide</value></data>
+  <data name="Llm_ProtocolOpenAiChat" xml:space="preserve"><value>OpenAI Chat Completions</value></data>
+  <data name="Llm_ProtocolOpenAiResponses" xml:space="preserve"><value>OpenAI Responses</value></data>
+  <data name="Llm_ProtocolAnthropic" xml:space="preserve"><value>Anthropic Messages</value></data>
+  <data name="Llm_EndpointRequired" xml:space="preserve"><value>Enter a Base URL.</value></data>
+  <data name="Llm_ApiKeyRequired" xml:space="preserve"><value>Enter an API Key.</value></data>
+  <data name="Llm_LoadingModels" xml:space="preserve"><value>Fetching models…</value></data>
+  <data name="Llm_NoModels" xml:space="preserve"><value>No models were returned.</value></data>
+  <data name="Llm_ModelsLoaded" xml:space="preserve"><value>Loaded {0} models.</value></data>
+  <data name="Llm_AuthenticationFailed" xml:space="preserve"><value>Authentication failed. Check the API Key.</value></data>
+  <data name="Llm_Timeout" xml:space="preserve"><value>Model request timed out.</value></data>
+  <data name="Llm_CatalogUnavailable" xml:space="preserve"><value>This provider does not expose a supported model-list endpoint. Enter a model ID manually.</value></data>
+  <data name="Llm_FetchFailed" xml:space="preserve"><value>Could not fetch models. Check the URL and connection.</value></data>
+  <data name="Llm_FetchCancelled" xml:space="preserve"><value>Model request cancelled.</value></data>
 </root>

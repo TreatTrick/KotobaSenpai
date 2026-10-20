@@ -6,6 +6,7 @@ using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Ocr;
+using KotobaSenpai.Core.Llm;
 using KotobaSenpai.Core.TargetWindow;
 using System.IO;
 using System.Net.Http;
@@ -160,20 +161,12 @@ public partial class App : Application
 
         // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
         // enabled by the config key PhraseGroupsEnabled=true; when the key is not configured the adapter returns NoKey and skips the call.
-        // The protocol is selected by LlmProtocol (anthropic/responses/default OpenAI Chat Completions).
+        // The protocol is selected by LlmProtocol for each request (anthropic/openai-responses/default OpenAI Chat Completions).
         services.AddSingleton<PhrasePromptBuilder>();
         services.AddSingleton<PhraseResponseParser>();
         services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
-        services.AddSingleton<ILlmProtocol>(sp =>
-        {
-            var key = sp.GetRequiredService<ISettingsService>().GetValue(LlmSettingsKeys.Protocol);
-            return key switch
-            {
-                "anthropic" => new AnthropicMessagesProtocol(),
-                "responses" => new OpenAiResponsesProtocol(),
-                _ => new OpenAiChatCompletionsProtocol(),
-            };
-        });
+        services.AddSingleton<LlmProtocolRegistry>();
+        services.AddSingleton<ILlmModelCatalog, HttpLlmModelCatalog>();
         services.AddSingleton<ILlmPhraseAnalyzer, LlmPhraseAnalyzer>();
         services.AddSingleton<SentenceSegmenter>();
         services.AddSingleton<SentenceTokenBuilder>();
@@ -229,6 +222,7 @@ public partial class App : Application
         services.AddSingleton<IThemePreferenceStore, LocalAppDataThemePreferenceStore>();
         services.AddSingleton<FluentThemeService>();
 
+        services.AddSingleton<LlmSettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
     }
 
