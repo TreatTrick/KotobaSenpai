@@ -3,19 +3,19 @@
 ## MODIFIED Requirements
 
 ### Requirement: Provide a pluggable provider-wire-protocol port
-系统 SHALL 暴露一个协议端口：给定规范化的短语分析请求和模型名称，该端口生成供应商专属请求封装和请求路径，应用供应商专属认证请求头，并将供应商专属响应封装中的结构化分组数组提取为 JSON element。每个协议 SHALL 声明其原生结构化输出机制和认证策略，以约束供应商返回符合 schema 的 JSON。该端口 SHALL 独立实现 OpenAI Chat Completions、Anthropic Messages 和 OpenAI Responses 三种 wire 格式。
+系统 SHALL 暴露一个协议端口：给定规范化的短语分析请求和模型名称，该端口生成协议专属请求封装和回退请求路径，应用协议专属认证请求头，并将响应封装中的结构化分组数组提取为 JSON element。Chat SHALL 使用 JSON object 模式与 prompt 结构示例，Anthropic 和 Responses SHALL 使用各自原生的结构化输出声明；返回结果 SHALL 继续通过本地解析和语义校验。该端口 SHALL 独立实现 OpenAI Chat Completions、Anthropic Messages 和 OpenAI Responses 三种 wire 格式。
 
 #### Scenario: 选择 OpenAI Chat Completions 协议
 - **WHEN** 配置的 protocol 是 OpenAI Chat Completions
-- **THEN** 请求发送到 `/chat/completions` 路径，使用 OpenAI `messages` 封装和严格的 `response_format` JSON schema，发送 Bearer 认证，并从 `choices[0].message.content` 读取分组数组
+- **THEN** 请求使用 OpenAI `messages` 封装和 `response_format.type=json_object`，在 system 消息中提供 JSON 结构示例，设置 `max_tokens=4096`，发送 Bearer 认证，并从 `choices[0].message.content` 读取分组数组；地址回退时使用 `/v1/chat/completions` 和 `/chat/completions`
 
 #### Scenario: 选择 Anthropic Messages 协议
 - **WHEN** 配置的 protocol 是 Anthropic Messages
-- **THEN** 请求发送到 `/v1/messages` 路径，使用包含 Anthropic `system`+`messages`+`max_tokens` 封装和强制 `tool_use`，发送 `x-api-key` 与 `anthropic-version: 2023-06-01` 而不发送 Bearer 认证，并从 `content[].tool_use.input` 读取分组数组
+- **THEN** 请求使用包含 Anthropic `system`+`messages`+`max_tokens` 封装和强制 `tool_use`，发送 `x-api-key` 与 `anthropic-version: 2023-06-01` 而不发送 Bearer 认证，并从 `content[].tool_use.input` 读取分组数组；地址回退时使用 `/v1/messages` 和 `/anthropic/v1/messages`
 
 #### Scenario: 选择 OpenAI Responses 协议
 - **WHEN** 配置的 protocol 是 OpenAI Responses
-- **THEN** 请求发送到 `/responses` 路径，使用包含 OpenAI `input` 封装和严格 `text.format` JSON schema，发送 Bearer 认证，并从 `output` 数组的文本内容读取分组数组
+- **THEN** 请求使用包含 OpenAI `input` 封装和严格 `text.format` JSON schema，发送 Bearer 认证，并从 `output` 数组的文本内容读取分组数组；地址回退时使用 `/v1/responses` 和 `/responses`
 
 ### Requirement: Select the protocol by configuration
 系统 SHALL 在每个新的短语分析或模型发现请求中，根据当前 BYOK 设置键选择活动 wire 协议；未设置或未知时默认使用 OpenAI Chat Completions。修改该键 SHALL 改变后续请求使用的协议实现和认证策略，同时不改变短语分析端口契约。
@@ -57,3 +57,31 @@
 #### Scenario: 本地化后各协议产出一致的分组
 - **WHEN** 同一份本地化的短语请求通过三种协议中任一发送
 - **THEN** 每个协议的结构化 group 数组由同一个 group 解析器校验并得到相同的 groups。
+
+## ADDED Requirements
+
+### Requirement: 优先请求配置地址并有条件回退
+短语分析 SHALL 首先原样 POST 配置的地址，包括完整接口路径及查询参数。仅在 HTTP 404/405 时 SHALL 尝试下一个有限候选地址。候选 SHALL 按协议生成、保留自定义前缀和查询参数、使用 URI 相等性去重，且不重复追加版本段或完整协议路径。
+
+#### Scenario: 完整地址直接成功
+- **WHEN** 用户填写完整接口地址且该地址返回可解析的 HTTP 成功响应
+- **THEN** 分析器只向该地址发送一次请求，不追加任何协议路径
+
+#### Scenario: 在路径不存在时继续
+- **WHEN** 原地址或后续候选返回 HTTP 404 或 405
+- **THEN** 分析器使用相同的请求体与协议认证尝试下一个唯一候选，成功后立即停止
+
+#### Scenario: 全部地址不可用
+- **WHEN** 所有候选均返回 HTTP 404/405
+- **THEN** 分析器返回 Refused，警告包含最终 HTTP 状态码和已尝试地址数量
+
+#### Scenario: 其他失败不触发地址切换
+- **WHEN** 返回 HTTP 400、401、403、429 或 5xx，或发生超时、传输错误、取消或成功响应格式错误
+- **THEN** 分析器立即返回对应失败结果，不再尝试其他地址
+
+### Requirement: 保留 HTTP 尝试的错误诊断
+启用诊断时，每次 HTTP 失败 SHALL 保存请求体、脱敏后的响应体及空的 groups/words 数组；日志 SHALL 记录协议、目标路径、状态码和耗时，不记录认证请求头或 URL 查询参数。
+
+#### Scenario: 错误响应回显 API Key
+- **WHEN** HTTP 错误响应中包含当前配置的 API Key
+- **THEN** 诊断中该值被替换为 `[REDACTED]`，日志与结果警告不暴露该值

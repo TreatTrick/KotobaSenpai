@@ -19,7 +19,7 @@ KotobaSenpai 是一个 Windows WPF 应用，拥有 Core 设置端口和由 App �
 
 - 多个已保存供应商、供应商 Profile、故障转移队列、聚合、路由或账户/OAuth 流程。
 - 自动供应商预设或远程供应商目录。
-- 修改语义短语 prompt、响应 schema、OCR 流程、悬浮层行为或短语结果缓存。
+- 修改短语分析语义、响应字段、OCR 流程、悬浮层行为或短语结果缓存。
 - 在本次变更中加密 Secret 或迁移到 Credential Manager；明文设置存储是本版本明确的产品决策。
 
 ## 决策
@@ -69,7 +69,15 @@ ViewModel 负责检查缺少 endpoint/key 的本地前置条件，立即持久�
 
 ### 7. 在分析器中规范化 endpoint 拼接
 
-分析器会规范化配置的 Base URL 和协议路径，避免重复版本段和尾部斜杠错误。Base URL 可以是主机根路径、带版本的 Base URL 或兼容子路径。规范化器不会悄悄改写任意用户路径；候选地址生成和分析器请求构造共用一个带测试的小型 URL 帮助器。
+分析器首先原样 POST 用户填写的地址，允许基础地址或完整接口地址。仅 HTTP 404/405 会继续尝试下一个候选；其他 HTTP 错误、成功但格式不正确的响应、传输失败、超时和取消均立即终止。全部候选失败后保留 Refused 结果，并报告最终状态码及已尝试地址数量。
+
+对普通基础地址，Chat 的候选顺序为原地址、`/v1/chat/completions`、`/chat/completions`；Responses 为原地址、`/v1/responses`、`/responses`；Anthropic 为原地址、`/v1/messages`、`/anthropic/v1/messages`。候选保留自定义路径前缀和查询参数，使用 URI 相等性去重；已存在的 `/v1`、`/anthropic` 和完整协议路径不得重复拼接。不根据供应商域名分支，也不修改用户已保存的地址。模型目录 GET 仍使用独立的目录候选规则。
+
+每次尝试均创建新的 HTTP 请求和请求体实例，使用请求开始时快照的同一 body、model 和认证信息。HTTP 错误先读取响应体，再保存脱敏后的 exchange，日志记录协议、目标路径、状态码和耗时；查询参数和认证头不进入日志。
+
+### 8. Chat Completions 统一使用 JSON object 模式
+
+所有 Chat 请求均使用 `response_format: {"type":"json_object"}` 和 `max_tokens=4096`。协议适配器在 system 消息后添加包含 groups/words 及其完整字段的 JSON 结构示例，明确要求替换示例值；本地化 prompt 指示输出实际分析结果。Chat 请求不发送 `json_schema` 或 `strict`，保留现有响应解析和语义校验。Anthropic 的 tool schema 与 Responses 的 `text.format` schema 保持原有机制。
 
 ## 风险 / 权衡
 

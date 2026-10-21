@@ -4,9 +4,11 @@ using System.Text.Json.Nodes;
 
 namespace KotobaSenpai.Platform.Windows.Llm;
 
-/// <summary>OpenAI Chat Completions protocol: <c>/chat/completions</c>, with <c>response_format</c> strict JSON schema.</summary>
+/// <summary>OpenAI Chat Completions protocol with JSON object output and a prompt-level output example.</summary>
 public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
 {
+    private const string OutputExample = """{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0","l0:t1"]],"label":"example","meaning":"example","grammar":"example"}],"words":[{"headword":"example","pos":"example","meaning":"example","grammar":"example"}]}""";
+
     public LlmPromptProfile PromptProfile => LlmPromptProfile.OpenAiChatCompletions;
 
     public string Path => "/chat/completions";
@@ -19,22 +21,17 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
         var payload = new JsonObject
         {
             ["model"] = model,
+            ["max_tokens"] = 4096,
             ["reasoning_effort"] = "low",
             // DeepSeek's OpenAI-compatible endpoint uses this extension to explicitly disable thinking.
             ["thinking"] = new JsonObject { ["type"] = "disabled" },
             ["temperature"] = 0.0,
             ["messages"] = new JsonArray(
-                new JsonObject { ["role"] = "system", ["content"] = systemPrompt },
+                new JsonObject { ["role"] = "system", ["content"] = systemPrompt + "\nJSON output structure example (replace all example values with the actual analysis):\n" + OutputExample },
                 new JsonObject { ["role"] = "user", ["content"] = userContent }),
             ["response_format"] = new JsonObject
             {
-                ["type"] = "json_schema",
-                ["json_schema"] = new JsonObject
-                {
-                    ["name"] = "return_groups",
-                    ["schema"] = PhraseGroupSchema.Root.DeepClone(),
-                    ["strict"] = true,
-                },
+                ["type"] = "json_object",
             },
         };
         return payload.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));

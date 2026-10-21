@@ -3,11 +3,11 @@
 ## ADDED Requirements
 
 ### Requirement: 配置当前云端短语分析连接
-应用 SHALL 在主设置窗口中暴露一个单一的 LLM 配置区。该区域 SHALL 提供启用开关、包含 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages 选项的协议选择器、Base URL 输入框、带显示/隐藏控件的 API Key 密码输入框，以及可编辑的模型选择器。
+应用 SHALL 在主设置窗口中暴露一个单一的 LLM 配置区。该区域 SHALL 提供启用开关、包含 OpenAI Chat Completions、OpenAI Responses 和 Anthropic Messages 选项的协议选择器、支持基础地址或完整接口地址的 API 地址输入框、带显示/隐藏控件的 API Key 密码输入框，以及可编辑的模型选择器。
 
 #### Scenario: 显示 LLM 配置控件
 - **WHEN** 主设置窗口显示时
-- **THEN** 用户可以看到云端短语分析开关、协议选择器、Base URL 字段、API Key 字段、模型字段，以及单个支持首次获取和再次点击刷新列表的“获取模型”按钮
+- **THEN** 用户可以看到云端短语分析开关、协议选择器、说明可填写基础地址或完整接口地址的 API 地址字段、API Key 字段、模型字段，以及单个支持首次获取和再次点击刷新列表的“获取模型”按钮
 
 #### Scenario: 隐藏和显示 API Key
 - **WHEN** 用户激活 API Key 的显示/隐藏控件

@@ -11,6 +11,9 @@ KotobaSenpai 已经包含 OpenAI Chat Completions、OpenAI Responses 和 Anthrop
 - 通过现有扁平设置键持久化所选协议、endpoint、model 和启用状态。
 - 后续请求从当前设置解析所选协议，无需重启应用。
 - 对短语请求和模型发现请求应用协议专属的认证请求头。
+- 短语分析先原样请求用户填写的地址，仅在 HTTP 404/405 时依次尝试去重后的通用协议路径，全部候选失败后报告错误。
+- Chat Completions 统一使用 `json_object`，通过 prompt 中的 JSON 结构示例约束输出并继续本地校验，不再发送 `json_schema`。
+- 为各次 HTTP 失败保存脱敏请求/响应诊断，并记录协议、目标地址、状态码和耗时。
 - 为常见的 OpenAI 兼容和 Anthropic 兼容供应商增加模型列表地址回退和响应解析。
 - 当供应商没有可用的模型列表地址时，保留手动输入模型的能力。
 

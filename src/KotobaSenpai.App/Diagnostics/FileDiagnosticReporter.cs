@@ -90,7 +90,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         var seq = Interlocked.Increment(ref _seq);
         var safe = Sanitize(segmentId);
         var stamp = $"{recognitionId:N}-{safe}-{seq:D3}";
-        // Indented + UTF-8 with BOM so each file opens correctly in a Chinese-locale editor/JSON viewer; the request body never contains the API key (it lives in the Authorization header).
+        // Indented + UTF-8 with BOM for readable JSON; API keys stay in authentication headers and are redacted from HTTP errors by the caller.
         File.WriteAllText(Path.Combine(dir, $"llm-req-{stamp}.json"), FormatJson(requestJson), Utf8Bom);
         File.WriteAllText(Path.Combine(dir, $"llm-resp-{stamp}.json"), FormatJson(responseJson), Utf8Bom);
         PruneToLatest(dir, "llm-req-");

@@ -247,18 +247,26 @@ public sealed class LlmProtocolTests
         """{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0"]],"label":"x","meaning":"y","grammar":"z"}]}""";
 
     [Fact]
-    public void OpenAiChatCompletions_builds_strict_schema_envelope()
+    public void OpenAiChatCompletions_builds_json_object_envelope_with_an_output_example()
     {
         var protocol = new OpenAiChatCompletionsProtocol();
         Assert.Equal("/chat/completions", protocol.Path);
 
         var body = protocol.BuildBody("sys", "user", "m");
         Assert.Contains("response_format", body);
-        Assert.Contains("json_schema", body);
-        Assert.Contains("strict", body);
+        Assert.DoesNotContain("json_schema", body);
+        Assert.DoesNotContain("\"strict\"", body);
 
         using var document = JsonDocument.Parse(body);
         var root = document.RootElement;
+        Assert.Equal("json_object", root.GetProperty("response_format").GetProperty("type").GetString());
+        Assert.Equal(4096, root.GetProperty("max_tokens").GetInt32());
+        var system = root.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.StartsWith("sys", system);
+        Assert.Contains("JSON", system);
+        using var example = JsonDocument.Parse(system[system.IndexOf('{')..]);
+        Assert.Single(new PhraseResponseParser().ParseGroups(example.RootElement.GetProperty("groups")));
+        Assert.Single(new PhraseResponseParser().ParseWords(example.RootElement.GetProperty("words")));
         Assert.Equal("low", root.GetProperty("reasoning_effort").GetString());
         Assert.Equal("disabled", root.GetProperty("thinking").GetProperty("type").GetString());
     }
@@ -516,6 +524,7 @@ public sealed class LlmPhraseAnalyzerTests
     public async Task Resolves_protocol_and_authentication_from_current_settings_for_each_request()
     {
         var settings = new FakeSettings(apiKey: "secret");
+        settings.SetValue(LlmSettingsKeys.Endpoint, "https://example.com/chat/completions");
         var requests = new List<(string Path, string? Authorization, string? ApiKey)>();
         var handler = new StubHandler(HttpStatusCode.InternalServerError, "", captureRequest: request =>
             requests.Add((request.RequestUri!.AbsolutePath,
@@ -525,9 +534,10 @@ public sealed class LlmPhraseAnalyzerTests
 
         await analyzer.AnalyzeAsync(Request());
         settings.SetValue(LlmSettingsKeys.Protocol, LlmProtocolIds.Anthropic);
+        settings.SetValue(LlmSettingsKeys.Endpoint, "https://example.com/v1/messages");
         await analyzer.AnalyzeAsync(Request());
         settings.SetValue(LlmSettingsKeys.Protocol, LlmProtocolIds.OpenAiResponses);
-        settings.SetValue(LlmSettingsKeys.Endpoint, "https://example.com/v1");
+        settings.SetValue(LlmSettingsKeys.Endpoint, "https://example.com/v1/responses");
         await analyzer.AnalyzeAsync(Request());
 
         Assert.Equal("/chat/completions", requests[0].Path);

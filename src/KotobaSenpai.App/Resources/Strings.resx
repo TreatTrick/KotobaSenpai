@@ -189,10 +189,10 @@
     <value>Call the `return_groups` tool now. Its input must contain exactly the top-level arrays `groups` and `words`; `groups` may be empty. Do not return JSON as normal assistant text or add explanatory fields.</value>
   </data>
   <data name="Llm.OpenAiChatSystemPrompt" xml:space="preserve">
-    <value>You analyze Japanese visual-novel text for teaching value. Return exactly one JSON object matching the response schema as the assistant content. Do not call tools and do not emit Markdown, explanations, or any other text. The object must contain exactly the top-level arrays `groups` and `words`. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
+    <value>You analyze Japanese visual-novel text for teaching value. Return exactly one JSON object following the supplied JSON structure example as the assistant content. Replace all example values with the actual analysis. Do not call tools and do not emit Markdown, explanations, or any other text. The object must contain exactly the top-level arrays `groups` and `words`. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
   </data>
   <data name="Llm.OpenAiChatUserInstruction" xml:space="preserve">
-    <value>Return exactly one JSON object with the top-level arrays `groups` and `words`, even when `groups` is empty. Do not call a tool and do not add any other fields or explanatory text. Follow the response schema exactly.</value>
+    <value>Return exactly one JSON object with the top-level arrays `groups` and `words`, even when `groups` is empty. Do not call a tool and do not add any other fields or explanatory text. Follow the supplied JSON structure exactly.</value>
   </data>
   <data name="Llm.OpenAiResponsesSystemPrompt" xml:space="preserve">
     <value>You analyze Japanese visual-novel text for teaching value. Return exactly one JSON object matching the `text.format` schema as the output text. Do not call tools and do not emit Markdown, explanations, or any other text. The object must contain exactly the top-level arrays `groups` and `words`. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
@@ -233,7 +233,7 @@
   <data name="Label_LlmSettings" xml:space="preserve"><value>Cloud phrase analysis</value></data>
   <data name="Label_LlmEnabled" xml:space="preserve"><value>Enable cloud phrase analysis</value></data>
   <data name="Label_LlmProtocol" xml:space="preserve"><value>Protocol</value></data>
-  <data name="Label_LlmEndpoint" xml:space="preserve"><value>Base URL</value></data>
+  <data name="Label_LlmEndpoint" xml:space="preserve"><value>API URL (base or full endpoint)</value></data>
   <data name="Label_LlmApiKey" xml:space="preserve"><value>API Key</value></data>
   <data name="Label_LlmModel" xml:space="preserve"><value>Model</value></data>
   <data name="Button_LlmFetchModels" xml:space="preserve"><value>Get models</value></data>
@@ -241,7 +241,7 @@
   <data name="Llm_ProtocolOpenAiChat" xml:space="preserve"><value>OpenAI Chat Completions</value></data>
   <data name="Llm_ProtocolOpenAiResponses" xml:space="preserve"><value>OpenAI Responses</value></data>
   <data name="Llm_ProtocolAnthropic" xml:space="preserve"><value>Anthropic Messages</value></data>
-  <data name="Llm_EndpointRequired" xml:space="preserve"><value>Enter a Base URL.</value></data>
+  <data name="Llm_EndpointRequired" xml:space="preserve"><value>Enter an API URL.</value></data>
   <data name="Llm_ApiKeyRequired" xml:space="preserve"><value>Enter an API Key.</value></data>
   <data name="Llm_LoadingModels" xml:space="preserve"><value>Fetching models…</value></data>
   <data name="Llm_NoModels" xml:space="preserve"><value>No models were returned.</value></data>

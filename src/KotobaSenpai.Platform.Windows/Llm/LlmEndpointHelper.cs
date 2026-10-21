@@ -2,6 +2,31 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 
 internal static class LlmEndpointHelper
 {
+    public static IReadOnlyList<Uri> AnalysisCandidates(Uri endpoint, string path)
+    {
+        var basePath = endpoint.AbsolutePath.TrimEnd('/');
+        if (basePath.EndsWith(path, StringComparison.OrdinalIgnoreCase))
+            basePath = basePath[..^path.Length];
+
+        var versionedPath = path.StartsWith("/v1/", StringComparison.OrdinalIgnoreCase) ? path : "/v1" + path;
+        var candidates = new List<Uri>
+        {
+            endpoint,
+            new UriBuilder(endpoint) { Path = Join(basePath, versionedPath) }.Uri,
+            new UriBuilder(endpoint) { Path = Join(basePath, path) }.Uri,
+        };
+
+        if (path == "/v1/messages")
+        {
+            var prefix = basePath.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? basePath[..^3] : basePath;
+            if (!prefix.EndsWith("/anthropic", StringComparison.OrdinalIgnoreCase))
+                prefix += "/anthropic";
+            candidates.Add(new UriBuilder(endpoint) { Path = Join(prefix, path) }.Uri);
+        }
+
+        return candidates.Distinct().ToArray();
+    }
+
     public static string Join(string endpoint, string path)
     {
         var baseUrl = endpoint.Trim().TrimEnd('/');

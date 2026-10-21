@@ -76,42 +76,67 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         }
 
         var body = protocol.BuildBody(systemPrompt, userContent, model);
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, LlmEndpointHelper.Join(endpoint, protocol.Path));
-        try
+        var candidates = LlmEndpointHelper.AnalysisCandidates(endpointUri, protocol.Path);
+        string? envelope = null;
+        for (var index = 0; index < candidates.Count; index++)
         {
-            protocol.ApplyAuthentication(httpRequest, apiKey);
-        }
-        catch (Exception ex) when (ex is ArgumentException or FormatException)
-        {
-            return new PhraseAnalysisResult(PhraseAnalysisOutcome.TransportError, [], null);
-        }
-        httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            var candidate = candidates[index];
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, candidate);
+            try
+            {
+                protocol.ApplyAuthentication(httpRequest, apiKey);
+            }
+            catch (Exception ex) when (ex is ArgumentException or FormatException)
+            {
+                return new PhraseAnalysisResult(PhraseAnalysisOutcome.TransportError, [], null);
+            }
+            httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
-        string envelope;
-        var llmTimer = Stopwatch.StartNew();
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            using var response = await _http.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
-            if ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500)
-                return new PhraseAnalysisResult(PhraseAnalysisOutcome.Refused, [], $"Provider returned {(int)response.StatusCode}.");
-            if (!response.IsSuccessStatusCode)
-                return new PhraseAnalysisResult(PhraseAnalysisOutcome.Refused, [], $"Provider refused with {(int)response.StatusCode}.");
-            envelope = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            _logger?.LogInformation("LLM {0} returned {1} in {2} ms", request.SegmentId, (int)response.StatusCode, llmTimer.ElapsedMilliseconds);
+            var llmTimer = Stopwatch.StartNew();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var response = await _http.SendAsync(httpRequest, cancellationToken).ConfigureAwait(false);
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (response.IsSuccessStatusCode)
+                {
+                    envelope = responseBody;
+                    _logger?.LogInformation("LLM {0} ({1}) returned {2} from {3} in {4} ms",
+                        request.SegmentId, protocol.PromptProfile, (int)response.StatusCode,
+                        candidate.GetLeftPart(UriPartial.Path), llmTimer.ElapsedMilliseconds);
+                    break;
+                }
+
+                _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body,
+                    responseBody.Replace(apiKey, "[REDACTED]", StringComparison.Ordinal), "[]", "[]");
+                _logger?.LogWarning("LLM {0} ({1}) returned {2} from {3} in {4} ms",
+                    request.SegmentId, protocol.PromptProfile, (int)response.StatusCode,
+                    candidate.GetLeftPart(UriPartial.Path), llmTimer.ElapsedMilliseconds);
+
+                if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed
+                    && index + 1 < candidates.Count)
+                    continue;
+
+                return new PhraseAnalysisResult(PhraseAnalysisOutcome.Refused, [],
+                    $"Provider refused with HTTP {(int)response.StatusCode} after trying {index + 1} endpoint(s).");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return new PhraseAnalysisResult(PhraseAnalysisOutcome.Timeout, [], null);
+            }
+            catch (OperationCanceledException)
+            {
+                return new PhraseAnalysisResult(PhraseAnalysisOutcome.Cancelled, [], null);
+            }
+            catch (HttpRequestException ex)
+            {
+                return new PhraseAnalysisResult(PhraseAnalysisOutcome.TransportError, [], ex.Message);
+            }
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return new PhraseAnalysisResult(PhraseAnalysisOutcome.Timeout, [], null);
-        }
-        catch (OperationCanceledException)
-        {
-            return new PhraseAnalysisResult(PhraseAnalysisOutcome.Cancelled, [], null);
-        }
-        catch (HttpRequestException ex)
-        {
-            return new PhraseAnalysisResult(PhraseAnalysisOutcome.TransportError, [], ex.Message);
-        }
+
+        if (envelope is null)
+            return new PhraseAnalysisResult(PhraseAnalysisOutcome.Refused, [], "No analysis endpoint accepted the request.");
 
         string groupsJson = "[]";
         string wordsJson = "[]";

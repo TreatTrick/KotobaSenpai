@@ -18,7 +18,7 @@ public interface IDiagnosticReporter
     /// <summary>Records one phrase analysis run: segment/group counts, provider results, and validation warnings. It does not record screenshots, API keys, or window titles.</summary>
     void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning);
 
-    /// <summary>Records one raw LLM exchange verbatim and the extracted groups and words arrays as inspectable JSON files. The request body must not contain the API key.</summary>
+    /// <summary>Records one LLM exchange, including HTTP error responses, and the extracted groups and words arrays as inspectable JSON files. Recorded payloads must not contain API keys.</summary>
     void RecordLlmExchange(
         Guid recognitionId,
         string segmentId,

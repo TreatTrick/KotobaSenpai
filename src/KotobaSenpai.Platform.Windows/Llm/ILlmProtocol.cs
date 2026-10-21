@@ -14,7 +14,7 @@ public interface ILlmProtocol
     /// <summary>Identifies the prompt wording required by the wire protocol.</summary>
     LlmPromptProfile PromptProfile { get; }
 
-    /// <summary>POST target relative path (appended to the configured endpoint).</summary>
+    /// <summary>POST target path used for fallback after the configured URL returns HTTP 404 or 405.</summary>
     /// <example>OpenAI uses <c>/chat/completions</c>, Anthropic uses <c>/v1/messages</c>.</example>
     string Path { get; }
 
@@ -28,8 +28,7 @@ public interface ILlmProtocol
     /// { "model": "…", "temperature": 0.0,
     ///   "messages": [ { "role": "system", "content": systemPrompt },
     ///                 { "role": "user",   "content": userContent } ],
-    ///   "response_format": { "type": "json_schema",
-    ///     "json_schema": { "name": "return_groups", "schema": …, "strict": true } } }
+    ///   "response_format": { "type": "json_object" } }
     /// </code>
     /// Anthropic uses a forced <c>return_groups</c> tool; the root object is in the response's
     /// <c>content[].tool_use.input</c> block.
