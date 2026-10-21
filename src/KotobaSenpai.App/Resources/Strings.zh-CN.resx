@@ -94,6 +94,12 @@
   <data name="MainWindow_Title" xml:space="preserve">
     <value>KotobaSenpai · 第一阶段</value>
   </data>
+  <data name="Tab_Recognize" xml:space="preserve">
+    <value>识别</value>
+  </data>
+  <data name="Tab_Settings" xml:space="preserve">
+    <value>设置</value>
+  </data>
   <data name="Label_TargetWindow" xml:space="preserve">
     <value>目标窗口</value>
   </data>

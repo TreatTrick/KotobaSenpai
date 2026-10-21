@@ -94,6 +94,12 @@
   <data name="MainWindow_Title" xml:space="preserve">
     <value>KotobaSenpai · Phase 1</value>
   </data>
+  <data name="Tab_Recognize" xml:space="preserve">
+    <value>Recognize</value>
+  </data>
+  <data name="Tab_Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
   <data name="Label_TargetWindow" xml:space="preserve">
     <value>Target window</value>
   </data>
