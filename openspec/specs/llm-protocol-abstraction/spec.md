@@ -4,33 +4,37 @@
 TBD - created by archiving change abstract-llm-protocol. Update Purpose after archive.
 ## Requirements
 ### Requirement: Provide a pluggable provider-wire-protocol port
-The system SHALL expose a protocol port that, given a canonical phrase-analysis request and a model name, produces the provider-specific request envelope, the provider-specific request path, and extracts the structured group array from the provider-specific response envelope as a JSON element. Each protocol SHALL declare its native structured-output mechanism so the provider is constrained to return schema-compliant JSON. The port SHALL be implemented independently for OpenAI Chat Completions, Anthropic Messages, and OpenAI Responses wire formats.
+The system SHALL expose a protocol port that, given a canonical phrase-analysis request and a model name, produces the provider-specific request envelope and fallback request paths, applies protocol-specific authentication headers, and extracts the structured group array from the provider-specific response envelope as a JSON element. Chat SHALL use JSON object mode with a prompt-level structure example, while Anthropic and Responses SHALL declare their native structured-output mechanisms; returned results SHALL continue through local parsing and semantic validation. The port SHALL be implemented independently for OpenAI Chat Completions, Anthropic Messages, and OpenAI Responses wire formats.
 
 #### Scenario: Select the OpenAI Chat Completions protocol
 - **WHEN** the configured protocol is OpenAI Chat Completions
-- **THEN** the request posts to the `/chat/completions` path with an OpenAI `messages` envelope plus a strict `response_format` JSON schema, and the group array is read from `choices[0].message.content`
+- **THEN** the request uses an OpenAI `messages` envelope with `response_format.type=json_object`, includes a JSON structure example in the system message, sets `max_tokens=4096`, sends Bearer authentication, and reads the group array from `choices[0].message.content`; endpoint fallback uses `/v1/chat/completions` and `/chat/completions`
 
 #### Scenario: Select the Anthropic Messages protocol
 - **WHEN** the configured protocol is Anthropic Messages
-- **THEN** the request posts to the `/v1/messages` path with an Anthropic `system`+`messages`+`max_tokens` envelope plus a forced `tool_use`, and the group array is read from `content[].tool_use.input`
+- **THEN** the request uses an Anthropic `system`+`messages`+`max_tokens` envelope with a forced `tool_use`, sends `x-api-key` and `anthropic-version: 2023-06-01` without Bearer authentication, and reads the group array from `content[].tool_use.input`; endpoint fallback uses `/v1/messages` and `/anthropic/v1/messages`
 
 #### Scenario: Select the OpenAI Responses protocol
 - **WHEN** the configured protocol is OpenAI Responses
-- **THEN** the request posts to the `/responses` path with an OpenAI `input` envelope plus a strict `text.format` JSON schema, and the group array is read from the `output` array's text content
+- **THEN** the request uses an OpenAI `input` envelope with a strict `text.format` JSON schema, sends Bearer authentication, and reads the group array from the `output` array's text content; endpoint fallback uses `/v1/responses` and `/responses`
 
 ### Requirement: Select the protocol by configuration
-The system SHALL select the active wire protocol from a BYOK settings key, defaulting to OpenAI Chat Completions when unset. Changing the key SHALL change which protocol implementation the provider analyzer uses without changing the phrase-analysis port contract.
+The system SHALL select the active wire protocol from the current BYOK settings key for each new phrase-analysis or model-discovery request, defaulting to OpenAI Chat Completions when unset or unknown. Changing the key SHALL change the protocol implementation and authentication strategy used by subsequent requests without changing the phrase-analysis port contract.
 
 #### Scenario: Default to OpenAI Chat Completions
-- **WHEN** no protocol is configured
-- **THEN** the analyzer uses the OpenAI Chat Completions protocol
+- **WHEN** no protocol is configured or the stored value is unknown
+- **THEN** the next request uses the OpenAI Chat Completions protocol and Bearer authentication
 
 #### Scenario: Switch protocol by configuration
 - **WHEN** the protocol setting is changed to Anthropic Messages
-- **THEN** subsequent phrase requests use the Anthropic Messages path and envelope
+- **THEN** subsequent phrase requests and model-list requests use the Anthropic Messages paths, envelopes, and authentication headers
+
+#### Scenario: Change protocol without restarting
+- **WHEN** the protocol setting changes while the application is running and before the next request starts
+- **THEN** the next request resolves the new protocol without rebuilding the application or restarting the process
 
 ### Requirement: Preserve semantic content across protocols
-All three protocols SHALL transmit the same canonical semantic content — the segment text, stable token references with UniDic metadata, and locally resolved continuous span summaries — and SHALL produce the same group array for validation. The protocol abstraction SHALL add no semantics beyond wire-format translation.
+All three protocols SHALL transmit the same canonical semantic content — the segment text, stable token references with UniDic metadata, and locally resolved continuous span summaries — and SHALL produce the same group array for validation. The protocol abstraction SHALL add no semantics beyond wire-format translation and authentication metadata handling.
 
 #### Scenario: Same payload across protocols
 - **WHEN** the same phrase request is sent through any of the three protocols
@@ -54,4 +58,30 @@ All three protocols SHALL transmit the same canonical semantic content — the s
 #### Scenario: 本地化后各协议产出一致的分组
 - **WHEN** 同一份本地化的短语请求通过三种协议中任一发送
 - **THEN** 每个协议的结构化 group 数组由同一个 group 解析器校验并得到相同的 groups。
+
+### Requirement: 优先请求配置地址并有条件回退
+短语分析 SHALL 首先原样 POST 配置的地址，包括完整接口路径及查询参数。仅在 HTTP 404/405 时 SHALL 尝试下一个有限候选地址。候选 SHALL 按协议生成、保留自定义前缀和查询参数、使用 URI 相等性去重，且不重复追加版本段或完整协议路径。
+
+#### Scenario: 完整地址直接成功
+- **WHEN** 用户填写完整接口地址且该地址返回可解析的 HTTP 成功响应
+- **THEN** 分析器只向该地址发送一次请求，不追加任何协议路径
+
+#### Scenario: 在路径不存在时继续
+- **WHEN** 原地址或后续候选返回 HTTP 404 或 405
+- **THEN** 分析器使用相同的请求体与协议认证尝试下一个唯一候选，成功后立即停止
+
+#### Scenario: 全部地址不可用
+- **WHEN** 所有候选均返回 HTTP 404/405
+- **THEN** 分析器返回 Refused，警告包含最终 HTTP 状态码和已尝试地址数量
+
+#### Scenario: 其他失败不触发地址切换
+- **WHEN** 返回 HTTP 400、401、403、429 或 5xx，或发生超时、传输错误、取消或成功响应格式错误
+- **THEN** 分析器立即返回对应失败结果，不再尝试其他地址
+
+### Requirement: 保留 HTTP 尝试的错误诊断
+启用诊断时，每次 HTTP 失败 SHALL 保存请求体、脱敏后的响应体及空的 groups/words 数组；日志 SHALL 记录协议、目标路径、状态码和耗时，不记录认证请求头或 URL 查询参数。
+
+#### Scenario: 错误响应回显 API Key
+- **WHEN** HTTP 错误响应中包含当前配置的 API Key
+- **THEN** 诊断中该值被替换为 `[REDACTED]`，日志与结果警告不暴露该值
 
