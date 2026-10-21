@@ -239,7 +239,7 @@
   <data name="Button_LlmFetchModels" xml:space="preserve"><value>获取模型</value></data>
   <data name="Button_LlmToggleKey" xml:space="preserve"><value>显示 / 隐藏</value></data>
   <data name="Llm_ProtocolOpenAiChat" xml:space="preserve"><value>OpenAI Chat Completions</value></data>
-  <data name="Llm_ProtocolOpenAiResponses" xml:space="preserve"><value>OpenAI Responses</value></data>
+  <data name="Llm_ProtocolOpenAiResponses" xml:space="preserve"><value>OpenAI Responses（OpenAI 优先推荐）</value></data>
   <data name="Llm_ProtocolAnthropic" xml:space="preserve"><value>Anthropic Messages</value></data>
   <data name="Llm_EndpointRequired" xml:space="preserve"><value>请输入 API 地址。</value></data>
   <data name="Llm_ApiKeyRequired" xml:space="preserve"><value>请输入 API Key。</value></data>

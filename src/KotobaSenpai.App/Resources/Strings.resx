@@ -239,7 +239,7 @@
   <data name="Button_LlmFetchModels" xml:space="preserve"><value>Get models</value></data>
   <data name="Button_LlmToggleKey" xml:space="preserve"><value>Show / hide</value></data>
   <data name="Llm_ProtocolOpenAiChat" xml:space="preserve"><value>OpenAI Chat Completions</value></data>
-  <data name="Llm_ProtocolOpenAiResponses" xml:space="preserve"><value>OpenAI Responses</value></data>
+  <data name="Llm_ProtocolOpenAiResponses" xml:space="preserve"><value>OpenAI Responses (recommended by OpenAI)</value></data>
   <data name="Llm_ProtocolAnthropic" xml:space="preserve"><value>Anthropic Messages</value></data>
   <data name="Llm_EndpointRequired" xml:space="preserve"><value>Enter an API URL.</value></data>
   <data name="Llm_ApiKeyRequired" xml:space="preserve"><value>Enter an API Key.</value></data>
