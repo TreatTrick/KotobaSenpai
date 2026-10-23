@@ -15,9 +15,8 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 /// </summary>
 public sealed partial class PhrasePopup : Window
 {
-    private const double FieldMaxWidth = 360;
-    private const double FieldMaxHeight = 360;
-    private const double Pad = 12;
+    private const double ReadingWidth = 440;
+    private const double MinimumWidth = 280;
 
     private readonly IStringLocalizer? _localizer;
     private readonly ILogger? _logger;
@@ -25,6 +24,14 @@ public sealed partial class PhrasePopup : Window
     public PhrasePopup(IStringLocalizer? localizer = null, ILogger? logger = null)
     {
         InitializeComponent();
+        // Resolve dynamic Fluent brushes from the host while keeping standalone use self-contained.
+        if (Application.Current?.TryFindResource("TextFillColorPrimaryBrush") is System.Windows.Media.Brush
+            && Application.Current.TryFindResource("SolidBackgroundFillColorBaseBrush") is System.Windows.Media.Brush)
+        {
+            var fallbackPalette = Resources.MergedDictionaries.First(dictionary =>
+                dictionary.Source.OriginalString.EndsWith("PhrasePopupPalette.xaml", StringComparison.Ordinal));
+            Resources.MergedDictionaries.Remove(fallbackPalette);
+        }
         _localizer = localizer;
         _logger = logger;
         SourceInitialized += (_, _) =>
@@ -67,15 +74,29 @@ public sealed partial class PhrasePopup : Window
 
     private void ShowAndPosition(ScreenRect anchor)
     {
-        // Realize templates and their deferred bindings before reading the content size.
-        ContentPanel.Measure(new Size(FieldMaxWidth, FieldMaxHeight));
-        ContentPanel.UpdateLayout();
-        ContentPanel.Measure(new Size(FieldMaxWidth, FieldMaxHeight));
-        Width = Math.Min(FieldMaxWidth, Math.Max(200, ContentPanel.DesiredSize.Width + Pad * 2));
-        Height = Math.Min(FieldMaxHeight, ContentPanel.DesiredSize.Height + Pad * 2);
-        if (!IsVisible)
-            Show();
+        PopupScrollViewer.ScrollToTop();
+        new WindowInteropHelper(this).EnsureHandle();
         Position(anchor);
+    }
+
+    private void MeasureContent(ScreenRect workArea, double scale)
+    {
+        var availableWidth = workArea.Width / scale;
+        var availableHeight = workArea.Height / scale;
+        var padding = PopupScrollViewer.Padding.Left + PopupScrollViewer.Padding.Right
+            + PopupFrame.BorderThickness.Left + PopupFrame.BorderThickness.Right;
+
+        // Realize the current templates before choosing a readable column or a wider headword.
+        PopupFrame.Measure(new Size(availableWidth, double.PositiveInfinity));
+        PopupFrame.UpdateLayout();
+        Heading.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var readingWidth = Math.Min(availableWidth, Math.Max(ReadingWidth, Heading.DesiredSize.Width + padding));
+        PopupFrame.Measure(new Size(readingWidth, double.PositiveInfinity));
+        PopupFrame.UpdateLayout();
+        PopupFrame.Measure(new Size(readingWidth, double.PositiveInfinity));
+        Width = Math.Min(availableWidth, Math.Max(MinimumWidth, PopupFrame.DesiredSize.Width));
+        PopupFrame.Measure(new Size(Width, double.PositiveInfinity));
+        Height = Math.Min(availableHeight, PopupFrame.DesiredSize.Height);
     }
 
     private void Position(ScreenRect anchor)
@@ -97,13 +118,17 @@ public sealed partial class PhrasePopup : Window
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var dpi = Native.GetDpiForWindow(handle);
+            var scale = dpi == 0 ? 1 : dpi / 96d;
+            MeasureContent(workArea, scale);
+            if (!IsVisible)
+                Show();
             if (!Native.GetWindowRect(handle, out var window))
             {
                 _logger?.LogWarning("[OVERLAY] Popup window bounds are unavailable: error={0}.", Marshal.GetLastWin32Error());
                 HidePopup();
                 return;
             }
-            var gap = (int)Math.Ceiling(4 * (dpi == 0 ? 1 : dpi / 96d));
+            var gap = (int)Math.Ceiling(4 * scale);
             var placement = CalculatePlacement(anchor, workArea, window.Right - window.Left, window.Bottom - window.Top, gap);
             if (!Native.SetWindowPos(handle, nint.Zero, placement.X, placement.Y, placement.Width, placement.Height,
                 Native.SwpNoActivate | Native.SwpNoZOrder))

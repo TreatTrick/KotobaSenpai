@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:system="clr-namespace:System;assembly=System.Runtime">
+  <!-- Shared values are independent of application services and theme colors. -->
+  <FontFamily x:Key="FluentFontFamily">Segoe UI Variable Text, Segoe UI, Yu Gothic UI, Microsoft YaHei UI</FontFamily>
+  <system:Double x:Key="FluentCaptionFontSize">12</system:Double>
+  <system:Double x:Key="FluentBodyFontSize">14</system:Double>
+  <system:Double x:Key="FluentEmphasisFontSize">16</system:Double>
+  <system:Double x:Key="FluentSubtitleFontSize">20</system:Double>
+  <system:Double x:Key="FluentTitleFontSize">28</system:Double>
+  <system:Double x:Key="FluentCaptionLineHeight">18</system:Double>
+  <system:Double x:Key="FluentBodyLineHeight">22</system:Double>
+  <system:Double x:Key="FluentTitleLineHeight">36</system:Double>
+  <system:Double x:Key="FluentControlHeight">36</system:Double>
+  <Thickness x:Key="FluentPagePadding">32,24,32,24</Thickness>
+  <Thickness x:Key="FluentCardPadding">20,16</Thickness>
+  <Thickness x:Key="FluentPopupPadding">20</Thickness>
+  <Thickness x:Key="FluentPopupCardPadding">16,12</Thickness>
+  <Thickness x:Key="FluentSectionHeadingSpacing">0,24,0,8</Thickness>
+  <Thickness x:Key="FluentSectionGap">0,0,0,16</Thickness>
+  <Thickness x:Key="FluentCardGap">0,0,0,4</Thickness>
+  <Thickness x:Key="FluentDescriptionGap">0,4,0,0</Thickness>
+  <CornerRadius x:Key="FluentCardRadius">8</CornerRadius>
+  <CornerRadius x:Key="FluentWindowRadius">12</CornerRadius>
+</ResourceDictionary>

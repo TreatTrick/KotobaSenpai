@@ -92,7 +92,7 @@
   </data>
   <!-- XAML labels -->
   <data name="MainWindow_Title" xml:space="preserve">
-    <value>KotobaSenpai · 第一阶段</value>
+    <value>KotobaSenpai</value>
   </data>
   <data name="Tab_Recognize" xml:space="preserve">
     <value>识别</value>
@@ -113,16 +113,16 @@
     <value>刷新窗口</value>
   </data>
   <data name="Button_Recognize" xml:space="preserve">
-    <value>识别并绘制下划线</value>
+    <value>开始识别</value>
   </data>
   <data name="Button_Hide" xml:space="preserve">
-    <value>隐藏下划线</value>
+    <value>隐藏标注</value>
   </data>
   <data name="Button_SetRecognitionRegion" xml:space="preserve">
-    <value>设置识别区域</value>
+    <value>选择区域</value>
   </data>
   <data name="Label_AutoRecognition" xml:space="preserve">
-    <value>文字变化时自动识别</value>
+    <value>自动识别</value>
   </data>
   <data name="Label_Description" xml:space="preserve">
     <value>说明：选择一个窗口后，应用会抓取当前画面，识别日语词并在每个词下方绘制横线。</value>
@@ -221,6 +221,9 @@
   <data name="Llm.WordMeaningLabel" xml:space="preserve">
     <value>释义</value>
   </data>
+  <data name="Llm.GrammarLabel" xml:space="preserve">
+    <value>用法与语法</value>
+  </data>
   <data name="Llm.WordsLabel" xml:space="preserve">
     <value>单词</value>
   </data>
@@ -257,4 +260,74 @@
   <data name="Llm_CatalogUnavailable" xml:space="preserve"><value>该服务没有可用的模型列表接口。你仍可手动输入模型 ID。</value></data>
   <data name="Llm_FetchFailed" xml:space="preserve"><value>获取模型失败，请检查地址和网络连接。</value></data>
   <data name="Llm_FetchCancelled" xml:space="preserve"><value>模型请求已取消。</value></data>
+  <!-- Windows Settings navigation and card descriptions -->
+  <data name="App_Subtitle" xml:space="preserve">
+    <value>日语阅读助手</value>
+  </data>
+  <data name="Page_RecognizeDescription" xml:space="preserve">
+    <value>识别窗口中的日语，轻松查词与阅读。</value>
+  </data>
+  <data name="Page_SettingsDescription" xml:space="preserve">
+    <value>调整阅读体验，配置你的 AI 服务。</value>
+  </data>
+  <data name="Label_TargetAndRecognition" xml:space="preserve">
+    <value>窗口与识别</value>
+  </data>
+  <data name="Label_RecognizeText" xml:space="preserve">
+    <value>文字识别</value>
+  </data>
+  <data name="Label_RecognitionRegion" xml:space="preserve">
+    <value>识别区域</value>
+  </data>
+  <data name="Label_RecognitionBehavior" xml:space="preserve">
+    <value>识别与标注</value>
+  </data>
+  <data name="Label_Overlay" xml:space="preserve">
+    <value>屏幕标注</value>
+  </data>
+  <data name="Description_TargetWindow" xml:space="preserve">
+    <value>选择正在运行的游戏或应用。</value>
+  </data>
+  <data name="Description_RecognizeText" xml:space="preserve">
+    <value>识别日语词汇，添加下划线以便查词。</value>
+  </data>
+  <data name="Description_RecognitionRegion" xml:space="preserve">
+    <value>框选文字区域，只识别选定范围。</value>
+  </data>
+  <data name="Description_AutoRecognition" xml:space="preserve">
+    <value>开始识别后，在文字变化时自动更新标注。</value>
+  </data>
+  <data name="Description_Overlay" xml:space="preserve">
+    <value>隐藏下划线，并停止自动识别。</value>
+  </data>
+  <data name="Description_Theme" xml:space="preserve">
+    <value>选择浅色、深色，或跟随 Windows。</value>
+  </data>
+  <data name="Description_Language" xml:space="preserve">
+    <value>即时切换界面语言，无需重启。</value>
+  </data>
+  <data name="Description_FuriganaSize" xml:space="preserve">
+    <value>调整注音与日语正文的字号比例。</value>
+  </data>
+  <data name="Description_LlmEnabled" xml:space="preserve">
+    <value>使用 AI 辅助分析短语与词义。</value>
+  </data>
+  <data name="Description_LlmProtocol" xml:space="preserve">
+    <value>选择服务商支持的 API 协议。</value>
+  </data>
+  <data name="Description_LlmEndpoint" xml:space="preserve">
+    <value>填写服务商提供的 API 地址。</value>
+  </data>
+  <data name="Description_LlmApiKey" xml:space="preserve">
+    <value>用于访问 AI 服务的凭据。</value>
+  </data>
+  <data name="Description_LlmModel" xml:space="preserve">
+    <value>获取模型列表，或直接输入模型名称。</value>
+  </data>
+  <data name="Toggle_On" xml:space="preserve">
+    <value>开</value>
+  </data>
+  <data name="Toggle_Off" xml:space="preserve">
+    <value>关</value>
+  </data>
 </root>

@@ -1,0 +1,62 @@
+<UserControl x:Class="KotobaSenpai.App.Views.RecognitionPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:controls="clr-namespace:KotobaSenpai.App.Controls">
+  <ScrollViewer Style="{StaticResource SettingsPageScrollViewer}">
+    <StackPanel>
+      <TextBlock Text="{loc:Loc Key=Tab_Recognize}" Style="{StaticResource PageTitle}" />
+      <TextBlock Text="{loc:Loc Key=Page_RecognizeDescription}" Style="{StaticResource PageDescription}" />
+      <TextBlock Text="{loc:Loc Key=Label_TargetAndRecognition}" Style="{StaticResource SectionTitle}" />
+
+      <controls:SettingsCard Header="{loc:Loc Key=Label_TargetWindow}" Description="{loc:Loc Key=Description_TargetWindow}"
+                             Icon="{ui:SymbolIcon Window24}">
+        <Grid Width="{StaticResource SettingsInputWidth}">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ComboBox x:Name="TargetWindowComboBox" Style="{StaticResource SettingInput}" Width="Auto"
+                    ItemsSource="{Binding Windows}" SelectedItem="{Binding SelectedWindow}"
+                    ToolTip="{Binding SelectedWindow.Title}"
+                    DisplayMemberPath="Title" AutomationProperties.Name="{loc:Loc Key=Label_TargetWindow}">
+            <ComboBox.ItemContainerStyle>
+              <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                <Setter Property="MaxWidth" Value="460" />
+                <Setter Property="ToolTip" Value="{Binding Title}" />
+              </Style>
+            </ComboBox.ItemContainerStyle>
+          </ComboBox>
+          <ui:Button Grid.Column="1" Icon="{ui:SymbolIcon ArrowClockwise24}" Style="{StaticResource SettingsIconButton}" Command="{Binding RefreshCommand}"
+                     ToolTip="{loc:Loc Key=Button_RefreshWindows}" AutomationProperties.Name="{loc:Loc Key=Button_RefreshWindows}" />
+        </Grid>
+      </controls:SettingsCard>
+
+      <controls:SettingsCard Header="{loc:Loc Key=Label_RecognizeText}" Description="{loc:Loc Key=Description_RecognizeText}"
+                             Icon="{ui:SymbolIcon ScanText24}">
+        <ui:Button Content="{loc:Loc Key=Button_Recognize}" Command="{Binding RecognizeCommand}"
+                   Style="{StaticResource SettingsActionButton}" IsDefault="{Binding IsVisible, RelativeSource={RelativeSource Self}}"
+                   Icon="{ui:SymbolIcon Play24}" Appearance="Primary" />
+      </controls:SettingsCard>
+
+      <controls:SettingsCard Header="{loc:Loc Key=Label_RecognitionRegion}" Description="{loc:Loc Key=Description_RecognitionRegion}"
+                             Icon="{ui:SymbolIcon Crop24}">
+        <ui:Button Content="{loc:Loc Key=Button_SetRecognitionRegion}" Command="{Binding SetRecognitionRegionCommand}" Style="{StaticResource SettingsActionButton}" />
+      </controls:SettingsCard>
+      <TextBlock Text="{loc:Loc Key=Label_RecognitionBehavior}" Style="{StaticResource SectionTitle}" />
+
+      <controls:SettingsCard Header="{loc:Loc Key=Label_AutoRecognition}" Description="{loc:Loc Key=Description_AutoRecognition}"
+                             Icon="{ui:SymbolIcon ArrowSync24}">
+        <ui:ToggleSwitch IsChecked="{Binding AutoRecognitionEnabled, Mode=TwoWay}" Style="{StaticResource SettingsToggle}"
+                         OnContent="{loc:Loc Key=Toggle_On}" OffContent="{loc:Loc Key=Toggle_Off}"
+                         AutomationProperties.Name="{loc:Loc Key=Label_AutoRecognition}" />
+      </controls:SettingsCard>
+
+      <controls:SettingsCard Header="{loc:Loc Key=Label_Overlay}" Description="{loc:Loc Key=Description_Overlay}"
+                             Icon="{ui:SymbolIcon EyeOff24}">
+        <ui:Button Content="{loc:Loc Key=Button_Hide}" Command="{Binding HideCommand}" Style="{StaticResource SettingsActionButton}" />
+      </controls:SettingsCard>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

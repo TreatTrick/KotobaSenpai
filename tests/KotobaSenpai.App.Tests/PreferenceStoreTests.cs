@@ -1,5 +1,4 @@
 using KotobaSenpai.App.Localization;
-using KotobaSenpai.App.Themes;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.Tests;

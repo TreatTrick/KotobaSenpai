@@ -69,7 +69,7 @@ public sealed class AutoRecognitionSettingsTests
         public void SetValue(string key, string? value) => _values[key] = value;
     }
 
-    private static MainWindowViewModel Create(
+    private static RecognitionPageViewModel Create(
         ISettingsService settings,
         IAutoRecognitionController? controller = null,
         WindowTarget? target = null)
@@ -79,7 +79,7 @@ public sealed class AutoRecognitionSettingsTests
             new FakeRecognizer(),
             new WordGroupingService(new FakeTokenizer(), new SentenceSegmenter(), new FakeSpanResolver()),
             new FakeOverlay());
-        return new MainWindowViewModel(
+        return new RecognitionPageViewModel(
             new FakeWindowCatalog(target),
             workflow,
             new FakeRegionSelector(),

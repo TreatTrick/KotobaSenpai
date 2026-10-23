@@ -1,5 +1,4 @@
 using KotobaSenpai.Core.Japanese;
-using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
@@ -7,11 +6,9 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 /// <summary>A surface range and the reading assigned to it.</summary>
 public sealed record FuriganaSegment(int SurfaceStart, int SurfaceLength, string Reading, bool IsKana);
 
-/// <summary>Settings key, default value, and pure logic for the furigana size ratio.</summary>
+/// <summary>Pure furigana segmentation and pitch presentation rules.</summary>
 public static class FuriganaSettings
 {
-    public const string FontScaleKey = "FuriganaFontScale";
-    public const double DefaultFontScale = 1.0 / 3.0;
     public const string PitchHighColor = "#FF4444";
     public const string PitchLowColor = "#4488FF";
     public const string PitchHeibanColor = "#88FF88";
@@ -226,12 +223,6 @@ public static class FuriganaSettings
         }
         return result;
     }
-
-    /// <summary>Parses a stored font scale; missing, invalid, or zero values fall back to the default 1/3.</summary>
-    public static double ResolveFontScale(string? raw)
-        => double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var scale) && scale > 0
-            ? scale
-            : DefaultFontScale;
 
     private static bool IsKana(char character)
         => (character >= '\u3040' && character <= '\u30ff')

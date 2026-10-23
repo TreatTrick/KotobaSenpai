@@ -10,7 +10,7 @@ namespace KotobaSenpai.App.Localization;
 /// persists/restores the preference, and exposes <see cref="AvailableCultures"/> and <see cref="CurrentCulture"/> for binding.
 /// Default UI: Simplified Chinese when the system is Chinese, otherwise English; English is the neutral fallback.
 /// </summary>
-public sealed partial class LanguageService : ObservableObject
+public sealed partial class LanguageService : ObservableObject, ILanguagePreferences
 {
     /// <summary>Supported cultures: Simplified Chinese first by default, English as the fallback.</summary>
     public IReadOnlyList<CultureInfo> AvailableCultures { get; } = [new CultureInfo("zh-CN"), new CultureInfo("en")];

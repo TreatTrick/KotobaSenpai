@@ -8,7 +8,13 @@ using KotobaSenpai.App.Resources;
 
 namespace KotobaSenpai.App.ViewModels;
 
-public sealed record LlmProtocolChoice(string Id, string Name);
+public sealed partial class LlmProtocolChoice(string id, string name) : ObservableObject
+{
+    public string Id { get; } = id;
+
+    [ObservableProperty]
+    private string _name = name;
+}
 
 public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
 {
@@ -157,9 +163,14 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
 
     private void RefreshProtocolChoices()
     {
-        Protocols.Clear();
         foreach (var option in LlmProtocolIds.Options)
-            Protocols.Add(new LlmProtocolChoice(option.Id, _localizer.Get(option.DisplayNameKey)));
+        {
+            var name = _localizer.Get(option.DisplayNameKey);
+            if (Protocols.FirstOrDefault(choice => choice.Id == option.Id) is { } existing)
+                existing.Name = name;
+            else
+                Protocols.Add(new LlmProtocolChoice(option.Id, name));
+        }
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)

@@ -1,5 +1,5 @@
 using System.Windows;
-using KotobaSenpai.App.Localization;
+using KotobaSenpai.Core.Settings;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
 

@@ -92,7 +92,7 @@
   </data>
   <!-- XAML labels -->
   <data name="MainWindow_Title" xml:space="preserve">
-    <value>KotobaSenpai · Phase 1</value>
+    <value>KotobaSenpai</value>
   </data>
   <data name="Tab_Recognize" xml:space="preserve">
     <value>Recognize</value>
@@ -113,16 +113,16 @@
     <value>Refresh windows</value>
   </data>
   <data name="Button_Recognize" xml:space="preserve">
-    <value>Recognize &amp; underline</value>
+    <value>Start recognition</value>
   </data>
   <data name="Button_Hide" xml:space="preserve">
-    <value>Hide underline</value>
+    <value>Hide annotations</value>
   </data>
   <data name="Button_SetRecognitionRegion" xml:space="preserve">
-    <value>Set recognition region</value>
+    <value>Select region</value>
   </data>
   <data name="Label_AutoRecognition" xml:space="preserve">
-    <value>Automatically recognize when the text changes</value>
+    <value>Automatic recognition</value>
   </data>
   <data name="Label_Description" xml:space="preserve">
     <value>Instructions: After selecting a window, the app captures the current screen, recognizes Japanese words, and draws a line beneath each word.</value>
@@ -221,6 +221,9 @@
   <data name="Llm.WordMeaningLabel" xml:space="preserve">
     <value>Meaning</value>
   </data>
+  <data name="Llm.GrammarLabel" xml:space="preserve">
+    <value>Usage and grammar</value>
+  </data>
   <data name="Llm.WordsLabel" xml:space="preserve">
     <value>Words</value>
   </data>
@@ -257,4 +260,74 @@
   <data name="Llm_CatalogUnavailable" xml:space="preserve"><value>This provider does not expose a supported model-list endpoint. Enter a model ID manually.</value></data>
   <data name="Llm_FetchFailed" xml:space="preserve"><value>Could not fetch models. Check the URL and connection.</value></data>
   <data name="Llm_FetchCancelled" xml:space="preserve"><value>Model request cancelled.</value></data>
+  <!-- Windows Settings navigation and card descriptions -->
+  <data name="App_Subtitle" xml:space="preserve">
+    <value>Japanese reading assistant</value>
+  </data>
+  <data name="Page_RecognizeDescription" xml:space="preserve">
+    <value>Read Japanese in any window, with word annotations and dictionary lookups.</value>
+  </data>
+  <data name="Page_SettingsDescription" xml:space="preserve">
+    <value>Make KotobaSenpai work the way you read.</value>
+  </data>
+  <data name="Label_TargetAndRecognition" xml:space="preserve">
+    <value>Window and recognition</value>
+  </data>
+  <data name="Label_RecognizeText" xml:space="preserve">
+    <value>Text recognition</value>
+  </data>
+  <data name="Label_RecognitionRegion" xml:space="preserve">
+    <value>Recognition region</value>
+  </data>
+  <data name="Label_RecognitionBehavior" xml:space="preserve">
+    <value>Recognition and annotations</value>
+  </data>
+  <data name="Label_Overlay" xml:space="preserve">
+    <value>On-screen annotations</value>
+  </data>
+  <data name="Description_TargetWindow" xml:space="preserve">
+    <value>Choose a running game or application.</value>
+  </data>
+  <data name="Description_RecognizeText" xml:space="preserve">
+    <value>Recognize Japanese and underline words for lookup.</value>
+  </data>
+  <data name="Description_RecognitionRegion" xml:space="preserve">
+    <value>Limit recognition to the text area you select.</value>
+  </data>
+  <data name="Description_AutoRecognition" xml:space="preserve">
+    <value>After starting recognition, update annotations when the text changes.</value>
+  </data>
+  <data name="Description_Overlay" xml:space="preserve">
+    <value>Hide annotations and stop automatic recognition.</value>
+  </data>
+  <data name="Description_Theme" xml:space="preserve">
+    <value>Choose light, dark, or follow Windows.</value>
+  </data>
+  <data name="Description_Language" xml:space="preserve">
+    <value>Change the display language without restarting.</value>
+  </data>
+  <data name="Description_FuriganaSize" xml:space="preserve">
+    <value>Set the reading size relative to Japanese text.</value>
+  </data>
+  <data name="Description_LlmEnabled" xml:space="preserve">
+    <value>Use AI to explain phrases and word meanings.</value>
+  </data>
+  <data name="Description_LlmProtocol" xml:space="preserve">
+    <value>Match the API format used by your provider.</value>
+  </data>
+  <data name="Description_LlmEndpoint" xml:space="preserve">
+    <value>The API address supplied by your provider.</value>
+  </data>
+  <data name="Description_LlmApiKey" xml:space="preserve">
+    <value>The credential for your AI service.</value>
+  </data>
+  <data name="Description_LlmModel" xml:space="preserve">
+    <value>Choose a model or enter its name.</value>
+  </data>
+  <data name="Toggle_On" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="Toggle_Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
 </root>

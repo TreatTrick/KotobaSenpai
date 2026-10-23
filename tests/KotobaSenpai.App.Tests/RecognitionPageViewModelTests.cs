@@ -17,7 +17,7 @@ using KotobaSenpai.Platform.Windows;
 
 namespace KotobaSenpai.App.Tests;
 
-public sealed class MainWindowViewModelTests
+public sealed class RecognitionPageViewModelTests
 {
     [Theory]
     [InlineData("hide")]
@@ -206,7 +206,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(ErrorCodes.WindowEnumerationFailed, vm.Status);
     }
 
-    private static (MainWindowViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(
+    private static (RecognitionPageViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(
         IWindowCatalog catalog,
         ITargetWindowTracker? tracker = null,
         IWindowWordRecognizer? recognizer = null,
@@ -221,7 +221,7 @@ public sealed class MainWindowViewModelTests
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
-        return (new MainWindowViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
+        return (new RecognitionPageViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowCatalog : IWindowCatalog

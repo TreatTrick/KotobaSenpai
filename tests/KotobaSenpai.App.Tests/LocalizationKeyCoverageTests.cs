@@ -11,8 +11,8 @@ using KotobaSenpai.Core.Localization;
 namespace KotobaSenpai.App.Tests;
 
 /// <summary>
-/// Pins down that there are no gaps in the localization keys: every key referenced in MainWindow.xaml,
-/// MainWindowViewModel (via ResourceKeys), and ErrorCodes must exist in the neutral Strings.resx, so the runtime never falls back to the key name.
+/// Pins down that there are no gaps in the localization keys: every key referenced in the shell and page XAML,
+/// page view models (via ResourceKeys), and ErrorCodes must exist in the neutral Strings.resx, so the runtime never falls back to the key name.
 /// </summary>
 public sealed partial class LocalizationKeyCoverageTests
 {
@@ -63,14 +63,22 @@ public sealed partial class LocalizationKeyCoverageTests
             Assert.Contains(code, neutral);
     }
 
-    [Fact]
-    public void Every_xaml_loc_key_has_a_neutral_resource_entry()
+    [Theory]
+    [InlineData("src/KotobaSenpai.App/MainWindow.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/RecognitionPage.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/SettingsPage.xaml")]
+    public void Every_xaml_loc_key_has_english_and_chinese_resource_entries(string sourcePath)
     {
         var neutral = NeutralKeys;
-        var xaml = File.ReadAllText(FindSourceFile("src/KotobaSenpai.App/MainWindow.xaml"));
+        var translated = Strings.GetResourceSet(CultureInfo.GetCultureInfo("zh-CN"), true, false);
+        Assert.NotNull(translated);
+        var xaml = File.ReadAllText(FindSourceFile(sourcePath));
 
         foreach (var match in LocKeyRegex().Matches(xaml).Cast<Match>())
+        {
             Assert.Contains(match.Groups[1].Value, neutral);
+            Assert.NotNull(translated.GetString(match.Groups[1].Value));
+        }
     }
 
     [Fact]

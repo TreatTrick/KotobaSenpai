@@ -1,4 +1,5 @@
 using KotobaSenpai.Core.Japanese;
+using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Overlay;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
@@ -15,19 +16,19 @@ public class FuriganaSettingsTests
         => Assert.Equal(expected, FuriganaSettings.ContainsKanji(text));
 
     [Theory]
-    [InlineData(null, FuriganaSettings.DefaultFontScale)]
-    [InlineData("", FuriganaSettings.DefaultFontScale)]
-    [InlineData("abc", FuriganaSettings.DefaultFontScale)]
-    [InlineData("0", FuriganaSettings.DefaultFontScale)]
-    [InlineData("-0.5", FuriganaSettings.DefaultFontScale)]
+    [InlineData(null, FuriganaFontSettings.DefaultFontScale)]
+    [InlineData("", FuriganaFontSettings.DefaultFontScale)]
+    [InlineData("abc", FuriganaFontSettings.DefaultFontScale)]
+    [InlineData("0", FuriganaFontSettings.DefaultFontScale)]
+    [InlineData("-0.5", FuriganaFontSettings.DefaultFontScale)]
     [InlineData("0.25", 0.25)]
     [InlineData("0.5", 0.5)]
     public void ResolveFontScale_falls_back_on_missing_invalid_and_uses_valid(string? raw, double expected)
-        => Assert.Equal(expected, FuriganaSettings.ResolveFontScale(raw));
+        => Assert.Equal(expected, FuriganaFontSettings.ResolveFontScale(raw));
 
     [Fact]
     public void Default_font_scale_matches_the_overlay_specification()
-        => Assert.Equal(1.0 / 3.0, FuriganaSettings.DefaultFontScale);
+        => Assert.Equal(1.0 / 3.0, FuriganaFontSettings.DefaultFontScale);
 
     [Fact]
     public void Known_pitch_pattern_has_one_color_state_per_mora()

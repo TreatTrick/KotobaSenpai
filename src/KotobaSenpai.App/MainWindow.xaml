@@ -3,198 +3,160 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:views="clr-namespace:KotobaSenpai.App.Views"
+        x:Name="RootWindow"
         Title="{loc:Loc Key=MainWindow_Title}"
-        Width="700" Height="560"
-        MinWidth="560" MinHeight="440"
+        Icon="Assets/Branding/app-icon.ico"
+        Width="1100" Height="800" MinWidth="900" MinHeight="620"
+        FontFamily="{StaticResource FluentFontFamily}" FontSize="{StaticResource FluentBodyFontSize}"
         WindowStartupLocation="CenterScreen"
-        ExtendsContentIntoTitleBar="True"
-        WindowBackdropType="Mica">
+        ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" UseLayoutRounding="True">
   <ui:FluentWindow.Resources>
-    <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    <Style x:Key="NavigationTab" TargetType="TabItem">
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+      <Setter Property="FocusVisualStyle" Value="{DynamicResource DefaultControlFocusVisualStyle}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TabItem">
+            <Border x:Name="NavigationBackground" Background="{TemplateBinding Background}"
+                    CornerRadius="4" MinHeight="40">
+              <Grid>
+                <Border x:Name="SelectionIndicator" Width="3" Height="16" CornerRadius="2"
+                        Background="{DynamicResource AccentFillColorDefaultBrush}"
+                        HorizontalAlignment="Left" Visibility="Collapsed" />
+                <ContentPresenter ContentSource="Header" Margin="16,10"
+                                  VerticalAlignment="Center" RecognizesAccessKey="True" />
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="NavigationBackground" Property="Background"
+                        Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="NavigationBackground" Property="Background"
+                        Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                <Setter TargetName="SelectionIndicator" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
   </ui:FluentWindow.Resources>
 
   <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
+      <RowDefinition Height="48" />
       <RowDefinition Height="*" />
-      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
+    <ui:TitleBar Title="{loc:Loc Key=MainWindow_Title}" Height="48">
+      <ui:TitleBar.Icon>
+        <ui:ImageIcon Source="Assets/Branding/app-icon.ico" Width="20" Height="20" />
+      </ui:TitleBar.Icon>
+    </ui:TitleBar>
 
-    <ui:TitleBar Grid.Row="0" Title="{loc:Loc Key=MainWindow_Title}" />
-
-    <TabControl Grid.Row="1" BorderThickness="0" Padding="0" Background="Transparent">
-
-      <!-- Tab 1: Recognize -->
-      <TabItem Header="{loc:Loc Key=Tab_Recognize}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,16,24,8">
-          <StackPanel>
-
-            <TextBlock Text="{loc:Loc Key=Label_TargetWindow}"
-                       FontWeight="SemiBold" Margin="0,0,0,8" />
-            <ui:Card Padding="12">
+    <TabControl x:Name="MainNavigation" Grid.Row="1" SelectedIndex="0" TabStripPlacement="Left"
+                Background="Transparent" BorderThickness="0" Padding="0"
+                ItemContainerStyle="{StaticResource NavigationTab}">
+      <TabControl.Template>
+        <ControlTemplate TargetType="TabControl">
+          <Grid KeyboardNavigation.TabNavigation="Local">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="224" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TabPanel IsItemsHost="True" Margin="12,96,12,16" KeyboardNavigation.TabIndex="1"
+                      KeyboardNavigation.DirectionalNavigation="Cycle" />
+            <Border Grid.Column="1" CornerRadius="8,0,0,0"
+                    Background="{DynamicResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1,1,0,0">
               <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <ComboBox Grid.Column="0" ItemsSource="{Binding Windows}"
-                          SelectedItem="{Binding SelectedWindow}" DisplayMemberPath="Title" />
-                <ui:Button Grid.Column="1" Content="{loc:Loc Key=Button_RefreshWindows}"
-                           Command="{Binding RefreshCommand}"
-                           Appearance="Secondary" Margin="10,0,0,0" />
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="*" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"
+                                  KeyboardNavigation.TabIndex="2" />
+                <Border Grid.Row="1" Padding="32,12,32,16"
+                        BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ui:SymbolIcon Symbol="Info24" FontSize="16" Margin="0,2,10,0"
+                                   VerticalAlignment="Top" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Recognition.Status}" Style="{StaticResource Description}" Margin="0"
+                               AutomationProperties.LiveSetting="Polite" />
+                  </Grid>
+                </Border>
               </Grid>
-            </ui:Card>
+            </Border>
+          </Grid>
+        </ControlTemplate>
+      </TabControl.Template>
 
-            <TextBlock Text="{loc:Loc Key=Label_Actions}"
-                       FontWeight="SemiBold" Margin="0,20,0,8" />
-            <ui:Card Padding="16">
-              <StackPanel>
-                <ui:Button Content="{loc:Loc Key=Button_Recognize}" Command="{Binding RecognizeCommand}"
-                           IsDefault="True" Appearance="Primary" HorizontalAlignment="Stretch" />
-                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                  <ui:Button Content="{loc:Loc Key=Button_SetRecognitionRegion}"
-                             Command="{Binding SetRecognitionRegionCommand}" Appearance="Secondary" />
-                  <ui:Button Content="{loc:Loc Key=Button_Hide}"
-                             Command="{Binding HideCommand}" Appearance="Secondary" Margin="8,0,0,0" />
-                </StackPanel>
-                <CheckBox Content="{loc:Loc Key=Label_AutoRecognition}"
-                          IsChecked="{Binding AutoRecognitionEnabled, Mode=TwoWay}" Margin="0,14,0,0" />
-                <TextBlock Text="{loc:Loc Key=Label_Description}" TextWrapping="Wrap"
-                           Margin="0,14,0,0" Opacity="0.7" />
-              </StackPanel>
-            </ui:Card>
+      <TabItem AutomationProperties.Name="{loc:Loc Key=Tab_Recognize}">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <Image Source="{StaticResource ScanColorIcon}" Width="24" Height="24" Margin="0,0,12,0" />
+            <TextBlock Text="{loc:Loc Key=Tab_Recognize}" VerticalAlignment="Center" />
           </StackPanel>
-        </ScrollViewer>
+        </TabItem.Header>
+        <views:RecognitionPage DataContext="{Binding Recognition}" />
       </TabItem>
 
-      <!-- Tab: Settings -->
-      <TabItem Header="{loc:Loc Key=Tab_Settings}">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,16,24,8">
-          <StackPanel>
-            <TextBlock Text="{loc:Loc Key=Label_LlmSettings}" FontWeight="SemiBold" Margin="0,0,0,8" />
-            <ui:Card Padding="14">
-              <StackPanel>
-                <CheckBox Content="{loc:Loc Key=Label_LlmEnabled}"
-                          IsChecked="{Binding LlmSettings.Enabled, Mode=TwoWay}" />
-                <TextBlock Text="{loc:Loc Key=Label_LlmProtocol}" Margin="0,12,0,4" />
-                <ComboBox ItemsSource="{Binding LlmSettings.Protocols}"
-                          SelectedValuePath="Id" DisplayMemberPath="Name"
-                          SelectedValue="{Binding LlmSettings.Protocol, Mode=TwoWay}" />
-                <TextBlock Text="{loc:Loc Key=Label_LlmEndpoint}" Margin="0,12,0,4" />
-                <TextBox Text="{Binding LlmSettings.Endpoint, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBlock Text="{loc:Loc Key=Label_LlmApiKey}" Margin="0,12,0,4" />
-                <Grid>
-                  <PasswordBox x:Name="LlmApiKeyPasswordBox"
-                             PasswordChanged="LlmApiKeyPasswordBox_PasswordChanged">
-                    <PasswordBox.Style>
-                      <Style TargetType="PasswordBox">
-                        <Setter Property="Visibility" Value="Visible" />
-                        <Style.Triggers>
-                          <DataTrigger Binding="{Binding LlmSettings.IsApiKeyVisible}" Value="True">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                          </DataTrigger>
-                        </Style.Triggers>
-                      </Style>
-                    </PasswordBox.Style>
-                  </PasswordBox>
-                  <TextBox Text="{Binding LlmSettings.ApiKey, UpdateSourceTrigger=PropertyChanged}">
-                    <TextBox.Style>
-                      <Style TargetType="TextBox">
-                        <Setter Property="Visibility" Value="Collapsed" />
-                        <Style.Triggers>
-                          <DataTrigger Binding="{Binding LlmSettings.IsApiKeyVisible}" Value="True">
-                            <Setter Property="Visibility" Value="Visible" />
-                          </DataTrigger>
-                        </Style.Triggers>
-                      </Style>
-                    </TextBox.Style>
-                  </TextBox>
-                </Grid>
-                <ui:Button Content="{loc:Loc Key=Button_LlmToggleKey}"
-                           Command="{Binding LlmSettings.ToggleApiKeyVisibilityCommand}"
-                           Appearance="Secondary" HorizontalAlignment="Right" Margin="0,4,0,0" />
-                <TextBlock Text="{loc:Loc Key=Label_LlmModel}" Margin="0,12,0,4" />
-                <ComboBox IsEditable="True" IsTextSearchEnabled="True"
-                          ItemsSource="{Binding LlmSettings.Models}" DisplayMemberPath="Id"
-                          Text="{Binding LlmSettings.Model, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                  <ui:Button Content="{loc:Loc Key=Button_LlmFetchModels}"
-                             Command="{Binding LlmSettings.FetchModelsCommand}" Appearance="Primary" />
-                  <ProgressBar IsIndeterminate="True" Width="80" Height="4"
-                               VerticalAlignment="Center" Margin="12,0,0,0"
-                               Visibility="{Binding LlmSettings.IsFetchingModels, Converter={StaticResource BoolToVisibility}}" />
-                </StackPanel>
-                <TextBlock Text="{Binding LlmSettings.ModelStatus}" TextWrapping="Wrap"
-                           Margin="0,8,0,0" Opacity="0.75" />
-              </StackPanel>
-            </ui:Card>
-            <TextBlock Text="{loc:Loc Key=Label_Appearance}" FontWeight="SemiBold" Margin="0,20,0,8" />
-            <ui:Card Padding="14">
-              <StackPanel>
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Grid.Column="0" Text="{loc:Loc Key=Label_Theme}" VerticalAlignment="Center" />
-                  <ComboBox Grid.Column="1" x:Name="ThemeModeComboBox" Width="200"
-                            SelectionChanged="ThemeModeComboBox_SelectionChanged">
-                    <ComboBoxItem Content="{loc:Loc Key=ThemeMode_Auto}" Tag="Auto" />
-                    <ComboBoxItem Content="{loc:Loc Key=ThemeMode_Light}" Tag="Light" />
-                    <ComboBoxItem Content="{loc:Loc Key=ThemeMode_Dark}" Tag="Dark" />
-                  </ComboBox>
-                </Grid>
-                <Grid Margin="0,12,0,0">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Grid.Column="0" Text="{loc:Loc Key=Label_Language}" VerticalAlignment="Center" />
-                  <ComboBox Grid.Column="1" Width="200"
-                            ItemsSource="{Binding LanguageService.AvailableCultures, RelativeSource={RelativeSource AncestorType=Window}}"
-                            SelectedItem="{Binding LanguageService.CurrentCulture, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay}"
-                            DisplayMemberPath="NativeName" />
-                </Grid>
-                <Grid Margin="0,12,0,0">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Grid.Column="0" Text="{loc:Loc Key=Label_FuriganaSize}" VerticalAlignment="Center" />
-                  <Slider Grid.Column="1" x:Name="FuriganaSlider" Width="200"
-                          Minimum="0.1" Maximum="0.5" ValueChanged="FuriganaSlider_ValueChanged" />
-                </Grid>
-              </StackPanel>
-            </ui:Card>
-
+      <TabItem AutomationProperties.Name="{loc:Loc Key=Tab_Settings}">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <Image Source="{StaticResource SettingsColorIcon}" Width="24" Height="24" Margin="0,0,12,0" />
+            <TextBlock Text="{loc:Loc Key=Tab_Settings}" VerticalAlignment="Center" />
           </StackPanel>
-        </ScrollViewer>
+        </TabItem.Header>
+        <views:SettingsPage x:Name="SettingsView" DataContext="{Binding Settings}" />
       </TabItem>
-
     </TabControl>
 
-    <!-- Status bar -->
-    <Border Grid.Row="2" Padding="24,8,24,14">
-      <TextBlock Text="{Binding Status}" Opacity="0.7" TextWrapping="Wrap" />
-    </Border>
+    <Grid Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Width="184" Margin="20,20,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Image Source="Assets/Branding/app-icon.png" Width="40" Height="40"
+             RenderOptions.BitmapScalingMode="HighQuality" />
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+        <TextBlock Text="KotobaSenpai" FontWeight="SemiBold" FontSize="{StaticResource FluentEmphasisFontSize}" />
+        <TextBlock Text="{loc:Loc Key=App_Subtitle}" Style="{StaticResource Description}" />
+      </StackPanel>
+    </Grid>
 
-    <!-- Dictionary install blocking overlay (shown during install/failure; blocks all other controls) -->
-    <Grid Grid.Row="0" Grid.RowSpan="3" Background="#99000000"
+    <!-- Dictionary installation blocks the content while keeping window controls accessible. -->
+    <Grid Grid.Row="1" Background="{DynamicResource SmokeFillColorDefaultBrush}"
           Visibility="{Binding InstallController.IsBlocking, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}">
-      <ui:Card Width="380" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <ui:Card Width="400" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
         <StackPanel>
-          <TextBlock Text="{loc:Loc Key=Install_Title}" FontWeight="SemiBold" FontSize="16"
-                     TextAlignment="Center" Margin="0,0,0,16" />
+          <Image Source="{StaticResource BookOpenColorIcon}" Width="40" Height="40" Margin="0,0,0,16" />
+          <TextBlock Text="{loc:Loc Key=Install_Title}" FontWeight="SemiBold" FontSize="{StaticResource FluentSubtitleFontSize}"
+                     TextAlignment="Center" Margin="0,0,0,24" />
           <ProgressBar Value="{Binding InstallController.Progress, RelativeSource={RelativeSource AncestorType=Window}}"
-                       Maximum="1" Height="6" />
-          <TextBlock Text="{loc:Loc Key=Install_Progress}" Opacity="0.7"
-                     TextAlignment="Center" Margin="0,10,0,0" />
+                       Maximum="1" Height="4" />
+          <TextBlock Text="{loc:Loc Key=Install_Progress}" Style="{StaticResource Description}"
+                     TextAlignment="Center" Margin="0,12,0,0" />
           <TextBlock Text="{Binding InstallController.Error, RelativeSource={RelativeSource AncestorType=Window}}"
-                     Foreground="#E81123" TextWrapping="Wrap" TextAlignment="Center" Margin="0,14,0,0"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap"
+                     TextAlignment="Center" Margin="0,16,0,0"
                      Visibility="{Binding InstallController.HasError, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}" />
           <ui:Button Content="{loc:Loc Key=Install_Retry}"
                      Command="{Binding InstallController.InstallCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                     Appearance="Primary" HorizontalAlignment="Center" Margin="0,16,0,0"
+                     Style="{StaticResource SettingsButton}"
+                     Appearance="Primary" HorizontalAlignment="Center" Margin="0,20,0,0"
                      Visibility="{Binding InstallController.HasError, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}" />
         </StackPanel>
       </ui:Card>

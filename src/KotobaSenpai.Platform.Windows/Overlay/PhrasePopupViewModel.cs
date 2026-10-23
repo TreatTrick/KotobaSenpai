@@ -10,6 +10,7 @@ internal sealed class PhrasePopupViewModel
     private PhrasePopupViewModel() { }
 
     public string Heading { get; private init; } = "";
+    public string Reading { get; private init; } = "";
     public string Pos { get; private init; } = "";
     public string Pitch { get; private init; } = "";
     public string Meaning { get; private init; } = "";
@@ -18,7 +19,7 @@ internal sealed class PhrasePopupViewModel
     public string PosLabel { get; private init; } = "Pos";
     public string PitchLabel { get; private init; } = "Pitch";
     public string MeaningLabel { get; private init; } = "Meaning";
-    public string GrammarLabel => "Grammar";
+    public string GrammarLabel { get; private init; } = "Grammar";
     public string WordsLabel { get; private init; } = "Words";
     public IReadOnlyList<PhrasePopupWordViewModel> Words { get; private init; } = Array.Empty<PhrasePopupWordViewModel>();
 
@@ -30,13 +31,15 @@ internal sealed class PhrasePopupViewModel
             Heading = label,
             Meaning = meaning,
             Grammar = grammar,
+            MeaningLabel = localizer?.Get("Llm.WordMeaningLabel") ?? "Meaning",
+            GrammarLabel = localizer?.Get("Llm.GrammarLabel") ?? "Grammar",
             WordsLabel = localizer?.Get("Llm.WordsLabel") ?? "Words",
             Words = Array.AsReadOnly((memberMeanings ?? Array.Empty<WordMeaningView>()).Select(word =>
                 new PhrasePopupWordViewModel(
                     word.Headword,
-                    string.IsNullOrEmpty(word.Reading) ? "" : $" [{Kana.ToHiragana(word.Reading)}]",
-                    $" ({PitchText(word, localizer)})",
-                    string.IsNullOrEmpty(word.Pos) ? "" : $" {word.Pos}",
+                    Kana.ToHiragana(word.Reading),
+                    PitchText(word, localizer),
+                    word.Pos,
                     word.Meaning)).ToArray()),
         };
 
@@ -44,14 +47,16 @@ internal sealed class PhrasePopupViewModel
         WordMeaningView word, IStringLocalizer? localizer = null, bool showMeaning = true)
         => new()
         {
-            Heading = $"{word.Headword} [{Kana.ToHiragana(word.Reading)}]",
+            Heading = word.Headword,
+            Reading = Kana.ToHiragana(word.Reading),
             Pos = showMeaning ? word.Pos : "",
             Pitch = PitchText(word, localizer),
             Meaning = showMeaning ? word.Meaning : "",
             Grammar = showMeaning ? word.Grammar : "",
             PosLabel = localizer?.Get("Llm.WordPosLabel") ?? "Pos",
-            PitchLabel = localizer?.Get("Llm.WordPitchLabel") ?? "Pitch",
+            PitchLabel = string.IsNullOrEmpty(word.PitchAccentText) ? "" : localizer?.Get("Llm.WordPitchLabel") ?? "Pitch",
             MeaningLabel = localizer?.Get("Llm.WordMeaningLabel") ?? "Meaning",
+            GrammarLabel = localizer?.Get("Llm.GrammarLabel") ?? "Grammar",
             NoMeaningHint = showMeaning ? "" : localizer?.Get("Llm.WordNoMeaning") ?? "no meaning",
         };
 

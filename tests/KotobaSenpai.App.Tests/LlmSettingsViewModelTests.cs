@@ -8,6 +8,22 @@ namespace KotobaSenpai.App.Tests;
 public sealed class LlmSettingsViewModelTests
 {
     [Fact]
+    public void Culture_changes_translate_protocol_choices_without_replacing_the_selected_item()
+    {
+        var localizer = new FakeLocalizer();
+        using var viewModel = new LlmSettingsViewModel(new FakeSettings(), new FakeCatalog(), localizer);
+        viewModel.Protocol = LlmProtocolIds.OpenAiResponses;
+        var selected = viewModel.Protocols.Single(option => option.Id == viewModel.Protocol);
+        var previousName = selected.Name;
+
+        localizer.ChangeCulture();
+
+        Assert.Same(selected, viewModel.Protocols.Single(option => option.Id == viewModel.Protocol));
+        Assert.NotEqual(previousName, selected.Name);
+        Assert.Equal(LlmProtocolIds.OpenAiResponses, viewModel.Protocol);
+    }
+
+    [Fact]
     public void Loads_and_persists_flat_settings_while_preserving_other_values()
     {
         var settings = new FakeSettings(new Dictionary<string, string?>
@@ -180,9 +196,13 @@ public sealed class LlmSettingsViewModelTests
 
     private sealed class FakeLocalizer : IStringLocalizer
     {
-#pragma warning disable CS0067
         public event EventHandler? CultureChanged;
-#pragma warning restore CS0067
-        public string Get(string key, params object[] args) => args.Length == 0 ? key : $"{key}:{string.Join(',', args)}";
+        private string _suffix = string.Empty;
+        public string Get(string key, params object[] args) => args.Length == 0 ? key + _suffix : $"{key}:{string.Join(',', args)}{_suffix}";
+        public void ChangeCulture()
+        {
+            _suffix = " (translated)";
+            CultureChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 }

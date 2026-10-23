@@ -7,6 +7,9 @@
       <ResourceDictionary.MergedDictionaries>
         <ui:ThemesDictionary Theme="Light" />
         <ui:ControlsDictionary />
+        <ResourceDictionary Source="/KotobaSenpai.Platform.Windows;component/Presentation/FluentDesignTokens.xaml" />
+        <ResourceDictionary Source="Themes/FluentColorIcons.xaml" />
+        <ResourceDictionary Source="Themes/SettingsStyles.xaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

@@ -10,6 +10,7 @@
     <!-- MVVMTK0045 针对 WinRT AOT (UWP/WinUI) 场景；本工程是 WPF 桌面 exe，不适用，故关闭。 -->
     <NoWarn>MVVMTK0045</NoWarn>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Branding\app-icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
@@ -21,6 +22,12 @@
     <ProjectReference Include="..\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Assets\FluentIcons\LICENSE.txt"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Branding\app-icon.ico" />
+    <Resource Include="Assets\Branding\app-icon.png" />
     <EmbeddedResource Update="Resources\Strings.resx">
       <Generator>PublicResXFileCodeGenerator</Generator>
     </EmbeddedResource>

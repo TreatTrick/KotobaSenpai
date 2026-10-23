@@ -78,10 +78,8 @@ public partial class App : Application
 
         var window = new MainWindow
         {
-            LanguageService = languageService,
             ThemeService = themeService,
-            InstallController = installController,
-            SettingsService = _services.GetRequiredService<ISettingsService>()
+            InstallController = installController
         };
         window.Show();
 
@@ -206,6 +204,7 @@ public partial class App : Application
         services.AddSingleton<IUserMessageResolver, UserMessageResolver>();
         services.AddSingleton<ILanguagePreferenceStore, LocalAppDataLanguagePreferenceStore>();
         services.AddSingleton<LanguageService>();
+        services.AddSingleton<ILanguagePreferences>(sp => sp.GetRequiredService<LanguageService>());
 
         // Logging: the FileLogger singleton holds the file handle; the LogRetentionPolicy singleton is shared by startup/timer/cross-midnight rollover.
         var logsDirectory = Path.Combine(
@@ -223,6 +222,8 @@ public partial class App : Application
         services.AddSingleton<FluentThemeService>();
 
         services.AddSingleton<LlmSettingsViewModel>();
+        services.AddSingleton<SettingsPageViewModel>();
+        services.AddSingleton<RecognitionPageViewModel>();
         services.AddSingleton<MainWindowViewModel>();
     }
 

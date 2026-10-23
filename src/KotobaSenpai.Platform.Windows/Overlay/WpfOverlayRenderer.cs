@@ -71,7 +71,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
     /// <summary>Reads the configurable furigana font scale (proportion of OCR text height); missing/invalid falls back to the default 1/3.</summary>
     private double ResolveFontScale()
-        => FuriganaSettings.ResolveFontScale(_settings?.GetValue(FuriganaSettings.FontScaleKey));
+        => FuriganaFontSettings.ResolveFontScale(_settings?.GetValue(FuriganaFontSettings.FontScaleKey));
 
     internal static IReadOnlyList<int> GetLineIndicesForWords(
         IEnumerable<int> wordIndices,

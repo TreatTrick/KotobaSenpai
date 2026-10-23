@@ -1,10 +1,7 @@
-using KotobaSenpai.App.Themes;
-
-namespace KotobaSenpai.App.Localization;
+namespace KotobaSenpai.Core.Settings;
 
 /// <summary>
 /// Theme-preference persistence port: saves/restores the user's chosen theme mode (Auto/Light/Dark) across restarts.
-/// Symmetric to <see cref="ILanguagePreferenceStore"/>; minimal JSON persistence, to migrate once the settings module lands.
 /// Abstracted as a port so tests can validate the restore logic with an in-memory fake without touching disk.
 /// </summary>
 public interface IThemePreferenceStore

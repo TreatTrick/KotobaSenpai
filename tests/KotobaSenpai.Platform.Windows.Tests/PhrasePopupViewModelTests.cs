@@ -29,13 +29,13 @@ public sealed class PhrasePopupViewModelTests
         Assert.Empty(model.NoMeaningHint);
         Assert.Equal("Words", model.WordsLabel);
         Assert.Equal(["学校", "Second"], model.Words.Select(word => word.Headword));
-        Assert.Equal(" [がっこう]", model.Words[0].Reading);
-        Assert.Equal(" ([0] LHHH)", model.Words[0].Pitch);
-        Assert.Equal(" Noun", model.Words[0].Pos);
+        Assert.Equal("がっこう", model.Words[0].Reading);
+        Assert.Equal("[0] LHHH", model.Words[0].Pitch);
+        Assert.Equal("Noun", model.Words[0].Pos);
         Assert.Equal("School", model.Words[0].Meaning);
         Assert.Empty(model.Words[1].Reading);
         Assert.Empty(model.Words[1].Pos);
-        Assert.Equal(" (pitch unknown)", model.Words[1].Pitch);
+        Assert.Equal("pitch unknown", model.Words[1].Pitch);
         Assert.Throws<NotSupportedException>(() => ((IList<PhrasePopupWordViewModel>)model.Words).Clear());
     }
 
@@ -51,7 +51,8 @@ public sealed class PhrasePopupViewModelTests
 
         var model = PhrasePopupViewModel.ForWord(word);
 
-        Assert.Equal("学校へ [がっこうへ]", model.Heading);
+        Assert.Equal("学校へ", model.Heading);
+        Assert.Equal("がっこうへ", model.Reading);
         Assert.Equal("Expression", model.Pos);
         Assert.Equal("[0] LHHH | [1] H", model.Pitch);
         Assert.Equal("To school", model.Meaning);
@@ -71,7 +72,8 @@ public sealed class PhrasePopupViewModelTests
 
         var model = PhrasePopupViewModel.ForWord(word, showMeaning: false);
 
-        Assert.Equal("Word []", model.Heading);
+        Assert.Equal("Word", model.Heading);
+        Assert.Empty(model.Reading);
         Assert.Equal("pitch unknown", model.Pitch);
         Assert.Equal("no meaning", model.NoMeaningHint);
         Assert.Empty(model.Pos);
@@ -107,9 +109,11 @@ public sealed class PhrasePopupViewModelTests
         var fallback = PhrasePopupViewModel.ForWord(word, localizer, showMeaning: false);
 
         Assert.Equal("Localized:Llm.WordsLabel", phrase.WordsLabel);
-        Assert.Equal("Meaning", phrase.MeaningLabel);
+        Assert.Equal("Localized:Llm.WordMeaningLabel", phrase.MeaningLabel);
+        Assert.Equal("Localized:Llm.GrammarLabel", phrase.GrammarLabel);
+        Assert.Equal("Localized:Llm.GrammarLabel", rich.GrammarLabel);
         Assert.Equal("Localized:Llm.WordPosLabel", rich.PosLabel);
-        Assert.Equal("Localized:Llm.WordPitchLabel", rich.PitchLabel);
+        Assert.Empty(rich.PitchLabel);
         Assert.Equal("Localized:Llm.WordMeaningLabel", rich.MeaningLabel);
         Assert.Equal("Localized:Llm.WordPitchUnknown", rich.Pitch);
         Assert.Equal("Updated:Llm.WordPitchUnknown", fallback.Pitch);

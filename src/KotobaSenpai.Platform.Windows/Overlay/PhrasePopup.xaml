@@ -1,164 +1,198 @@
 <Window x:Class="KotobaSenpai.Platform.Windows.Overlay.PhrasePopup"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        WindowStyle="None" AllowsTransparency="True"
-        Background="Transparent"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        FontFamily="{DynamicResource FluentFontFamily}"
+        FontSize="{DynamicResource FluentBodyFontSize}" UseLayoutRounding="True"
         ShowInTaskbar="False" Topmost="False" ShowActivated="False" ResizeMode="NoResize">
   <Window.Resources>
-    <!-- Color tokens -->
-    <Color x:Key="SurfaceColor">#EE1A1A2E</Color>
-    <Color x:Key="BorderColor">#33FFFFFF</Color>
-    <Color x:Key="AccentColor">#5B9CF6</Color>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="../Presentation/FluentDesignTokens.xaml" />
+        <ResourceDictionary Source="PhrasePopupPalette.xaml" />
+      </ResourceDictionary.MergedDictionaries>
 
-    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
-    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
-    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
-    <SolidColorBrush x:Key="HeadingBrush" Color="#F0F4FF" />
-    <SolidColorBrush x:Key="LabelBrush" Color="#8AB4F8" />
-    <SolidColorBrush x:Key="BodyBrush" Color="#D8DEF0" />
-    <SolidColorBrush x:Key="PitchBrush" Color="#6EE7A0" />
-    <SolidColorBrush x:Key="PosBrush" Color="#93C5FD" />
-    <SolidColorBrush x:Key="DividerBrush" Color="#22FFFFFF" />
+      <Style x:Key="BodyText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="FontSize" Value="{StaticResource FluentBodyFontSize}" />
+        <Setter Property="LineHeight" Value="{StaticResource FluentBodyLineHeight}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+      </Style>
+      <Style x:Key="SecondaryText" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="FontSize" Value="{StaticResource FluentCaptionFontSize}" />
+        <Setter Property="LineHeight" Value="{StaticResource FluentCaptionLineHeight}" />
+      </Style>
+      <Style x:Key="OptionalText" TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
+        <Style.Triggers>
+          <Trigger Property="Text" Value="">
+            <Setter Property="Visibility" Value="Collapsed" />
+          </Trigger>
+        </Style.Triggers>
+      </Style>
+      <Style x:Key="SectionLabel" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+        <Style.Triggers>
+          <Trigger Property="Text" Value="">
+            <Setter Property="Visibility" Value="Collapsed" />
+          </Trigger>
+          <Trigger Property="Text" Value="{x:Null}">
+            <Setter Property="Visibility" Value="Collapsed" />
+          </Trigger>
+        </Style.Triggers>
+      </Style>
+      <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Padding" Value="{StaticResource FluentPopupCardPadding}" />
+        <Setter Property="CornerRadius" Value="{StaticResource FluentCardRadius}" />
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+      </Style>
+      <DataTemplate x:Key="SecondaryCardContent">
+        <Border Style="{StaticResource Card}">
+          <TextBlock Text="{Binding Mode=OneTime}" Style="{StaticResource BodyText}"
+                     Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Border>
+      </DataTemplate>
+      <Style x:Key="Section" TargetType="ContentControl">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Margin" Value="{StaticResource FluentSectionGap}" />
+        <Setter Property="ContentTemplate">
+          <Setter.Value>
+            <DataTemplate>
+              <Border Style="{StaticResource Card}">
+                <TextBlock Text="{Binding Mode=OneTime}" Style="{StaticResource BodyText}" />
+              </Border>
+            </DataTemplate>
+          </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ContentControl">
+              <StackPanel>
+                <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                           Style="{StaticResource SectionLabel}" />
+                <ContentPresenter Content="{TemplateBinding Content}"
+                                  ContentTemplate="{TemplateBinding ContentTemplate}" />
+              </StackPanel>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+          <Trigger Property="Content" Value="{x:Null}">
+            <Setter Property="Visibility" Value="Collapsed" />
+          </Trigger>
+          <Trigger Property="Content" Value="">
+            <Setter Property="Visibility" Value="Collapsed" />
+          </Trigger>
+        </Style.Triggers>
+      </Style>
+      <Style x:Key="Metadata" TargetType="ContentControl" BasedOn="{StaticResource Section}">
+        <Setter Property="Margin" Value="0,8,8,0" />
+        <Setter Property="ContentTemplate">
+          <Setter.Value>
+            <DataTemplate>
+              <TextBlock Text="{Binding Mode=OneTime}" Style="{StaticResource SecondaryText}"
+                         Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+            </DataTemplate>
+          </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ContentControl">
+              <Border Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                      CornerRadius="4" Padding="8,4">
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Left" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                             Style="{StaticResource OptionalText}" Margin="0,0,8,0" />
+                  <ContentPresenter Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}" />
+                </DockPanel>
+              </Border>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
 
-    <Style x:Key="BodyText" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource BodyBrush}" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="LineHeight" Value="20" />
-    </Style>
-
-    <Style x:Key="OptionalText" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
-      <Style.Triggers>
-        <Trigger Property="Text" Value="">
-          <Setter Property="Visibility" Value="Collapsed" />
-        </Trigger>
-      </Style.Triggers>
-    </Style>
-
-    <Style x:Key="HeadingText" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource HeadingBrush}" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="FontSize" Value="15" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="Margin" Value="0,0,0,10" />
-    </Style>
-
-    <Style x:Key="SectionLabel" TargetType="TextBlock">
-      <Setter Property="Foreground" Value="{StaticResource LabelBrush}" />
-      <Setter Property="FontSize" Value="10" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Margin" Value="0,0,0,3" />
-    </Style>
-
-    <Style x:Key="Section" TargetType="ContentControl">
-      <Setter Property="Margin" Value="0,0,0,10" />
-      <Setter Property="ContentTemplate">
-        <Setter.Value>
-          <DataTemplate>
-            <TextBlock Text="{Binding Mode=OneTime}" Style="{StaticResource BodyText}" />
-          </DataTemplate>
-        </Setter.Value>
-      </Setter>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="ContentControl">
-            <StackPanel>
-              <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                         Style="{StaticResource SectionLabel}" />
-              <ContentPresenter Content="{TemplateBinding Content}"
-                                ContentTemplate="{TemplateBinding ContentTemplate}" />
-            </StackPanel>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-      <Style.Triggers>
-        <Trigger Property="Content" Value="{x:Null}">
-          <Setter Property="Visibility" Value="Collapsed" />
-        </Trigger>
-        <Trigger Property="Content" Value="">
-          <Setter Property="Visibility" Value="Collapsed" />
-        </Trigger>
-      </Style.Triggers>
-    </Style>
-
-    <DataTemplate x:Key="MemberWord">
-      <StackPanel Margin="0,0,0,8">
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-          <TextBlock Text="{Binding Headword, Mode=OneTime}" FontWeight="SemiBold"
-                     FontSize="13" Foreground="{StaticResource HeadingBrush}" />
-          <TextBlock Text="{Binding Reading, Mode=OneTime}"
-                     Foreground="{StaticResource LabelBrush}" Margin="6,0,0,0" />
-          <TextBlock Text="{Binding Pitch, Mode=OneTime}"
-                     Foreground="{StaticResource PitchBrush}" Margin="6,0,0,0" />
-          <TextBlock Text="{Binding Pos, Mode=OneTime}"
-                     Foreground="{StaticResource PosBrush}" Margin="6,0,0,0" />
-        </StackPanel>
-        <TextBlock Text="{Binding Meaning, Mode=OneTime}" Style="{StaticResource OptionalText}" />
-      </StackPanel>
-    </DataTemplate>
-  </Window.Resources>
-
-  <!-- Outer drop-shadow frame -->
-  <Border CornerRadius="10" Background="Transparent"
-          Effect="{x:Null}">
-    <Border CornerRadius="10" Background="{StaticResource SurfaceBrush}"
-            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
-      <Grid>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <!-- Accent bar -->
-        <Border Grid.Row="0" Height="3" CornerRadius="10,10,0,0"
-                Background="{StaticResource AccentBrush}" />
-
-        <!-- Content -->
-        <ScrollViewer Grid.Row="1" MaxHeight="340"
-                      VerticalScrollBarVisibility="Auto" Padding="16,14,16,16">
-          <StackPanel x:Name="ContentPanel">
-            <TextBlock x:Name="Heading" Text="{Binding Heading, Mode=OneTime}"
-                       Style="{StaticResource HeadingText}" />
-            <ContentControl x:Name="PosSection"
-                            Content="{Binding Pos, Mode=OneTime}"
-                            Tag="{Binding PosLabel, Mode=OneTime}"
-                            Style="{StaticResource Section}" />
-            <ContentControl x:Name="PitchSection"
-                            Content="{Binding Pitch, Mode=OneTime}"
-                            Tag="{Binding PitchLabel, Mode=OneTime}"
-                            Style="{StaticResource Section}" />
-            <ContentControl x:Name="MeaningSection"
-                            Content="{Binding Meaning, Mode=OneTime}"
-                            Tag="{Binding MeaningLabel, Mode=OneTime}"
-                            Style="{StaticResource Section}" />
-            <ContentControl x:Name="GrammarSection"
-                            Content="{Binding Grammar, Mode=OneTime}"
-                            Tag="{Binding GrammarLabel, Mode=OneTime}"
-                            Style="{StaticResource Section}" />
-            <ContentControl x:Name="WordsSection"
-                            Content="{Binding Words, Mode=OneTime}"
-                            Tag="{Binding WordsLabel, Mode=OneTime}">
-              <ContentControl.Style>
-                <Style TargetType="ContentControl" BasedOn="{StaticResource Section}">
+      <DataTemplate x:Key="MemberWord">
+        <Border Style="{StaticResource Card}" Margin="{StaticResource FluentCardGap}">
+          <StackPanel>
+            <TextBlock Text="{Binding Headword, Mode=OneTime}" Style="{StaticResource BodyText}"
+                       FontSize="{StaticResource FluentEmphasisFontSize}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Reading, Mode=OneTime}" Style="{StaticResource OptionalText}"
+                       FontSize="{StaticResource FluentBodyFontSize}" LineHeight="{StaticResource FluentBodyLineHeight}"
+                       Margin="{StaticResource FluentDescriptionGap}" />
+            <WrapPanel Margin="0,4,0,0">
+              <TextBlock Text="{Binding Pos, Mode=OneTime}" Style="{StaticResource OptionalText}" Margin="0,0,8,0" />
+              <TextBlock Text="{Binding Pitch, Mode=OneTime}" Style="{StaticResource OptionalText}"
+                         Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            </WrapPanel>
+            <TextBlock Text="{Binding Meaning, Mode=OneTime}">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+                  <Setter Property="Margin" Value="0,8,0,0" />
                   <Style.Triggers>
-                    <DataTrigger Binding="{Binding Words.Count, Mode=OneTime}" Value="0">
+                    <Trigger Property="Text" Value="">
                       <Setter Property="Visibility" Value="Collapsed" />
-                    </DataTrigger>
+                    </Trigger>
                   </Style.Triggers>
                 </Style>
-              </ContentControl.Style>
-              <ContentControl.ContentTemplate>
-                <DataTemplate>
-                  <ItemsControl ItemsSource="{Binding Mode=OneTime}"
-                                ItemTemplate="{StaticResource MemberWord}" />
-                </DataTemplate>
-              </ContentControl.ContentTemplate>
-            </ContentControl>
-            <TextBlock x:Name="NoMeaningHint"
-                       Text="{Binding NoMeaningHint, Mode=OneTime}"
-                       Style="{StaticResource OptionalText}" Opacity="0.6" />
+              </TextBlock.Style>
+            </TextBlock>
           </StackPanel>
-        </ScrollViewer>
-      </Grid>
-    </Border>
+        </Border>
+      </DataTemplate>
+    </ResourceDictionary>
+  </Window.Resources>
+
+  <Border x:Name="PopupFrame" CornerRadius="{StaticResource FluentWindowRadius}"
+          Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+          BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1">
+    <ScrollViewer x:Name="PopupScrollViewer" VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled" Padding="{StaticResource FluentPopupPadding}">
+      <StackPanel x:Name="ContentPanel">
+        <StackPanel Margin="0,0,0,24">
+          <TextBlock x:Name="Heading" Text="{Binding Heading, Mode=OneTime}"
+                     Style="{StaticResource BodyText}" FontSize="{StaticResource FluentTitleFontSize}"
+                     LineHeight="{StaticResource FluentTitleLineHeight}" FontWeight="SemiBold" />
+          <TextBlock x:Name="Reading" Text="{Binding Reading, Mode=OneTime}"
+                     Style="{StaticResource OptionalText}" FontSize="{StaticResource FluentBodyFontSize}"
+                     LineHeight="{StaticResource FluentBodyLineHeight}" Margin="{StaticResource FluentDescriptionGap}" />
+          <WrapPanel>
+            <ContentControl x:Name="PosSection" Content="{Binding Pos, Mode=OneTime}"
+                            Tag="{Binding PosLabel, Mode=OneTime}" Style="{StaticResource Metadata}" />
+            <ContentControl x:Name="PitchSection" Content="{Binding Pitch, Mode=OneTime}"
+                            Tag="{Binding PitchLabel, Mode=OneTime}" Style="{StaticResource Metadata}" />
+          </WrapPanel>
+        </StackPanel>
+        <ContentControl x:Name="MeaningSection" Content="{Binding Meaning, Mode=OneTime}"
+                        Tag="{Binding MeaningLabel, Mode=OneTime}" Style="{StaticResource Section}" />
+        <ContentControl x:Name="GrammarSection" Content="{Binding Grammar, Mode=OneTime}"
+                        Tag="{Binding GrammarLabel, Mode=OneTime}" Style="{StaticResource Section}"
+                        ContentTemplate="{StaticResource SecondaryCardContent}" />
+        <ContentControl x:Name="WordsSection" Content="{Binding Words, Mode=OneTime}"
+                        Tag="{Binding WordsLabel, Mode=OneTime}">
+          <ContentControl.Style>
+            <Style TargetType="ContentControl" BasedOn="{StaticResource Section}">
+              <Setter Property="Margin" Value="0" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Words.Count, Mode=OneTime}" Value="0">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ContentControl.Style>
+          <ContentControl.ContentTemplate>
+            <DataTemplate>
+              <ItemsControl ItemsSource="{Binding Mode=OneTime}" ItemTemplate="{StaticResource MemberWord}" />
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
+        <ContentControl x:Name="NoMeaningHint" Content="{Binding NoMeaningHint, Mode=OneTime}"
+                        Style="{StaticResource Section}" Margin="0"
+                        ContentTemplate="{StaticResource SecondaryCardContent}" />
+      </StackPanel>
+    </ScrollViewer>
   </Border>
 </Window>

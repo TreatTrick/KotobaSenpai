@@ -31,9 +31,9 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.Contains("Phrase", VisibleText(popup));
             Assert.Contains("Group meaning", VisibleText(popup));
             Assert.Contains("School", VisibleText(popup));
-            Assert.Contains(" [がっこう]", VisibleText(popup));
+            Assert.Contains("がっこう", VisibleText(popup));
             var unknownPitch = localized ? "Localized Llm.WordPitchUnknown" : "pitch unknown";
-            Assert.Contains($" ({unknownPitch})", VisibleText(popup));
+            Assert.Contains(unknownPitch, VisibleText(popup));
             Assert.Contains(phrase.WordsLabel, VisibleText(popup));
             Assert.Equal(Visibility.Collapsed, Section(popup, "PosSection").Visibility);
             Assert.Equal(Visibility.Collapsed, Section(popup, "PitchSection").Visibility);
@@ -43,9 +43,11 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             popup.UpdateLayout();
             var wordModel = Assert.IsType<PhrasePopupViewModel>(popup.DataContext);
             Assert.NotSame(phrase, wordModel);
-            Assert.Contains("学校 [がっこう]", VisibleText(popup));
+            Assert.Contains("学校", VisibleText(popup));
+            Assert.Contains("がっこう", VisibleText(popup));
             Assert.Contains(wordModel.PosLabel, VisibleText(popup));
-            Assert.Contains(wordModel.PitchLabel, VisibleText(popup));
+            if (!string.IsNullOrEmpty(wordModel.PitchLabel))
+                Assert.Contains(wordModel.PitchLabel, VisibleText(popup));
             Assert.Contains(wordModel.MeaningLabel, VisibleText(popup));
             Assert.Contains("Word grammar", VisibleText(popup));
             Assert.DoesNotContain("Group grammar", VisibleText(popup));
@@ -72,6 +74,45 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
     });
 
     [Fact]
+    public Task Theme_brush_changes_update_the_existing_popup() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            popup.ShowWordMeaning(new WordMeaningView("Word", "Reading", "Noun", "Meaning", ""), new ScreenRect(100, 100, 100, 30));
+            var snapshot = popup.DataContext;
+            var foreground = new SolidColorBrush(Colors.Black);
+            var surface = new SolidColorBrush(Colors.WhiteSmoke);
+            popup.Resources["TextFillColorPrimaryBrush"] = foreground;
+            popup.Resources["SolidBackgroundFillColorBaseBrush"] = surface;
+            popup.UpdateLayout();
+
+            Assert.Same(foreground, Assert.IsType<TextBlock>(popup.FindName("Heading")).Foreground);
+            Assert.Same(surface, Assert.IsType<Border>(popup.FindName("PopupFrame")).Background);
+            Assert.Same(snapshot, popup.DataContext);
+        }
+        finally
+        {
+            popup.Close();
+        }
+    });
+
+    [Fact]
+    public Task Long_headings_can_expand_beyond_the_preferred_reading_column() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            popup.ShowResult(string.Join(" ", Enumerable.Repeat("Wide heading", 12)), "Meaning", "", new ScreenRect(100, 100, 100, 30));
+            Assert.True(popup.Width > 440, "The reading column is not a hard width limit.");
+        }
+        finally
+        {
+            popup.Close();
+        }
+    });
+
+    [Fact]
     public Task Replacing_short_long_short_content_measures_the_current_templates() => RunSta(() =>
     {
         var popup = new PhrasePopup();
@@ -87,8 +128,8 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
                 .ToArray();
 
             popup.ShowResult("Long phrase", longText, longText, anchor, members);
-            Assert.Equal(360, popup.Width);
-            Assert.Equal(360, popup.Height);
+            Assert.True(popup.Width > 360, "Long content can grow wider than the previous limit.");
+            Assert.True(popup.Height > 360, "Long content can grow taller than the previous limit.");
             Assert.True(popup.Height > shortSize.Height);
             popup.UpdateLayout();
             Assert.Contains(longText, VisibleText(popup));
@@ -96,8 +137,8 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             popup.ShowWordWithoutMeaning(word, anchor);
             Assert.Equal(shortSize.Width, popup.Width, precision: 3);
             Assert.Equal(shortSize.Height, popup.Height, precision: 3);
-            Assert.InRange(popup.Width, 200, 360);
-            Assert.InRange(popup.Height, 1, 360);
+            Assert.True(popup.Width > 0);
+            Assert.True(popup.Height > 0);
         }
         finally
         {

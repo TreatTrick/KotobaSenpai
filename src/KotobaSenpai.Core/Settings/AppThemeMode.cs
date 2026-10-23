@@ -1,4 +1,4 @@
-namespace KotobaSenpai.App.Themes;
+namespace KotobaSenpai.Core.Settings;
 
 /// <summary>Theme mode: <see cref="Auto"/> follows the Windows system theme; <see cref="Light"/>/<see cref="Dark"/> are explicit overrides.</summary>
 public enum AppThemeMode
