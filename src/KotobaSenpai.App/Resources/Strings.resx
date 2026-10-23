@@ -161,6 +161,9 @@
   <data name="Region_Confirm" xml:space="preserve">
     <value>OK</value>
   </data>
+  <data name="Region_NoJapanese" xml:space="preserve">
+    <value>No recognizable Japanese was found in this area. Please select a different area.</value>
+  </data>
   <!-- Unexpected error notice (global unhandled-exception fallback) -->
   <data name="UnexpectedError_Title" xml:space="preserve">
     <value>Unexpected error</value>

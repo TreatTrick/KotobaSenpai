@@ -1,6 +1,7 @@
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Geometry;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -32,6 +33,16 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private readonly ITargetWindowTracker? _tracker;
     private readonly Canvas _canvas = new();
     private readonly Grid _flashOutline = CreateWarningOutline();
+    private readonly TextBlock _feedbackText = new()
+    {
+        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"),
+        FontSize = 16,
+        FontWeight = FontWeights.SemiBold,
+        LineHeight = 24,
+        TextWrapping = TextWrapping.Wrap,
+        Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x79, 0x89)),
+    };
+    private readonly Border _feedbackMessage;
     private readonly DispatcherTimer _flashTimer;
 
     private WindowTarget? _target;
@@ -51,6 +62,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _localizer = localizer;
         _tracker = tracker;
+        _feedbackMessage = CreateWarningMessage(_feedbackText);
         _flashTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher)
         {
             Interval = TimeSpan.FromMilliseconds(250),
@@ -76,11 +88,15 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         };
         if (_tracker is not null)
             _tracker.Changed += OnTargetChanged;
+        if (_localizer is not null)
+            _localizer.CultureChanged += OnCultureChanged;
         Closed += (_, _) =>
         {
             ClearSelection();
             if (_tracker is not null)
                 _tracker.Changed -= OnTargetChanged;
+            if (_localizer is not null)
+                _localizer.CultureChanged -= OnCultureChanged;
         };
         // NOTE: intentionally NOT click-through — this window must capture mouse for dragging and the confirm button.
     }
@@ -90,15 +106,6 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
     private static Grid CreateWarningOutline()
     {
-        var glow = new DropShadowEffect
-        {
-            Color = Color.FromRgb(0xFF, 0x2A, 0x40),
-            BlurRadius = 16,
-            ShadowDepth = 0,
-            Opacity = 0.95,
-            RenderingBias = RenderingBias.Quality,
-        };
-        glow.Freeze();
         var outline = new Grid { IsHitTestVisible = false };
         outline.Children.Add(new System.Windows.Shapes.Rectangle
         {
@@ -107,7 +114,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             RadiusX = 6,
             RadiusY = 6,
             Margin = new Thickness(2),
-            Effect = glow,
+            Effect = CreateWarningGlow(16, 0.95),
         });
         outline.Children.Add(new System.Windows.Shapes.Rectangle
         {
@@ -118,6 +125,56 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             Margin = new Thickness(3),
         });
         return outline;
+    }
+
+    private static DropShadowEffect CreateWarningGlow(double blurRadius, double opacity)
+    {
+        var glow = new DropShadowEffect
+        {
+            Color = Color.FromRgb(0xFF, 0x2A, 0x40),
+            BlurRadius = blurRadius,
+            ShadowDepth = 0,
+            Opacity = opacity,
+            RenderingBias = RenderingBias.Quality,
+        };
+        glow.Freeze();
+        return glow;
+    }
+
+    private static Border CreateWarningMessage(TextBlock text)
+    {
+        var pen = new Pen(text.Foreground, 1.75) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+        var drawing = new DrawingGroup();
+        drawing.Children.Add(new GeometryDrawing(null, pen, new EllipseGeometry(new Point(12, 12), 10, 10)));
+        drawing.Children.Add(new GeometryDrawing(null, pen, Geometry.Parse("M8,8 L16,16 M16,8 L8,16")));
+        drawing.Freeze();
+        var content = new Grid { Effect = CreateWarningGlow(8, 0.8) };
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.ColumnDefinitions.Add(new ColumnDefinition());
+        content.Children.Add(new Image
+        {
+            Source = new DrawingImage(drawing), Width = 24, Height = 24,
+            VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 12, 0),
+        });
+        Grid.SetColumn(text, 1);
+        content.Children.Add(text);
+        AutomationProperties.SetLiveSetting(text, AutomationLiveSetting.Polite);
+        return new Border
+        {
+            Child = content, Padding = new Thickness(16, 12, 16, 12), CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Color.FromArgb(0xEB, 0x19, 0x1C, 0x24)), IsHitTestVisible = false,
+        };
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => OnCultureChanged(sender, e));
+            return;
+        }
+        if (_isFlashing)
+            Redraw();
     }
 
     private void ShowCore(WindowTarget target, RecognitionRegion? initial, bool flashing)
@@ -318,6 +375,17 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             Canvas.SetLeft(_flashOutline, sx);
             Canvas.SetTop(_flashOutline, sy);
             _canvas.Children.Add(_flashOutline);
+            _feedbackText.Text = _localizer?.Get("Region_NoJapanese")
+                ?? "No recognizable Japanese was found in this area. Please select a different area.";
+            _feedbackMessage.MaxWidth = Math.Min(560, Math.Min(Math.Max(0, winW - 24), Math.Max(280, sw - 32)));
+            _feedbackMessage.MaxHeight = Math.Max(0, winH - 24);
+            _feedbackMessage.Measure(new Size(_feedbackMessage.MaxWidth, _feedbackMessage.MaxHeight));
+            var messageSize = _feedbackMessage.DesiredSize;
+            Canvas.SetLeft(_feedbackMessage, Math.Clamp(sx + (sw - messageSize.Width) / 2,
+                12, Math.Max(12, winW - messageSize.Width - 12)));
+            Canvas.SetTop(_feedbackMessage, Math.Clamp(sy + (sh - messageSize.Height) / 2,
+                12, Math.Max(12, winH - messageSize.Height - 12)));
+            _canvas.Children.Add(_feedbackMessage);
             return;
         }
 

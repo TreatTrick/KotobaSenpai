@@ -98,6 +98,17 @@ public sealed partial class LocalizationKeyCoverageTests
             Assert.NotNull(translated.GetString(key));
     }
 
+    [Fact]
+    public void Empty_recognition_warning_has_distinct_english_and_chinese_translations()
+    {
+        var english = Strings.GetString("Region_NoJapanese", CultureInfo.GetCultureInfo("en"));
+        var chinese = Strings.GetString("Region_NoJapanese", CultureInfo.GetCultureInfo("zh-CN"));
+
+        Assert.Equal("No recognizable Japanese was found in this area. Please select a different area.", english);
+        Assert.False(string.IsNullOrWhiteSpace(chinese));
+        Assert.NotEqual(english, chinese);
+    }
+
     /// <summary>Searches upward from the test output directory for a source file in the repo, avoiding a hard-coded relative depth.</summary>
     private static string FindSourceFile(string relativePathFromRepo)
     {

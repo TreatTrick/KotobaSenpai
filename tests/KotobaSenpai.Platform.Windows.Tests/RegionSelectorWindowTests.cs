@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Platform.Windows.Overlay;
@@ -31,7 +32,7 @@ public sealed class RegionSelectorWindowTests
 
             Assert.True(selector.IsVisible);
             var canvas = Assert.IsType<Canvas>(selector.Content);
-            var outline = Assert.IsType<Grid>(Assert.Single(canvas.Children.Cast<UIElement>()));
+            var outline = Assert.Single(canvas.Children.OfType<Grid>());
             selector.UpdateLayout();
             Assert.False(canvas.IsHitTestVisible);
             Assert.False(selector.ShowActivated);
@@ -49,7 +50,7 @@ public sealed class RegionSelectorWindowTests
             Assert.Equal(pixels.Height / scale, outline.Height, precision: 3);
             var image = new RenderTargetBitmap((int)Math.Ceiling(selector.Width), (int)Math.Ceiling(selector.Height),
                 96, 96, PixelFormats.Pbgra32);
-            image.Render(canvas);
+            image.Render(outline);
             var centerX = (int)(Canvas.GetLeft(outline) + outline.Width / 2);
             var top = (int)Canvas.GetTop(outline);
             var center = PixelAt(image, centerX, (int)(top + outline.Height / 2));
@@ -80,9 +81,21 @@ public sealed class RegionSelectorWindowTests
             Assert.True(selector.IsVisible);
             handle = new WindowInteropHelper(selector).Handle;
             var canvas = Assert.IsType<Canvas>(selector.Content);
-            var outline = Assert.IsType<Grid>(Assert.Single(canvas.Children.Cast<UIElement>()));
+            var outline = Assert.Single(canvas.Children.OfType<Grid>());
+            var message = Assert.Single(canvas.Children.OfType<Border>());
+            var messageBlinked = false;
+            var offPhases = 0;
             var pulses = outline.IsVisible ? 1 : 0;
-            outline.IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) pulses++; };
+            outline.IsVisibleChanged += (_, e) =>
+            {
+                if ((bool)e.NewValue)
+                    pulses++;
+                else if (canvas.Children.Contains(outline))
+                {
+                    offPhases++;
+                    messageBlinked |= !message.IsVisible || message.Opacity != 1;
+                }
+            };
             var frame = new DispatcherFrame();
             selector.IsVisibleChanged += (_, _) => { if (!selector.IsVisible) frame.Continue = false; };
             var timedOut = false;
@@ -97,6 +110,8 @@ public sealed class RegionSelectorWindowTests
 
             Assert.False(timedOut, "Region feedback must finish without user interaction.");
             Assert.Equal(5, pulses);
+            Assert.Equal(5, offPhases);
+            Assert.False(messageBlinked, "The error message must remain visible while only the rim blinks.");
             Assert.False(selector.IsVisible);
             Assert.Empty(canvas.Children.Cast<UIElement>());
         }
@@ -181,6 +196,43 @@ public sealed class RegionSelectorWindowTests
         }
     });
 
+    [Fact]
+    public Task Feedback_message_is_localized_includes_an_error_icon_and_refreshes_while_visible() => RunSta(() =>
+    {
+        var (window, target) = CreateTarget();
+        var localizer = new FeedbackLocalizer();
+        var selector = new RegionSelectorWindow(new RecordingSettings(), localizer);
+        try
+        {
+            selector.Flash(target);
+            selector.UpdateLayout();
+            var canvas = Assert.IsType<Canvas>(selector.Content);
+            var message = Assert.Single(canvas.Children.OfType<Border>());
+            var content = Assert.IsType<Grid>(message.Child);
+            var text = Assert.Single(content.Children.OfType<TextBlock>());
+            var icon = Assert.Single(content.Children.OfType<Image>());
+
+            Assert.Equal(localizer.Translation, text.Text);
+            Assert.Equal("Region_NoJapanese", localizer.LastKey);
+            Assert.NotNull(icon.Source);
+            Assert.Equal(0, Grid.GetColumn(icon));
+            Assert.Equal(1, Grid.GetColumn(text));
+            Assert.True(message.IsVisible);
+
+            localizer.ChangeTranslation("Updated language: choose a different area.");
+
+            Assert.Equal(localizer.Translation, text.Text);
+            selector.Close();
+            Assert.Equal(0, localizer.SubscriberCount);
+        }
+        finally
+        {
+            if (selector.IsVisible)
+                selector.Close();
+            window.Close();
+        }
+    });
+
     private static (byte Blue, byte Green, byte Red, byte Alpha) PixelAt(BitmapSource image, int x, int y)
     {
         var pixel = new byte[4];
@@ -221,6 +273,21 @@ public sealed class RegionSelectorWindowTests
         public int WriteCount { get; private set; }
         public string? GetValue(string key) => null;
         public void SetValue(string key, string? value) => WriteCount++;
+    }
+
+    private sealed class FeedbackLocalizer : IStringLocalizer
+    {
+        private EventHandler? _cultureChanged;
+        public string Translation { get; private set; } = "No recognizable Japanese was found in this area. Please select a different area.";
+        public string? LastKey { get; private set; }
+        public int SubscriberCount => _cultureChanged?.GetInvocationList().Length ?? 0;
+        public string Get(string key, params object[] args) { LastKey = key; return Translation; }
+        public event EventHandler? CultureChanged
+        {
+            add => _cultureChanged += value;
+            remove => _cultureChanged -= value;
+        }
+        public void ChangeTranslation(string text) { Translation = text; _cultureChanged?.Invoke(this, EventArgs.Empty); }
     }
 
     private sealed class FakeTracker : ITargetWindowTracker

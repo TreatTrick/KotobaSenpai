@@ -54,6 +54,7 @@ public static class ResourceKeys
     public const string Status_Hidden = nameof(Status_Hidden);
     public const string Status_RegionSelecting = nameof(Status_RegionSelecting);
     public const string Region_Confirm = nameof(Region_Confirm);
+    public const string Region_NoJapanese = nameof(Region_NoJapanese);
 
     // --- Unexpected-error prompt (global unhandled-exception fallback dialog) ---
     public const string UnexpectedError_Title = nameof(UnexpectedError_Title);

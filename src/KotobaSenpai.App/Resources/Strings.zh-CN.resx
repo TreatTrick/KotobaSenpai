@@ -161,6 +161,9 @@
   <data name="Region_Confirm" xml:space="preserve">
     <value>确定</value>
   </data>
+  <data name="Region_NoJapanese" xml:space="preserve">
+    <value>选取内没有可识别日语，请重新选择选取</value>
+  </data>
   <!-- 意外错误提示（全局未处理异常兜底弹窗） -->
   <data name="UnexpectedError_Title" xml:space="preserve">
     <value>意外错误</value>
