@@ -30,7 +30,8 @@ public sealed class RecognitionPageViewModelTests
         var recognizer = new DeferredRecognizer();
         var capture = new RecordingCapture();
         var controller = new RecordingAutoController();
-        var (vm, overlay, _, logger) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer, capture: capture, controller: controller);
+        var selector = new FakeRegionSelector();
+        var (vm, overlay, _, logger) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer, capture: capture, controller: controller, regionSelector: selector);
         vm.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
         var stoppedBefore = capture.StopCount;
@@ -48,6 +49,82 @@ public sealed class RecognitionPageViewModelTests
         Assert.Equal(0, overlay.ShowCount);
         Assert.Equal(status, vm.Status);
         Assert.Equal(0, logger.ErrorCount);
+        Assert.Equal(0, selector.FlashCount);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("0.1,0.6,0.8,0.3")]
+    public async Task Empty_manual_recognition_flashes_the_saved_region_and_can_be_repeated(string? savedRegion)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 200, 100));
+        var recognizer = new DeferredRecognizer();
+        recognizer.Completion.SetResult(new WordRecognitionResult(200, 100, []));
+        var selector = new FakeRegionSelector();
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer,
+            regionSelector: selector, settings: new FakeSettings(savedRegion));
+        vm.SelectedWindow = target;
+
+        await vm.RecognizeCommand.ExecuteAsync(null);
+
+        Assert.Equal(ResourceKeys.Status_NoWords + ":0", vm.Status);
+        Assert.Equal(1, selector.FlashCount);
+        Assert.Equal(target, selector.LastFlashTarget);
+        Assert.Equal(savedRegion, selector.LastFlashRegion?.Serialize());
+
+        await vm.RecognizeCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, selector.FlashCount);
+    }
+
+    [Fact]
+    public async Task Automatic_empty_results_flash_once_until_text_is_recognized_again()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 200, 100));
+        var empty = new WordRecognitionResult(200, 100, []);
+        var text = new WordRecognitionResult(200, 100,
+            [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]);
+        var recognizer = new SequenceRecognizer(empty, empty, text, empty);
+        var selector = new FakeRegionSelector();
+        var controller = new RecordingAutoController();
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer,
+            controller: controller, regionSelector: selector);
+        vm.SelectedWindow = target;
+        vm.AutoRecognitionEnabled = true;
+
+        await vm.RecognizeCommand.ExecuteAsync(null);
+        Assert.Equal(1, selector.FlashCount);
+        await controller.ChangeAsync();
+        Assert.Equal(1, selector.FlashCount);
+        var stoppedBefore = selector.StopFlashingCount;
+        await controller.ChangeAsync();
+        Assert.Equal(stoppedBefore + 1, selector.StopFlashingCount);
+        await controller.ChangeAsync();
+        Assert.Equal(2, selector.FlashCount);
+    }
+
+    [Theory]
+    [InlineData("hide")]
+    [InlineData("switch")]
+    [InlineData("clear")]
+    [InlineData("dispose")]
+    public async Task Ending_a_session_stops_empty_result_feedback(string action)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 200, 100));
+        var recognizer = new DeferredRecognizer();
+        recognizer.Completion.SetResult(new WordRecognitionResult(200, 100, []));
+        var selector = new FakeRegionSelector();
+        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer, regionSelector: selector);
+        vm.SelectedWindow = target;
+        await vm.RecognizeCommand.ExecuteAsync(null);
+        var stoppedBefore = selector.StopFlashingCount;
+
+        if (action == "hide") vm.HideCommand.Execute(null);
+        if (action == "switch") vm.SelectedWindow = new WindowTarget((nint)3, "Other", target.Bounds);
+        if (action == "clear") vm.SelectedWindow = null;
+        if (action == "dispose") vm.Dispose();
+
+        Assert.Equal(stoppedBefore + 1, selector.StopFlashingCount);
     }
 
     [Fact]
@@ -97,7 +174,8 @@ public sealed class RecognitionPageViewModelTests
     public async Task Recognize_reports_count_and_shows_overlay()
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
-        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog(target));
+        var selector = new FakeRegionSelector();
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog(target), regionSelector: selector);
         vm.RefreshCommand.Execute(null);
         vm.SelectedWindow = vm.Windows[0];
 
@@ -106,6 +184,7 @@ public sealed class RecognitionPageViewModelTests
         Assert.Equal($"{ResourceKeys.Status_WordsRecognized}:1", vm.Status);
         Assert.Equal(1, overlay.ShowCount);
         Assert.NotNull(overlay.LastSession);
+        Assert.Equal(0, selector.FlashCount);
     }
 
     [Fact]
@@ -211,7 +290,9 @@ public sealed class RecognitionPageViewModelTests
         ITargetWindowTracker? tracker = null,
         IWindowWordRecognizer? recognizer = null,
         IWindowFrameCapture? capture = null,
-        IAutoRecognitionController? controller = null)
+        IAutoRecognitionController? controller = null,
+        IRegionSelector? regionSelector = null,
+        ISettingsService? settings = null)
     {
         var overlay = new FakeOverlay();
         var workflow = new WordOverlayApplicationService(
@@ -221,7 +302,7 @@ public sealed class RecognitionPageViewModelTests
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
-        return (new RecognitionPageViewModel(catalog, workflow, new FakeRegionSelector(), new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
+        return (new RecognitionPageViewModel(catalog, workflow, regionSelector ?? new FakeRegionSelector(), settings ?? new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowCatalog : IWindowCatalog
@@ -264,9 +345,11 @@ public sealed class RecognitionPageViewModelTests
 
     private sealed class RecordingAutoController : IAutoRecognitionController
     {
+        private Func<CancellationToken, Task>? _onChange;
         public int StartCount { get; private set; }
         public bool IsRunning { get; private set; }
-        public void Start(WindowTarget target, Func<CancellationToken, Task>? onChange = null) { StartCount++; IsRunning = true; }
+        public void Start(WindowTarget target, Func<CancellationToken, Task>? onChange = null) { StartCount++; IsRunning = true; _onChange = onChange; }
+        public Task ChangeAsync() => _onChange!(CancellationToken.None);
         public void Stop() => IsRunning = false;
         public void Dispose() => Stop();
     }
@@ -275,13 +358,32 @@ public sealed class RecognitionPageViewModelTests
     {
         public static WindowTarget? LastTarget;
         public static int ShowCount;
+        public int FlashCount { get; private set; }
+        public int StopFlashingCount { get; private set; }
+        public WindowTarget? LastFlashTarget { get; private set; }
+        public RecognitionRegion? LastFlashRegion { get; private set; }
         public void Show(WindowTarget target, RecognitionRegion? initial = null) { LastTarget = target; ShowCount++; }
+        public void Flash(WindowTarget target, RecognitionRegion? region = null)
+        {
+            FlashCount++;
+            LastFlashTarget = target;
+            LastFlashRegion = region;
+        }
+        public void StopFlashing() => StopFlashingCount++;
     }
 
-    private sealed class FakeSettings : ISettingsService
+    private sealed class FakeSettings(string? region = null) : ISettingsService
     {
-        public string? GetValue(string key) => null;
+        public string? GetValue(string key) => key == RecognitionRegion.SettingsKey ? region : null;
         public void SetValue(string key, string? value) { }
+    }
+
+    private sealed class SequenceRecognizer(params WordRecognitionResult[] results) : IWindowWordRecognizer
+    {
+        private readonly Queue<WordRecognitionResult> _results = new(results);
+        public Task<WordRecognitionResult> RecognizeAsync(Guid recognitionId, WindowTarget target,
+            CancellationToken cancellationToken = default, ScreenRect? region = null)
+            => Task.FromResult(_results.Dequeue());
     }
 
     private sealed class StubTokenizer : ITokenizer

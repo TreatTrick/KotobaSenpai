@@ -5,6 +5,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
+using System.Windows.Threading;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
 
@@ -29,6 +31,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private readonly IStringLocalizer? _localizer;
     private readonly ITargetWindowTracker? _tracker;
     private readonly Canvas _canvas = new();
+    private readonly Grid _flashOutline = CreateWarningOutline();
+    private readonly DispatcherTimer _flashTimer;
 
     private WindowTarget? _target;
     private nint _ownerHandle;
@@ -36,6 +40,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private ScreenRect _region;   // window-relative pixels
     private double _scale = 1.0;
     private int _dragCorner = -1; // 0..3 = TL,TR,BL,BR; -1 = none
+    private bool _isFlashing;
+    private int _flashesRemaining;
 
     public RegionSelectorWindow(
         ISettingsService settings,
@@ -45,6 +51,11 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _localizer = localizer;
         _tracker = tracker;
+        _flashTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(250),
+        };
+        _flashTimer.Tick += OnFlashTick;
 
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -58,20 +69,58 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         {
             SetOwnerHandle();
             SetNoActivate();
-            OverlayWindowRegistry.Register(new WindowInteropHelper(this).Handle);
+            var handle = new WindowInteropHelper(this).Handle;
+            OverlayWindowRegistry.Register(handle);
+            // WPF clears the native handle before raising Closed.
+            Closed += (_, _) => OverlayWindowRegistry.Unregister(handle);
         };
         if (_tracker is not null)
             _tracker.Changed += OnTargetChanged;
         Closed += (_, _) =>
         {
+            ClearSelection();
             if (_tracker is not null)
                 _tracker.Changed -= OnTargetChanged;
-            OverlayWindowRegistry.Unregister(new WindowInteropHelper(this).Handle);
         };
         // NOTE: intentionally NOT click-through — this window must capture mouse for dragging and the confirm button.
     }
 
     public void Show(WindowTarget target, RecognitionRegion? initial = null)
+        => ShowCore(target, initial, flashing: false);
+
+    private static Grid CreateWarningOutline()
+    {
+        var glow = new DropShadowEffect
+        {
+            Color = Color.FromRgb(0xFF, 0x2A, 0x40),
+            BlurRadius = 16,
+            ShadowDepth = 0,
+            Opacity = 0.95,
+            RenderingBias = RenderingBias.Quality,
+        };
+        glow.Freeze();
+        var outline = new Grid { IsHitTestVisible = false };
+        outline.Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Stroke = new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x50)),
+            StrokeThickness = 3,
+            RadiusX = 6,
+            RadiusY = 6,
+            Margin = new Thickness(2),
+            Effect = glow,
+        });
+        outline.Children.Add(new System.Windows.Shapes.Rectangle
+        {
+            Stroke = new SolidColorBrush(Color.FromRgb(0xFF, 0xD5, 0xDC)),
+            StrokeThickness = 1,
+            RadiusX = 5,
+            RadiusY = 5,
+            Margin = new Thickness(3),
+        });
+        return outline;
+    }
+
+    private void ShowCore(WindowTarget target, RecognitionRegion? initial, bool flashing)
     {
         ArgumentNullException.ThrowIfNull(target);
         ClearSelection();
@@ -88,6 +137,9 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         }
 
         _target = activeTarget;
+        _isFlashing = flashing;
+        _flashesRemaining = 5;
+        _canvas.IsHitTestVisible = !flashing;
         _ownerHandle = activeTarget.Handle;
         SetOwnerHandle();
         _normalizedRegion = initial ?? RecognitionRegion.Full;
@@ -95,7 +147,50 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
         if (!IsVisible)
             Show();
+        SetNoActivate();
         PositionAndRedraw();
+        if (flashing)
+            _flashTimer.Start();
+    }
+
+    public void Flash(WindowTarget target, RecognitionRegion? region = null)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => Flash(target, region));
+            return;
+        }
+        // Keep an active editor intact when an asynchronous recognition finishes.
+        if (IsVisible && !_isFlashing)
+            return;
+        ShowCore(target, region, flashing: true);
+    }
+
+    public void StopFlashing()
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(StopFlashing);
+            return;
+        }
+        if (!_isFlashing)
+            return;
+        ClearSelection();
+        Hide();
+    }
+
+    private void OnFlashTick(object? sender, EventArgs e)
+    {
+        if (_flashOutline.Visibility == Visibility.Visible)
+        {
+            _flashOutline.Visibility = Visibility.Hidden;
+            if (--_flashesRemaining == 0)
+                StopFlashing();
+        }
+        else
+        {
+            _flashOutline.Visibility = Visibility.Visible;
+        }
     }
 
     private void OnTargetChanged(object? sender, TargetWindowSnapshot snapshot)
@@ -116,6 +211,11 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         }
         if (!snapshot.IsRenderable)
         {
+            if (_isFlashing)
+            {
+                StopFlashing();
+                return;
+            }
             _dragCorner = -1;
             if (IsMouseCaptured)
                 ReleaseMouseCapture();
@@ -135,6 +235,12 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
     private void ClearSelection()
     {
+        _flashTimer.Stop();
+        _isFlashing = false;
+        _canvas.Children.Clear();
+        _canvas.IsHitTestVisible = true;
+        _flashOutline.Visibility = Visibility.Visible;
+        SetNoActivate();
         _target = null;
         _dragCorner = -1;
         if (IsMouseCaptured)
@@ -204,6 +310,16 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         double winH = target.Bounds.Height / _scale;
         double sx = _region.X / _scale, sy = _region.Y / _scale;
         double sw = _region.Width / _scale, sh = _region.Height / _scale;
+
+        if (_isFlashing)
+        {
+            _flashOutline.Width = sw;
+            _flashOutline.Height = sh;
+            Canvas.SetLeft(_flashOutline, sx);
+            Canvas.SetTop(_flashOutline, sy);
+            _canvas.Children.Add(_flashOutline);
+            return;
+        }
 
         // Dim the four areas outside the region so the capture range stands out.
         AddRect(0, 0, winW, sy);
@@ -315,7 +431,12 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private void SetNoActivate()
     {
         var handle = new WindowInteropHelper(this).Handle;
+        if (handle == nint.Zero)
+            return;
         var style = NativeMethods.GetWindowLongPtr(handle, NativeMethods.GwlExStyle).ToInt64();
+        style = _isFlashing
+            ? style | NativeMethods.WsExTransparent
+            : style & ~NativeMethods.WsExTransparent;
         NativeMethods.SetWindowLongPtr(handle, NativeMethods.GwlExStyle,
             new nint(style | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
     }
@@ -333,6 +454,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     {
         public const int GwlExStyle = -20;
         public const long WsExNoActivate = 0x08000000;
+        public const long WsExTransparent = 0x20;
         public const long WsExToolWindow = 0x80;
         public const uint GwHwndPrev = 3;
         public const uint SwpNoSize = 0x0001;

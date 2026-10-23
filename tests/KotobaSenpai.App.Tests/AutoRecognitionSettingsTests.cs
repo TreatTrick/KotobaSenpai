@@ -98,6 +98,8 @@ public sealed class AutoRecognitionSettingsTests
     private sealed class FakeRegionSelector : IRegionSelector
     {
         public void Show(WindowTarget target, RecognitionRegion? initial = null) { }
+        public void Flash(WindowTarget target, RecognitionRegion? region = null) { }
+        public void StopFlashing() { }
     }
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
