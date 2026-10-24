@@ -21,7 +21,7 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 /// WPF implementation of the <see cref="IOverlayRenderer"/> port: a transparent, target-relative, non-activating, click-through
 /// tool window that draws one underline for each local merged word. Hovering a local word recolors its underline and shows
 /// its LLM meaning popup; hovering a group recolors the underlines of its member words and shows the group detail popup.
-/// Clicks always pass through to the window below.
+/// Annotation clicks pass through; the detail popup receives mouse input without activating.
 /// </summary>
 public sealed class WpfOverlayRenderer : IOverlayRenderer
 {
@@ -102,7 +102,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         });
     }
 
-    private sealed class OverlayWindow : Window
+    internal sealed class OverlayWindow : Window
     {
         private static readonly Brush DefaultLineBrush = Brushes.DeepSkyBlue;
         private static readonly Brush HoverLineBrush = Brushes.OrangeRed;
@@ -148,9 +148,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _tracker.Changed += OnTargetChanged;
             Closed += (_, _) =>
             {
+                StopHover();
                 if (_tracker is not null)
                     _tracker.Changed -= OnTargetChanged;
-                OverlayWindowRegistry.Unregister(new WindowInteropHelper(this).Handle);
             };
 
             WindowStyle = WindowStyle.None;
@@ -163,9 +163,12 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             Content = _canvas;
             SourceInitialized += (_, _) =>
             {
+                _phrasePopup.Owner = this;
                 SetOwnerHandle();
                 SetClickThrough();
-                OverlayWindowRegistry.Register(new WindowInteropHelper(this).Handle);
+                var handle = new WindowInteropHelper(this).Handle;
+                OverlayWindowRegistry.Register(handle);
+                Closed += (_, _) => OverlayWindowRegistry.Unregister(handle);
             };
             IsVisibleChanged += (_, _) => LogWindowDiagnostics("visibility-changed");
             StateChanged += (_, _) => LogWindowDiagnostics("window-state-changed");
@@ -728,9 +731,19 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         public void StopHover()
         {
             _hoverTimer.Stop();
+            ClearHover();
+        }
+
+        private void ClearHover()
+        {
             _hoverIndex = -1;
             _hoveredGroup = -1;
             _hoveredGroupLines = Array.Empty<int>();
+            DismissPopup();
+        }
+
+        private void DismissPopup()
+        {
             _phrasePopup.HidePopup();
             foreach (var element in _lineElements)
                 element.Background = DefaultLineBrush;
@@ -739,18 +752,39 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         /// <summary>
         /// Polls the cursor position for hit testing (the window is click-through and receives no mouse events of its own).
         /// Tests phrase groups first (overlaps resolved by fewer tokens, then provider order), highlighting the underlines of
-        /// the group's member words; otherwise falls back to the local-word hot zone.
+        /// the group's member words; otherwise falls back to the local-word hot zone. Retains the active popup
+        /// while approaching it or staying within its exit margin, before resolving a different source.
         /// </summary>
         private void PollHover()
+        {
+            if (NativeMethods.GetCursorPos(out var cursor))
+                PollHover(cursor.X, cursor.Y);
+        }
+
+        internal void PollHover(int cursorX, int cursorY)
         {
             var session = _session;
             if (session is null || (session.Words.Count == 0 && session.PhraseGroups.Count == 0))
                 return;
 
-            if (!NativeMethods.GetCursorPos(out var cursor))
-                return;
-
+            var cursor = new NativeMethods.POINT { X = cursorX, Y = cursorY };
             var groupHit = PhraseHoverResolver.Resolve(session.PhraseGroups, cursor.X, cursor.Y);
+            var hit = groupHit < 0 ? HitTestWord(session, cursor) : -1;
+            if (_phrasePopup.IsVisible)
+            {
+                var isOverSource = _hoveredGroup >= 0
+                    ? groupHit == _hoveredGroup
+                    : hit >= 0 && hit == _hoverIndex;
+                if (_phrasePopup.ShouldRemainOpen(cursor.X, cursor.Y, isOverSource))
+                    return;
+                if (isOverSource)
+                {
+                    // Keep the source identity until it is left, so dismissal does not immediately reopen it.
+                    DismissPopup();
+                    return;
+                }
+                ClearHover();
+            }
             if (groupHit != _hoveredGroup)
             {
                 foreach (var i in _hoveredGroupLines)
@@ -779,9 +813,24 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 // Suspend local-word hover while a group is hit, to keep the two popup states from fighting.
                 UnhighlightWord(_hoverIndex);
                 _hoverIndex = -1;
+                _phrasePopup.ShouldRemainOpen(cursor.X, cursor.Y, isOverSource: true);
                 return;
             }
 
+            if (hit == _hoverIndex)
+                return;
+            UnhighlightWord(_hoverIndex);
+            _hoverIndex = hit;
+            if (hit >= 0)
+                foreach (var li in WordLineIndices(hit))
+                    if (li < _lineElements.Count)
+                        _lineElements[li].Background = HoverLineBrush;
+            UpdatePopup(hit);
+            _phrasePopup.ShouldRemainOpen(cursor.X, cursor.Y, isOverSource: true);
+        }
+
+        private static int HitTestWord(WordOverlaySession session, NativeMethods.POINT cursor)
+        {
             // Local-word hot zone: hit any rect of a word; on overlap, the one whose union center is nearest.
             int hit = -1;
             double best = double.MaxValue;
@@ -800,15 +849,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 }
             }
 
-            if (hit == _hoverIndex)
-                return;
-            UnhighlightWord(_hoverIndex);
-            _hoverIndex = hit;
-            if (hit >= 0)
-                foreach (var li in WordLineIndices(hit))
-                    if (li < _lineElements.Count)
-                        _lineElements[li].Background = HoverLineBrush;
-            UpdatePopup(hit);
+            return hit;
         }
 
         private void UnhighlightWord(int wordIndex)

@@ -1,6 +1,7 @@
 using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Geometry;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
@@ -10,8 +11,8 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
 /// Detail popup for both phrase groups and LLM word meanings: shows the group's label/meaning/grammar (plus per-word
-/// meanings) or a single word's headword/pos/reading/meaning/grammar. Click-through and non-activating; updated by
-/// the overlay when the hovered group or word changes and hidden when it leaves.
+/// meanings) or a single word's headword/pos/reading/meaning/grammar. Receives mouse input without activation;
+/// the overlay controls its lifetime while the pointer approaches or interacts with it.
 /// </summary>
 public sealed partial class PhrasePopup : Window
 {
@@ -20,6 +21,7 @@ public sealed partial class PhrasePopup : Window
 
     private readonly IStringLocalizer? _localizer;
     private readonly ILogger? _logger;
+    private readonly PhrasePopupHoverTracker _hoverTracker = new();
 
     public PhrasePopup(IStringLocalizer? localizer = null, ILogger? logger = null)
     {
@@ -36,8 +38,9 @@ public sealed partial class PhrasePopup : Window
         _logger = logger;
         SourceInitialized += (_, _) =>
         {
-            SetClickThrough();
+            ConfigureMouseInput();
             var handle = new WindowInteropHelper(this).Handle;
+            HwndSource.FromHwnd(handle)?.AddHook(WindowProc);
             OverlayWindowRegistry.Register(handle);
             // WPF resets WindowInteropHelper.Handle before raising Closed.
             Closed += (_, _) => OverlayWindowRegistry.Unregister(handle);
@@ -68,12 +71,32 @@ public sealed partial class PhrasePopup : Window
 
     public void HidePopup()
     {
+        _hoverTracker.Reset();
         if (IsVisible)
             Hide();
     }
 
+    protected override void OnMouseEnter(MouseEventArgs e)
+    {
+        base.OnMouseEnter(e);
+        _hoverTracker.MarkEntered();
+    }
+
+    internal bool ShouldRemainOpen(int cursorX, int cursorY, bool isOverSource)
+    {
+        if (!IsVisible)
+            return false;
+        var handle = new WindowInteropHelper(this).Handle;
+        if (!Native.GetWindowRect(handle, out var bounds))
+            return false;
+        var dpi = Native.GetDpiForWindow(handle);
+        return _hoverTracker.ShouldRemainOpen(bounds.ToScreenRect(), cursorX, cursorY,
+            dpi == 0 ? 1 : dpi / 96d, isOverSource);
+    }
+
     private void ShowAndPosition(ScreenRect anchor)
     {
+        _hoverTracker.Reset();
         PopupScrollViewer.ScrollToTop();
         new WindowInteropHelper(this).EnsureHandle();
         Position(anchor);
@@ -157,17 +180,40 @@ public sealed partial class PhrasePopup : Window
         return new ScreenRect(x, y, width, height);
     }
 
-    private void SetClickThrough()
+    private void ConfigureMouseInput()
     {
         var handle = new WindowInteropHelper(this).Handle;
         var style = Native.GetWindowLongPtr(handle, Native.GwlExStyle).ToInt64();
         Native.SetWindowLongPtr(handle, Native.GwlExStyle,
-            new nint(style | Native.WsExTransparent | Native.WsExNoActivate | Native.WsExToolWindow));
+            new nint((style & ~Native.WsExTransparent) | Native.WsExNoActivate | Native.WsExToolWindow));
+    }
+
+    private nint WindowProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
+    {
+        if (message == Native.WmMouseActivate)
+        {
+            handled = true;
+            return Native.MaNoActivate;
+        }
+        if (message == Native.WmMouseWheel)
+        {
+            // Route directly to the scroll viewer even though this window never takes keyboard focus.
+            var delta = unchecked((short)(wParam.ToInt64() >> 16));
+            PopupScrollViewer.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, delta)
+            {
+                RoutedEvent = Mouse.MouseWheelEvent,
+            });
+            handled = true;
+        }
+        return nint.Zero;
     }
 
     private static class Native
     {
         public const int GwlExStyle = -20;
+        public const int WmMouseActivate = 0x0021;
+        public const int WmMouseWheel = 0x020A;
+        public const int MaNoActivate = 3;
         public const long WsExTransparent = 0x20;
         public const long WsExNoActivate = 0x08000000;
         public const long WsExToolWindow = 0x80;

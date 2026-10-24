@@ -3,11 +3,16 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Platform.Windows.Overlay;
 using Xunit.Abstractions;
 
@@ -174,7 +179,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
     });
 
     [Fact]
-    public Task Native_window_keeps_focus_click_through_registration_and_reuse() => RunSta(() =>
+    public Task Native_window_intercepts_mouse_input_without_activation_and_keeps_registration_and_reuse() => RunSta(() =>
     {
         var target = new Window
         {
@@ -197,8 +202,11 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.False(popup.Topmost);
             Assert.False(popup.ShowActivated);
             Assert.False(popup.ShowInTaskbar);
-            const long requiredStyles = 0x20 | 0x08000000 | 0x80;
+            const long requiredStyles = 0x08000000 | 0x80;
             Assert.Equal(requiredStyles, Native.GetWindowLongPtr(handle, -20).ToInt64() & requiredStyles);
+            Assert.Equal(0, Native.GetWindowLongPtr(handle, -20).ToInt64() & 0x20);
+            Assert.Equal((nint)3, Native.SendMessage(handle, 0x0021, targetHandle, (nint)0x02010001));
+            Assert.Equal(activeBefore, Native.GetActiveWindow());
             Assert.Contains(handle, OverlayWindowRegistry.Snapshot());
             Assert.True(Native.GetWindowRect(handle, out var bounds));
             // Arrange both test windows above other non-topmost desktop windows without taking focus.
@@ -206,7 +214,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.True(Native.SetWindowPos(targetHandle, nint.Zero, 0, 0, 0, 0, positionFlags));
             Assert.True(Native.SetWindowPos(handle, nint.Zero, 0, 0, 0, 0, positionFlags));
             Assert.Equal(activeBefore, Native.GetActiveWindow());
-            Assert.Equal(targetHandle, Native.WindowFromPoint(new Native.Point { X = bounds.Left + 5, Y = bounds.Top + 5 }));
+            Assert.Equal(handle, Native.WindowFromPoint(new Native.Point { X = bounds.Left + 20, Y = bounds.Top + 20 }));
 
             popup.HidePopup();
             Assert.False(popup.IsVisible);
@@ -237,6 +245,163 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 
     private static ContentControl Section(PhrasePopup popup, string name)
         => Assert.IsType<ContentControl>(popup.FindName(name));
+
+    [Fact]
+    public Task Mouse_entry_between_poll_ticks_enables_the_exit_margin() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            popup.ShowResult("Phrase", "Meaning", "", new ScreenRect(100, 100, 100, 30));
+            var handle = new WindowInteropHelper(popup).Handle;
+            Assert.True(Native.GetWindowRect(handle, out var bounds));
+            Assert.True(popup.ShouldRemainOpen(bounds.Left - 1, bounds.Top + 20, isOverSource: true));
+
+            popup.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice, Environment.TickCount)
+            {
+                RoutedEvent = Mouse.MouseEnterEvent,
+            });
+
+            var margin = (int)Math.Floor(10 * Native.GetDpiForWindow(handle) / 96d);
+            Assert.True(popup.ShouldRemainOpen(bounds.Left - margin, bounds.Top + 20, isOverSource: false));
+            Assert.False(popup.ShouldRemainOpen(bounds.Left - margin - 1, bounds.Top + 20, isOverSource: false));
+        }
+        finally { popup.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public Task Hover_retains_the_popup_during_transfer_and_after_entry(bool phrase, bool initiallyInside) => RunSta(() =>
+    {
+        var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 600 };
+        var overlay = new WpfOverlayRenderer.OverlayWindow();
+        nint overlayHandle = 0;
+        nint popupHandle = 0;
+        try
+        {
+            target.Show();
+            var targetHandle = new WindowInteropHelper(target).Handle;
+            Assert.True(Native.GetWindowRect(targetHandle, out var targetBounds));
+            var source = new ScreenRect(targetBounds.Left + 100, targetBounds.Top + 100, 100, 80);
+            var word = new GroupedWord(new Token("Word", "Word", "Word", "", "", "",
+                new PartsOfSpeech("Noun", "", "", ""), "", "", "", 0), source);
+            var behind = new GroupedWord(new Token("Other", "Other", "Other", "", "", "",
+                new PartsOfSpeech("Noun", "", "", ""), "", "", "", 0),
+                new ScreenRect(source.X, source.Bottom + 10, 100, 30));
+            var meaning = initiallyInside
+                ? string.Join(" ", Enumerable.Repeat("An explanation that exceeds the available monitor height.", 500))
+                : "Meaning";
+            var groups = phrase
+                ? new[] { new PhraseGroupView(Guid.NewGuid(), "Phrase", "Type", meaning, "", 0, 1, [new([source])]) }
+                : Array.Empty<PhraseGroupView>();
+            overlay.Render(WordOverlaySession.Start(new WindowTarget(targetHandle, "Target",
+                new ScreenRect(targetBounds.Left, targetBounds.Top, targetBounds.Right - targetBounds.Left, targetBounds.Bottom - targetBounds.Top)),
+                [word, behind], groups, wordMeanings: [new WordMeaningView("Word", "", "Noun", meaning, "")]), 1d / 3);
+            overlayHandle = new WindowInteropHelper(overlay).Handle;
+            var popup = Assert.Single(overlay.OwnedWindows.OfType<PhrasePopup>());
+            overlay.PollHover(source.X + 20, source.Y + 10);
+            Assert.True(popup.IsVisible);
+            var snapshot = popup.DataContext;
+            var handle = new WindowInteropHelper(popup).Handle;
+            popupHandle = handle;
+            Assert.True(Native.GetWindowRect(handle, out var bounds));
+            var margin = (int)Math.Floor(10 * Native.GetDpiForWindow(handle) / 96d);
+
+            if (initiallyInside)
+            {
+                Assert.InRange(source.Y + 10, bounds.Top, bounds.Bottom);
+                overlay.PollHover(bounds.Left - margin, source.Y + 10);
+                Assert.True(popup.IsVisible, "Initial overlap must use the entered popup's exit margin.");
+                Assert.Same(snapshot, popup.DataContext);
+                overlay.PollHover(bounds.Left - margin - 1, source.Y + 10);
+                Assert.False(popup.IsVisible);
+            }
+            else
+            {
+                overlay.PollHover(source.X + 20, source.Bottom + 1);
+                Assert.True(popup.IsVisible, "Moving across the gap toward the popup must not close it.");
+                Assert.Same(snapshot, popup.DataContext);
+                overlay.PollHover(bounds.Left + 20, bounds.Top + 20);
+                Assert.True(popup.IsVisible);
+                Assert.Same(snapshot, popup.DataContext);
+                overlay.PollHover(bounds.Left + 20, bounds.Bottom + margin);
+                Assert.True(popup.IsVisible, "The DPI-scaled exit margin must preserve the popup.");
+                overlay.PollHover(bounds.Left + 20, bounds.Bottom + margin + 1);
+                Assert.False(popup.IsVisible);
+
+                overlay.PollHover(source.X + 20, source.Y + 10);
+                Assert.True(popup.IsVisible);
+                overlay.PollHover(bounds.Left + 20, bounds.Top + 20);
+                var returnY = bounds.Top - margin - 1;
+                Assert.InRange(returnY, source.Y, source.Bottom);
+                overlay.PollHover(source.X + 20, returnY);
+                Assert.False(popup.IsVisible, "Exiting onto the original source must not immediately reopen the popup.");
+                overlay.PollHover(source.X + 20, returnY);
+                Assert.False(popup.IsVisible);
+                overlay.PollHover(source.X - 10, source.Y + 10);
+                overlay.PollHover(source.X + 20, source.Y + 10);
+                Assert.True(popup.IsVisible);
+                overlay.PollHover(source.X + 20, source.Y - 10);
+                Assert.False(popup.IsVisible, "Moving away before entry must close the popup.");
+            }
+            overlay.PollHover(source.X + 20, source.Y + 10);
+            Assert.True(popup.IsVisible);
+            overlay.ClearSession();
+            Assert.False(popup.IsVisible);
+        }
+        finally { overlay.Close(); target.Close(); }
+        Assert.DoesNotContain(overlayHandle, OverlayWindowRegistry.Snapshot());
+        Assert.DoesNotContain(popupHandle, OverlayWindowRegistry.Snapshot());
+    });
+
+    [Fact]
+    public Task Long_content_has_a_scrollbar_and_accepts_wheel_input_without_activation() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            var anchor = new ScreenRect(100, 100, 100, 30);
+            var longText = string.Join(" ", Enumerable.Repeat("An explanation that exceeds the available monitor height.", 500));
+            var activeBefore = Native.GetActiveWindow();
+            popup.ShowResult("Long phrase", longText, "", anchor);
+            Pump();
+            var viewer = Assert.IsType<ScrollViewer>(popup.FindName("PopupScrollViewer"));
+            Assert.Equal(Visibility.Visible, viewer.ComputedVerticalScrollBarVisibility);
+            Assert.True(viewer.ScrollableHeight > 0);
+            Assert.Equal(0, viewer.VerticalOffset);
+            var focusedBefore = Keyboard.FocusedElement;
+            viewer.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+            {
+                RoutedEvent = UIElement.MouseLeftButtonDownEvent,
+            });
+            Assert.Same(focusedBefore, Keyboard.FocusedElement);
+            Assert.Equal(activeBefore, Native.GetActiveWindow());
+
+            var handle = new WindowInteropHelper(popup).Handle;
+            Assert.True(Native.GetWindowRect(handle, out var bounds));
+            var point = (nint)(((bounds.Top + 40) << 16) | ((bounds.Left + 40) & 0xffff));
+            Native.SendMessage(handle, 0x020A, (nint)unchecked((int)0xFF880000), point);
+            Pump();
+            Assert.True(viewer.VerticalOffset > 0, "Wheel input must scroll the popup's content.");
+            Assert.Equal(activeBefore, Native.GetActiveWindow());
+
+            popup.ShowResult("Short phrase", "Short meaning", "", anchor);
+            Pump();
+            Assert.Equal(Visibility.Collapsed, viewer.ComputedVerticalScrollBarVisibility);
+            Assert.Equal(0, viewer.VerticalOffset);
+        }
+        finally { popup.Close(); }
+    });
+
+    private static void Pump()
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() => frame.Continue = false));
+        Dispatcher.PushFrame(frame);
+    }
 
     private static IEnumerable<string> VisibleText(DependencyObject root)
     {
@@ -292,6 +457,9 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 
         [DllImport("user32.dll")]
         public static extern nint GetActiveWindow();
+
+        [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+        public static extern nint SendMessage(nint handle, uint message, nint wParam, nint lParam);
 
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
         public static extern nint GetWindowLongPtr(nint handle, int index);

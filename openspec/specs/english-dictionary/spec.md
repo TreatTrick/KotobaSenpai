@@ -52,7 +52,7 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 - **THEN** 弹窗显示未收录提示，不重复访问词典或改变 span 边界
 
 ### Requirement: Popup lifecycle and hit-through
-弹窗 SHALL 保持非点击穿透（不拦截鼠标点击），在鼠标移出悬停词后（带短延迟防抖动）隐藏；悬停词切换时弹窗内容随之更新。
+词典详情弹窗 SHALL 遵守 `phrase-popup-presentation` 的鼠标停留、输入拦截及滚动规则；鼠标移向弹窗时保留，进入后离开超过按当前 DPI 换算的 10 DIP 才隐藏。
 
 #### Scenario: Hide on leave
 - **WHEN** 鼠标移出悬停词并停留超过延迟时间

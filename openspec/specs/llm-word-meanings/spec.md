@@ -34,7 +34,7 @@ TBD - created by archiving change keep-jmdic-merge-add-llm-meanings. Update Purp
 - **THEN** 合法词被保留，畸形词被丢弃，本地词块/spans 保持可用
 
 ### Requirement: Word meaning drives the hover popup
-系统 SHALL 在悬停某个本地合并词时，弹出释义小窗，展示该词的`词头 + [词性] + [读音] + [音调] + LLM 最佳中文释义 + 语法`，其中读音和音调来自本地 UniDic 音调片段，音调使用统一 notation（例如 `[2] LH↓L`）。并定位在该词包围盒下方且不遮挡该词。悬停的词若无 LLM 词条，弹窗 SHALL 展示该词的词头、读音、已知音调与“无释义”提示；音调未知时不得伪造红蓝模式。释义 SHALL 仅在对应句段的完整 AI 分析成功并完成最终覆盖层刷新后可用；等待期间的本地振假名和音调显示不得依赖释义结果。弹窗 SHALL 保持点击穿透，移出后延迟隐藏，切换时更新内容。
+系统 SHALL 在悬停某个本地合并词时，弹出释义小窗，展示该词的`词头 + [词性] + [读音] + [音调] + LLM 最佳中文释义 + 语法`，其中读音和音调来自本地 UniDic 音调片段，音调使用统一 notation（例如 `[2] LH↓L`）。并定位在该词包围盒下方且不遮挡该词。悬停的词若无 LLM 词条，弹窗 SHALL 展示该词的词头、读音、已知音调与“无释义”提示；音调未知时不得伪造红蓝模式。释义 SHALL 仅在对应句段的完整 AI 分析成功并完成最终覆盖层刷新后可用；等待期间的本地振假名和音调显示不得依赖释义结果。弹窗 SHALL 遵守 `phrase-popup-presentation` 的鼠标停留、输入拦截及滚动规则：移向弹窗时保留，进入后离开超过按当前 DPI 换算的 10 DIP 才隐藏，窗口内操作不得透传。
 
 #### Scenario: Hover a word after successful analysis
 - **WHEN** 光标悬停在完成 AI 分析且有 LLM 词条的本地合并词上
