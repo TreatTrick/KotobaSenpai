@@ -25,6 +25,22 @@ Detect changes in the selected recognition region and run full or incremental re
 - **WHEN** 应用启动且 `AutoRecognitionEnabled` 为 true
 - **THEN** 在用户选择目标窗口并完成首次手动识别后，自动轮询 SHALL 自动启动
 
+### Requirement: Empty-result region warnings are manual-only
+The system SHALL show the red neon region warning only when a completed, current manual recognition request returns no recognized words. Enabling automatic recognition SHALL NOT suppress this manual feedback. Automatic empty results SHALL NOT start or restart the warning, including repeated empty results or empty results after successful recognition. Automatic results containing words SHALL stop any active region warning.
+
+#### Scenario: Manual recognition finds no words
+- **WHEN** the user clicks the recognition button and the current request completes without recognized words
+- **THEN** the warning appears for the saved region, or the full target client area when no region is saved, even if automatic recognition is enabled
+- **AND** each subsequent manual empty recognition can show the warning again
+
+#### Scenario: Automatic recognition finds no words
+- **WHEN** an automatic recognition callback completes without recognized words
+- **THEN** it does not show or restart the red border or its warning message
+
+#### Scenario: Automatic recognition finds words
+- **WHEN** an active automatic recognition callback returns recognized words
+- **THEN** any warning from a preceding manual empty recognition stops
+
 ### Requirement: 像素差异变化检测
 系统 SHALL 以可配置的间隔（默认 300ms）从当前选中 HWND 的 WGC 会话读取识别区域，并与上一份可比较样本进行像素级差异比较。当差异超过阈值时，系统 SHALL 触发一次 OCR 文本确认。差异采样和后续 OCR SHALL 使用同一目标的 WGC 画面，不依赖桌面屏幕拷贝，也 SHALL NOT 被 WGC 到帧事件直接驱动。遮挡和失去前台焦点 SHALL NOT 暂停检测；目标隐藏、最小化、关闭或捕获不可用时 SHALL 暂停提供有效样本，失败后按当前轮询间隔有限重试，不执行无界内部重试。
 

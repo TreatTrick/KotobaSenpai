@@ -77,14 +77,16 @@ public sealed class RecognitionPageViewModelTests
         Assert.Equal(2, selector.FlashCount);
     }
 
-    [Fact]
-    public async Task Automatic_empty_results_flash_once_until_text_is_recognized_again()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Automatic_empty_results_do_not_flash_while_manual_empty_results_still_do(bool manualStartsEmpty)
     {
         var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 200, 100));
         var empty = new WordRecognitionResult(200, 100, []);
         var text = new WordRecognitionResult(200, 100,
             [new OcrLine([new OcrWord("日", new ScreenRect(10, 5, 10, 10))])]);
-        var recognizer = new SequenceRecognizer(empty, empty, text, empty);
+        var recognizer = new SequenceRecognizer(manualStartsEmpty ? empty : text, empty, empty, text, empty, empty, empty);
         var selector = new FakeRegionSelector();
         var controller = new RecordingAutoController();
         var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer,
@@ -93,14 +95,22 @@ public sealed class RecognitionPageViewModelTests
         vm.AutoRecognitionEnabled = true;
 
         await vm.RecognizeCommand.ExecuteAsync(null);
-        Assert.Equal(1, selector.FlashCount);
+        var expectedWarnings = manualStartsEmpty ? 1 : 0;
+        Assert.Equal(expectedWarnings, selector.FlashCount);
         await controller.ChangeAsync();
-        Assert.Equal(1, selector.FlashCount);
+        Assert.Equal(expectedWarnings, selector.FlashCount);
+        await controller.ChangeAsync();
+        Assert.Equal(expectedWarnings, selector.FlashCount);
         var stoppedBefore = selector.StopFlashingCount;
         await controller.ChangeAsync();
         Assert.Equal(stoppedBefore + 1, selector.StopFlashingCount);
         await controller.ChangeAsync();
-        Assert.Equal(2, selector.FlashCount);
+        Assert.Equal(expectedWarnings, selector.FlashCount);
+        await controller.ChangeAsync();
+        Assert.Equal(expectedWarnings, selector.FlashCount);
+
+        await vm.RecognizeCommand.ExecuteAsync(null);
+        Assert.Equal(expectedWarnings + 1, selector.FlashCount);
     }
 
     [Theory]

@@ -30,7 +30,6 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private readonly IAutoRecognitionController? _autoRecognitionController;
     private readonly IWindowFrameCapture? _capture;
     private bool _recognitionSessionActive;
-    private bool _lastRecognitionWasEmpty;
     private CancellationTokenSource? _manualRecognition;
     private int _sessionVersion;
     private bool _disposed;
@@ -149,14 +148,14 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         {
             _autoRecognitionController?.Stop();
             _recognitionSessionActive = false;
-            _lastRecognitionWasEmpty = false;
             _regionSelector.StopFlashing();
             SetStatus(ResourceKeys.Status_Recognizing);
             var result = await _workflow.RecognizeAndShowAsync(target, cancellation.Token);
             if (cancellation.IsCancellationRequested || version != _sessionVersion) return;
             _recognitionSessionActive = true;
             var wordCount = result.Lines.Sum(line => line.Words.Count);
-            UpdateRegionFeedback(target, wordCount == 0);
+            if (wordCount == 0)
+                _regionSelector.Flash(target, ReadSavedRegion());
             SetStatus(wordCount == 0
                 ? ResourceKeys.Status_NoWords
                 : ResourceKeys.Status_WordsRecognized,
@@ -192,7 +191,6 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         _manualRecognition?.Cancel();
         _autoRecognitionController?.Stop();
         _recognitionSessionActive = false;
-        _lastRecognitionWasEmpty = false;
         _regionSelector.StopFlashing();
         _capture?.Stop();
         _workflow.Hide();
@@ -231,8 +229,9 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         {
             var result = await _workflow.RecognizeChangedAndShowAsync(target, cancellationToken).ConfigureAwait(true);
             cancellationToken.ThrowIfCancellationRequested();
-            if (result is not null && version == _sessionVersion && _recognitionSessionActive)
-                UpdateRegionFeedback(target, result.Lines.All(line => line.Words.Count == 0));
+            if (result is not null && version == _sessionVersion && _recognitionSessionActive
+                && result.Lines.Any(line => line.Words.Count > 0))
+                _regionSelector.StopFlashing();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -246,15 +245,6 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 
     private static bool IsEnabled(string? value)
         => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
-
-    private void UpdateRegionFeedback(WindowTarget target, bool isEmpty)
-    {
-        if (isEmpty && !_lastRecognitionWasEmpty)
-            _regionSelector.Flash(target, ReadSavedRegion());
-        else if (!isEmpty)
-            _regionSelector.StopFlashing();
-        _lastRecognitionWasEmpty = isEmpty;
-    }
 
     /// <summary>Opens the interactive region selector over the selected window to set the recognition sub-region.</summary>
     [RelayCommand]
