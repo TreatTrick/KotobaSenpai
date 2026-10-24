@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -24,35 +25,36 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
         {
             var anchor = new ScreenRect(100, 100, 100, 30);
             var word = new WordMeaningView("学校", "ガッコウ", "Noun", "School", "Word grammar");
-            popup.ShowResult("Phrase", "Group meaning", "Group grammar", anchor, [word]);
+            popup.ShowResult("Phrase", "Group meaning", "Group grammar", anchor, [word], reading: "ガッコウ");
             popup.UpdateLayout();
 
             var phrase = Assert.IsType<PhrasePopupViewModel>(popup.DataContext);
             Assert.Contains("Phrase", VisibleText(popup));
             Assert.Contains("Group meaning", VisibleText(popup));
             Assert.Contains("School", VisibleText(popup));
-            Assert.Contains("がっこう", VisibleText(popup));
+            Assert.Contains("がっこう  |  gakkou", VisibleText(popup));
             var unknownPitch = localized ? "Localized Llm.WordPitchUnknown" : "pitch unknown";
             Assert.Contains(unknownPitch, VisibleText(popup));
             Assert.Contains(phrase.WordsLabel, VisibleText(popup));
             Assert.Equal(Visibility.Collapsed, Section(popup, "PosSection").Visibility);
             Assert.Equal(Visibility.Collapsed, Section(popup, "PitchSection").Visibility);
             Assert.Equal(Visibility.Visible, Section(popup, "WordsSection").Visibility);
+            Assert.Equal(Visibility.Visible, Assert.IsType<Border>(popup.FindName("WordsDivider")).Visibility);
 
             popup.ShowWordMeaning(word, anchor);
             popup.UpdateLayout();
             var wordModel = Assert.IsType<PhrasePopupViewModel>(popup.DataContext);
             Assert.NotSame(phrase, wordModel);
             Assert.Contains("学校", VisibleText(popup));
-            Assert.Contains("がっこう", VisibleText(popup));
-            Assert.Contains(wordModel.PosLabel, VisibleText(popup));
-            if (!string.IsNullOrEmpty(wordModel.PitchLabel))
-                Assert.Contains(wordModel.PitchLabel, VisibleText(popup));
+            Assert.Contains("がっこう  |  gakkou", VisibleText(popup));
+            Assert.Contains("Noun", VisibleText(popup));
+            Assert.DoesNotContain(localized ? "Localized Llm.WordPosLabel" : "Pos", VisibleText(popup));
             Assert.Contains(wordModel.MeaningLabel, VisibleText(popup));
             Assert.Contains("Word grammar", VisibleText(popup));
             Assert.DoesNotContain("Group grammar", VisibleText(popup));
             Assert.Equal(Visibility.Visible, Section(popup, "PosSection").Visibility);
             Assert.Equal(Visibility.Collapsed, Section(popup, "WordsSection").Visibility);
+            Assert.Equal(Visibility.Collapsed, Assert.IsType<Border>(popup.FindName("WordsDivider")).Visibility);
 
             popup.ShowWordWithoutMeaning(word, anchor);
             popup.UpdateLayout();
@@ -74,6 +76,28 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
     });
 
     [Fact]
+    public Task Known_pitch_is_superscript_and_the_metadata_cards_have_distinct_underlines() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            var word = new WordMeaningView("尽きる", "ツキル", "Verb", "Run out", "",
+                [new("尽きる", "ツキル", 0, 2, "[2] LH↓L")]);
+            popup.ShowWordMeaning(word, new ScreenRect(100, 100, 100, 30));
+            popup.UpdateLayout();
+            var heading = Assert.IsType<TextBlock>(popup.FindName("Heading"));
+            var badge = Assert.Single(heading.Inlines.OfType<Run>(), run => run.Text == "②");
+
+            Assert.Equal(BaselineAlignment.Superscript, badge.BaselineAlignment);
+            Assert.Contains("つきる  |  tsukiru", VisibleText(popup));
+            Assert.Contains("Pitch LH↓L", VisibleText(popup));
+            Assert.DoesNotContain("[2]", string.Join(" ", VisibleText(popup)));
+            Assert.NotEqual(Section(popup, "PosSection").Tag, Section(popup, "PitchSection").Tag);
+        }
+        finally { popup.Close(); }
+    });
+
+    [Fact]
     public Task Theme_brush_changes_update_the_existing_popup() => RunSta(() =>
     {
         var popup = new PhrasePopup();
@@ -83,12 +107,15 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             var snapshot = popup.DataContext;
             var foreground = new SolidColorBrush(Colors.Black);
             var surface = new SolidColorBrush(Colors.WhiteSmoke);
+            var layer = new SolidColorBrush(Color.FromArgb(128, 255, 255, 255));
             popup.Resources["TextFillColorPrimaryBrush"] = foreground;
             popup.Resources["SolidBackgroundFillColorBaseBrush"] = surface;
+            popup.Resources["LayerFillColorDefaultBrush"] = layer;
             popup.UpdateLayout();
 
             Assert.Same(foreground, Assert.IsType<TextBlock>(popup.FindName("Heading")).Foreground);
             Assert.Same(surface, Assert.IsType<Border>(popup.FindName("PopupFrame")).Background);
+            Assert.Same(layer, Assert.IsType<Border>(Assert.IsType<Border>(popup.FindName("PopupFrame")).Child).Background);
             Assert.Same(snapshot, popup.DataContext);
         }
         finally
@@ -174,6 +201,11 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.Equal(requiredStyles, Native.GetWindowLongPtr(handle, -20).ToInt64() & requiredStyles);
             Assert.Contains(handle, OverlayWindowRegistry.Snapshot());
             Assert.True(Native.GetWindowRect(handle, out var bounds));
+            // Arrange both test windows above other non-topmost desktop windows without taking focus.
+            const uint positionFlags = 0x0001 | 0x0002 | 0x0010;
+            Assert.True(Native.SetWindowPos(targetHandle, nint.Zero, 0, 0, 0, 0, positionFlags));
+            Assert.True(Native.SetWindowPos(handle, nint.Zero, 0, 0, 0, 0, positionFlags));
+            Assert.Equal(activeBefore, Native.GetActiveWindow());
             Assert.Equal(targetHandle, Native.WindowFromPoint(new Native.Point { X = bounds.Left + 5, Y = bounds.Top + 5 }));
 
             popup.HidePopup();
@@ -270,6 +302,10 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetWindowRect(nint handle, out Rect rect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetWindowPos(nint handle, nint insertAfter, int x, int y, int width, int height, uint flags);
 
         [DllImport("user32.dll")]
         public static extern nint MonitorFromWindow(nint handle, uint flags);

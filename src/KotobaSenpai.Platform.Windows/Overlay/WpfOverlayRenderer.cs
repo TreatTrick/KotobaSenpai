@@ -838,7 +838,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var memberMeanings = session is null
                 ? Array.Empty<WordMeaningView>()
                 : session.GetCoveredWordMeanings(group);
-            _phrasePopup.ShowResult(group.Label, group.Meaning, group.Grammar, anchor, memberMeanings);
+            var reading = string.Join(" ", group.Parts.Select(part => part.Reading).Where(value => !string.IsNullOrWhiteSpace(value)));
+            _phrasePopup.ShowResult(group.Label, group.Meaning, group.Grammar, anchor, memberMeanings, reading);
         }
 
         /// <summary>Shows the hovered word's LLM meaning popup, or headword + reading + "no meaning" when the provider returned none.</summary>

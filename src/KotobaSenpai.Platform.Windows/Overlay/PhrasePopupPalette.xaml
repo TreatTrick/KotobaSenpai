@@ -2,6 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!-- Standalone fallback; hosted popups resolve these Fluent keys from the application instead. -->
   <SolidColorBrush x:Key="SolidBackgroundFillColorBaseBrush" Color="#202020" />
+  <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#4C3A3A3A" />
+  <SolidColorBrush x:Key="DividerStrokeColorDefaultBrush" Color="#20FFFFFF" />
   <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#0DFFFFFF" />
   <SolidColorBrush x:Key="CardStrokeColorDefaultBrush" Color="#19000000" />
   <SolidColorBrush x:Key="SurfaceStrokeColorDefaultBrush" Color="#66757575" />

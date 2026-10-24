@@ -30,7 +30,10 @@ public sealed class PhrasePopupViewModelTests
         Assert.Equal("Words", model.WordsLabel);
         Assert.Equal(["学校", "Second"], model.Words.Select(word => word.Headword));
         Assert.Equal("がっこう", model.Words[0].Reading);
-        Assert.Equal("[0] LHHH", model.Words[0].Pitch);
+        Assert.Equal("⓪", model.Words[0].PitchMarker);
+        Assert.Equal("gakkou", model.Words[0].Romanization);
+        Assert.Equal("がっこう  |  gakkou", model.Words[0].Pronunciation);
+        Assert.Equal("Pitch LHHH", model.Words[0].Pitch);
         Assert.Equal("Noun", model.Words[0].Pos);
         Assert.Equal("School", model.Words[0].Meaning);
         Assert.Empty(model.Words[1].Reading);
@@ -54,11 +57,12 @@ public sealed class PhrasePopupViewModelTests
         Assert.Equal("学校へ", model.Heading);
         Assert.Equal("がっこうへ", model.Reading);
         Assert.Equal("Expression", model.Pos);
-        Assert.Equal("[0] LHHH | [1] H", model.Pitch);
+        Assert.Equal("⓪①", model.PitchMarker);
+        Assert.Equal("Pitch LHHH | H↓", model.Pitch);
+        Assert.Equal("gakkouhe", model.Romanization);
+        Assert.Equal("がっこうへ  |  gakkouhe", model.Pronunciation);
         Assert.Equal("To school", model.Meaning);
         Assert.Equal("Direction", model.Grammar);
-        Assert.Equal("Pos", model.PosLabel);
-        Assert.Equal("Pitch", model.PitchLabel);
         Assert.Equal("Meaning", model.MeaningLabel);
         Assert.Equal("Grammar", model.GrammarLabel);
         Assert.Empty(model.Words);
@@ -112,8 +116,6 @@ public sealed class PhrasePopupViewModelTests
         Assert.Equal("Localized:Llm.WordMeaningLabel", phrase.MeaningLabel);
         Assert.Equal("Localized:Llm.GrammarLabel", phrase.GrammarLabel);
         Assert.Equal("Localized:Llm.GrammarLabel", rich.GrammarLabel);
-        Assert.Equal("Localized:Llm.WordPosLabel", rich.PosLabel);
-        Assert.Empty(rich.PitchLabel);
         Assert.Equal("Localized:Llm.WordMeaningLabel", rich.MeaningLabel);
         Assert.Equal("Localized:Llm.WordPitchUnknown", rich.Pitch);
         Assert.Equal("Updated:Llm.WordPitchUnknown", fallback.Pitch);
@@ -121,6 +123,43 @@ public sealed class PhrasePopupViewModelTests
         Assert.Empty(fallback.Meaning);
         Assert.Equal("Meaning text", rich.Meaning);
         Assert.Single(phrase.Words);
+    }
+
+    [Fact]
+    public void Phrase_pronunciation_uses_source_reading_and_never_shows_word_metadata()
+    {
+        var model = PhrasePopupViewModel.ForPhrase("飲み込んでいく", "Meaning", "Grammar",
+            reading: "ノミコンデイク");
+
+        Assert.Equal("のみこんでいく", model.Reading);
+        Assert.Equal("nomikondeiku", model.Romanization);
+        Assert.Equal("のみこんでいく  |  nomikondeiku", model.Pronunciation);
+        Assert.Empty(model.PitchMarker);
+        Assert.Empty(model.Pos);
+        Assert.Empty(model.Pitch);
+    }
+
+    [Fact]
+    public void Known_word_pitch_has_a_header_marker_and_a_localized_contour_without_bracketed_numbers()
+    {
+        var word = new WordMeaningView("突き刺さって", "ツキササッテ", "Verb", "Pierce", "",
+            [new("突き刺さって", "ツキササッテ", 0, 4, "[4] LHHH↓LL")]);
+        var model = PhrasePopupViewModel.ForWord(word, new TestLocalizer());
+
+        Assert.Equal("④", model.PitchMarker);
+        Assert.Equal("つきささって  |  tsukisasatte", model.Pronunciation);
+        Assert.Equal("Localized:Llm.WordPitchLabel LHHH↓LL", model.Pitch);
+        Assert.DoesNotContain("[4]", model.Pitch);
+    }
+
+    [Fact]
+    public void Unknown_pitch_and_absent_readings_never_create_a_badge_or_separator()
+    {
+        var model = PhrasePopupViewModel.ForWord(new WordMeaningView("Word", "", "", "", ""));
+
+        Assert.Empty(model.PitchMarker);
+        Assert.Empty(model.Romanization);
+        Assert.Empty(model.Pronunciation);
     }
 
     private sealed class TestLocalizer : IStringLocalizer

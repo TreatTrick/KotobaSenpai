@@ -46,9 +46,9 @@ public sealed partial class PhrasePopup : Window
 
     public void ShowResult(
         string label, string meaning, string grammar, ScreenRect anchor,
-        IReadOnlyList<WordMeaningView>? memberMeanings = null)
+        IReadOnlyList<WordMeaningView>? memberMeanings = null, string reading = "")
     {
-        DataContext = PhrasePopupViewModel.ForPhrase(label, meaning, grammar, memberMeanings, _localizer);
+        DataContext = PhrasePopupViewModel.ForPhrase(label, meaning, grammar, memberMeanings, _localizer, reading);
         ShowAndPosition(anchor);
     }
 
@@ -84,6 +84,7 @@ public sealed partial class PhrasePopup : Window
         var availableWidth = workArea.Width / scale;
         var availableHeight = workArea.Height / scale;
         var padding = PopupScrollViewer.Padding.Left + PopupScrollViewer.Padding.Right
+            + ContentPanel.Margin.Left + ContentPanel.Margin.Right
             + PopupFrame.BorderThickness.Left + PopupFrame.BorderThickness.Right;
 
         // Realize the current templates before choosing a readable column or a wider headword.

@@ -1,7 +1,7 @@
 namespace KotobaSenpai.Core.Japanese;
 
 /// <summary>Hiragana/katakana conversion utilities.</summary>
-public static class Kana
+public static partial class Kana
 {
     /// <summary>Converts katakana to hiragana; non-katakana characters are kept as-is. Reading tables uniformly store hiragana, normalized during lookup.</summary>
     public static string ToHiragana(string text)
