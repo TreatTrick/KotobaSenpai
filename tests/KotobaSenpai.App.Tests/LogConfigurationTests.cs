@@ -28,11 +28,11 @@ public sealed class LogConfigurationTests
         Assert.Equal(LogLevel.Error, LogConfiguration.LoadMinimumLevel(new FakeSettings("Verbose")));
     }
 
-    private sealed class FakeSettings : ISettingsService
+    private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly string? _value;
         public FakeSettings(string? value) => _value = value;
-        public string? GetValue(string key) => _value;
-        public void SetValue(string key, string? value) { }
+        public override string? GetValue(string key) => _value;
+        public override void SetValue(string key, string? value) { }
     }
 }

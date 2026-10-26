@@ -2,7 +2,7 @@ using KotobaSenpai.Core.Workflow;
 using System.Reflection;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
-using KotobaSenpai.App.Settings;
+using KotobaSenpai.Platform.Windows.Settings;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
@@ -36,7 +36,42 @@ public sealed class DependencyDirectionTests
     private const string PlatformNamespace = @"KotobaSenpai\.Platform\.Windows(\..*)?$";
     private const string ViewModelsNamespace = @"KotobaSenpai\.App\.ViewModels(\..*)?$";
 
+    [Fact]
+    public void Settings_batch_operations_require_an_explicit_implementation()
+    {
+        Assert.True(typeof(ISettingsService).GetMethod(nameof(ISettingsService.GetSnapshot))!.IsAbstract);
+        Assert.True(typeof(ISettingsService).GetMethod(nameof(ISettingsService.TryUpdate))!.IsAbstract);
+    }
+
     /// <summary>Core must not depend on Platform.Windows or App (pure domain, zero external dependencies).</summary>
+    [Fact]
+    public void Agent_cli_uses_shared_infrastructure_without_implementing_provider_requests_or_file_access()
+    {
+        var result = Types.InAssembly(typeof(KotobaSenpai.Cli.Program).Assembly)
+            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.App", "System.Windows", "System.Net.Http.HttpRequestMessage", "System.IO.File", "System.IO.Directory")
+            .GetResult();
+        Assert.True(result.IsSuccessful, FormatFailure("CLI must delegate provider and settings operations", result));
+    }
+
+    [Fact]
+    public void Agent_cli_calls_the_shared_configuration_use_case_directly()
+    {
+        var result = Types.InAssembly(typeof(KotobaSenpai.Cli.Program).Assembly)
+            .That().HaveName("Program")
+            .Should().HaveDependencyOn("KotobaSenpai.Core.Llm.LlmConfigurationService")
+            .GetResult();
+        Assert.True(result.IsSuccessful, FormatFailure("CLI must execute the shared configuration use case in its own process", result));
+    }
+
+    [Fact]
+    public void Core_remains_free_of_http_wpf_and_file_system_dependencies()
+    {
+        var result = Types.InAssembly(typeof(KotobaSenpai.Core.Llm.LlmConfigurationService).Assembly)
+            .ShouldNot().HaveDependencyOnAny("System.Net.Http", "System.Windows", "System.IO")
+            .GetResult();
+        Assert.True(result.IsSuccessful, FormatFailure("Core must remain independent of technical adapters", result));
+    }
+
     [Fact]
     public void Core_ShouldNotDependOn_Platform_Or_App()
     {
@@ -154,15 +189,15 @@ public sealed class DependencyDirectionTests
         Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must not depend on the theme service MaterialThemeService (theme is a view-layer concern)", result));
     }
 
-    /// <summary>The settings port ISettingsService must live in Core; the file implementation SettingsService must live in App.</summary>
+    /// <summary>The settings port lives in Core; its reusable file adapter belongs to Windows infrastructure.</summary>
     [Fact]
-    public void Settings_Port_ResidesInCore_Implementation_ResidesInApp()
+    public void Settings_port_resides_in_core_and_implementation_resides_in_windows_infrastructure()
     {
         var coreAssembly = typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly;
-        var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
+        var infrastructureAssembly = typeof(KotobaSenpai.Platform.Windows.Llm.LlmPhraseAnalyzer).Assembly;
 
         Assert.Same(coreAssembly, typeof(ISettingsService).Assembly);
-        Assert.Same(appAssembly, typeof(SettingsService).Assembly);
+        Assert.Same(infrastructureAssembly, typeof(SettingsService).Assembly);
     }
 
     [Fact]
@@ -189,16 +224,16 @@ public sealed class DependencyDirectionTests
         Assert.Contains(loadMinLevel!.GetParameters(), p => p.ParameterType == typeof(ISettingsService));
     }
 
-    /// <summary>ViewModels must not depend on the settings file implementation (settings implementation lives in the App infrastructure layer; ViewModels must go through the port).</summary>
+    /// <summary>ViewModels must access settings through the Core port rather than the file adapter.</summary>
     [Fact]
     public void ViewModels_ShouldNotDependOn_SettingsImplementation()
     {
         var result = Types.InAssemblies(Assemblies)
             .That().ResideInNamespaceMatching(ViewModelsNamespace)
-            .ShouldNot().HaveDependencyOn("KotobaSenpai.App.Settings")
+            .ShouldNot().HaveDependencyOn("KotobaSenpai.Platform.Windows.Settings")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must not depend on the settings implementation SettingsService (settings implementation lives in the App infrastructure layer)", result));
+        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must depend on the Core settings port", result));
     }
 
     private static string FormatFailure(string rule, TestResult result) =>

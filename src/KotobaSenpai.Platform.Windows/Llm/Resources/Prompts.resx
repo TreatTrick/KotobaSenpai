@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Error code messages (one per ErrorCodes key) -->
+  <data name="Llm.AnthropicSystemPrompt" xml:space="preserve">
+    <value>You analyze Japanese visual-novel text for teaching value. Call the `return_groups` tool exactly once and put the complete answer in its input. Do not emit plain text, Markdown, or explanations. The tool input must be exactly one object with exactly two top-level arrays, `groups` and `words`, and no other top-level fields. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
+  </data>
+  <data name="Llm.AnthropicUserInstruction" xml:space="preserve">
+    <value>Call the `return_groups` tool now. Its input must contain exactly the top-level arrays `groups` and `words`; `groups` may be empty. Do not return JSON as normal assistant text or add explanatory fields.</value>
+  </data>
+  <data name="Llm.OpenAiChatSystemPrompt" xml:space="preserve">
+    <value>You analyze Japanese visual-novel text for teaching value. Return exactly one JSON object following the supplied JSON structure example as the assistant content. Replace all example values with the actual analysis. Do not call tools and do not emit Markdown, explanations, or any other text. The object must contain exactly the top-level arrays `groups` and `words`. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
+  </data>
+  <data name="Llm.OpenAiChatUserInstruction" xml:space="preserve">
+    <value>Return exactly one JSON object with the top-level arrays `groups` and `words`, even when `groups` is empty. Do not call a tool and do not add any other fields or explanatory text. Follow the supplied JSON structure exactly.</value>
+  </data>
+  <data name="Llm.OpenAiResponsesSystemPrompt" xml:space="preserve">
+    <value>You analyze Japanese visual-novel text for teaching value. Return exactly one JSON object matching the `text.format` schema as the output text. Do not call tools and do not emit Markdown, explanations, or any other text. The object must contain exactly the top-level arrays `groups` and `words`. `groups` contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally. Every group object must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`. Every token value in `parts` must be copied exactly from the token table as an ID in l&lt;line&gt;:t&lt;token&gt; form. Write group meaning and grammar in English.</value>
+  </data>
+  <data name="Llm.OpenAiResponsesUserInstruction" xml:space="preserve">
+    <value>Return exactly one JSON object with the top-level arrays `groups` and `words`, even when `groups` is empty. Do not call a tool and do not add any other fields or explanatory text. Follow the `text.format` schema exactly.</value>
+  </data>
+  <data name="Llm.SegmentLabel" xml:space="preserve">
+    <value>Segment text:</value>
+  </data>
+  <data name="Llm.TokenTableLabel" xml:space="preserve">
+    <value>token table (id/surface/lemma/reading/pos1/cType/cForm):</value>
+  </data>
+  <data name="Llm.LocalSpansLabel" xml:space="preserve">
+    <value>Locally recognized contiguous word chunks:</value>
+  </data>
+  <data name="Llm.WordsInstruction" xml:space="preserve">
+    <value>Populate `words` with exactly one entry for every local word chunk listed above, including particles and auxiliaries, in table order. Each entry must contain only `headword`, `pos`, `meaning`, and `grammar`. Copy `headword` exactly from the chunk's surface; do not add a `surface` field or invent a surface, token id, or reading. Set `pos` to contextual part of speech, `meaning` to the best contextual Chinese meaning, and `grammar` to a concise grammar explanation. Do not omit chunks or add entries for anything not in the table.</value>
+  </data>
+</root>

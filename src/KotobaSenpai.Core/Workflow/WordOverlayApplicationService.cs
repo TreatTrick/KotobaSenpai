@@ -21,7 +21,7 @@ public sealed class WordOverlayApplicationService
     private readonly IOcrWordGroupingService _grouping;
     private readonly IOverlayRenderer _overlay;
     private readonly IDiagnosticReporter? _diagnostics;
-    private readonly PhraseAnalysisOrchestrator? _phraseOrchestrator;
+    private readonly PhraseAnalysisOrchestrator _phraseOrchestrator;
     private readonly ISettingsService? _settings;
     private readonly ITargetWindowTracker? _tracker;
     private int _recognitionGeneration;
@@ -31,8 +31,8 @@ public sealed class WordOverlayApplicationService
         IWindowWordRecognizer recognizer,
         IOcrWordGroupingService grouping,
         IOverlayRenderer overlay,
+        PhraseAnalysisOrchestrator phraseOrchestrator,
         IDiagnosticReporter? diagnostics = null,
-        PhraseAnalysisOrchestrator? phraseOrchestrator = null,
         ISettingsService? settings = null,
         ITargetWindowTracker? tracker = null)
     {
@@ -40,7 +40,7 @@ public sealed class WordOverlayApplicationService
         _grouping = grouping;
         _overlay = overlay;
         _diagnostics = diagnostics;
-        _phraseOrchestrator = phraseOrchestrator;
+        _phraseOrchestrator = phraseOrchestrator ?? throw new ArgumentNullException(nameof(phraseOrchestrator));
         _settings = settings;
         _tracker = tracker;
     }
@@ -52,7 +52,7 @@ public sealed class WordOverlayApplicationService
         var recognitionId = Guid.NewGuid();
         var generation = Interlocked.Increment(ref _recognitionGeneration);
         var activeTarget = ValidateTarget(target);
-        _phraseOrchestrator?.ClearCache();
+        _phraseOrchestrator.ClearCache();
         _overlay.Hide();
         var result = await RecognizeCoreAsync(recognitionId, activeTarget, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
@@ -87,7 +87,7 @@ public sealed class WordOverlayApplicationService
         var generation = Interlocked.Increment(ref _recognitionGeneration);
         if (!incremental)
         {
-            _phraseOrchestrator?.ClearCache();
+            _phraseOrchestrator.ClearCache();
             _overlay.Hide();
         }
 
@@ -135,44 +135,34 @@ public sealed class WordOverlayApplicationService
 
         _diagnostics?.RecordTokens(recognitionId, activeTarget, screenWords);
 
-        // Publish local furigana before the optional provider call. The empty set intentionally suppresses underlines
-        // only while phrase analysis is enabled; the disabled path below keeps the legacy all-local overlay.
-        var phraseEnabled = _phraseOrchestrator is not null && IsPhraseEnabled();
-        if (phraseEnabled)
-        {
-            if (!IsCurrent(generation))
-                return;
-            if (!incremental)
-                _overlay.Show(WordOverlaySession.Start(
-                    activeTarget,
-                    screenWords,
-                    underlineSegmentIds: Array.Empty<string>()), CanRender);
-
-            var phraseRun = await _phraseOrchestrator!
-                .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
-                .ConfigureAwait(false);
-
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!IsCurrent(generation))
-                return;
-
-            var phraseGroups = phraseRun.Groups
-                .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds))
-                .ToArray();
-            _diagnostics?.RecordPhraseAnalysis(recognitionId, phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
+        // Publish local furigana while the required cloud analysis runs; only successful segments receive underlines.
+        if (!IsCurrent(generation))
+            return;
+        if (!incremental)
             _overlay.Show(WordOverlaySession.Start(
                 activeTarget,
                 screenWords,
-                phraseGroups,
-                phraseRun.Warning,
-                phraseRun.Words,
-                phraseRun.SuccessfulSegmentIds), CanRender);
-            return;
-        }
+                underlineSegmentIds: Array.Empty<string>()), CanRender);
 
+        var phraseRun = await _phraseOrchestrator
+            .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
+            .ConfigureAwait(false);
+
+        cancellationToken.ThrowIfCancellationRequested();
         if (!IsCurrent(generation))
             return;
-        _overlay.Show(WordOverlaySession.Start(activeTarget, screenWords), CanRender);
+
+        var phraseGroups = phraseRun.Groups
+            .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds))
+            .ToArray();
+        _diagnostics?.RecordPhraseAnalysis(recognitionId, phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
+        _overlay.Show(WordOverlaySession.Start(
+            activeTarget,
+            screenWords,
+            phraseGroups,
+            phraseRun.Warning,
+            phraseRun.Words,
+            phraseRun.SuccessfulSegmentIds), CanRender);
     }
 
     public void Hide()
@@ -218,9 +208,6 @@ public sealed class WordOverlayApplicationService
             ? region.ToPixelRect(target.Bounds.Width, target.Bounds.Height)
             : null;
     }
-
-    private bool IsPhraseEnabled()
-        => string.Equals(_settings?.GetValue("PhraseGroupsEnabled"), "true", StringComparison.OrdinalIgnoreCase);
 
     private static PhraseGroupView ToScreen(PhraseGroupView group, int frameWidth, int frameHeight, ScreenRect windowBounds)
         => new(

@@ -302,12 +302,18 @@ public sealed class PhraseSessionTests
 
 public sealed class PhraseFallbackTests
 {
-    [Fact]
-    public async Task App_service_keeps_local_words_when_phrase_disabled()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("false")]
+    [InlineData("true")]
+    public async Task App_service_always_runs_cloud_analysis_regardless_of_legacy_setting(string? legacyValue)
     {
-        var (service, overlay, _) = BuildService(analyzer: null, settings: new FakeSettings("false"));
+        var analyzer = new FakeAnalyzer(PhraseAnalysisOutcome.Success);
+        var (service, overlay, _) = BuildService(analyzer, new FakeSettings(legacyValue));
         await service.RecognizeAndShowAsync(Target());
 
+        Assert.Single(analyzer.RecognitionIds);
+        Assert.Equal(2, overlay.Sessions.Count);
         Assert.Single(overlay.Session!.Words);
         Assert.Empty(overlay.Session.PhraseGroups);
         Assert.Null(overlay.Session.PhraseWarning);
@@ -387,7 +393,7 @@ public sealed class PhraseFallbackTests
     }
 
     [Fact]
-    public async Task App_service_maps_valid_phrase_group_to_screen_when_enabled()
+    public async Task App_service_maps_valid_cloud_phrase_group_to_screen()
     {
         var analyzer = new FakeAnalyzer(PhraseAnalysisOutcome.Success,
             new ParsedPhraseGroup("g1", "grammar", [[SentenceTokenId.Parse("l0:t0")]], "彼は", "他是", "主语助词"));
@@ -421,7 +427,7 @@ public sealed class PhraseFallbackTests
     public async Task Each_recognition_gets_a_distinct_id()
     {
         var diagnostics = new FakeDiagnosticReporter();
-        var (service, _, recognizer) = BuildService(null, new FakeSettings("false"), diagnostics);
+        var (service, _, recognizer) = BuildService(new FakeAnalyzer(PhraseAnalysisOutcome.Success), new FakeSettings("false"), diagnostics);
 
         await service.RecognizeAndShowAsync(Target());
         await service.RecognizeAndShowAsync(Target());
@@ -539,13 +545,11 @@ public sealed class PhraseOrchestratorConcurrencyTests
 }
 
     private static (WordOverlayApplicationService Service, FakeOverlay Overlay, FakeRecognizer Recognizer) BuildService(
-        ILlmPhraseAnalyzer? analyzer,
+        ILlmPhraseAnalyzer analyzer,
         ISettingsService settings,
         FakeDiagnosticReporter? diagnostics = null)
     {
-        var phraseOrchestrator = analyzer is null
-            ? null
-            : new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
+        var phraseOrchestrator = new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
         var overlay = new FakeOverlay();
         var recognizer = new FakeRecognizer();
         var service = new WordOverlayApplicationService(
@@ -558,12 +562,12 @@ public sealed class PhraseOrchestratorConcurrencyTests
         return (service, overlay, recognizer);
     }
 
-    private sealed class FakeSettings : ISettingsService
+    private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly string? _enabled;
         public FakeSettings(string? enabled) => _enabled = enabled;
-        public string? GetValue(string key) => key == "PhraseGroupsEnabled" ? _enabled : null;
-        public void SetValue(string key, string? value) { }
+        public override string? GetValue(string key) => key == "PhraseGroupsEnabled" ? _enabled : null;
+        public override void SetValue(string key, string? value) { }
     }
 
     private sealed class FakeAnalyzer : ILlmPhraseAnalyzer

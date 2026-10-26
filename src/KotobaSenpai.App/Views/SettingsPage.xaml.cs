@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.IO;
+using System.Runtime.InteropServices;
 using KotobaSenpai.App.ViewModels;
 
 namespace KotobaSenpai.App.Views;
@@ -56,5 +58,34 @@ public partial class SettingsPage : UserControl
         if ((DataContext as SettingsPageViewModel)?.Llm is { } settings
             && !string.Equals(settings.ApiKey, LlmApiKeyPasswordBox.Password, StringComparison.Ordinal))
             LlmApiKeyPasswordBox.Password = settings.ApiKey;
+    }
+
+    private void CopyAgentPrompt_Click(object sender, RoutedEventArgs e)
+    {
+        if ((DataContext as SettingsPageViewModel)?.Llm is not { } settings)
+            return;
+        var path = Path.Combine(AppContext.BaseDirectory, "KotobaSenpai.Cli.exe");
+        var prompt = settings.CreateAgentPrompt(File.Exists(path) ? path : null);
+        if (prompt is null)
+            return;
+        try
+        {
+            Clipboard.SetText(prompt);
+            settings.ReportPromptCopy(true);
+        }
+        catch (ExternalException) { settings.ReportPromptCopy(false); }
+    }
+
+    private void CopyConfigurationError_Click(object sender, RoutedEventArgs e)
+    {
+        if ((DataContext as SettingsPageViewModel)?.Llm is not { } settings
+            || string.IsNullOrWhiteSpace(settings.ConfigurationErrorDetails))
+            return;
+        try
+        {
+            Clipboard.SetText(settings.ConfigurationErrorDetails);
+            settings.ReportErrorCopy(true);
+        }
+        catch (ExternalException) { settings.ReportErrorCopy(false); }
     }
 }

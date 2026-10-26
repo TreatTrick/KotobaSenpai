@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using KotobaSenpai.Core.Settings;
 
-namespace KotobaSenpai.App.Settings;
+namespace KotobaSenpai.Platform.Windows.Settings;
 
 /// <summary>
 /// File implementation of <see cref="ISettingsService"/>: the single owner of <c>%LocalAppData%/KotobaSenpai/settings.json</c>.
@@ -18,7 +18,8 @@ public sealed class SettingsService : ISettingsService
 
     private readonly string _filePath;
     private readonly object _gate = new();
-    private readonly JsonObject _settings;
+    private JsonObject _settings;
+    private readonly bool _readOnly;
 
     public static string DefaultFilePath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -29,9 +30,10 @@ public sealed class SettingsService : ISettingsService
     public SettingsService() : this(DefaultFilePath) { }
 
     /// <summary><paramref name="filePath"/> is injected so tests can point at a temporary file.</summary>
-    public SettingsService(string filePath)
+    public SettingsService(string filePath, bool readOnly = false)
     {
         _filePath = filePath;
+        _readOnly = readOnly;
         _settings = LoadOrEmpty();
     }
 
@@ -57,14 +59,31 @@ public sealed class SettingsService : ISettingsService
 
     /// <inheritdoc />
     public void SetValue(string key, string? value)
+        => TryUpdate(new Dictionary<string, string?>(), new Dictionary<string, string?> { [key] = value });
+
+    public IReadOnlyDictionary<string, string?> GetSnapshot(IEnumerable<string> keys)
     {
         lock (_gate)
+            return keys.ToDictionary(key => key, GetValue, StringComparer.Ordinal);
+    }
+
+    public bool TryUpdate(IReadOnlyDictionary<string, string?> expected, IReadOnlyDictionary<string, string?> changes)
+    {
+        if (_readOnly)
+            throw new InvalidOperationException("This settings instance is read-only.");
+        lock (_gate)
         {
-            if (value is null)
-                _settings.Remove(key);
-            else
-                _settings[key] = value;
-            Save();
+            if (expected.Any(entry => GetValue(entry.Key) != entry.Value))
+                return false;
+            var next = (JsonObject)_settings.DeepClone();
+            foreach (var (key, value) in changes)
+                if (value is null)
+                    next.Remove(key);
+                else
+                    next[key] = value;
+            Save(next);
+            _settings = next;
+            return true;
         }
     }
 
@@ -89,12 +108,25 @@ public sealed class SettingsService : ISettingsService
     }
 
     /// <summary>Write-through: serializes the entire in-memory object (preserving unknown fields), including automatic directory creation.</summary>
-    private void Save()
+    private void Save(JsonObject next)
     {
         var directory = Path.GetDirectoryName(_filePath);
         if (directory is not null)
             Directory.CreateDirectory(directory);
 
-        File.WriteAllText(_filePath, _settings.ToJsonString(SerializerOptions));
+        var temporary = _filePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, next.ToJsonString(SerializerOptions));
+            if (File.Exists(_filePath))
+                File.Replace(temporary, _filePath, null);
+            else
+                File.Move(temporary, _filePath);
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+                File.Delete(temporary);
+        }
     }
 }

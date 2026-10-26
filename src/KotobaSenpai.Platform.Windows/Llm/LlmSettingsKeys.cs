@@ -7,5 +7,4 @@ public static class LlmSettingsKeys
     public const string Endpoint = KotobaSenpai.Core.Llm.LlmSettingsKeys.Endpoint;
     public const string Model = KotobaSenpai.Core.Llm.LlmSettingsKeys.Model;
     public const string Protocol = KotobaSenpai.Core.Llm.LlmSettingsKeys.Protocol;
-    public const string Enabled = KotobaSenpai.Core.Llm.LlmSettingsKeys.Enabled;
 }

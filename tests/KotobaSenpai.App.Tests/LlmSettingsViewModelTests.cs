@@ -28,7 +28,6 @@ public sealed class LlmSettingsViewModelTests
     {
         var settings = new FakeSettings(new Dictionary<string, string?>
         {
-            [LlmSettingsKeys.Enabled] = "true",
             [LlmSettingsKeys.Protocol] = LlmProtocolIds.Anthropic,
             [LlmSettingsKeys.Endpoint] = "https://provider.example",
             [LlmSettingsKeys.ApiKey] = "secret",
@@ -37,16 +36,13 @@ public sealed class LlmSettingsViewModelTests
         });
         using var viewModel = new LlmSettingsViewModel(settings, new FakeCatalog(), new FakeLocalizer());
 
-        Assert.True(viewModel.Enabled);
         Assert.Equal(LlmProtocolIds.Anthropic, viewModel.Protocol);
         Assert.Equal("secret", viewModel.ApiKey);
         viewModel.Endpoint = "https://other.example/v1";
         viewModel.Model = "custom-model";
-        viewModel.Enabled = false;
 
         Assert.Equal("https://other.example/v1", settings.GetValue(LlmSettingsKeys.Endpoint));
         Assert.Equal("custom-model", settings.GetValue(LlmSettingsKeys.Model));
-        Assert.Equal("false", settings.GetValue(LlmSettingsKeys.Enabled));
         Assert.Equal("Dark", settings.GetValue("Theme"));
     }
 
@@ -151,11 +147,11 @@ public sealed class LlmSettingsViewModelTests
         Assert.Empty(viewModel.ModelStatus);
     }
 
-    private sealed class FakeSettings(Dictionary<string, string?>? values = null) : ISettingsService
+    private sealed class FakeSettings(Dictionary<string, string?>? values = null) : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly Dictionary<string, string?> _values = values is null ? new() : new(values);
-        public string? GetValue(string key) => _values.GetValueOrDefault(key);
-        public void SetValue(string key, string? value) => _values[key] = value;
+        public override string? GetValue(string key) => _values.GetValueOrDefault(key);
+        public override void SetValue(string key, string? value) => _values[key] = value;
     }
 
     private sealed class FakeCatalog : ILlmModelCatalog

@@ -111,6 +111,7 @@ public sealed class TargetWindowGeometryTests
             recognizer,
             new EmptyGroupingService(),
             new NullOverlay(),
+            KotobaSenpai.TestSupport.PhraseAnalysisStub.Create(),
             tracker: tracker);
 
         if (expectedCapture)

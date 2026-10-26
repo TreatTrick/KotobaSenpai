@@ -1,5 +1,5 @@
 using System.IO;
-using KotobaSenpai.App.Settings;
+using KotobaSenpai.Platform.Windows.Settings;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -112,6 +112,66 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.True(File.Exists(path));
         // A new instance re-reads from disk, verifying the write-through persisted.
         Assert.Equal("en", new SettingsService(path).GetValue("Language"));
+    }
+
+    [Fact]
+    public async Task Concurrent_batch_readers_never_observe_mixed_values()
+    {
+        var svc = new SettingsService(NewPath());
+        svc.TryUpdate(new Dictionary<string, string?>(), new Dictionary<string, string?> { ["Endpoint"] = "0", ["Key"] = "0" });
+        var writer = Task.Run(() =>
+        {
+            for (var index = 1; index < 50; index++)
+                svc.TryUpdate(new Dictionary<string, string?>(), new Dictionary<string, string?>
+                    { ["Endpoint"] = index.ToString(), ["Key"] = index.ToString() });
+        });
+        do
+        {
+            var snapshot = svc.GetSnapshot(["Endpoint", "Key"]);
+            Assert.Equal(snapshot["Endpoint"], snapshot["Key"]);
+        } while (!writer.IsCompleted);
+        await writer;
+    }
+
+    [Fact]
+    public void Conditional_batch_preserves_unknown_fields_and_rejects_stale_related_values()
+    {
+        var path = NewPath();
+        File.WriteAllText(path, """{"Theme":"Dark","custom":{"enabled":true}}""");
+        var svc = new SettingsService(path);
+        var before = svc.GetSnapshot(["Endpoint", "Key"]);
+        svc.SetValue("Theme", "Light");
+
+        Assert.True(svc.TryUpdate(before, new Dictionary<string, string?> { ["Endpoint"] = "new", ["Key"] = "secret" }));
+        Assert.False(svc.TryUpdate(before, new Dictionary<string, string?> { ["Key"] = "stale" }));
+
+        var reloaded = new SettingsService(path);
+        Assert.Equal("new", reloaded.GetValue("Endpoint"));
+        Assert.Equal("secret", reloaded.GetValue("Key"));
+        Assert.Equal("Light", reloaded.GetValue("Theme"));
+        Assert.Contains("custom", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void Read_only_settings_cannot_save()
+    {
+        var path = NewPath();
+        var svc = new SettingsService(path, readOnly: true);
+        Assert.Throws<InvalidOperationException>(() => svc.SetValue("Key", "secret"));
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void Failed_save_preserves_the_last_committed_memory_state()
+    {
+        var path = NewPath();
+        var svc = new SettingsService(path);
+        svc.SetValue("Theme", "Dark");
+        using var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        Assert.Throws<IOException>(() => svc.SetValue("Theme", "Light"));
+
+        Assert.Equal("Dark", svc.GetValue("Theme"));
     }
 
     [Fact]

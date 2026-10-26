@@ -1,11 +1,31 @@
 using System.Globalization;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Resources;
+using KotobaSenpai.Platform.Windows.Llm;
 
 namespace KotobaSenpai.App.Tests;
 
 public sealed class ResourceManagerStringLocalizerTests
 {
+    [Theory]
+    [InlineData("en")]
+    [InlineData("zh-CN")]
+    [InlineData("fr")]
+    public void Ui_and_cli_use_identical_localized_provider_prompts(string language)
+    {
+        var culture = CultureInfo.GetCultureInfo(language);
+        var ui = new PhrasePromptBuilder(LocalizerFactory.Create(culture));
+        var cli = new PhrasePromptBuilder(new LlmPromptLocalizer(culture));
+        var request = LlmConnectionDetector.CreateSample();
+        foreach (var profile in Enum.GetValues<LlmPromptProfile>())
+        {
+            var expected = ui.Build(request, profile);
+            Assert.Equal(expected, cli.Build(request, profile));
+            Assert.DoesNotContain("Llm.", expected.SystemPrompt);
+            Assert.DoesNotContain("Llm.", expected.UserContent);
+        }
+    }
+
     [Fact]
     public void Resolves_active_zhCN_culture_to_chinese_value()
     {

@@ -2,6 +2,10 @@
 bin/
 obj/
 
+# Local verification and publish output
+.codex/tmp/
+artifacts/
+
 # IDE / tools
 .vs/
 .idea/

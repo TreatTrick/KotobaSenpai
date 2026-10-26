@@ -22,7 +22,8 @@ public sealed class WindowWordOverlayTests
         var overlay = new DeferredOverlay();
         var service = new WordOverlayApplicationService(new FakeRecognizer(),
             new WordGroupingService(new StubTokenizer(new TokenSpec("日", 0)), new SentenceSegmenter(),
-                new StubSpanResolver(new LookupSpan([Token("日")], "日", []))), overlay);
+                new StubSpanResolver(new LookupSpan([Token("日")], "日", []))), overlay,
+            KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
         using var cancellation = new CancellationTokenSource();
         await service.RecognizeAndShowAsync(new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 200, 100)), cancellation.Token);
         if (hide) service.Hide();
@@ -82,7 +83,7 @@ public sealed class WindowWordOverlayTests
                 new StubTokenizer(new TokenSpec("日", 0)),
                 new SentenceSegmenter(),
                 new StubSpanResolver(new LookupSpan([Token("日")], "日", []))),
-            overlay);
+            overlay, KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
 
         var result = await service.RecognizeAndShowAsync(target);
 
@@ -106,7 +107,7 @@ public sealed class WindowWordOverlayTests
                 new StubTokenizer(new TokenSpec("日", 0)),
                 new SentenceSegmenter(),
                 new StubSpanResolver(new LookupSpan([Token("日")], "日", [entry]))),
-            overlay);
+            overlay, KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
 
         await service.RecognizeAndShowAsync(target);
 
@@ -128,11 +129,11 @@ public sealed class WindowWordOverlayTests
                 new StubTokenizer(new TokenSpec("日", 0)),
                 new SentenceSegmenter(),
                 new StubSpanResolver(new LookupSpan([Token("日")], "日", []))),
-            new RecordingOverlay(events));
+            new RecordingOverlay(events), KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
 
         await service.RecognizeAndShowAsync(target);
 
-        Assert.Equal(["hide", "recognize", "show"], events);
+        Assert.Equal(["hide", "recognize", "show", "show"], events);
     }
 
     private static Token Token(string surface)

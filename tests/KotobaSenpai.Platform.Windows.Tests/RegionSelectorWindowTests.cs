@@ -268,11 +268,11 @@ public sealed class RegionSelectorWindowTests
         return completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
-    private sealed class RecordingSettings : ISettingsService
+    private sealed class RecordingSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         public int WriteCount { get; private set; }
-        public string? GetValue(string key) => null;
-        public void SetValue(string key, string? value) => WriteCount++;
+        public override string? GetValue(string key) => null;
+        public override void SetValue(string key, string? value) => WriteCount++;
     }
 
     private sealed class FeedbackLocalizer : IStringLocalizer

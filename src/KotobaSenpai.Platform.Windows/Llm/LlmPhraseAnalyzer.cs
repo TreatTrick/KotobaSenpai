@@ -7,6 +7,7 @@ using System.Text.Json;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Core.Llm;
 
 namespace KotobaSenpai.Platform.Windows.Llm;
 
@@ -49,21 +50,25 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         _logger = logger;
     }
 
-    public async Task<PhraseAnalysisResult> AnalyzeAsync(
+    public Task<PhraseAnalysisResult> AnalyzeAsync(
         PhraseAnalysisRequest request,
         CancellationToken cancellationToken = default)
+        => AnalyzeAsync(request, LlmConfiguration.Read(_settings), cancellationToken);
+
+    public async Task<PhraseAnalysisResult> AnalyzeAsync(
+        PhraseAnalysisRequest request,
+        LlmConfiguration configuration,
+        CancellationToken cancellationToken = default,
+        bool singleEndpoint = false)
     {
-        var apiKey = _settings.GetValue(LlmSettingsKeys.ApiKey);
-        var endpoint = _settings.GetValue(LlmSettingsKeys.Endpoint);
-        var model = _settings.GetValue(LlmSettingsKeys.Model);
-        if (!string.Equals(_settings.GetValue(LlmSettingsKeys.Enabled), "true", StringComparison.OrdinalIgnoreCase)
-            || string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(model))
+        var (protocolId, endpoint, apiKey, model) = configuration;
+        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(model))
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.NoKey, [], null);
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
             || (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.NoKey, [], null);
 
-        var protocol = _fixedProtocol ?? _protocolRegistry.Resolve(_settings.GetValue(LlmSettingsKeys.Protocol));
+        var protocol = _fixedProtocol ?? _protocolRegistry.Resolve(protocolId);
 
         string systemPrompt, userContent;
         try
@@ -76,8 +81,9 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         }
 
         var body = protocol.BuildBody(systemPrompt, userContent, model);
-        var candidates = LlmEndpointHelper.AnalysisCandidates(endpointUri, protocol.Path);
+        var candidates = singleEndpoint ? [endpointUri] : LlmEndpointHelper.AnalysisCandidates(endpointUri, protocol.Path);
         string? envelope = null;
+        string? acceptedEndpoint = null;
         for (var index = 0; index < candidates.Count; index++)
         {
             var candidate = candidates[index];
@@ -102,6 +108,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
                 if (response.IsSuccessStatusCode)
                 {
                     envelope = responseBody;
+                    acceptedEndpoint = candidate.AbsoluteUri;
                     _logger?.LogInformation("LLM {0} ({1}) returned {2} from {3} in {4} ms",
                         request.SegmentId, protocol.PromptProfile, (int)response.StatusCode,
                         candidate.GetLeftPart(UriPartial.Path), llmTimer.ElapsedMilliseconds);
@@ -119,7 +126,8 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
                     continue;
 
                 return new PhraseAnalysisResult(PhraseAnalysisOutcome.Refused, [],
-                    $"Provider refused with HTTP {(int)response.StatusCode} after trying {index + 1} endpoint(s).");
+                    $"Provider refused with HTTP {(int)response.StatusCode} after trying {index + 1} endpoint(s).")
+                    { ProviderStatusCode = (int)response.StatusCode };
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -160,7 +168,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
 
         // Capture the raw request/response and extracted arrays with one shared exchange stamp for offline inspection.
         _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
-        return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words };
+        return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words, Endpoint = acceptedEndpoint };
     }
 }
 

@@ -47,13 +47,144 @@
       <StackPanel DataContext="{Binding Llm}">
         <TextBlock Text="{loc:Loc Key=Label_LlmSettings}" Style="{StaticResource SectionTitle}" />
 
-        <controls:SettingsCard Header="{loc:Loc Key=Label_LlmEnabled}" Description="{loc:Loc Key=Description_LlmEnabled}"
+        <controls:SettingsCard x:Name="AgentApiConfigurationCard" Header="{loc:Loc Key=Agent_Title}" Description="{loc:Loc Key=Agent_Description}"
                                Icon="{ui:SymbolIcon Sparkle24}">
-          <ui:ToggleSwitch IsChecked="{Binding Enabled, Mode=TwoWay}" Style="{StaticResource SettingsToggle}"
-                           OnContent="{loc:Loc Key=Toggle_On}" OffContent="{loc:Loc Key=Toggle_Off}"
-                           AutomationProperties.Name="{loc:Loc Key=Label_LlmEnabled}" />
+          <controls:SettingsCard.DescriptionContent>
+            <Grid Margin="0,8,0,0">
+              <Grid.Style>
+                <Style TargetType="Grid">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding PromptCopyStatus}" Value="">
+                      <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Grid.Style>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <ui:SymbolIcon x:Name="AgentPromptCopyStatusIcon" FontSize="18" VerticalAlignment="Top" Margin="0,1,8,0">
+                <ui:SymbolIcon.Style>
+                  <Style TargetType="ui:SymbolIcon">
+                    <Setter Property="Symbol" Value="Warning24" />
+                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsPromptCopied}" Value="True">
+                        <Setter Property="Symbol" Value="CheckmarkCircle24" />
+                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </ui:SymbolIcon.Style>
+              </ui:SymbolIcon>
+              <TextBlock x:Name="AgentPromptCopyStatusText" Grid.Column="1" Text="{Binding PromptCopyStatus}"
+                         Margin="0" AutomationProperties.LiveSetting="Polite">
+                <TextBlock.Style>
+                  <Style TargetType="TextBlock" BasedOn="{StaticResource Description}">
+                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsPromptCopied}" Value="True">
+                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </TextBlock.Style>
+              </TextBlock>
+            </Grid>
+          </controls:SettingsCard.DescriptionContent>
+          <StackPanel Width="{StaticResource SettingsInputWidth}">
+            <ui:Button x:Name="CopyAgentPromptButton" Content="{loc:Loc Key=Agent_CopyPrompt}" Icon="{ui:SymbolIcon Copy24}"
+                       Click="CopyAgentPrompt_Click" Style="{StaticResource SettingsButton}"
+                       AutomationProperties.Name="{loc:Loc Key=Agent_CopyPrompt}" />
+          </StackPanel>
         </controls:SettingsCard>
-
+        <Expander x:Name="AdvancedLlmSettings" Header="{loc:Loc Key=Agent_Advanced}" IsExpanded="True" Margin="0,12,0,0">
+          <StackPanel>
+            <ui:Card x:Name="ConfigurationCheckCard" Padding="{StaticResource FluentCardPadding}"
+                     Margin="{StaticResource FluentCardGap}" MinHeight="80" HorizontalContentAlignment="Stretch"
+                     Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <ui:Button x:Name="CheckConfigurationButton" Command="{Binding CheckConfigurationCommand}"
+                         Style="{StaticResource SettingsButton}" HorizontalAlignment="Left"
+                         AutomationProperties.Name="{loc:Loc Key=Agent_CheckConfiguration}">
+                <StackPanel Orientation="Horizontal">
+                  <Grid Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <ui:SymbolIcon Symbol="PlugConnected24" FontSize="16">
+                      <ui:SymbolIcon.Style>
+                        <Style TargetType="ui:SymbolIcon">
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCheckingConfiguration}" Value="True">
+                              <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </ui:SymbolIcon.Style>
+                    </ui:SymbolIcon>
+                    <ui:ProgressRing x:Name="ConfigurationProgressRing" Width="18" Height="18"
+                                     IsIndeterminate="{Binding IsCheckingConfiguration}"
+                                     Visibility="{Binding IsCheckingConfiguration, Converter={StaticResource BoolToVisibility}}" />
+                  </Grid>
+                  <TextBlock x:Name="CheckConfigurationLabel" Text="{loc:Loc Key=Agent_CheckConfiguration}" VerticalAlignment="Center" />
+                </StackPanel>
+              </ui:Button>
+              <Grid Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <ui:SymbolIcon x:Name="ConfigurationSuccessIcon" Symbol="CheckmarkCircle24" FontSize="22"
+                               Foreground="{DynamicResource SystemFillColorSuccessBrush}"
+                               Visibility="{Binding IsConfigurationUsable, Converter={StaticResource BoolToVisibility}}" />
+                <ui:SymbolIcon x:Name="ConfigurationErrorIcon" Symbol="Warning24" FontSize="22"
+                               Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                               Visibility="{Binding IsConfigurationUnavailable, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock x:Name="ConfigurationValidationText" Grid.Column="1" Margin="8,0,0,0"
+                           Text="{Binding ConfigurationValidationMessage}" VerticalAlignment="Center" TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="FontWeight" Value="SemiBold" />
+                      <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsConfigurationUsable}" Value="True">
+                          <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </Grid>
+              <ui:Button x:Name="CopyConfigurationErrorButton" Grid.Column="2" Margin="16,0,0,0"
+                         Content="{loc:Loc Key=Agent_CopyError}" Icon="{ui:SymbolIcon Copy24}"
+                         Click="CopyConfigurationError_Click" Style="{StaticResource SettingsButton}"
+                         Visibility="{Binding IsConfigurationUnavailable, Converter={StaticResource BoolToVisibility}}"
+                         AutomationProperties.Name="{loc:Loc Key=Agent_CopyError}" />
+              <ui:Button Grid.Column="2" Margin="16,0,0,0" Content="{loc:Loc Key=Agent_Cancel}"
+                         Command="{Binding CancelConfigurationCommand}" Style="{StaticResource SettingsButton}"
+                         Visibility="{Binding IsCheckingConfiguration, Converter={StaticResource BoolToVisibility}}" />
+              <TextBlock x:Name="ConfigurationOperationStatusText" Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding ConfigurationStatus}"
+                         Style="{StaticResource ModelStatus}" AutomationProperties.LiveSetting="Polite" />
+              <TextBlock x:Name="ConfigurationErrorDetailsText" Grid.Row="2" Grid.ColumnSpan="3"
+                         Text="{Binding ConfigurationErrorDetails}" Style="{StaticResource Description}" Margin="0,8,0,0"
+                         Visibility="{Binding IsConfigurationUnavailable, Converter={StaticResource BoolToVisibility}}"
+                         AutomationProperties.LiveSetting="Polite" />
+              <ProgressBar Grid.Row="3" Grid.ColumnSpan="3" IsIndeterminate="True" Height="4" Margin="0,12,0,0"
+                           Visibility="{Binding IsCheckingConfiguration, Converter={StaticResource BoolToVisibility}}" />
+            </Grid>
+            </ui:Card>
         <controls:SettingsCard Header="{loc:Loc Key=Label_LlmProtocol}" Description="{loc:Loc Key=Description_LlmProtocol}"
                                Icon="{ui:SymbolIcon PlugConnected24}">
           <ComboBox Style="{StaticResource SettingInput}" ItemsSource="{Binding Protocols}"
@@ -103,6 +234,8 @@
             <TextBlock Text="{Binding ModelStatus}" Style="{StaticResource ModelStatus}" AutomationProperties.LiveSetting="Polite" />
           </StackPanel>
         </controls:SettingsCard>
+          </StackPanel>
+        </Expander>
       </StackPanel>
     </StackPanel>
   </ScrollViewer>

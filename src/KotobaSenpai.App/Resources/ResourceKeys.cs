@@ -21,7 +21,6 @@ public static class ResourceKeys
     public const string Label_AutoRecognition = nameof(Label_AutoRecognition);
     public const string Label_Description = nameof(Label_Description);
     public const string Label_LlmSettings = nameof(Label_LlmSettings);
-    public const string Label_LlmEnabled = nameof(Label_LlmEnabled);
     public const string Label_LlmProtocol = nameof(Label_LlmProtocol);
     public const string Label_LlmEndpoint = nameof(Label_LlmEndpoint);
     public const string Label_LlmApiKey = nameof(Label_LlmApiKey);

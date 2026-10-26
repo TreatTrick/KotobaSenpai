@@ -402,18 +402,21 @@ public sealed class LlmPhraseAnalyzerTests
         Assert.Equal(PhraseAnalysisOutcome.NoKey, result.Outcome);
     }
 
-    [Fact]
-    public async Task Disabled_cloud_analysis_does_not_send_a_request()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("false")]
+    [InlineData("true")]
+    public async Task Legacy_enable_setting_cannot_disable_cloud_analysis(string? legacyValue)
     {
         var handler = new StubHandler(HttpStatusCode.OK, GroupEnvelope);
         var settings = new FakeSettings(apiKey: "secret");
-        settings.SetValue(LlmSettingsKeys.Enabled, "false");
+        settings.SetValue("PhraseGroupsEnabled", legacyValue);
         var analyzer = new LlmPhraseAnalyzer(settings, new HttpClient(handler));
 
         var result = await analyzer.AnalyzeAsync(Request());
 
-        Assert.Equal(PhraseAnalysisOutcome.NoKey, result.Outcome);
-        Assert.False(handler.WasCalled);
+        Assert.Equal(PhraseAnalysisOutcome.Success, result.Outcome);
+        Assert.True(handler.WasCalled);
     }
 
     [Fact]
@@ -556,7 +559,7 @@ public sealed class LlmPhraseAnalyzerTests
         => new("あ", "あ", "あ", "あ", "あ", "あ",
             new PartsOfSpeech("", "", "", ""), "", "", "", 0);
 
-    private sealed class FakeSettings : ISettingsService
+    private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly Dictionary<string, string?> _values = new()
         {
@@ -564,12 +567,11 @@ public sealed class LlmPhraseAnalyzerTests
             [LlmSettingsKeys.Endpoint] = "https://example.com",
             [LlmSettingsKeys.Model] = "test-model",
             [LlmSettingsKeys.Protocol] = LlmProtocolIds.OpenAiChat,
-            [LlmSettingsKeys.Enabled] = "true",
         };
 
         public FakeSettings(string? apiKey = null) => _values[LlmSettingsKeys.ApiKey] = apiKey;
-        public string? GetValue(string key) => _values.GetValueOrDefault(key);
-        public void SetValue(string key, string? value) => _values[key] = value;
+        public override string? GetValue(string key) => _values.GetValueOrDefault(key);
+        public override void SetValue(string key, string? value) => _values[key] = value;
     }
 
     private sealed class FakeDiagnosticReporter : IDiagnosticReporter

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <!-- Error code messages (one per ErrorCodes key) -->
+  <data name="Llm.AnthropicSystemPrompt" xml:space="preserve">
+    <value>你是日语视觉小说文本的教学分析器。必须恰好调用一次 `return_groups` 工具，并把完整答案放入它的 input。不得输出普通文本、Markdown 或解释。工具 input 必须严格是一个对象，顶层只能有 `groups` 和 `words` 两个数组，不得有其他顶层字段。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
+  </data>
+  <data name="Llm.AnthropicUserInstruction" xml:space="preserve">
+    <value>现在调用一次 `return_groups` 工具。其 input 必须严格包含顶层 `groups` 和 `words` 两个数组；`groups` 可以为空。不要在普通 assistant 文本中返回 JSON，不要添加解释性字段。</value>
+  </data>
+  <data name="Llm.OpenAiChatSystemPrompt" xml:space="preserve">
+    <value>你是日语视觉小说文本的教学分析器。必须直接返回一个遵循所提供 JSON 结构示例的 JSON 对象，作为 assistant 内容。示例中的值必须替换为实际分析结果。不得调用工具，不得输出 Markdown、解释或其他文本。对象顶层只能有 `groups` 和 `words` 两个数组。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
+  </data>
+  <data name="Llm.OpenAiChatUserInstruction" xml:space="preserve">
+    <value>直接返回一个 JSON 对象，必须包含顶层 `groups` 和 `words` 两个数组，即使 `groups` 为空。不要调用工具，不要添加其他字段或解释性文字。严格遵循所提供的 JSON 结构。</value>
+  </data>
+  <data name="Llm.OpenAiResponsesSystemPrompt" xml:space="preserve">
+    <value>你是日语视觉小说文本的教学分析器。必须直接返回一个符合 `text.format` schema 的 JSON 对象，作为 output text。不得调用工具，不得输出 Markdown、解释或其他文本。对象顶层只能有 `groups` 和 `words` 两个数组。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
+  </data>
+  <data name="Llm.OpenAiResponsesUserInstruction" xml:space="preserve">
+    <value>直接返回一个 JSON 对象，必须包含顶层 `groups` 和 `words` 两个数组，即使 `groups` 为空。不要调用工具，不要添加其他字段或解释性文字。严格遵循 `text.format` schema。</value>
+  </data>
+  <data name="Llm.SegmentLabel" xml:space="preserve">
+    <value>句段文本：</value>
+  </data>
+  <data name="Llm.TokenTableLabel" xml:space="preserve">
+    <value>token 表（id/surface/lemma/reading/pos1/cType/cForm）：</value>
+  </data>
+  <data name="Llm.LocalSpansLabel" xml:space="preserve">
+    <value>本地已识别连续词块：</value>
+  </data>
+  <data name="Llm.WordsInstruction" xml:space="preserve">
+    <value>请在 `words` 中按词块表顺序，为上方列出的每一个本地词块各返回一条记录，包括助词和助动词。每条记录只能包含 `headword`、`pos`、`meaning`、`grammar` 四个字段。`headword` 必须从对应词块的 surface 逐字复制；不要添加 `surface` 字段，不要自行发明 surface、token id 或读音。`pos` 填写语境词性，`meaning` 填写本语境最佳中文释义，`grammar` 填写简洁的语法说明。不要遗漏词块，也不要为表外内容添加记录。</value>
+  </data>
+</root>

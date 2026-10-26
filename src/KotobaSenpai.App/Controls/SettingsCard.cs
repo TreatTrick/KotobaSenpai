@@ -10,9 +10,18 @@ public sealed class SettingsCard : CardControl
         DependencyProperty.Register(nameof(Description), typeof(string), typeof(SettingsCard),
             new PropertyMetadata(string.Empty));
 
+    public static readonly DependencyProperty DescriptionContentProperty =
+        DependencyProperty.Register(nameof(DescriptionContent), typeof(object), typeof(SettingsCard));
+
     public string Description
     {
         get => (string)GetValue(DescriptionProperty);
         set => SetValue(DescriptionProperty, value);
+    }
+
+    public object? DescriptionContent
+    {
+        get => GetValue(DescriptionContentProperty);
+        set => SetValue(DescriptionContentProperty, value);
     }
 }

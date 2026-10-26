@@ -88,15 +88,15 @@ public sealed class FileDiagnosticReporterTests
     private static string NewTempDir()
         => Path.Combine(Path.GetTempPath(), "kotoba-diag-" + Guid.NewGuid().ToString("N"));
 
-    private sealed class FakeSettings : ISettingsService
+    private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly bool _enabled;
 
         public FakeSettings(bool enabled) => _enabled = enabled;
 
-        public string? GetValue(string key)
+        public override string? GetValue(string key)
             => key == "DiagEnabled" && _enabled ? "true" : null;
 
-        public void SetValue(string key, string? value) { }
+        public override void SetValue(string key, string? value) { }
     }
 }

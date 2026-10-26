@@ -17,6 +17,7 @@ public sealed class CoreSliceArchitectureTests
         ["Localization", 0],
         ["Logging", 0],
         ["Settings", 0],
+        ["Llm", 1],
         ["TargetWindow", 1],
         ["Ocr", 2],
         ["Tokenization", 3],

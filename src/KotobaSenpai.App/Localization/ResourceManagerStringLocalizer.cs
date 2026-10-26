@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Resources;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Platform.Windows.Llm;
 
 namespace KotobaSenpai.App.Localization;
 
@@ -39,7 +40,7 @@ public sealed class ResourceManagerStringLocalizer : IStringLocalizer
     /// <inheritdoc />
     public string Get(string key, params object[] args)
     {
-        var value = _manager.GetString(key, _culture) ?? key;
+        var value = _manager.GetString(key, _culture) ?? LlmPromptLocalizer.Resources.GetString(key, _culture) ?? key;
         return args.Length == 0 ? value : string.Format(_culture, value, args);
     }
 
