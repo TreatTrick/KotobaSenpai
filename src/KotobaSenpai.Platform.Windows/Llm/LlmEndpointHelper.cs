@@ -2,6 +2,17 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 
 internal static class LlmEndpointHelper
 {
+    public static Uri ForProtocol(Uri endpoint, string path)
+    {
+        foreach (var suffix in new[] { "/chat/completions", "/responses", "/messages" })
+        {
+            var current = endpoint.AbsolutePath.TrimEnd('/');
+            if (current.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return new UriBuilder(endpoint) { Path = Join(current[..^suffix.Length], path) }.Uri;
+        }
+        return endpoint;
+    }
+
     public static IReadOnlyList<Uri> AnalysisCandidates(Uri endpoint, string path)
     {
         var basePath = endpoint.AbsolutePath.TrimEnd('/');
@@ -43,32 +54,34 @@ internal static class LlmEndpointHelper
             || (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps))
             return [];
 
-        var baseText = baseUri.ToString().TrimEnd('/');
         var path = baseUri.AbsolutePath.TrimEnd('/');
+        foreach (var analysisSuffix in new[] { "/chat/completions", "/responses", "/messages", "/models" })
+            if (path.EndsWith(analysisSuffix, StringComparison.OrdinalIgnoreCase))
+            {
+                path = path[..^analysisSuffix.Length];
+                break;
+            }
         var candidates = new List<string>();
         if (System.Text.RegularExpressions.Regex.IsMatch(path, @"/v\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            candidates.Add(baseText + "/models");
+            candidates.Add(path + "/models");
         else
-            candidates.Add(baseText + "/v1/models");
+            candidates.Add(path + "/v1/models");
 
         var suffixes = new[] { "/api/anthropic", "/anthropic", "/claudecode", "/api/coding" };
         foreach (var suffix in suffixes)
         {
             if (!path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
                 continue;
-            var root = baseUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
             var parentPath = path[..^suffix.Length].TrimEnd('/');
-            if (parentPath.Length > 0)
-                root += parentPath;
             candidates.Add(System.Text.RegularExpressions.Regex.IsMatch(parentPath, @"/v\d+$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
-                ? root + "/models"
-                : root + "/v1/models");
-            candidates.Add(root + "/models");
+                ? parentPath + "/models"
+                : parentPath + "/v1/models");
+            candidates.Add(parentPath + "/models");
             break;
         }
 
         return candidates.Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(value => new Uri(value, UriKind.Absolute))
+            .Select(value => new UriBuilder(baseUri) { Path = value }.Uri)
             .ToArray();
     }
 }

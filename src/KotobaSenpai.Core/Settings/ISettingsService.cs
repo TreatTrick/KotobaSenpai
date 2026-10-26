@@ -16,4 +16,10 @@ public interface ISettingsService
 
     /// <summary>Writes a key/value (implementations write through to disk and preserve other unknown fields).</summary>
     void SetValue(string key, string? value);
+
+    /// <summary>Reads a consistent raw snapshot using the implementation's private synchronization mechanism.</summary>
+    IReadOnlyDictionary<string, string?> GetSnapshot(IEnumerable<string> keys);
+
+    /// <summary>Atomically compares relevant keys and commits all changes together; null values remove keys.</summary>
+    bool TryUpdate(IReadOnlyDictionary<string, string?> expected, IReadOnlyDictionary<string, string?> changes);
 }

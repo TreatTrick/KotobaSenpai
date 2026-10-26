@@ -209,12 +209,22 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.Equal(activeBefore, Native.GetActiveWindow());
             Assert.Contains(handle, OverlayWindowRegistry.Snapshot());
             Assert.True(Native.GetWindowRect(handle, out var bounds));
-            // Arrange both test windows above other non-topmost desktop windows without taking focus.
+            // Isolate the native hit-test probe from unrelated desktop windows without taking focus.
             const uint positionFlags = 0x0001 | 0x0002 | 0x0010;
-            Assert.True(Native.SetWindowPos(targetHandle, nint.Zero, 0, 0, 0, 0, positionFlags));
-            Assert.True(Native.SetWindowPos(handle, nint.Zero, 0, 0, 0, 0, positionFlags));
-            Assert.Equal(activeBefore, Native.GetActiveWindow());
-            Assert.Equal(handle, Native.WindowFromPoint(new Native.Point { X = bounds.Left + 20, Y = bounds.Top + 20 }));
+            try
+            {
+                Assert.True(Native.SetWindowPos(targetHandle, (nint)(-1), 0, 0, 0, 0, positionFlags));
+                Assert.True(Native.SetWindowPos(handle, (nint)(-1), 0, 0, 0, 0, positionFlags));
+                Pump();
+                Assert.Equal(activeBefore, Native.GetActiveWindow());
+                Assert.Equal(handle, Native.WindowFromPoint(new Native.Point { X = bounds.Left + 20, Y = bounds.Top + 20 }));
+            }
+            finally
+            {
+                Native.SetWindowPos(targetHandle, (nint)(-2), 0, 0, 0, 0, positionFlags);
+                Native.SetWindowPos(handle, (nint)(-2), 0, 0, 0, 0, positionFlags);
+            }
+            Assert.Equal(0, Native.GetWindowLongPtr(handle, -20).ToInt64() & 0x8);
 
             popup.HidePopup();
             Assert.False(popup.IsVisible);

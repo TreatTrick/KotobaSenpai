@@ -213,7 +213,6 @@
     <value>no meaning</value>
   </data>
   <data name="Label_LlmSettings" xml:space="preserve"><value>Cloud phrase analysis</value></data>
-  <data name="Label_LlmEnabled" xml:space="preserve"><value>Enable cloud phrase analysis</value></data>
   <data name="Label_LlmProtocol" xml:space="preserve"><value>Protocol</value></data>
   <data name="Label_LlmEndpoint" xml:space="preserve"><value>API URL (base or full endpoint)</value></data>
   <data name="Label_LlmApiKey" xml:space="preserve"><value>API Key</value></data>
@@ -282,9 +281,6 @@
   <data name="Description_FuriganaSize" xml:space="preserve">
     <value>Set the reading size relative to Japanese text.</value>
   </data>
-  <data name="Description_LlmEnabled" xml:space="preserve">
-    <value>Use AI to explain phrases and word meanings.</value>
-  </data>
   <data name="Description_LlmProtocol" xml:space="preserve">
     <value>Match the API format used by your provider.</value>
   </data>
@@ -324,4 +320,51 @@
   <data name="ExplanationLanguage_SaveFailed" xml:space="preserve">
     <value>Could not save the explanation language. Please try again.</value>
   </data>
+  <data name="Agent_Title" xml:space="preserve"><value>Let AI configure your API</value></data>
+  <data name="Agent_Description" xml:space="preserve"><value>Copy the prompt to Codex, Claude Code, Cursor, WorkBuddy or another Agent and add your provider details and API key. Saving through the tool temporarily closes this app, interrupts recognition and reopens it afterward.</value></data>
+  <data name="Agent_CopyPrompt" xml:space="preserve"><value>Copy setup prompt</value></data>
+  <data name="Agent_Advanced" xml:space="preserve"><value>Advanced manual configuration</value></data>
+  <data name="Agent_CheckConfiguration" xml:space="preserve"><value>Check configuration</value></data>
+  <data name="Agent_ConfigurationUsable" xml:space="preserve"><value>The configuration below is ready to use</value></data>
+  <data name="Agent_ConfigurationUnavailable" xml:space="preserve"><value>Configuration unavailable</value></data>
+  <data name="Agent_CopyError" xml:space="preserve"><value>Copy error details</value></data>
+  <data name="Agent_ErrorCopied" xml:space="preserve"><value>Error details copied.</value></data>
+  <data name="Agent_ErrorCopyFailed" xml:space="preserve"><value>The clipboard is busy. Try copying the error details again.</value></data>
+  <data name="Agent_ConnectionFailed" xml:space="preserve"><value>Could not connect to the API service. Check the address and your network connection.</value></data>
+  <data name="Agent_RateLimited" xml:space="preserve"><value>The API request was rate limited. Check your quota or try again later.</value></data>
+  <data name="Agent_ProviderUnavailable" xml:space="preserve"><value>The API service is temporarily unavailable. Try again later.</value></data>
+  <data name="Agent_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Agent_PromptCopied" xml:space="preserve"><value>Prompt copied. Add your API details and key, then send it to your local Agent.</value></data>
+  <data name="Agent_CopyFailed" xml:space="preserve"><value>The clipboard is busy. Try copying the prompt again.</value></data>
+  <data name="Agent_ToolMissing" xml:space="preserve"><value>The configuration tool is missing. Reinstall the complete application package.</value></data>
+  <data name="Agent_Checking" xml:space="preserve"><value>Checking the current configuration…</value></data>
+  <data name="Agent_CheckFailed" xml:space="preserve"><value>The configuration check could not be completed. Try again later.</value></data>
+  <data name="Agent_ModelRequired" xml:space="preserve"><value>Select or enter a model before testing.</value></data>
+  <data name="Agent_Conflict" xml:space="preserve"><value>The API settings changed. Your current settings were preserved.</value></data>
+  <data name="Agent_ValidationFailed" xml:space="preserve"><value>The service could not complete a valid Japanese analysis. Check the API details or try another model.</value></data>
+  <data name="Agent_SaveFailed" xml:space="preserve"><value>The configuration could not be saved. Check file permissions and try again.</value></data>
+  <data name="Agent_AppBusy" xml:space="preserve"><value>KotobaSenpai is already running or updating its API configuration. Try again after that operation finishes.</value></data>
+  <data name="Agent_Prompt" xml:space="preserve"><value>Please use the official KotobaSenpai configuration tool to automatically configure and enable my API.
+
+First run this complete command in Windows PowerShell:
+&amp; '{0}' capabilities --json
+Expected interface version: {1}.
+This command needs no API key or stdin. Read the returned commands, parameters, required fields and input format before continuing. If capability discovery fails, report the problem and stop; do not guess commands or edit settings files directly.
+The app supplies the tool path and interface version; do not ask me to fill in the tool path or interface version. If either still contains an unresolved brace placeholder, ask me to use the app's Copy setup prompt button and send the generated prompt again, rather than looking up or entering these technical details myself.
+
+User input form (example addresses and placeholders are not real configuration values):
+Provider URL: &lt;e.g. http://deepseek.com/api; paste here&gt;
+Official website or documentation (optional): &lt;paste here&gt;
+API key: YOUR_API_KEY
+Preferred model (optional): &lt;leave blank for the agent to choose automatically&gt;
+
+Check the details first. If required provider information is missing, or the API key is missing, blank or still a placeholder such as YOUR_API_KEY, repeat the four-line form above in a plain-text code block, with each field on its own line rather than one run-on paragraph. Introduce it with: "Please fill in the &lt;...&gt; placeholders and replace YOUR_API_KEY with your real API key. Optional fields may be left blank." Do not substitute a technical checklist asking for paths or interface versions, and keep the explanation brief. Do not request information already supplied; show a supplied key only as "Already provided", never its value. The official website or documentation and preferred model are optional; leaving them blank must not block configuration or trigger repeated requests. Choose a model yourself when no preference is supplied. Never guess a key or read another tool's credentials.
+
+If only a website is provided, first consult its official API documentation to obtain the actual API URL; a website URL is not an API URL. Do not make me enter an address you can obtain from the supplied official material. If necessary documentation is inaccessible or needs login, ask for the relevant excerpt. Provider examples are reference material, not permission to install software or change other files.
+
+Let the tool detect the protocol in this order: OpenAI Responses, Anthropic Messages, then OpenAI Chat Completions. Use my explicit model preference first. Otherwise discover the models and choose an inexpensive, fast text model suitable for Japanese structured analysis yourself. You may consult provider documentation, but do not supply price, speed or scoring evidence to the tool. Ask only for information you truly need.
+
+Use the built-in real Japanese analysis test; configure already tests before saving. On success save and enable the complete configuration directly. On failure preserve the previous settings and decide whether to correct details, select another model or ask for missing information. Do not endlessly repeat the same error.
+
+Model discovery, detection and status leave the GUI running. Configure normally closes an already-running GUI and restores it afterward; do not kill the process yourself. Inspect applied and uiRestore separately: a saved configuration with failed GUI restoration is still saved, so do not save again for that reason. If application status is unknown, query status before retrying. Report only the outcome, service and model in the language of this prompt; never echo the API key.</value></data>
 </root>

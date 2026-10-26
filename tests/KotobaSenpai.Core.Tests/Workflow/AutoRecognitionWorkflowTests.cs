@@ -20,7 +20,7 @@ public sealed class AutoRecognitionWorkflowTests
         var recognizer = new SequencedRecognizer([Line("同じ。")], [Line("同じ。")]);
         var analyzer = new CountingAnalyzer();
         var language = new LanguagePreferences();
-        using var service = CreateService(recognizer, overlay, true, analyzer, language);
+        using var service = CreateService(recognizer, overlay, analyzer, language);
         await service.RecognizeAndShowAsync(Target());
         var previous = overlay.LastSession;
 
@@ -39,7 +39,7 @@ public sealed class AutoRecognitionWorkflowTests
         var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var overlay = new RecordingOverlay();
         var service = CreateService(new SequencedRecognizer([Line("旧句。")], [Line("旧句。新句。")]),
-            overlay, phraseAnalysisEnabled: true, new SequencedAnalyzer(release));
+            overlay, new SequencedAnalyzer(release));
         await service.RecognizeAndShowAsync(Target());
         var previous = overlay.LastSession;
         using var cancellation = new CancellationTokenSource();
@@ -56,7 +56,7 @@ public sealed class AutoRecognitionWorkflowTests
         var overlay = new RecordingOverlay();
         var recognizer = new SequencedRecognizer([Line("同じ。")], [Line("同じ。")]);
         var analyzer = new CountingAnalyzer();
-        var service = CreateService(recognizer, overlay, phraseAnalysisEnabled: true, analyzer);
+        var service = CreateService(recognizer, overlay, analyzer);
 
         await service.RecognizeAndShowAsync(Target());
         await service.RecognizeChangedAndShowAsync(Target());
@@ -73,7 +73,7 @@ public sealed class AutoRecognitionWorkflowTests
         var overlay = new RecordingOverlay();
         var recognizer = new SequencedRecognizer([Line("旧句。")], [Line("旧句。新句。")] );
         var analyzer = new SequencedAnalyzer(release);
-        var service = CreateService(recognizer, overlay, phraseAnalysisEnabled: true, analyzer);
+        var service = CreateService(recognizer, overlay, analyzer);
 
         await service.RecognizeAndShowAsync(Target());
         var previous = overlay.LastSession;
@@ -97,7 +97,7 @@ public sealed class AutoRecognitionWorkflowTests
         var overlay = new RecordingOverlay();
         var recognizer = new SequencedRecognizer([Line("甲。"), Line("乙。")], [Line("甲。")]);
         var analyzer = new CountingAnalyzer();
-        var service = CreateService(recognizer, overlay, phraseAnalysisEnabled: true, analyzer);
+        var service = CreateService(recognizer, overlay, analyzer);
 
         await service.RecognizeAndShowAsync(Target());
         await service.RecognizeChangedAndShowAsync(Target());
@@ -108,17 +108,13 @@ public sealed class AutoRecognitionWorkflowTests
     private static WordOverlayApplicationService CreateService(
         IWindowWordRecognizer recognizer,
         IOverlayRenderer overlay,
-        bool phraseAnalysisEnabled,
-        ILlmPhraseAnalyzer? analyzer = null,
+        ILlmPhraseAnalyzer analyzer,
         IExplanationLanguagePreferences? language = null)
         => new(
             recognizer,
             new WordGroupingService(new CharTokenizer(), new SentenceSegmenter(), new IdentitySpanResolver()),
             overlay,
-            phraseOrchestrator: analyzer is null
-                ? null
-                : new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()), language),
-            settings: new FakeSettings(phraseAnalysisEnabled),
+            phraseOrchestrator: new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()), language),
             explanationLanguage: language);
 
     private static WindowTarget Target() => new((nint)42, "VN", new ScreenRect(0, 0, 200, 100));
@@ -200,14 +196,6 @@ public sealed class AutoRecognitionWorkflowTests
             EffectiveLanguageChanged?.Invoke(this, EventArgs.Empty);
             return true;
         }
-    }
-
-    private sealed class FakeSettings(bool phraseAnalysisEnabled) : ISettingsService
-    {
-        public string? GetValue(string key)
-            => key == "PhraseGroupsEnabled" && phraseAnalysisEnabled ? "true" : null;
-
-        public void SetValue(string key, string? value) { }
     }
 
     private sealed class CharTokenizer : ITokenizer

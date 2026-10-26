@@ -226,19 +226,18 @@ public sealed class LlmEndpointFallbackTests
         _ => """{"choices":[{"message":{"content":"{\"groups\":[],\"words\":[]}"}}]}""",
     };
 
-    private sealed class Settings(string endpoint, string protocol) : ISettingsService
+    private sealed class Settings(string endpoint, string protocol) : KotobaSenpai.TestSupport.SettingsStub
     {
-        public string? GetValue(string key) => key switch
+        public override string? GetValue(string key) => key switch
         {
             LlmSettingsKeys.Endpoint => endpoint,
             LlmSettingsKeys.Protocol => protocol,
             LlmSettingsKeys.ApiKey => "secret-api-key",
             LlmSettingsKeys.Model => "test-model",
-            LlmSettingsKeys.Enabled => "true",
             _ => null,
         };
 
-        public void SetValue(string key, string? value) { }
+        public override void SetValue(string key, string? value) { }
     }
 
     private sealed record CapturedRequest(Uri Uri, string Body, string? Authorization, string? ApiKey, string? Version);

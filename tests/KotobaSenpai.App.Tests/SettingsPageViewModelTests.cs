@@ -175,12 +175,12 @@ public sealed class SettingsPageViewModelTests
             new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer), localizer, language);
     }
 
-    private sealed class RecordingSettings : ISettingsService
+    private sealed class RecordingSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         public Dictionary<string, string?> Values { get; } = [];
         public int WriteCount { get; private set; }
-        public string? GetValue(string key) => Values.GetValueOrDefault(key);
-        public void SetValue(string key, string? value) { Values[key] = value; WriteCount++; }
+        public override string? GetValue(string key) => Values.GetValueOrDefault(key);
+        public override void SetValue(string key, string? value) { Values[key] = value; WriteCount++; }
     }
 
     private sealed class RecordingThemeStore : IThemePreferenceStore

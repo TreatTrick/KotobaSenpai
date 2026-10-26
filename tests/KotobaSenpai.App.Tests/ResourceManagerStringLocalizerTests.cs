@@ -1,11 +1,37 @@
 using System.Globalization;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Resources;
+using KotobaSenpai.Platform.Windows.Llm;
 
 namespace KotobaSenpai.App.Tests;
 
 public sealed class ResourceManagerStringLocalizerTests
 {
+    [Theory]
+    [InlineData("en")]
+    [InlineData("zh-CN")]
+    [InlineData("fr")]
+    public void Shared_provider_prompts_use_the_request_language_independently_of_ui_culture(string language)
+    {
+        var previous = CultureInfo.CurrentUICulture;
+        CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo(language);
+        try
+        {
+            var sample = LlmConnectionDetector.CreateSample();
+            var request = new KotobaSenpai.Core.PhraseAnalysis.PhraseAnalysisRequest(sample.RecognitionId,
+                sample.SegmentId, sample.SegmentText, sample.Tokens, sample.LocalSpans, "French");
+            var builder = new PhrasePromptBuilder();
+            foreach (var profile in Enum.GetValues<LlmPromptProfile>())
+            {
+                var prompt = builder.Build(request, profile);
+                Assert.Contains("Target explanation language: \"French\"", prompt.SystemPrompt);
+                Assert.DoesNotContain("Llm.", prompt.SystemPrompt);
+                Assert.DoesNotContain("Llm.", prompt.UserContent);
+            }
+        }
+        finally { CultureInfo.CurrentUICulture = previous; }
+    }
+
     [Fact]
     public void Resolves_active_zhCN_culture_to_chinese_value()
     {

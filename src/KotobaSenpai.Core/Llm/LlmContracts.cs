@@ -9,9 +9,9 @@ public static class LlmProtocolIds
 
     public static IReadOnlyList<LlmProtocolOption> Options { get; } =
     [
-        new(OpenAiChat, "Llm_ProtocolOpenAiChat"),
         new(OpenAiResponses, "Llm_ProtocolOpenAiResponses"),
         new(Anthropic, "Llm_ProtocolAnthropic"),
+        new(OpenAiChat, "Llm_ProtocolOpenAiChat"),
     ];
 
     public static string Normalize(string? value)
@@ -31,7 +31,6 @@ public static class LlmSettingsKeys
     public const string Endpoint = "LlmEndpoint";
     public const string Model = "LlmModel";
     public const string Protocol = "LlmProtocol";
-    public const string Enabled = "PhraseGroupsEnabled";
 }
 
 /// <summary>Display metadata for a selectable protocol.</summary>

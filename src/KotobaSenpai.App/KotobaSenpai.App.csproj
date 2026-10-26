@@ -13,6 +13,7 @@
     <ApplicationIcon>Assets\Branding\app-icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="KotobaSenpai.App.Tests" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
@@ -20,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
     <ProjectReference Include="..\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
+    <ProjectReference Include="..\KotobaSenpai.Cli\KotobaSenpai.Cli.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\FluentIcons\LICENSE.txt"
@@ -35,4 +37,24 @@
       <Generator>PublicResXFileCodeGenerator</Generator>
     </EmbeddedResource>
   </ItemGroup>
+  <Target Name="GetAgentCliFiles">
+    <MSBuild Projects="..\KotobaSenpai.Cli\KotobaSenpai.Cli.csproj" Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_AgentCliTarget" />
+    </MSBuild>
+    <ItemGroup>
+      <_AgentCliFiles Include="@(_AgentCliTarget->'%(RootDir)%(Directory)%(Filename).exe');@(_AgentCliTarget->'%(RootDir)%(Directory)%(Filename).dll');@(_AgentCliTarget->'%(RootDir)%(Directory)%(Filename).deps.json');@(_AgentCliTarget->'%(RootDir)%(Directory)%(Filename).runtimeconfig.json')" />
+    </ItemGroup>
+  </Target>
+  <Target Name="CopyAgentCli" AfterTargets="Build" DependsOnTargets="GetAgentCliFiles">
+    <Copy SourceFiles="@(_AgentCliFiles)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishAgentCli" AfterTargets="ComputeFilesToPublish" DependsOnTargets="GetAgentCliFiles">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(ResolvedFileToPublish.RelativePath)' == 'KotobaSenpai.Cli.exe' Or '%(ResolvedFileToPublish.RelativePath)' == 'KotobaSenpai.Cli.dll' Or '%(ResolvedFileToPublish.RelativePath)' == 'KotobaSenpai.Cli.deps.json' Or '%(ResolvedFileToPublish.RelativePath)' == 'KotobaSenpai.Cli.runtimeconfig.json'" />
+      <ResolvedFileToPublish Include="@(_AgentCliFiles)" RelativePath="%(Filename)%(Extension)"
+                             CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 </Project>

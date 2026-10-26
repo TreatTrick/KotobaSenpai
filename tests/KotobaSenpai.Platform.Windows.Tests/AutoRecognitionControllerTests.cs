@@ -178,11 +178,11 @@ public sealed class AutoRecognitionControllerTests
         public void Dispose() { }
     }
 
-    private sealed class FakeSettings : ISettingsService
+    private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         public string? Region { get; set; }
-        public string? GetValue(string key) => key == RecognitionRegion.SettingsKey ? Region : null;
+        public override string? GetValue(string key) => key == RecognitionRegion.SettingsKey ? Region : null;
 
-        public void SetValue(string key, string? value) { }
+        public override void SetValue(string key, string? value) { }
     }
 }

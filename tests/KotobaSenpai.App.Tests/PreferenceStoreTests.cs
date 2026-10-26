@@ -69,13 +69,13 @@ public sealed class PreferenceStoreTests
         Assert.Null(store.Load());
     }
 
-    private sealed class FakeSettings : ISettingsService
+    private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         public Dictionary<string, string?> Values { get; } = new();
 
-        public string? GetValue(string key) =>
+        public override string? GetValue(string key) =>
             Values.TryGetValue(key, out var v) ? v : null;
 
-        public void SetValue(string key, string? value) => Values[key] = value;
+        public override void SetValue(string key, string? value) => Values[key] = value;
     }
 }

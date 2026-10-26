@@ -23,6 +23,10 @@ public sealed record PhraseAnalysisResult
     public IReadOnlyList<ParsedWordMeaning> Words { get; set; } = Array.Empty<ParsedWordMeaning>();
 
     public bool Succeeded => Outcome == PhraseAnalysisOutcome.Success;
+
+    /// <summary>Transport metadata used by connection verification without parsing diagnostic text.</summary>
+    public int? ProviderStatusCode { get; init; }
+    public string? Endpoint { get; init; }
 }
 
 /// <summary>Phrase analysis outcome category. On failure no partial group is rendered and local words/spans remain usable.</summary>

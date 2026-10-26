@@ -192,7 +192,7 @@ public sealed class RecognitionPageViewModelTests
         await vm.RecognizeCommand.ExecuteAsync(null);
 
         Assert.Equal($"{ResourceKeys.Status_WordsRecognized}:1", vm.Status);
-        Assert.Equal(1, overlay.ShowCount);
+        Assert.Equal(2, overlay.ShowCount);
         Assert.NotNull(overlay.LastSession);
         Assert.Equal(0, selector.FlashCount);
     }
@@ -308,7 +308,7 @@ public sealed class RecognitionPageViewModelTests
         var workflow = new WordOverlayApplicationService(
             recognizer ?? new FakeRecognizer(),
             new WordGroupingService(new StubTokenizer(), new SentenceSegmenter(), new StubSpanResolver()),
-            overlay);
+            overlay, KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
@@ -382,10 +382,10 @@ public sealed class RecognitionPageViewModelTests
         public void StopFlashing() => StopFlashingCount++;
     }
 
-    private sealed class FakeSettings(string? region = null) : ISettingsService
+    private sealed class FakeSettings(string? region = null) : KotobaSenpai.TestSupport.SettingsStub
     {
-        public string? GetValue(string key) => key == RecognitionRegion.SettingsKey ? region : null;
-        public void SetValue(string key, string? value) { }
+        public override string? GetValue(string key) => key == RecognitionRegion.SettingsKey ? region : null;
+        public override void SetValue(string key, string? value) { }
     }
 
     private sealed class SequenceRecognizer(params WordRecognitionResult[] results) : IWindowWordRecognizer

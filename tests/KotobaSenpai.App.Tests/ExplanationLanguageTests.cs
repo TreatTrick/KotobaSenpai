@@ -85,10 +85,10 @@ public sealed class ExplanationLanguageTests
         return language;
     }
 
-    private sealed class MemorySettings : ISettingsService
+    private sealed class MemorySettings : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly Dictionary<string, string?> _values = [];
-        public string? GetValue(string key) => _values.GetValueOrDefault(key);
-        public void SetValue(string key, string? value) => _values[key] = value;
+        public override string? GetValue(string key) => _values.GetValueOrDefault(key);
+        public override void SetValue(string key, string? value) => _values[key] = value;
     }
 }

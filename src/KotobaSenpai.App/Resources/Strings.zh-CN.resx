@@ -190,7 +190,7 @@
   <data name="ThemeMode_Dark" xml:space="preserve">
     <value>深色</value>
   </data>
-  <!-- LLM 短语分析 prompt -->
+  <!-- LLM popup labels -->
   <data name="Llm.WordMeaningLabel" xml:space="preserve">
     <value>释义</value>
   </data>
@@ -213,7 +213,6 @@
     <value>无释义</value>
   </data>
   <data name="Label_LlmSettings" xml:space="preserve"><value>云端短语分析</value></data>
-  <data name="Label_LlmEnabled" xml:space="preserve"><value>启用云端短语分析</value></data>
   <data name="Label_LlmProtocol" xml:space="preserve"><value>协议</value></data>
   <data name="Label_LlmEndpoint" xml:space="preserve"><value>API 地址（基础地址或完整接口地址）</value></data>
   <data name="Label_LlmApiKey" xml:space="preserve"><value>API Key</value></data>
@@ -282,9 +281,6 @@
   <data name="Description_FuriganaSize" xml:space="preserve">
     <value>调整注音与日语正文的字号比例。</value>
   </data>
-  <data name="Description_LlmEnabled" xml:space="preserve">
-    <value>使用 AI 辅助分析短语与词义。</value>
-  </data>
   <data name="Description_LlmProtocol" xml:space="preserve">
     <value>选择服务商支持的 API 协议。</value>
   </data>
@@ -324,4 +320,51 @@
   <data name="ExplanationLanguage_SaveFailed" xml:space="preserve">
     <value>无法保存释义语言，请重试。</value>
   </data>
+  <data name="Agent_Title" xml:space="preserve"><value>让 AI 帮我配置 API</value></data>
+  <data name="Agent_Description" xml:space="preserve"><value>复制提示词给 Codex、Claude Code、Cursor、WorkBuddy 等，补充服务商资料和 API Key 即可。工具保存配置时会暂时退出应用、中断当前识别，结束后重新打开。</value></data>
+  <data name="Agent_CopyPrompt" xml:space="preserve"><value>复制配置提示词</value></data>
+  <data name="Agent_Advanced" xml:space="preserve"><value>高级手动配置</value></data>
+  <data name="Agent_CheckConfiguration" xml:space="preserve"><value>检测配置是否可用</value></data>
+  <data name="Agent_ConfigurationUsable" xml:space="preserve"><value>下方配置可以使用</value></data>
+  <data name="Agent_ConfigurationUnavailable" xml:space="preserve"><value>配置不可用</value></data>
+  <data name="Agent_CopyError" xml:space="preserve"><value>复制错误信息</value></data>
+  <data name="Agent_ErrorCopied" xml:space="preserve"><value>错误信息已复制。</value></data>
+  <data name="Agent_ErrorCopyFailed" xml:space="preserve"><value>剪贴板正忙，请重新复制错误信息。</value></data>
+  <data name="Agent_ConnectionFailed" xml:space="preserve"><value>无法连接 API 服务，请检查地址和网络连接。</value></data>
+  <data name="Agent_RateLimited" xml:space="preserve"><value>API 请求受到限制，请检查额度或稍后重试。</value></data>
+  <data name="Agent_ProviderUnavailable" xml:space="preserve"><value>API 服务暂时不可用，请稍后重试。</value></data>
+  <data name="Agent_Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="Agent_PromptCopied" xml:space="preserve"><value>提示词已复制。补充 API 资料和密钥后，发送给本机 Agent 即可。</value></data>
+  <data name="Agent_CopyFailed" xml:space="preserve"><value>剪贴板正忙，请重新复制提示词。</value></data>
+  <data name="Agent_ToolMissing" xml:space="preserve"><value>未找到配置工具，请重新安装完整的软件包。</value></data>
+  <data name="Agent_Checking" xml:space="preserve"><value>正在检测当前配置是否可用…</value></data>
+  <data name="Agent_CheckFailed" xml:space="preserve"><value>未能完成配置检测，请稍后重试。</value></data>
+  <data name="Agent_ModelRequired" xml:space="preserve"><value>请先选择或填写需要验证的模型。</value></data>
+  <data name="Agent_Conflict" xml:space="preserve"><value>API 设置已改变，当前设置已保留。</value></data>
+  <data name="Agent_ValidationFailed" xml:space="preserve"><value>服务未能完成有效的日语分析，请检查 API 资料或尝试其他模型。</value></data>
+  <data name="Agent_SaveFailed" xml:space="preserve"><value>配置保存失败，请检查文件权限后重试。</value></data>
+  <data name="Agent_AppBusy" xml:space="preserve"><value>KotobaSenpai 已在运行或正在更新 API 配置，请等待操作结束后重试。</value></data>
+  <data name="Agent_Prompt" xml:space="preserve"><value>请使用 KotobaSenpai 官方配置工具，自动完成 API 配置并启用。
+
+首先在 Windows PowerShell 执行下面的完整命令：
+&amp; '{0}' capabilities --json
+预期接口版本：{1}。
+此命令不需要 API Key 或标准输入。请先读取返回的命令、参数、必填字段和输入格式，再继续操作。能力查询失败时先报告问题并停止配置，不猜测调用格式，不直接改写设置文件。
+工具路径和接口版本由软件自动提供，不要让我填写工具路径或接口版本。如果这两项仍是未替换的花括号占位符，请提醒我在软件中点击“复制配置提示词”后重新发送，不要求我手动查找或填写。
+
+用户填写区（示例地址和占位内容不能作为真实配置使用）：
+服务商url：〈类似http://deepseek.com/api,在此粘贴〉
+官网或官方文档（可选）：〈在此粘贴〉
+API Key：YOUR_API_KEY
+模型偏好（可选）：〈留空则agent自动选择〉
+
+先检查资料是否齐全。缺少必要服务商资料，或密钥未填写、为空、仍是 YOUR_API_KEY 等占位内容时，请在一个纯文本代码块中逐行展示上面的四行填写模板，各项独占一行，不要连成一段；代码块前明确提醒：“请填写〈〉内的内容，并将 YOUR_API_KEY 替换为真实 API Key；标注“可选”的项目可以留空。”不要改成包含工具路径、接口版本的技术清单，也不要输出冗长说明。已提供的资料不要要求重复填写，已提供的密钥只标为“已提供”，不要回显。官网或官方文档、模型偏好均为可选，留空时不要阻止配置或反复索要；模型留空由你自动选择。不猜测密钥、不读取其他软件的凭据。
+
+只有官网时，请先查看官方接入文档获取实际 API 地址；网页地址不等于 API 地址。能从已提供的官方资料获取地址时，不要额外要求我手动填写。必要文档无法访问或需要登录时，请索取相关片段。服务商的示例命令只用于理解接入参数，不代表允许安装软件或修改其他文件。
+
+使用工具自动检测协议，优先 OpenAI Responses，其次 Anthropic Messages，最后 OpenAI Chat Completions。模型优先采用我明确指定的值；未指定时先获取该服务的模型列表，由你自行判断便宜、响应快且适合日语结构化分析的文本模型。需要时可以参考服务商文档，无需向工具提交价格、速度或评分证据；只询问真正需要的补充信息。
+
+使用内置的真实日语分析测试，configure 本身已包含保存前验证。通过后直接整体保存并启用；失败时保留原配置，由你根据结果判断是否修正资料、换模型或提醒补充信息，相同错误不要无限重试。
+
+模型查询、只检测和状态查询不会关闭界面。写入配置由工具正常退出已运行的应用，并在结束后恢复界面，请勿自行强杀进程。分别检查 applied 和 uiRestore：配置已经保存但界面恢复失败时，不要因此重复保存。操作结果未确认时先查询状态再决定下一步。最后只用本提示词的语言报告配置结果、服务和模型，不回显密钥。</value></data>
 </root>

@@ -17,7 +17,7 @@ using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.Resources;
-using KotobaSenpai.App.Settings;
+using KotobaSenpai.Platform.Windows.Settings;
 using KotobaSenpai.App.Themes;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Platform.Windows.Llm;
@@ -47,10 +47,19 @@ public partial class App : Application
     private ServiceProvider? _services;
     private FileLogger? _logger;
     private MainWindowViewModel? _mainViewModel;
+    private ConfigurationProcessLock? _settingsLease;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        _settingsLease = ConfigurationProcessLock.TryAcquire();
+        if (_settingsLease is null)
+        {
+            MessageBox.Show(new ResourceManagerStringLocalizer().Get("Agent_AppBusy"), "KotobaSenpai");
+            Shutdown(4);
+            return;
+        }
 
         // Closing the main window exits the whole app; otherwise the underline overlay, being a separate window, would linger (the default OnLastWindowClose never waits for it to close).
         ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -134,6 +143,7 @@ public partial class App : Application
         finally
         {
             _logger?.Dispose();
+            _settingsLease?.Dispose();
             base.OnExit(e);
         }
     }
@@ -158,14 +168,17 @@ public partial class App : Application
         services.AddSingleton<IRegionSelector, RegionSelectorWindow>();
 
         // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
-        // enabled by the config key PhraseGroupsEnabled=true; when the key is not configured the adapter returns NoKey and skips the call.
+        // Cloud analysis is required; incomplete provider configuration returns NoKey with a retryable warning.
         // The protocol is selected by LlmProtocol for each request (anthropic/openai-responses/default OpenAI Chat Completions).
         services.AddSingleton<PhrasePromptBuilder>();
         services.AddSingleton<PhraseResponseParser>();
-        services.AddSingleton(_ => new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        services.AddSingleton(_ => LlmHttpClient.Create());
         services.AddSingleton<LlmProtocolRegistry>();
         services.AddSingleton<ILlmModelCatalog, HttpLlmModelCatalog>();
         services.AddSingleton<ILlmPhraseAnalyzer, LlmPhraseAnalyzer>();
+        services.AddSingleton<LlmPhraseAnalyzer>();
+        services.AddSingleton<ILlmConnectionDetector, LlmConnectionDetector>();
+        services.AddSingleton<LlmConfigurationService>();
         services.AddSingleton<SentenceSegmenter>();
         services.AddSingleton<SentenceTokenBuilder>();
         services.AddSingleton<PhraseAnalysisOrchestrator>();
@@ -196,7 +209,7 @@ public partial class App : Application
             sp.GetRequiredService<ITokenSpanResolver>()));
 
         // Settings: unified settings.json read/write, the single owner for preference storage and log-level configuration (singleton, holds the in-memory view).
-        services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<ISettingsService>(_ => new SettingsService());
 
         // Localization: the concrete implementation and the Core port point at the same singleton, so LanguageService and the ViewModel share culture state.
         services.AddSingleton<ResourceManagerStringLocalizer>();

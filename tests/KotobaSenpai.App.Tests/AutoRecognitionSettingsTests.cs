@@ -60,13 +60,13 @@ public sealed class AutoRecognitionSettingsTests
         Assert.Equal("false", settings.GetValue(AutoRecognitionSettings.EnabledKey));
     }
 
-    private sealed class RecordingSettings : ISettingsService
+    private sealed class RecordingSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly Dictionary<string, string?> _values = new();
 
-        public string? GetValue(string key) => _values.TryGetValue(key, out var value) ? value : null;
+        public override string? GetValue(string key) => _values.TryGetValue(key, out var value) ? value : null;
 
-        public void SetValue(string key, string? value) => _values[key] = value;
+        public override void SetValue(string key, string? value) => _values[key] = value;
     }
 
     private static RecognitionPageViewModel Create(
@@ -78,7 +78,7 @@ public sealed class AutoRecognitionSettingsTests
         var workflow = new WordOverlayApplicationService(
             new FakeRecognizer(),
             new WordGroupingService(new FakeTokenizer(), new SentenceSegmenter(), new FakeSpanResolver()),
-            new FakeOverlay());
+            new FakeOverlay(), KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
         return new RecognitionPageViewModel(
             new FakeWindowCatalog(target),
             workflow,
