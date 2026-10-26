@@ -4,6 +4,7 @@ using KotobaSenpai.App;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,9 +27,14 @@ public sealed class CompositionRootTests
 
         Assert.Same(provider.GetRequiredService<LanguageService>(), page.Language);
         Assert.Same(provider.GetRequiredService<ILanguagePreferences>(), page.Language);
+        Assert.Same(provider.GetRequiredService<IExplanationLanguagePreferences>(), page.Language);
         Assert.Same(provider.GetRequiredService<LlmSettingsViewModel>(), page.Llm);
         Assert.Equal(AppThemeMode.Dark, provider.GetRequiredService<IThemePreferenceStore>().Load());
         Assert.Equal("Dark", settings.GetValue("Theme"));
+        page.ExplanationLanguage = "French";
+        page.SaveExplanationLanguageCommand.Execute(null);
+        Assert.Equal("French", provider.GetRequiredService<IExplanationLanguagePreferences>().EffectiveLanguage);
+        Assert.Equal("French", settings.GetValue("ExplanationLanguage"));
     }
 
     [Fact]

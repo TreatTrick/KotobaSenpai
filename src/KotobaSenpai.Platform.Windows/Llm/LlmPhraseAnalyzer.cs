@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 
@@ -33,7 +32,6 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         ILlmProtocol? protocol = null,
         PhrasePromptBuilder? promptBuilder = null,
         PhraseResponseParser? parser = null,
-        IStringLocalizer? localizer = null,
         IDiagnosticReporter? diagnostics = null,
         ILogger? logger = null,
         LlmProtocolRegistry? protocolRegistry = null)
@@ -42,8 +40,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _fixedProtocol = protocol;
         _protocolRegistry = protocolRegistry ?? new LlmProtocolRegistry();
-        // ponytail: fallback only serves callers that don't inject a builder (production always injects via DI); returns the key itself when a localizer is missing.
-        _promptBuilder = promptBuilder ?? new PhrasePromptBuilder(localizer ?? new KeyReturningLocalizer());
+        _promptBuilder = promptBuilder ?? new PhrasePromptBuilder();
         _parser = parser ?? new PhraseResponseParser();
         _diagnostics = diagnostics;
         _logger = logger;
@@ -162,15 +159,4 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
         return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words };
     }
-}
-
-/// <summary>Fallback when no localizer is injected: returns the key name itself (only hit via tests/manual construction).</summary>
-internal sealed class KeyReturningLocalizer : IStringLocalizer
-{
-#pragma warning disable CS0067 // Event required by the interface; never raised on the fallback path
-    public event EventHandler? CultureChanged;
-#pragma warning restore CS0067
-
-    public string Get(string key, params object[] args)
-        => args.Length == 0 ? key : string.Join(",", args);
 }

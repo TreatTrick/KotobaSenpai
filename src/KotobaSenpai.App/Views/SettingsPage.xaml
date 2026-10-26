@@ -44,6 +44,21 @@
                      Style="{StaticResource Description}" Margin="0" />
         </Grid>
       </controls:SettingsCard>
+      <controls:SettingsCard Header="{loc:Loc Key=Label_ExplanationLanguage}"
+                             Description="{loc:Loc Key=Description_ExplanationLanguage}"
+                             Icon="{ui:SymbolIcon LocalLanguage24}">
+        <StackPanel Width="{StaticResource SettingsInputWidth}">
+          <TextBox x:Name="ExplanationLanguageTextBox" Style="{StaticResource SettingTextInput}"
+                   Text="{Binding ExplanationLanguage, UpdateSourceTrigger=PropertyChanged}"
+                   AutomationProperties.Name="{loc:Loc Key=Label_ExplanationLanguage}" />
+          <ui:Button Content="{loc:Loc Key=Button_SaveExplanationLanguage}"
+                     Command="{Binding SaveExplanationLanguageCommand}"
+                     Style="{StaticResource SettingsButton}" HorizontalAlignment="Right" Margin="0,8,0,0" />
+          <TextBlock Text="{Binding EffectiveExplanationLanguage}" Style="{StaticResource ModelStatus}" />
+          <TextBlock Text="{Binding ExplanationLanguageStatus}" Style="{StaticResource ModelStatus}"
+                     AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+      </controls:SettingsCard>
       <StackPanel DataContext="{Binding Llm}">
         <TextBlock Text="{loc:Loc Key=Label_LlmSettings}" Style="{StaticResource SectionTitle}" />
 

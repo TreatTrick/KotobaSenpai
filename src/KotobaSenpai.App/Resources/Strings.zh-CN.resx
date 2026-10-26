@@ -191,36 +191,6 @@
     <value>深色</value>
   </data>
   <!-- LLM 短语分析 prompt -->
-  <data name="Llm.AnthropicSystemPrompt" xml:space="preserve">
-    <value>你是日语视觉小说文本的教学分析器。必须恰好调用一次 `return_groups` 工具，并把完整答案放入它的 input。不得输出普通文本、Markdown 或解释。工具 input 必须严格是一个对象，顶层只能有 `groups` 和 `words` 两个数组，不得有其他顶层字段。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
-  </data>
-  <data name="Llm.AnthropicUserInstruction" xml:space="preserve">
-    <value>现在调用一次 `return_groups` 工具。其 input 必须严格包含顶层 `groups` 和 `words` 两个数组；`groups` 可以为空。不要在普通 assistant 文本中返回 JSON，不要添加解释性字段。</value>
-  </data>
-  <data name="Llm.OpenAiChatSystemPrompt" xml:space="preserve">
-    <value>你是日语视觉小说文本的教学分析器。必须直接返回一个遵循所提供 JSON 结构示例的 JSON 对象，作为 assistant 内容。示例中的值必须替换为实际分析结果。不得调用工具，不得输出 Markdown、解释或其他文本。对象顶层只能有 `groups` 和 `words` 两个数组。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
-  </data>
-  <data name="Llm.OpenAiChatUserInstruction" xml:space="preserve">
-    <value>直接返回一个 JSON 对象，必须包含顶层 `groups` 和 `words` 两个数组，即使 `groups` 为空。不要调用工具，不要添加其他字段或解释性文字。严格遵循所提供的 JSON 结构。</value>
-  </data>
-  <data name="Llm.OpenAiResponsesSystemPrompt" xml:space="preserve">
-    <value>你是日语视觉小说文本的教学分析器。必须直接返回一个符合 `text.format` schema 的 JSON 对象，作为 output text。不得调用工具，不得输出 Markdown、解释或其他文本。对象顶层只能有 `groups` 和 `words` 两个数组。`groups` 只包含真正有教学价值、且不是本地已识别普通词或连续词块的多词组合。每个 group 只能包含 `modelGroupId`、`type`、`parts`、`label`、`meaning`、`grammar`。`parts` 中的 token 值必须从 token 表逐字复制为 `l&lt;line&gt;:t&lt;token&gt;` 格式。meaning 与 grammar 使用简体中文。</value>
-  </data>
-  <data name="Llm.OpenAiResponsesUserInstruction" xml:space="preserve">
-    <value>直接返回一个 JSON 对象，必须包含顶层 `groups` 和 `words` 两个数组，即使 `groups` 为空。不要调用工具，不要添加其他字段或解释性文字。严格遵循 `text.format` schema。</value>
-  </data>
-  <data name="Llm.SegmentLabel" xml:space="preserve">
-    <value>句段文本：</value>
-  </data>
-  <data name="Llm.TokenTableLabel" xml:space="preserve">
-    <value>token 表（id/surface/lemma/reading/pos1/cType/cForm）：</value>
-  </data>
-  <data name="Llm.LocalSpansLabel" xml:space="preserve">
-    <value>本地已识别连续词块：</value>
-  </data>
-  <data name="Llm.WordsInstruction" xml:space="preserve">
-    <value>请在 `words` 中按词块表顺序，为上方列出的每一个本地词块各返回一条记录，包括助词和助动词。每条记录只能包含 `headword`、`pos`、`meaning`、`grammar` 四个字段。`headword` 必须从对应词块的 surface 逐字复制；不要添加 `surface` 字段，不要自行发明 surface、token id 或读音。`pos` 填写语境词性，`meaning` 填写本语境最佳中文释义，`grammar` 填写简洁的语法说明。不要遗漏词块，也不要为表外内容添加记录。</value>
-  </data>
   <data name="Llm.WordMeaningLabel" xml:space="preserve">
     <value>释义</value>
   </data>
@@ -332,5 +302,26 @@
   </data>
   <data name="Toggle_Off" xml:space="preserve">
     <value>关</value>
+  </data>
+  <data name="Label_ExplanationLanguage" xml:space="preserve">
+    <value>释义语言</value>
+  </data>
+  <data name="Description_ExplanationLanguage" xml:space="preserve">
+    <value>留空时跟随界面语言。可以填写中文名、英文名或该语言自己的名称，例如法语、French、français；请填写明确的语言名称。实际效果取决于所选模型。</value>
+  </data>
+  <data name="Button_SaveExplanationLanguage" xml:space="preserve">
+    <value>保存</value>
+  </data>
+  <data name="ExplanationLanguage_Current" xml:space="preserve">
+    <value>当前生效：{0}</value>
+  </data>
+  <data name="ExplanationLanguage_Saved" xml:space="preserve">
+    <value>释义语言已保存，下次识别生效。</value>
+  </data>
+  <data name="ExplanationLanguage_Invalid" xml:space="preserve">
+    <value>请填写不超过 80 个字符的单行语言名称，不要包含控制字符；也可以留空。</value>
+  </data>
+  <data name="ExplanationLanguage_SaveFailed" xml:space="preserve">
+    <value>无法保存释义语言，请重试。</value>
   </data>
 </root>

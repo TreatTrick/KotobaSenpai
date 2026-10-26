@@ -13,7 +13,8 @@ public sealed record PhraseAnalysisRequest
         string segmentId,
         string segmentText,
         IReadOnlyList<SentenceTokenReference> tokens,
-        IReadOnlyList<LocalSpanSummary> localSpans)
+        IReadOnlyList<LocalSpanSummary> localSpans,
+        string explanationLanguage = "English")
     {
         if (recognitionId == Guid.Empty)
             throw new ArgumentException("Recognition id must not be empty.", nameof(recognitionId));
@@ -22,12 +23,14 @@ public sealed record PhraseAnalysisRequest
         ArgumentNullException.ThrowIfNull(segmentText);
         tokens = tokens ?? throw new ArgumentNullException(nameof(tokens));
         localSpans = localSpans ?? throw new ArgumentNullException(nameof(localSpans));
+        ArgumentException.ThrowIfNullOrWhiteSpace(explanationLanguage);
 
         RecognitionId = recognitionId;
         SegmentId = segmentId;
         SegmentText = segmentText;
         Tokens = tokens.ToArray();
         LocalSpans = localSpans.ToArray();
+        ExplanationLanguage = explanationLanguage;
     }
 
     /// <summary>Application-owned recognition id used only for local diagnostic correlation.</summary>
@@ -44,4 +47,7 @@ public sealed record PhraseAnalysisRequest
 
     /// <summary>Locally resolved contiguous span summaries.</summary>
     public IReadOnlyList<LocalSpanSummary> LocalSpans { get; }
+
+    /// <summary>The language name used for this request's explanations and cache entry.</summary>
+    public string ExplanationLanguage { get; }
 }

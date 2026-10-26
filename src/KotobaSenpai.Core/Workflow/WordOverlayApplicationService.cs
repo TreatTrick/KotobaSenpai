@@ -15,7 +15,7 @@ namespace KotobaSenpai.Core.Workflow;
 /// Application service orchestrating the "capture -> OCR -> coordinate mapping -> overlay" use case.
 /// Depends only on Core ports; platform implementations are injected via dependency injection.
 /// </summary>
-public sealed class WordOverlayApplicationService
+public sealed class WordOverlayApplicationService : IDisposable
 {
     private readonly IWindowWordRecognizer _recognizer;
     private readonly IOcrWordGroupingService _grouping;
@@ -24,6 +24,7 @@ public sealed class WordOverlayApplicationService
     private readonly PhraseAnalysisOrchestrator? _phraseOrchestrator;
     private readonly ISettingsService? _settings;
     private readonly ITargetWindowTracker? _tracker;
+    private readonly IExplanationLanguagePreferences? _explanationLanguage;
     private int _recognitionGeneration;
     private string? _lastRecognizedText;
 
@@ -34,7 +35,8 @@ public sealed class WordOverlayApplicationService
         IDiagnosticReporter? diagnostics = null,
         PhraseAnalysisOrchestrator? phraseOrchestrator = null,
         ISettingsService? settings = null,
-        ITargetWindowTracker? tracker = null)
+        ITargetWindowTracker? tracker = null,
+        IExplanationLanguagePreferences? explanationLanguage = null)
     {
         _recognizer = recognizer;
         _grouping = grouping;
@@ -43,6 +45,22 @@ public sealed class WordOverlayApplicationService
         _phraseOrchestrator = phraseOrchestrator;
         _settings = settings;
         _tracker = tracker;
+        _explanationLanguage = explanationLanguage;
+        if (_explanationLanguage is not null)
+            _explanationLanguage.EffectiveLanguageChanged += OnExplanationLanguageChanged;
+    }
+
+    private void OnExplanationLanguageChanged(object? sender, EventArgs e)
+    {
+        // ponytail: in-flight requests finish normally; add cancellation only if mid-analysis language switching needs support.
+        _phraseOrchestrator?.ClearCache();
+        _lastRecognizedText = null;
+    }
+
+    public void Dispose()
+    {
+        if (_explanationLanguage is not null)
+            _explanationLanguage.EffectiveLanguageChanged -= OnExplanationLanguageChanged;
     }
 
     public async Task<WordRecognitionResult> RecognizeAndShowAsync(

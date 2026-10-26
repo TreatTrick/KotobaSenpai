@@ -17,7 +17,7 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class PhrasePromptBuilderTests
 {
-    private readonly PhrasePromptBuilder _builder = new(new BracketedLocalizer());
+    private readonly PhrasePromptBuilder _builder = new();
 
     [Fact]
     public void Body_contains_token_ids_and_metadata_but_no_key_or_offsets()
@@ -48,38 +48,34 @@ public sealed class PhrasePromptBuilderTests
     }
 
     [Fact]
-    public void Prompt_text_is_resolved_through_the_localizer()
+    public void Prompt_uses_english_instructions_independently_of_localization()
     {
         var (system, user) = _builder.Build(Request(Segment("あ")));
 
-        Assert.Contains("[Llm.AnthropicSystemPrompt]", system);
-        Assert.Contains("[Llm.AnthropicUserInstruction]", user);
-        Assert.Contains("[Llm.SegmentLabel]", user);
-        Assert.Contains("[Llm.TokenTableLabel]", user);
-        Assert.Contains("[Llm.LocalSpansLabel]", user);
+        Assert.Contains("You analyze Japanese", system);
+        Assert.Contains("Segment text:", user);
+        Assert.Contains("token table", user);
+        Assert.DoesNotContain("[Llm.", system + user);
     }
 
     [Fact]
     public void Prompt_contains_explicit_root_object_and_words_instructions()
     {
-        var builder = new PhrasePromptBuilder(new ContractLocalizer());
+        var builder = new PhrasePromptBuilder();
 
         var (system, user) = builder.Build(Request(Segment("あ")), LlmPromptProfile.AnthropicMessages);
 
         Assert.Contains("Call the `return_groups` tool exactly once", system);
         Assert.Contains("Do not emit a plain-text or Markdown answer", system);
-        Assert.Contains("Return exactly one JSON object with two top-level arrays: groups and words.", user);
-        Assert.Contains("返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。", user);
-        Assert.Contains("必须调用 `return_groups` 工具恰好一次", system);
-        Assert.Contains("不得输出纯文本或 Markdown", system);
+        Assert.Contains("one JSON object with the top-level arrays `groups` and `words`", user);
         Assert.Contains("groups contains only meaningful multi-token combinations", system);
-        Assert.Contains("words contains one entry for every local word chunk", user);
+        Assert.Contains("exactly one entry for every local word chunk", user);
     }
 
     [Fact]
     public void Prompt_profile_uses_protocol_specific_tool_or_json_instructions()
     {
-        var builder = new PhrasePromptBuilder(new ContractLocalizer());
+        var builder = new PhrasePromptBuilder();
 
         var anthropic = builder.Build(Request(Segment("あ")), LlmPromptProfile.AnthropicMessages);
         var chat = builder.Build(Request(Segment("あ")), LlmPromptProfile.OpenAiChatCompletions);
@@ -92,38 +88,28 @@ public sealed class PhrasePromptBuilderTests
         Assert.Contains("JSON object", responses.UserContent);
     }
 
-    /// <summary>Localization fake: wraps keys in square brackets so tests can assert the prompt text is actually resolved through the localizer.</summary>
-    private sealed class BracketedLocalizer : IStringLocalizer
+    [Theory]
+    [InlineData(LlmPromptProfile.AnthropicMessages, "French")]
+    [InlineData(LlmPromptProfile.OpenAiChatCompletions, "French")]
+    [InlineData(LlmPromptProfile.OpenAiResponses, "French")]
+    [InlineData(LlmPromptProfile.AnthropicMessages, "English")]
+    [InlineData(LlmPromptProfile.OpenAiChatCompletions, "Simplified Chinese")]
+    [InlineData(LlmPromptProfile.OpenAiResponses, "日本語")]
+    [InlineData(LlmPromptProfile.OpenAiChatCompletions, "French \"formal\"\\variant")]
+    public void Target_language_is_quoted_data_and_applies_to_all_explanations(LlmPromptProfile profile, string language)
     {
-#pragma warning disable CS0067
-        public event EventHandler? CultureChanged;
-#pragma warning restore CS0067
+        var request = new PhraseAnalysisRequest(Guid.NewGuid(), "s0", "あ", [Ref()], [], language);
+        var (system, user) = _builder.Build(request, profile);
+        var encodedName = system[(system.LastIndexOf("Target explanation language: ", StringComparison.Ordinal)
+            + "Target explanation language: ".Length)..];
 
-        public string Get(string key, params object[] args)
-            => $"[{key}]";
-    }
-
-    private sealed class ContractLocalizer : IStringLocalizer
-    {
-#pragma warning disable CS0067
-        public event EventHandler? CultureChanged;
-#pragma warning restore CS0067
-
-        public string Get(string key, params object[] args)
-            => key switch
-            {
-                "Llm.AnthropicSystemPrompt" => "Call the `return_groups` tool exactly once. Do not emit a plain-text or Markdown answer. groups contains only meaningful multi-token combinations. 必须调用 `return_groups` 工具恰好一次。不得输出纯文本或 Markdown。",
-                "Llm.AnthropicUserInstruction" => "Call the `return_groups` tool now. Return exactly one JSON object with two top-level arrays: groups and words. 返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。",
-                "Llm.OpenAiChatSystemPrompt" => "Return exactly one JSON object as assistant content. Do not call tools.",
-                "Llm.OpenAiChatUserInstruction" => "Return exactly one JSON object.",
-                "Llm.OpenAiResponsesSystemPrompt" => "Return exactly one JSON object as output text. Do not call tools.",
-                "Llm.OpenAiResponsesUserInstruction" => "Return exactly one JSON object.",
-                "Llm.SegmentLabel" => "Segment text:",
-                "Llm.TokenTableLabel" => "Token table:",
-                "Llm.LocalSpansLabel" => "Local spans:",
-                "Llm.WordsInstruction" => "返回一个 JSON 对象，必须包含顶层 groups 和 words 两个数组。 words contains one entry for every local word chunk.",
-                _ => key,
-            };
+        Assert.Equal(language, JsonSerializer.Deserialize<string>(encodedName));
+        Assert.Contains("ALL `meaning` and `grammar` values in BOTH `groups` and `words`", system);
+        Assert.Contains("interpret the language it names", system);
+        Assert.Contains("Do not add bilingual explanations", system);
+        Assert.Contains("Necessary Japanese quotations", system);
+        Assert.Contains("Structure examples illustrate shape only", system);
+        Assert.DoesNotContain("best contextual Chinese meaning", user);
     }
 
     [Fact]

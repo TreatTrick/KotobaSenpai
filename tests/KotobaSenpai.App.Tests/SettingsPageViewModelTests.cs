@@ -3,12 +3,58 @@ using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Llm;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.Tests;
 
 public sealed class SettingsPageViewModelTests
 {
+    [Theory]
+    [InlineData("en", null, "English")]
+    [InlineData("zh-CN", null, "Simplified Chinese")]
+    [InlineData("zh-CN", "French", "French")]
+    public void Explanation_language_and_localized_status_follow_independent_preferences(
+        string uiCulture, string? customLanguage, string expected)
+    {
+        var settings = new RecordingSettings();
+        using var viewModel = Create(settings, new RecordingThemeStore(), uiCulture);
+        var preferences = Assert.IsAssignableFrom<IExplanationLanguagePreferences>(viewModel.Language);
+        viewModel.ExplanationLanguage = customLanguage ?? string.Empty;
+        viewModel.SaveExplanationLanguageCommand.Execute(null);
+
+        Assert.Equal(expected, preferences.EffectiveLanguage);
+        Assert.Equal(uiCulture, viewModel.Language.CurrentCulture.Name);
+
+        viewModel.Language.CurrentCulture = new CultureInfo("en");
+
+        Assert.Equal(customLanguage ?? "English", preferences.EffectiveLanguage);
+        Assert.Contains("Currently active:", viewModel.EffectiveExplanationLanguage);
+        Assert.Contains("next recognition", viewModel.ExplanationLanguageStatus);
+        Assert.Null(settings.GetValue("ApiKey"));
+    }
+
+    [Fact]
+    public void Explanation_language_draft_only_applies_after_a_valid_save()
+    {
+        var settings = new RecordingSettings();
+        using var viewModel = Create(settings, new RecordingThemeStore());
+        viewModel.ExplanationLanguage = " French ";
+        Assert.Null(settings.GetValue("ExplanationLanguage"));
+
+        viewModel.SaveExplanationLanguageCommand.Execute(null);
+
+        Assert.Equal("French", viewModel.ExplanationLanguage);
+        Assert.Equal("French", settings.GetValue("ExplanationLanguage"));
+        Assert.Contains("French", viewModel.EffectiveExplanationLanguage);
+        Assert.Contains("next recognition", viewModel.ExplanationLanguageStatus);
+
+        viewModel.ExplanationLanguage = "French\nEnglish";
+        viewModel.SaveExplanationLanguageCommand.Execute(null);
+        Assert.Equal("French", settings.GetValue("ExplanationLanguage"));
+        Assert.DoesNotContain("next recognition", viewModel.ExplanationLanguageStatus);
+    }
+
     [Theory]
     [InlineData(null, 1.0 / 3.0)]
     [InlineData("invalid", 1.0 / 3.0)]
@@ -89,7 +135,7 @@ public sealed class SettingsPageViewModelTests
         var settings = new RecordingSettings();
         var theme = new RecordingThemeStore { Mode = AppThemeMode.Dark };
         using var llm = new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer);
-        using var viewModel = new SettingsPageViewModel(settings, theme, language, llm, localizer);
+        using var viewModel = new SettingsPageViewModel(settings, theme, language, llm, localizer, language);
         var choice = viewModel.ThemeModes.Single(option => option.Mode == AppThemeMode.Dark);
         var originalName = choice.Name;
 
@@ -111,7 +157,7 @@ public sealed class SettingsPageViewModelTests
         var llm = new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer);
         var language = new LanguageService(LocalizerFactory.Create(new CultureInfo("en")),
             new RecordingLanguageStore(), () => new CultureInfo("en"), _ => { });
-        var viewModel = new SettingsPageViewModel(settings, new RecordingThemeStore(), language, llm, localizer);
+        var viewModel = new SettingsPageViewModel(settings, new RecordingThemeStore(), language, llm, localizer, language);
         Assert.Equal(2, localizer.SubscriberCount);
 
         viewModel.Dispose();
@@ -120,13 +166,13 @@ public sealed class SettingsPageViewModelTests
         Assert.Equal(0, localizer.SubscriberCount);
     }
 
-    private static SettingsPageViewModel Create(RecordingSettings settings, RecordingThemeStore theme)
+    private static SettingsPageViewModel Create(RecordingSettings settings, RecordingThemeStore theme, string culture = "en")
     {
-        var localizer = LocalizerFactory.Create(new CultureInfo("en"));
-        var language = new LanguageService(localizer, new RecordingLanguageStore(), () => new CultureInfo("en"), _ => { });
+        var localizer = LocalizerFactory.Create(new CultureInfo(culture));
+        var language = new LanguageService(localizer, new RecordingLanguageStore(), () => new CultureInfo(culture), _ => { }, settings);
         language.Initialize();
         return new SettingsPageViewModel(settings, theme, language,
-            new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer), localizer);
+            new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer), localizer, language);
     }
 
     private sealed class RecordingSettings : ISettingsService

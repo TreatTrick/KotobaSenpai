@@ -14,6 +14,26 @@ namespace KotobaSenpai.Core.Tests.Workflow;
 public sealed class AutoRecognitionWorkflowTests
 {
     [Fact]
+    public async Task Changing_language_keeps_the_overlay_and_reanalyzes_unchanged_text_next_time()
+    {
+        var overlay = new RecordingOverlay();
+        var recognizer = new SequencedRecognizer([Line("同じ。")], [Line("同じ。")]);
+        var analyzer = new CountingAnalyzer();
+        var language = new LanguagePreferences();
+        using var service = CreateService(recognizer, overlay, true, analyzer, language);
+        await service.RecognizeAndShowAsync(Target());
+        var previous = overlay.LastSession;
+
+        language.TrySave("French");
+
+        Assert.Same(previous, overlay.LastSession);
+        Assert.Equal(1, analyzer.CallCount);
+        await service.RecognizeChangedAndShowAsync(Target());
+        Assert.Equal(2, analyzer.CallCount);
+        Assert.Equal("French", analyzer.LastLanguage);
+    }
+
+    [Fact]
     public async Task Cancelled_automatic_analysis_cannot_publish_a_late_result()
     {
         var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -89,15 +109,17 @@ public sealed class AutoRecognitionWorkflowTests
         IWindowWordRecognizer recognizer,
         IOverlayRenderer overlay,
         bool phraseAnalysisEnabled,
-        ILlmPhraseAnalyzer? analyzer = null)
+        ILlmPhraseAnalyzer? analyzer = null,
+        IExplanationLanguagePreferences? language = null)
         => new(
             recognizer,
             new WordGroupingService(new CharTokenizer(), new SentenceSegmenter(), new IdentitySpanResolver()),
             overlay,
             phraseOrchestrator: analyzer is null
                 ? null
-                : new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer())),
-            settings: new FakeSettings(phraseAnalysisEnabled));
+                : new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()), language),
+            settings: new FakeSettings(phraseAnalysisEnabled),
+            explanationLanguage: language);
 
     private static WindowTarget Target() => new((nint)42, "VN", new ScreenRect(0, 0, 200, 100));
 
@@ -157,11 +179,26 @@ public sealed class AutoRecognitionWorkflowTests
     private sealed class CountingAnalyzer : ILlmPhraseAnalyzer
     {
         public int CallCount { get; private set; }
+        public string? LastLanguage { get; private set; }
 
         public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
         {
             CallCount++;
+            LastLanguage = request.ExplanationLanguage;
             return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        }
+    }
+
+    private sealed class LanguagePreferences : IExplanationLanguagePreferences
+    {
+        public string? CustomLanguage { get; private set; }
+        public string EffectiveLanguage => CustomLanguage ?? "English";
+        public event EventHandler? EffectiveLanguageChanged;
+        public bool TrySave(string? language)
+        {
+            CustomLanguage = language;
+            EffectiveLanguageChanged?.Invoke(this, EventArgs.Empty);
+            return true;
         }
     }
 

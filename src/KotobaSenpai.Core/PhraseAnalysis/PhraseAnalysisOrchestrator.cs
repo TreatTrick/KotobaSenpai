@@ -20,19 +20,22 @@ public sealed class PhraseAnalysisOrchestrator
     private readonly ILlmPhraseAnalyzer _analyzer;
     private readonly SentenceSegmenter _segmenter;
     private readonly SentenceTokenBuilder _tokenBuilder;
+    private readonly IExplanationLanguagePreferences? _explanationLanguage;
     private readonly object _cacheGate = new();
-    private readonly Dictionary<string, PhraseAnalysisResult> _cache = new(StringComparer.Ordinal);
-    private readonly LinkedList<string> _cacheOrder = new();
-    private readonly Dictionary<(string SegmentText, string ModelGroupId), Guid> _sessionGroupIds = new();
+    private readonly Dictionary<(string SegmentText, string Language), PhraseAnalysisResult> _cache = new();
+    private readonly LinkedList<(string SegmentText, string Language)> _cacheOrder = new();
+    private readonly Dictionary<(string SegmentText, string Language, string ModelGroupId), Guid> _sessionGroupIds = new();
 
     public PhraseAnalysisOrchestrator(
         ILlmPhraseAnalyzer analyzer,
         SentenceSegmenter? segmenter = null,
-        SentenceTokenBuilder? tokenBuilder = null)
+        SentenceTokenBuilder? tokenBuilder = null,
+        IExplanationLanguagePreferences? explanationLanguage = null)
     {
         _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
         _segmenter = segmenter ?? new SentenceSegmenter();
         _tokenBuilder = tokenBuilder ?? throw new ArgumentNullException(nameof(tokenBuilder));
+        _explanationLanguage = explanationLanguage;
     }
 
     public async Task<PhraseAnalysisRun> AnalyzeAsync(
@@ -60,7 +63,7 @@ public sealed class PhraseAnalysisOrchestrator
             for (int i = 0; i < uncached.Count; i++)
             {
                 if (freshResults[i].Succeeded)
-                    CacheResult(uncached[i].SegmentText, freshResults[i]);
+                    CacheResult(uncached[i].Key, freshResults[i]);
             }
             // Merge: build a lookup for fresh results by request index in the uncached list
             var freshByIndex = new Dictionary<int, PhraseAnalysisResult>();
@@ -106,7 +109,7 @@ public sealed class PhraseAnalysisOrchestrator
             var validation = PhraseGroupValidator.ValidateAndBuild(result.Groups, tokenById);
             warnings.AddRange(validation.Warnings);
             groups.AddRange(validation.ValidGroups.Select(group => group.WithSessionId(
-                GetSessionGroupId(requests[i].SegmentText, group.ModelGroupId))));
+                GetSessionGroupId(requests[i], group.ModelGroupId))));
 
             var wordValidation = WordMeaningValidator.ValidateAndBuild(result.Words, requests[i].LocalSpans);
             warnings.AddRange(wordValidation.Warnings);
@@ -142,7 +145,8 @@ public sealed class PhraseAnalysisOrchestrator
                 segment.SegmentId,
                 string.Concat(segment.LineIndices.Select(i => lines[i].Text)),
                 segmentTokens.References,
-                segmentTokens.LocalSpans));
+                segmentTokens.LocalSpans,
+                _explanationLanguage?.EffectiveLanguage ?? "English"));
         }
         return requests;
     }
@@ -196,7 +200,7 @@ public sealed class PhraseAnalysisOrchestrator
         var uncached = new List<CacheableRequest>();
         for (int i = 0; i < requests.Count; i++)
         {
-            if (TryGetCached(requests[i].SegmentText, out var result))
+            if (TryGetCached((requests[i].SegmentText, requests[i].ExplanationLanguage), out var result))
                 cached[i] = result;
             else
                 uncached.Add(new CacheableRequest(requests[i], i));
@@ -204,13 +208,13 @@ public sealed class PhraseAnalysisOrchestrator
         return (cached, uncached);
     }
 
-    private void CacheResult(string segmentText, PhraseAnalysisResult result)
+    private void CacheResult((string SegmentText, string Language) key, PhraseAnalysisResult result)
     {
         lock (_cacheGate)
         {
-            if (_cache.ContainsKey(segmentText))
+            if (_cache.ContainsKey(key))
             {
-                _cache[segmentText] = result;
+                _cache[key] = result;
                 return;
             }
 
@@ -219,13 +223,13 @@ public sealed class PhraseAnalysisOrchestrator
                 var oldest = _cacheOrder.First!;
                 _cache.Remove(oldest.Value);
                 _cacheOrder.RemoveFirst();
-                foreach (var key in _sessionGroupIds.Keys
-                    .Where(key => string.Equals(key.SegmentText, oldest.Value, StringComparison.Ordinal))
+                foreach (var groupKey in _sessionGroupIds.Keys
+                    .Where(groupKey => (groupKey.SegmentText, groupKey.Language) == oldest.Value)
                     .ToArray())
-                    _sessionGroupIds.Remove(key);
+                    _sessionGroupIds.Remove(groupKey);
             }
-            _cache[segmentText] = result;
-            _cacheOrder.AddLast(segmentText);
+            _cache[key] = result;
+            _cacheOrder.AddLast(key);
         }
     }
 
@@ -239,17 +243,17 @@ public sealed class PhraseAnalysisOrchestrator
         }
     }
 
-    private bool TryGetCached(string segmentText, out PhraseAnalysisResult result)
+    private bool TryGetCached((string SegmentText, string Language) key, out PhraseAnalysisResult result)
     {
         lock (_cacheGate)
-            return _cache.TryGetValue(segmentText, out result!);
+            return _cache.TryGetValue(key, out result!);
     }
 
-    private Guid GetSessionGroupId(string segmentText, string modelGroupId)
+    private Guid GetSessionGroupId(PhraseAnalysisRequest request, string modelGroupId)
     {
         lock (_cacheGate)
         {
-            var key = (segmentText, modelGroupId);
+            var key = (request.SegmentText, request.ExplanationLanguage, modelGroupId);
             if (_sessionGroupIds.TryGetValue(key, out var id))
                 return id;
             id = Guid.NewGuid();
@@ -260,6 +264,6 @@ public sealed class PhraseAnalysisOrchestrator
 
     private sealed record CacheableRequest(PhraseAnalysisRequest Request, int OriginalIndex)
     {
-        public string SegmentText => Request.SegmentText;
+        public (string SegmentText, string Language) Key => (Request.SegmentText, Request.ExplanationLanguage);
     };
 }

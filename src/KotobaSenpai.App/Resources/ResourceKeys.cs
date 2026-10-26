@@ -14,6 +14,13 @@ public static class ResourceKeys
     public const string Label_TargetWindow = nameof(Label_TargetWindow);
     public const string Label_Actions = nameof(Label_Actions);
     public const string Label_Language = nameof(Label_Language);
+    public const string Label_ExplanationLanguage = nameof(Label_ExplanationLanguage);
+    public const string Description_ExplanationLanguage = nameof(Description_ExplanationLanguage);
+    public const string Button_SaveExplanationLanguage = nameof(Button_SaveExplanationLanguage);
+    public const string ExplanationLanguage_Current = nameof(ExplanationLanguage_Current);
+    public const string ExplanationLanguage_Saved = nameof(ExplanationLanguage_Saved);
+    public const string ExplanationLanguage_Invalid = nameof(ExplanationLanguage_Invalid);
+    public const string ExplanationLanguage_SaveFailed = nameof(ExplanationLanguage_SaveFailed);
     public const string Button_RefreshWindows = nameof(Button_RefreshWindows);
     public const string Button_Recognize = nameof(Button_Recognize);
     public const string Button_Hide = nameof(Button_Hide);

@@ -205,6 +205,7 @@ public partial class App : Application
         services.AddSingleton<ILanguagePreferenceStore, LocalAppDataLanguagePreferenceStore>();
         services.AddSingleton<LanguageService>();
         services.AddSingleton<ILanguagePreferences>(sp => sp.GetRequiredService<LanguageService>());
+        services.AddSingleton<IExplanationLanguagePreferences>(sp => sp.GetRequiredService<LanguageService>());
 
         // Logging: the FileLogger singleton holds the file handle; the LogRetentionPolicy singleton is shared by startup/timer/cross-midnight rollover.
         var logsDirectory = Path.Combine(

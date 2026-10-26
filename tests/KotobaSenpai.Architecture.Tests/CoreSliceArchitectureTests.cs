@@ -104,7 +104,8 @@ public sealed class CoreSliceArchitectureTests
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git")))
+            if (Directory.Exists(Path.Combine(directory.FullName, ".git"))
+                || File.Exists(Path.Combine(directory.FullName, ".git")))
                 return directory.FullName;
 
         throw new InvalidOperationException("Repository root could not be located from the test output directory.");

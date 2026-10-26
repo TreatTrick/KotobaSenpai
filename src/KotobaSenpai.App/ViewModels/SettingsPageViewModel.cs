@@ -1,8 +1,11 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using System.IO;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Core.PhraseAnalysis;
 
 namespace KotobaSenpai.App.ViewModels;
 
@@ -23,15 +26,20 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private readonly ISettingsService _settings;
     private readonly IThemePreferenceStore _themePreferences;
     private readonly IStringLocalizer _localizer;
+    private readonly IExplanationLanguagePreferences _explanationPreferences;
+    private string? _explanationStatusKey;
     private double _furiganaFontScale;
     private bool _disposed;
 
     public SettingsPageViewModel(ISettingsService settings, IThemePreferenceStore themePreferences,
-        ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer)
+        ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
+        IExplanationLanguagePreferences explanationLanguage)
     {
         _settings = settings;
         _themePreferences = themePreferences;
         _localizer = localizer;
+        _explanationPreferences = explanationLanguage;
+        _explanationLanguage = explanationLanguage.CustomLanguage ?? string.Empty;
         Language = language;
         Llm = llm;
         _selectedTheme = themePreferences.Load() ?? AppThemeMode.Auto;
@@ -39,6 +47,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         ThemeModes = [new(AppThemeMode.Auto, string.Empty), new(AppThemeMode.Light, string.Empty), new(AppThemeMode.Dark, string.Empty)];
         RefreshThemeNames();
         _localizer.CultureChanged += OnCultureChanged;
+        _explanationPreferences.EffectiveLanguageChanged += OnExplanationLanguageChanged;
     }
 
     public ILanguagePreferences Language { get; }
@@ -47,6 +56,43 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
 
     [ObservableProperty]
     private AppThemeMode _selectedTheme;
+
+    [ObservableProperty]
+    private string _explanationLanguage;
+
+    public string EffectiveExplanationLanguage => _localizer.Get(ResourceKeys.ExplanationLanguage_Current,
+        _explanationPreferences.CustomLanguage ?? Language.CurrentCulture.NativeName);
+
+    public string ExplanationLanguageStatus
+        => _explanationStatusKey is null ? string.Empty : _localizer.Get(_explanationStatusKey);
+
+    [RelayCommand]
+    private void SaveExplanationLanguage()
+    {
+        try
+        {
+            if (_explanationPreferences.TrySave(ExplanationLanguage))
+            {
+                ExplanationLanguage = _explanationPreferences.CustomLanguage ?? string.Empty;
+                _explanationStatusKey = ResourceKeys.ExplanationLanguage_Saved;
+            }
+            else
+                _explanationStatusKey = ResourceKeys.ExplanationLanguage_Invalid;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _explanationStatusKey = ResourceKeys.ExplanationLanguage_SaveFailed;
+        }
+        OnPropertyChanged(nameof(EffectiveExplanationLanguage));
+        OnPropertyChanged(nameof(ExplanationLanguageStatus));
+    }
+
+    private void OnExplanationLanguageChanged(object? sender, EventArgs e)
+    {
+        _explanationStatusKey = ResourceKeys.ExplanationLanguage_Saved;
+        OnPropertyChanged(nameof(EffectiveExplanationLanguage));
+        OnPropertyChanged(nameof(ExplanationLanguageStatus));
+    }
 
     public double FuriganaFontScale
     {
@@ -75,7 +121,12 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
             });
     }
 
-    private void OnCultureChanged(object? sender, EventArgs e) => RefreshThemeNames();
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        RefreshThemeNames();
+        OnPropertyChanged(nameof(EffectiveExplanationLanguage));
+        OnPropertyChanged(nameof(ExplanationLanguageStatus));
+    }
 
     public void Dispose()
     {
@@ -83,6 +134,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
             return;
         _disposed = true;
         _localizer.CultureChanged -= OnCultureChanged;
+        _explanationPreferences.EffectiveLanguageChanged -= OnExplanationLanguageChanged;
         Llm.Dispose();
     }
 }

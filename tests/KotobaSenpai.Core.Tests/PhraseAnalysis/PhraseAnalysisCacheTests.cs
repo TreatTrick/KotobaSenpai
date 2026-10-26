@@ -8,6 +8,23 @@ namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 public sealed class PhraseAnalysisCacheTests
 {
     [Fact]
+    public async Task Same_text_uses_separate_results_for_each_language()
+    {
+        var analyzer = new CountingAnalyzer();
+        var language = new LanguagePreferences();
+        var orchestrator = new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(),
+            new SentenceTokenBuilder(new CharTokenizer()), language);
+
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        language.TrySave("French");
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+
+        Assert.Equal(2, analyzer.CallCount);
+        Assert.Equal("French", analyzer.LastLanguage);
+    }
+
+    [Fact]
     public async Task Reuses_a_successful_result_for_the_same_segment_text()
     {
         var analyzer = new CountingAnalyzer();
@@ -95,11 +112,26 @@ public sealed class PhraseAnalysisCacheTests
     private sealed class CountingAnalyzer : ILlmPhraseAnalyzer
     {
         public int CallCount { get; private set; }
+        public string? LastLanguage { get; private set; }
 
         public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
         {
             CallCount++;
+            LastLanguage = request.ExplanationLanguage;
             return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        }
+    }
+
+    private sealed class LanguagePreferences : IExplanationLanguagePreferences
+    {
+        public string? CustomLanguage { get; private set; }
+        public string EffectiveLanguage => CustomLanguage ?? "English";
+        public event EventHandler? EffectiveLanguageChanged;
+        public bool TrySave(string? language)
+        {
+            CustomLanguage = language;
+            EffectiveLanguageChanged?.Invoke(this, EventArgs.Empty);
+            return true;
         }
     }
 

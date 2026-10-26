@@ -1,6 +1,8 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.Localization;
 
@@ -9,8 +11,9 @@ namespace KotobaSenpai.App.Localization;
 /// sets the global <c>CurrentUICulture</c> and the <see cref="ResourceManagerStringLocalizer"/>,
 /// persists/restores the preference, and exposes <see cref="AvailableCultures"/> and <see cref="CurrentCulture"/> for binding.
 /// Default UI: Simplified Chinese when the system is Chinese, otherwise English; English is the neutral fallback.
+/// Also persists the independent explanation language, defaulting to the active UI language when blank.
 /// </summary>
-public sealed partial class LanguageService : ObservableObject, ILanguagePreferences
+public sealed partial class LanguageService : ObservableObject, ILanguagePreferences, IExplanationLanguagePreferences
 {
     /// <summary>Supported cultures: Simplified Chinese first by default, English as the fallback.</summary>
     public IReadOnlyList<CultureInfo> AvailableCultures { get; } = [new CultureInfo("zh-CN"), new CultureInfo("en")];
@@ -19,6 +22,9 @@ public sealed partial class LanguageService : ObservableObject, ILanguagePrefere
     private readonly ILanguagePreferenceStore _store;
     private readonly Func<CultureInfo> _osCultureProvider;
     private readonly Action<CultureInfo> _applyGlobalCulture;
+    private readonly ISettingsService? _settings;
+    private const string ExplanationLanguageKey = "ExplanationLanguage";
+    private string _effectiveLanguage = "Simplified Chinese";
     private bool _applying;
 
     [ObservableProperty]
@@ -28,13 +34,51 @@ public sealed partial class LanguageService : ObservableObject, ILanguagePrefere
         ResourceManagerStringLocalizer localizer,
         ILanguagePreferenceStore store,
         Func<CultureInfo>? osCultureProvider = null,
-        Action<CultureInfo>? applyGlobalCulture = null)
+        Action<CultureInfo>? applyGlobalCulture = null,
+        ISettingsService? settings = null)
     {
         _localizer = localizer;
         _store = store;
         _osCultureProvider = osCultureProvider ?? (() => CultureInfo.CurrentUICulture);
         _applyGlobalCulture = applyGlobalCulture ?? ApplyGlobalCultureDefault;
         _currentCulture = AvailableCultures[0];
+        _settings = settings;
+        var saved = settings?.GetValue(ExplanationLanguageKey)?.Trim();
+        CustomLanguage = IsValidExplanationLanguage(saved) && !string.IsNullOrEmpty(saved) ? saved : null;
+        RefreshExplanationLanguage();
+    }
+
+    public string? CustomLanguage { get; private set; }
+    public string EffectiveLanguage => _effectiveLanguage;
+    public event EventHandler? EffectiveLanguageChanged;
+
+    public bool TrySave(string? language)
+    {
+        var value = language?.Trim();
+        if (!IsValidExplanationLanguage(value))
+            return false;
+        value = string.IsNullOrEmpty(value) ? null : value;
+        _settings?.SetValue(ExplanationLanguageKey, value);
+        if (string.Equals(CustomLanguage, value, StringComparison.Ordinal))
+            return true;
+
+        CustomLanguage = value;
+        OnPropertyChanged(nameof(CustomLanguage));
+        RefreshExplanationLanguage();
+        return true;
+    }
+
+    private static bool IsValidExplanationLanguage(string? value)
+        => value is null || value.Length <= 80 && !value.Any(c => char.IsControl(c) || c is '\u2028' or '\u2029');
+
+    private void RefreshExplanationLanguage()
+    {
+        var effective = CustomLanguage ?? (IsChinese(CurrentCulture) ? "Simplified Chinese" : "English");
+        if (string.Equals(effective, _effectiveLanguage, StringComparison.Ordinal))
+            return;
+        _effectiveLanguage = effective;
+        OnPropertyChanged(nameof(EffectiveLanguage));
+        EffectiveLanguageChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private static void ApplyGlobalCultureDefault(CultureInfo culture)
@@ -77,6 +121,7 @@ public sealed partial class LanguageService : ObservableObject, ILanguagePrefere
 
             if (persist)
                 _store.Save(culture.Name);
+            RefreshExplanationLanguage();
         }
         finally
         {
