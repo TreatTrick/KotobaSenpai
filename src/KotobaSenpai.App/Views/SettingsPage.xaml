@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
              xmlns:vm="clr-namespace:KotobaSenpai.App.ViewModels"
+             xmlns:settings="clr-namespace:KotobaSenpai.Core.Settings;assembly=KotobaSenpai.Core"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:controls="clr-namespace:KotobaSenpai.App.Controls">
   <ScrollViewer x:Name="SettingsScrollViewer" Style="{StaticResource SettingsPageScrollViewer}">
@@ -59,6 +60,79 @@
                      AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
       </controls:SettingsCard>
+      <TextBlock Text="{loc:Loc Key=OverlayAppearance_Title}" Style="{StaticResource SectionTitle}" />
+      <ItemsControl x:Name="OverlayColorSettings" ItemsSource="{Binding OverlayAppearance.Colors}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <controls:SettingsCard Header="{Binding Label}" Description="{Binding Description}" Icon="{ui:SymbolIcon PaintBrush24}">
+              <controls:SettingsCard.DescriptionContent>
+                <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource ModelStatus}"
+                           Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+              </controls:SettingsCard.DescriptionContent>
+              <controls:OverlayColorPicker Settings="{Binding DataContext.OverlayAppearance, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            </controls:SettingsCard>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <controls:SettingsCard x:Name="OverlayOutlineCard" Header="{loc:Loc Key=OverlayAppearance_Outline}"
+                             Description="{loc:Loc Key=OverlayAppearance_OutlineDescription}" Icon="{ui:SymbolIcon TextEffects24}">
+        <controls:SettingsCard.DescriptionContent>
+          <TextBlock Text="{Binding OverlayAppearance.OutlineError}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+        </controls:SettingsCard.DescriptionContent>
+        <ui:ToggleSwitch x:Name="OverlayOutlineSwitch" IsChecked="{Binding OverlayAppearance.OutlineEnabled, Mode=TwoWay}"
+                         Style="{StaticResource SettingsToggle}" AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_Outline}" />
+      </controls:SettingsCard>
+      <controls:SettingsCard Header="{loc:Loc Key=OverlayAppearance_OutlineColorMode}"
+                             Description="{loc:Loc Key=OverlayAppearance_OutlineColorModeDescription}" Icon="{ui:SymbolIcon PaintBrush24}">
+        <controls:SettingsCard.DescriptionContent>
+          <TextBlock Text="{Binding OverlayAppearance.OutlineColorModeError}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+        </controls:SettingsCard.DescriptionContent>
+        <ComboBox x:Name="OverlayOutlineColorModeComboBox" Style="{StaticResource SettingInput}"
+                  ItemsSource="{Binding OverlayAppearance.OutlineColorModes}" DisplayMemberPath="Name" SelectedValuePath="Mode"
+                  SelectedValue="{Binding OverlayAppearance.OutlineColorMode, Mode=TwoWay}"
+                  IsEnabled="{Binding OverlayAppearance.OutlineEnabled}" AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_OutlineColorMode}" />
+      </controls:SettingsCard>
+      <controls:SettingsCard Header="{loc:Loc Key=OverlayAppearance_OutlineThickness}"
+                             Description="{loc:Loc Key=OverlayAppearance_OutlineThicknessDescription}" Icon="{ui:SymbolIcon TextEffects24}">
+        <controls:SettingsCard.DescriptionContent>
+          <TextBlock Text="{Binding OverlayAppearance.OutlineThicknessError}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+        </controls:SettingsCard.DescriptionContent>
+        <Grid Width="{StaticResource SettingsInputWidth}" IsEnabled="{Binding OverlayAppearance.OutlineEnabled}">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="76" /></Grid.ColumnDefinitions>
+          <Slider x:Name="OverlayOutlineThicknessSlider" Minimum="{x:Static settings:OverlayAppearanceSettings.MinimumOutlineThickness}"
+                  Maximum="{x:Static settings:OverlayAppearanceSettings.MaximumOutlineThickness}"
+                  Value="{Binding OverlayAppearance.OutlineThickness, Mode=TwoWay}" TickFrequency="0.25" IsSnapToTickEnabled="True"
+                  SmallChange="0.25" LargeChange="0.5" MinHeight="{StaticResource FluentControlHeight}"
+                  VerticalAlignment="Center" AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_OutlineThickness}" />
+          <TextBlock Grid.Column="1" Text="{Binding OverlayAppearance.OutlineThickness, StringFormat={}{0:0.##} DIP}"
+                     HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource Description}" Margin="0" />
+        </Grid>
+      </controls:SettingsCard>
+      <ui:Card x:Name="OverlayPreviewCard" Padding="{StaticResource FluentCardPadding}" Margin="{StaticResource FluentCardGap}"
+               Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+               BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" HorizontalContentAlignment="Stretch">
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <StackPanel Margin="0,0,16,0" VerticalAlignment="Center">
+              <TextBlock Text="{loc:Loc Key=OverlayAppearance_Preview}" FontWeight="SemiBold" />
+              <TextBlock Text="{loc:Loc Key=OverlayAppearance_PreviewDescription}" Style="{StaticResource Description}" />
+            </StackPanel>
+            <ui:Button Grid.Column="1" Content="{loc:Loc Key=OverlayAppearance_ResetColors}" Icon="{ui:SymbolIcon ArrowCounterclockwise24}"
+                       Command="{Binding OverlayAppearance.ResetColorsCommand}" Style="{StaticResource SettingsButton}"
+                       AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_ResetColors}" />
+          </Grid>
+          <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left" Margin="0,12,0,0">
+            <controls:OverlayAppearancePreview x:Name="OverlayPreview" Appearance="{Binding OverlayAppearance.Appearance}"
+                                               AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_Preview}" />
+          </Viewbox>
+          <TextBlock Text="{Binding OverlayAppearance.ResetStatus}" Style="{StaticResource ModelStatus}" AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+      </ui:Card>
+
       <StackPanel DataContext="{Binding Llm}">
         <TextBlock Text="{loc:Loc Key=Label_LlmSettings}" Style="{StaticResource SectionTitle}" />
 

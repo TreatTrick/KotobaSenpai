@@ -67,6 +67,7 @@ public sealed partial class LocalizationKeyCoverageTests
     [InlineData("src/KotobaSenpai.App/MainWindow.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/RecognitionPage.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/SettingsPage.xaml")]
+    [InlineData("src/KotobaSenpai.App/Controls/OverlayColorPicker.xaml")]
     public void Every_xaml_loc_key_has_english_and_chinese_resource_entries(string sourcePath)
     {
         var neutral = NeutralKeys;

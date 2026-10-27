@@ -123,6 +123,7 @@ public partial class App : Application
             // Resolving these singletons now constructs the OCR model and UniDic tagger during startup.
             _services.GetRequiredService<IWindowWordRecognizer>();
             _mainViewModel = _services.GetRequiredService<MainWindowViewModel>();
+            _mainViewModel.Settings.OverlayAppearance.Changed += OnOverlayAppearanceChanged;
             window.DataContext = _mainViewModel;
         }
         catch (Exception ex)
@@ -135,6 +136,8 @@ public partial class App : Application
     {
         try
         {
+            if (_mainViewModel is not null)
+                _mainViewModel.Settings.OverlayAppearance.Changed -= OnOverlayAppearanceChanged;
             _mainViewModel?.Dispose();
             _services?.GetService<IAutoRecognitionController>()?.Stop();
             _services?.GetService<IWindowFrameCapture>()?.Stop();
@@ -147,6 +150,9 @@ public partial class App : Application
             base.OnExit(e);
         }
     }
+
+    private void OnOverlayAppearanceChanged(object? sender, EventArgs e)
+        => _services?.GetRequiredService<WpfOverlayRenderer>().RefreshAppearance();
 
     /// <summary>HttpClient for the dictionary download: a 502MB archive download needs a long timeout to avoid failing mid-way on the default 100s.</summary>
     private static HttpClient CreateDownloadHttpClient()
@@ -164,7 +170,8 @@ public partial class App : Application
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<ITargetWindowTracker, WinEventTargetWindowTracker>();
         services.AddSingleton<IAutoRecognitionController, AutoRecognitionController>();
-        services.AddSingleton<IOverlayRenderer, WpfOverlayRenderer>();
+        services.AddSingleton<WpfOverlayRenderer>();
+        services.AddSingleton<IOverlayRenderer>(sp => sp.GetRequiredService<WpfOverlayRenderer>());
         services.AddSingleton<IRegionSelector, RegionSelectorWindow>();
 
         // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
@@ -236,6 +243,7 @@ public partial class App : Application
         services.AddSingleton<FluentThemeService>();
 
         services.AddSingleton<LlmSettingsViewModel>();
+        services.AddSingleton<OverlayAppearanceViewModel>();
         services.AddSingleton<SettingsPageViewModel>();
         services.AddSingleton<RecognitionPageViewModel>();
         services.AddSingleton<MainWindowViewModel>();

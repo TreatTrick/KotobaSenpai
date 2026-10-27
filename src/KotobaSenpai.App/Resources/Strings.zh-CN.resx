@@ -367,4 +367,94 @@ API Key：YOUR_API_KEY
 使用内置的真实日语分析测试，configure 本身已包含保存前验证。通过后直接整体保存并启用；失败时保留原配置，由你根据结果判断是否修正资料、换模型或提醒补充信息，相同错误不要无限重试。
 
 模型查询、只检测和状态查询不会关闭界面。写入配置由工具正常退出已运行的应用，并在结束后恢复界面，请勿自行强杀进程。分别检查 applied 和 uiRestore：配置已经保存但界面恢复失败时，不要因此重复保存。操作结果未确认时先查询状态再决定下一步。最后只用本提示词的语言报告配置结果、服务和模型，不回显密钥。</value></data>
+  <data name="OverlayAppearance_Title" xml:space="preserve">
+    <value>标注外观</value>
+  </data>
+  <data name="OverlayFuriganaColor" xml:space="preserve">
+    <value>普通振假名</value>
+  </data>
+  <data name="OverlayFuriganaColor_Description" xml:space="preserve">
+    <value>没有音调信息时使用的读音颜色。</value>
+  </data>
+  <data name="OverlayPitchHighColor" xml:space="preserve">
+    <value>H 高音</value>
+  </data>
+  <data name="OverlayPitchHighColor_Description" xml:space="preserve">
+    <value>高音振假名和音调圆点的颜色。</value>
+  </data>
+  <data name="OverlayPitchLowColor" xml:space="preserve">
+    <value>L 低音</value>
+  </data>
+  <data name="OverlayPitchLowColor_Description" xml:space="preserve">
+    <value>低音振假名和音调圆点的颜色。</value>
+  </data>
+  <data name="OverlayUnderlineColor" xml:space="preserve">
+    <value>下划线</value>
+  </data>
+  <data name="OverlayUnderlineColor_Description" xml:space="preserve">
+    <value>鼠标未悬停时的标注线颜色。</value>
+  </data>
+  <data name="OverlayAppearance_Outline" xml:space="preserve">
+    <value>标注描边</value>
+  </data>
+  <data name="OverlayAppearance_OutlineDescription" xml:space="preserve">
+    <value>为振假名、音调标记和下划线添加描边。</value>
+  </data>
+  <data name="OverlayAppearance_Preview" xml:space="preserve">
+    <value>效果预览</value>
+  </data>
+  <data name="OverlayAppearance_PreviewDescription" xml:space="preserve">
+    <value>颜色保存后立即更新预览和当前标注。</value>
+  </data>
+  <data name="OverlayAppearance_ResetColors" xml:space="preserve">
+    <value>重置颜色</value>
+  </data>
+  <data name="OverlayAppearance_Hex" xml:space="preserve">
+    <value>HEX 颜色值</value>
+  </data>
+  <data name="OverlayAppearance_Hue" xml:space="preserve">
+    <value>色相</value>
+  </data>
+  <data name="OverlayAppearance_Spectrum" xml:space="preserve">
+    <value>饱和度与明暗</value>
+  </data>
+  <data name="OverlayAppearance_SpectrumHelp" xml:space="preserve">
+    <value>拖动或用方向键选色，右侧调整色相。</value>
+  </data>
+  <data name="OverlayAppearance_Confirm" xml:space="preserve">
+    <value>确认</value>
+  </data>
+  <data name="OverlayAppearance_Cancel" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="OverlayAppearance_InvalidColor" xml:space="preserve">
+    <value>请输入完整的六位 HEX 颜色，例如 #4488FF。</value>
+  </data>
+  <data name="OverlayAppearance_SaveFailed" xml:space="preserve">
+    <value>保存失败，原设置保持不变。请检查设置文件的写入权限后重试。</value>
+  </data>
+  <data name="OverlayAppearance_ColorsReset" xml:space="preserve">
+    <value>已恢复初始颜色，描边选项和其他设置保持不变。</value>
+  </data>
+  <data name="OverlayAppearance_OutlineColorMode" xml:space="preserve">
+    <value>描边颜色</value>
+  </data>
+  <data name="OverlayAppearance_OutlineColorModeDescription" xml:space="preserve">
+    <value>默认自动计算，也可以固定使用黑色或白色。</value>
+  </data>
+  <data name="OverlayAppearance_OutlineAuto" xml:space="preserve">
+    <value>自动（按填充色计算）</value>
+  </data>
+  <data name="OverlayAppearance_OutlineBlack" xml:space="preserve">
+    <value>黑色</value>
+  </data>
+  <data name="OverlayAppearance_OutlineWhite" xml:space="preserve">
+    <value>白色</value>
+  </data>
+  <data name="OverlayAppearance_OutlineThickness" xml:space="preserve">
+    <value>描边粗细</value>
+  </data>
+  <data name="OverlayAppearance_OutlineThicknessDescription" xml:space="preserve">
+    <value>调整描边宽度，范围为 0.5–3 DIP，随屏幕缩放。</value>
+  </data>
 </root>

@@ -8,7 +8,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Logging;
@@ -65,6 +64,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _tracker is not null,
                 session.Target.Bounds);
             _window ??= new OverlayWindow(_localizer, _tracker, _logger);
+            _window.ApplyAppearance(ResolveAppearance());
             _window.Render(session, ResolveFontScale());
         });
     }
@@ -72,6 +72,12 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     /// <summary>Reads the configurable furigana font scale (proportion of OCR text height); missing/invalid falls back to the default 1/3.</summary>
     private double ResolveFontScale()
         => FuriganaFontSettings.ResolveFontScale(_settings?.GetValue(FuriganaFontSettings.FontScaleKey));
+
+    private OverlayAppearance ResolveAppearance()
+        => _settings is null ? OverlayAppearanceSettings.Default : OverlayAppearanceSettings.Load(_settings);
+
+    public void RefreshAppearance()
+        => Application.Current.Dispatcher.Invoke(() => _window?.ApplyAppearance(ResolveAppearance()));
 
     internal static IReadOnlyList<int> GetLineIndicesForWords(
         IEnumerable<int> wordIndices,
@@ -104,23 +110,12 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
     internal sealed class OverlayWindow : Window
     {
-        private static readonly Brush DefaultLineBrush = Brushes.DeepSkyBlue;
-        private static readonly Brush HoverLineBrush = Brushes.OrangeRed;
-        private static readonly Brush PitchHighBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x44, 0x44));
-        private static readonly Brush PitchLowBrush = new SolidColorBrush(Color.FromRgb(0x44, 0x88, 0xFF));
-        private static readonly Brush PitchHeibanBrush = new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0x88));
-        private static readonly Effect FuriganaOutline = new DropShadowEffect
-        {
-            Color = Colors.Black,
-            BlurRadius = 1,
-            ShadowDepth = 0,
-            Opacity = 1,
-        };
+        private OverlayAnnotationStyle _annotationStyle = new(OverlayAppearanceSettings.Default);
 
         private const int HoverPollMs = 50;
 
         private readonly Canvas _canvas = new();
-        private readonly List<Border> _lineElements = new();
+        private readonly List<OverlayAnnotation> _lineElements = new();
         private readonly List<int> _lineOwner = new(); // parallel to _lineElements: the word index each line belongs to
         private readonly DispatcherTimer _hoverTimer;
         private readonly PhrasePopup _phrasePopup;
@@ -131,6 +126,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private int _renderDiagnosticGeneration;
         private nint _ownerHandle;
         private double _fontScale;
+        private int _edgePaddingPixels = 1;
         private int _hoverIndex = -1;
         private int _hoveredGroup = -1;
         private IReadOnlyList<int> _hoveredGroupLines = Array.Empty<int>();
@@ -257,6 +253,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             RenderCurrent(session, fontScale);
         }
 
+        internal void ApplyAppearance(OverlayAppearance appearance)
+        {
+            if (_annotationStyle.Appearance == appearance)
+                return;
+            _annotationStyle = new OverlayAnnotationStyle(appearance);
+            foreach (var annotation in _canvas.Children.OfType<OverlayAnnotation>())
+                annotation.ApplyStyle(_annotationStyle);
+        }
+
         private void OnTargetChanged(object? sender, TargetWindowSnapshot snapshot)
         {
             if (_session is null)
@@ -350,8 +355,11 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var handle = new WindowInteropHelper(this).Handle;
             var dpi = NativeMethods.GetDpiForWindow(handle);
             var scale = (dpi == 0 ? 96 : dpi) / 96d;
-            Width = session.Target.Bounds.Width / scale;
-            Height = session.Target.Bounds.Height / scale;
+            _edgePaddingPixels = (int)Math.Ceiling(OverlayAppearanceSettings.MaximumOutlineThickness * scale);
+            var edgePaddingDip = _edgePaddingPixels / scale;
+            _canvas.Margin = new Thickness(edgePaddingDip);
+            Width = session.Target.Bounds.Width / scale + edgePaddingDip * 2;
+            Height = session.Target.Bounds.Height / scale + edgePaddingDip * 2;
             PositionAboveTarget(session.Target);
             _canvas.Children.Clear();
             _lineElements.Clear();
@@ -367,7 +375,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 {
                     foreach (var rect in word.Rects)
                     {
-                        var element = MakeBox(rect.Width / scale, 2.0 / scale, DefaultLineBrush);
+                        var element = OverlayAnnotation.CreatePill(rect.Width / scale, 2.0 / scale,
+                            OverlayColorRole.Underline, _annotationStyle);
                         Canvas.SetLeft(element, (rect.X - session.Target.Bounds.X) / scale);
                         Canvas.SetTop(element, (Math.Max(rect.Y, rect.Bottom - 2) - session.Target.Bounds.Y) / scale);
                         _canvas.Children.Add(element);
@@ -475,7 +484,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 insertAfter = nint.Zero;
                 flags |= NativeMethods.SwpNoZOrder;
             }
-            if (!NativeMethods.SetWindowPos(handle, insertAfter, target.Bounds.X, target.Bounds.Y, 0, 0,
+            if (!NativeMethods.SetWindowPos(handle, insertAfter, target.Bounds.X - _edgePaddingPixels, target.Bounds.Y - _edgePaddingPixels, 0, 0,
                 flags | NativeMethods.SwpNoSize))
                 _logger?.LogWarning("[OVERLAY] SetWindowPos failed: hwnd={0}, targetHandle={1}, insertAfter={2}, error={3}.",
                     handle, target.Handle, insertAfter, System.Runtime.InteropServices.Marshal.GetLastWin32Error());
@@ -596,13 +605,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 foreach (var part in FuriganaLayout.GetParts(word, sourceTokenIndex, segment.SurfaceStart, segment.SurfaceLength, morae.Count))
                 {
                     var fontSize = (part.Bounds.Height / scale) * fontScale;
-                    var text = new TextBlock
-                    {
-                        Text = string.Concat(morae.Skip(part.MoraStart).Take(part.MoraCount)),
-                        FontSize = fontSize,
-                        Foreground = DefaultLineBrush,
-                        Effect = FuriganaOutline,
-                    };
+                    var text = OverlayAnnotation.CreateText(string.Concat(morae.Skip(part.MoraStart).Take(part.MoraCount)),
+                        fontSize, OverlayColorRole.Furigana, _annotationStyle, scale);
                     AddTextCentered(text, part.Bounds, scale, fontSize);
                 }
             }
@@ -630,11 +634,12 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 var readingStart = moraOffset + part.MoraStart;
                 var fontMorae = pattern.Morae.Skip(readingStart).Take(part.MoraCount).ToArray();
                 var highMorae = pattern.HighMorae.Skip(readingStart).Take(fontMorae.Length).ToArray();
-                var textBlocks = new List<TextBlock>(fontMorae.Length);
+                var textBlocks = new List<OverlayAnnotation>(fontMorae.Length);
                 var totalWidth = 0d;
-                foreach (var mora in fontMorae)
+                for (var i = 0; i < fontMorae.Length; i++)
                 {
-                    var block = new TextBlock { Text = mora, FontSize = fontSize, Effect = FuriganaOutline };
+                    var block = OverlayAnnotation.CreateText(fontMorae[i], fontSize,
+                        highMorae[i] ? OverlayColorRole.High : OverlayColorRole.Low, _annotationStyle, scale);
                     block.Measure(new Size(double.PositiveInfinity, fontSize));
                     textBlocks.Add(block);
                     totalWidth += block.DesiredSize.Width;
@@ -646,7 +651,6 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 for (var i = 0; i < textBlocks.Count; i++)
                 {
                     var block = textBlocks[i];
-                    block.Foreground = highMorae[i] ? PitchHighBrush : PitchLowBrush;
                     _canvas.Children.Add(block);
                     Canvas.SetLeft(block, Math.Max(0, cursor));
                     Canvas.SetTop(block, top);
@@ -682,13 +686,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     var dotRadius = Math.Max(2d, fontSize / 4d);
                     var centerY = Math.Max(dotRadius, (bounds.Y - _session!.Target.Bounds.Y) / scale - dotRadius - 2);
                     var centerX = (bounds.X - _session.Target.Bounds.X + bounds.Width / 2d) / scale;
-                    var dot = new Border
-                    {
-                        Width = dotRadius * 2,
-                        Height = dotRadius * 2,
-                        CornerRadius = new CornerRadius(dotRadius),
-                        Background = pattern.HighMorae[moraOffset + i] ? PitchHighBrush : PitchLowBrush,
-                    };
+                    var dot = OverlayAnnotation.CreatePill(dotRadius * 2, dotRadius * 2,
+                        pattern.HighMorae[moraOffset + i] ? OverlayColorRole.High : OverlayColorRole.Low, _annotationStyle);
                     _canvas.Children.Add(dot);
                     Canvas.SetLeft(dot, centerX - dotRadius);
                     Canvas.SetTop(dot, centerY - dotRadius);
@@ -700,7 +699,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             }
         }
 
-        private void AddTextCentered(TextBlock text, ScreenRect bounds, double scale, double fontSize)
+        private void AddTextCentered(OverlayAnnotation text, ScreenRect bounds, double scale, double fontSize)
         {
             _canvas.Children.Add(text);
             text.Measure(new Size(double.PositiveInfinity, fontSize));
@@ -711,12 +710,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         private void AddHeibanMarker(double x, double y, double fontSize)
         {
-            var marker = new Border
-            {
-                Width = Math.Max(3, fontSize / 3),
-                Height = Math.Max(1, fontSize / 8),
-                Background = PitchHeibanBrush,
-            };
+            var marker = OverlayAnnotation.CreatePill(Math.Max(3, fontSize / 3), Math.Max(1, fontSize / 8),
+                OverlayColorRole.Heiban, _annotationStyle);
             _canvas.Children.Add(marker);
             Canvas.SetLeft(marker, x + 1);
             Canvas.SetTop(marker, y);
@@ -746,7 +741,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         {
             _phrasePopup.HidePopup();
             foreach (var element in _lineElements)
-                element.Background = DefaultLineBrush;
+                element.Role = OverlayColorRole.Underline;
         }
 
         /// <summary>
@@ -789,7 +784,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             {
                 foreach (var i in _hoveredGroupLines)
                     if (i >= 0 && i < _lineElements.Count)
-                        _lineElements[i].Background = DefaultLineBrush;
+                        _lineElements[i].Role = OverlayColorRole.Underline;
                 _hoveredGroupLines = Array.Empty<int>();
                 _hoveredGroup = groupHit;
                 if (groupHit >= 0)
@@ -799,7 +794,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                         _lineOwner);
                     foreach (var i in _hoveredGroupLines)
                         if (i >= 0 && i < _lineElements.Count)
-                            _lineElements[i].Background = HoverLineBrush;
+                            _lineElements[i].Role = OverlayColorRole.Hover;
                     ShowPhrasePopup(session.PhraseGroups[groupHit]);
                 }
                 else
@@ -824,7 +819,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             if (hit >= 0)
                 foreach (var li in WordLineIndices(hit))
                     if (li < _lineElements.Count)
-                        _lineElements[li].Background = HoverLineBrush;
+                        _lineElements[li].Role = OverlayColorRole.Hover;
             UpdatePopup(hit);
             _phrasePopup.ShouldRemainOpen(cursor.X, cursor.Y, isOverSource: true);
         }
@@ -858,7 +853,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 return;
             foreach (var li in WordLineIndices(wordIndex))
                 if (li < _lineElements.Count)
-                    _lineElements[li].Background = DefaultLineBrush;
+                    _lineElements[li].Role = OverlayColorRole.Underline;
         }
 
         private IEnumerable<int> WordLineIndices(int wordIndex)
@@ -900,15 +895,6 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             else
                 _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), word.Bounds);
         }
-
-        private static Border MakeBox(double width, double height, Brush background)
-            => new()
-            {
-                Width = width,
-                Height = height,
-                Background = background,
-                CornerRadius = new CornerRadius(height / 2),
-            };
 
         private void SetClickThrough()
         {

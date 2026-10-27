@@ -9,6 +9,36 @@ namespace KotobaSenpai.App.Resources;
 /// </summary>
 public static class ResourceKeys
 {
+    public const string OverlayAppearance_OutlineColorMode = nameof(OverlayAppearance_OutlineColorMode);
+    public const string OverlayAppearance_OutlineColorModeDescription = nameof(OverlayAppearance_OutlineColorModeDescription);
+    public const string OverlayAppearance_OutlineAuto = nameof(OverlayAppearance_OutlineAuto);
+    public const string OverlayAppearance_OutlineBlack = nameof(OverlayAppearance_OutlineBlack);
+    public const string OverlayAppearance_OutlineWhite = nameof(OverlayAppearance_OutlineWhite);
+    public const string OverlayAppearance_OutlineThickness = nameof(OverlayAppearance_OutlineThickness);
+    public const string OverlayAppearance_OutlineThicknessDescription = nameof(OverlayAppearance_OutlineThicknessDescription);
+    public const string OverlayAppearance_Title = nameof(OverlayAppearance_Title);
+    public const string OverlayFuriganaColor = nameof(OverlayFuriganaColor);
+    public const string OverlayFuriganaColor_Description = nameof(OverlayFuriganaColor_Description);
+    public const string OverlayPitchHighColor = nameof(OverlayPitchHighColor);
+    public const string OverlayPitchHighColor_Description = nameof(OverlayPitchHighColor_Description);
+    public const string OverlayPitchLowColor = nameof(OverlayPitchLowColor);
+    public const string OverlayPitchLowColor_Description = nameof(OverlayPitchLowColor_Description);
+    public const string OverlayUnderlineColor = nameof(OverlayUnderlineColor);
+    public const string OverlayUnderlineColor_Description = nameof(OverlayUnderlineColor_Description);
+    public const string OverlayAppearance_Outline = nameof(OverlayAppearance_Outline);
+    public const string OverlayAppearance_OutlineDescription = nameof(OverlayAppearance_OutlineDescription);
+    public const string OverlayAppearance_Preview = nameof(OverlayAppearance_Preview);
+    public const string OverlayAppearance_PreviewDescription = nameof(OverlayAppearance_PreviewDescription);
+    public const string OverlayAppearance_ResetColors = nameof(OverlayAppearance_ResetColors);
+    public const string OverlayAppearance_Hex = nameof(OverlayAppearance_Hex);
+    public const string OverlayAppearance_Hue = nameof(OverlayAppearance_Hue);
+    public const string OverlayAppearance_Spectrum = nameof(OverlayAppearance_Spectrum);
+    public const string OverlayAppearance_SpectrumHelp = nameof(OverlayAppearance_SpectrumHelp);
+    public const string OverlayAppearance_Confirm = nameof(OverlayAppearance_Confirm);
+    public const string OverlayAppearance_Cancel = nameof(OverlayAppearance_Cancel);
+    public const string OverlayAppearance_SaveFailed = nameof(OverlayAppearance_SaveFailed);
+    public const string OverlayAppearance_InvalidColor = nameof(OverlayAppearance_InvalidColor);
+    public const string OverlayAppearance_ColorsReset = nameof(OverlayAppearance_ColorsReset);
     // --- XAML labels ---
     public const string MainWindow_Title = nameof(MainWindow_Title);
     public const string Label_TargetWindow = nameof(Label_TargetWindow);

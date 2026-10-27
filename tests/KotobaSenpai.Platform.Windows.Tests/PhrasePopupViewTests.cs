@@ -20,6 +20,43 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 {
+    [Fact]
+    public Task Appearance_roles_share_the_live_renderer_and_edges_keep_source_alignment() => RunSta(() =>
+    {
+        var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 500 };
+        var overlay = new WpfOverlayRenderer.OverlayWindow();
+        try
+        {
+            target.Show();
+            var handle = new WindowInteropHelper(target).Handle;
+            Assert.True(Native.GetWindowRect(handle, out var bounds));
+            GroupedWord Word(string surface, string reading, string accent, int x) => new(
+                new Token(surface, surface, surface, reading, reading, reading,
+                    new PartsOfSpeech("Noun", "", "", ""), "", "", accent, 0),
+                new ScreenRect(bounds.Left + x, bounds.Top + 60, 100, 40));
+            overlay.Render(WordOverlaySession.Start(new WindowTarget(handle, "Target",
+                new ScreenRect(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top)),
+                [Word("語", "ゴ", "invalid", 0), Word("日本語", "ニホンゴ", "2", 150), Word("かな", "カナ", "0", 300)]), 1d / 3);
+            overlay.UpdateLayout();
+            var canvas = Assert.IsType<Canvas>(overlay.Content);
+            var annotations = canvas.Children.OfType<OverlayAnnotation>().ToArray();
+            Assert.Contains(annotations, item => item.Role == OverlayColorRole.Furigana && item.Glyph is not null);
+            foreach (var role in new[] { OverlayColorRole.High, OverlayColorRole.Low })
+            {
+                Assert.Contains(annotations, item => item.Role == role && item.Glyph is not null);
+                Assert.Contains(annotations, item => item.Role == role && item.Glyph is null);
+            }
+            var firstLine = annotations.First(item => item.Role == OverlayColorRole.Underline);
+            Assert.Equal(0, Canvas.GetLeft(firstLine));
+            var left = firstLine.PointToScreen(new Point()).X;
+            Assert.InRange(left, bounds.Left - 0.5, bounds.Left + 0.5);
+            Assert.True(Native.GetWindowRect(new WindowInteropHelper(overlay).Handle, out var overlayBounds));
+            Assert.True(overlayBounds.Left < bounds.Left, "The native surface must reserve space for outlines outside the source bounds.");
+            Assert.True(overlayBounds.Right > bounds.Right);
+        }
+        finally { overlay.Close(); target.Close(); }
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -312,9 +349,22 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
                 [word, behind], groups, wordMeanings: [new WordMeaningView("Word", "", "Noun", meaning, "")]), 1d / 3);
             overlayHandle = new WindowInteropHelper(overlay).Handle;
             var popup = Assert.Single(overlay.OwnedWindows.OfType<PhrasePopup>());
+            var canvas = Assert.IsType<Canvas>(overlay.Content);
+            var annotations = canvas.Children.OfType<OverlayAnnotation>().ToArray();
+            var positions = annotations.Select(element => (Canvas.GetLeft(element), Canvas.GetTop(element))).ToArray();
+            overlay.Hide();
+            overlay.ApplyAppearance(new KotobaSenpai.Core.Settings.OverlayAppearance(UnderlineColor: "#FFFFFF"));
+            overlay.Show();
             overlay.PollHover(source.X + 20, source.Y + 10);
             Assert.True(popup.IsVisible);
             var snapshot = popup.DataContext;
+            overlay.ApplyAppearance(new KotobaSenpai.Core.Settings.OverlayAppearance(UnderlineColor: "#000000",
+                OutlineColorMode: KotobaSenpai.Core.Settings.OverlayOutlineColorMode.White, OutlineThickness: 3));
+            Assert.True(popup.IsVisible);
+            Assert.Same(snapshot, popup.DataContext);
+            Assert.Equal(annotations, canvas.Children.OfType<OverlayAnnotation>());
+            Assert.Equal(positions, annotations.Select(element => (Canvas.GetLeft(element), Canvas.GetTop(element))));
+            Assert.Contains(annotations, element => element.Role == OverlayColorRole.Hover);
             var handle = new WindowInteropHelper(popup).Handle;
             popupHandle = handle;
             Assert.True(Native.GetWindowRect(handle, out var bounds));

@@ -33,7 +33,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
 
     public SettingsPageViewModel(ISettingsService settings, IThemePreferenceStore themePreferences,
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
-        IExplanationLanguagePreferences explanationLanguage)
+        IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance)
     {
         _settings = settings;
         _themePreferences = themePreferences;
@@ -42,6 +42,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         _explanationLanguage = explanationLanguage.CustomLanguage ?? string.Empty;
         Language = language;
         Llm = llm;
+        OverlayAppearance = overlayAppearance;
         _selectedTheme = themePreferences.Load() ?? AppThemeMode.Auto;
         _furiganaFontScale = NormalizeFontScale(FuriganaFontSettings.ResolveFontScale(settings.GetValue(FuriganaFontSettings.FontScaleKey)));
         ThemeModes = [new(AppThemeMode.Auto, string.Empty), new(AppThemeMode.Light, string.Empty), new(AppThemeMode.Dark, string.Empty)];
@@ -52,6 +53,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
 
     public ILanguagePreferences Language { get; }
     public LlmSettingsViewModel Llm { get; }
+    public OverlayAppearanceViewModel OverlayAppearance { get; }
     public IReadOnlyList<ThemeModeChoice> ThemeModes { get; }
 
     [ObservableProperty]
@@ -124,6 +126,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private void OnCultureChanged(object? sender, EventArgs e)
     {
         RefreshThemeNames();
+        OverlayAppearance.RefreshLanguage();
         OnPropertyChanged(nameof(EffectiveExplanationLanguage));
         OnPropertyChanged(nameof(ExplanationLanguageStatus));
     }

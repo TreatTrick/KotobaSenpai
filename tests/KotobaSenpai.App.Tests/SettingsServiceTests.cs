@@ -9,6 +9,36 @@ namespace KotobaSenpai.App.Tests;
 /// </summary>
 public sealed class SettingsServiceTests : IDisposable
 {
+    [Fact]
+    public void Appearance_round_trips_and_a_failed_reset_preserves_the_committed_snapshot()
+    {
+        var path = NewPath();
+        var settings = new SettingsService(path);
+        settings.SetValue("UnrelatedSetting", "preserved");
+        var viewModel = new ViewModels.OverlayAppearanceViewModel(settings,
+            LocalizerFactory.Create(new System.Globalization.CultureInfo("en")));
+        Assert.True(viewModel.TrySaveColor(viewModel.Colors[1], "#abcdef"));
+        viewModel.OutlineEnabled = false;
+        viewModel.OutlineColorMode = Core.Settings.OverlayOutlineColorMode.White;
+        viewModel.OutlineThickness = 2.25;
+        var committed = viewModel.Appearance;
+        Assert.Equal(committed, Core.Settings.OverlayAppearanceSettings.Load(new SettingsService(path)));
+
+        using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            viewModel.ResetColorsCommand.Execute(null);
+            Assert.Equal(committed, viewModel.Appearance);
+            Assert.Equal("#ABCDEF", settings.GetValue("OverlayPitchHighColor"));
+            Assert.NotEmpty(viewModel.ResetStatus);
+        }
+        Assert.Equal(committed, Core.Settings.OverlayAppearanceSettings.Load(new SettingsService(path)));
+        viewModel.ResetColorsCommand.Execute(null);
+        Assert.Equal(new Core.Settings.OverlayAppearance(OutlineEnabled: false,
+                OutlineColorMode: Core.Settings.OverlayOutlineColorMode.White, OutlineThickness: 2.25),
+            Core.Settings.OverlayAppearanceSettings.Load(new SettingsService(path)));
+        Assert.Equal("preserved", settings.GetValue("UnrelatedSetting"));
+    }
+
     private readonly List<string> _tempPaths = new();
 
     private string NewPath()

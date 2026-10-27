@@ -1,0 +1,102 @@
+<UserControl x:Class="KotobaSenpai.App.Controls.OverlayColorPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
+             xmlns:controls="clr-namespace:KotobaSenpai.App.Controls"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+  <Grid>
+    <ui:Button x:Name="ChooseColorButton" Click="ChooseColor_Click" Width="{StaticResource SettingsInputWidth}"
+               HorizontalContentAlignment="Stretch" Style="{StaticResource SettingsButton}"
+               AutomationProperties.Name="{Binding Label}" AutomationProperties.HelpText="{Binding Description}">
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <Border Width="24" Height="24" CornerRadius="4" Background="{Binding Value}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" />
+        <TextBlock Text="{Binding Value}" Grid.Column="1" Margin="12,0" VerticalAlignment="Center" />
+        <ui:SymbolIcon Symbol="ChevronDown24" Grid.Column="2" FontSize="14" VerticalAlignment="Center" />
+      </Grid>
+    </ui:Button>
+    <Popup x:Name="PickerPopup" Placement="Bottom" PlacementTarget="{Binding ElementName=ChooseColorButton}"
+           AllowsTransparency="True" StaysOpen="False" Opened="Picker_Opened">
+      <Border Width="312" Padding="16" Margin="0,4" CornerRadius="8"
+              Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+              BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+              TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+        <StackPanel KeyboardNavigation.TabNavigation="Cycle" PreviewKeyDown="Picker_KeyDown">
+          <TextBlock Text="{Binding Label}" FontWeight="SemiBold" Margin="0,0,0,12" />
+          <Grid Margin="-6,0,0,8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
+            <controls:ColorSpectrum x:Name="Spectrum" Height="190" ColorChanged="Spectrum_ColorChanged"
+                                    AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_Spectrum}"
+                                    AutomationProperties.HelpText="{loc:Loc Key=OverlayAppearance_SpectrumHelp}" />
+            <Slider x:Name="HueSlider" Grid.Column="2" Minimum="0" Maximum="360" SmallChange="1" LargeChange="30"
+                    Orientation="Vertical" IsDirectionReversed="True" IsMoveToPointEnabled="True"
+                    ValueChanged="Hue_Changed" Margin="0,2,0,2" AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_Hue}">
+              <Slider.Template>
+                <ControlTemplate TargetType="Slider">
+                  <Grid>
+                    <Border Margin="4" CornerRadius="3">
+                      <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                          <GradientStop Color="#FF0000" Offset="0" />
+                          <GradientStop Color="#FFFF00" Offset="0.1666667" />
+                          <GradientStop Color="#00FF00" Offset="0.3333333" />
+                          <GradientStop Color="#00FFFF" Offset="0.5" />
+                          <GradientStop Color="#0000FF" Offset="0.6666667" />
+                          <GradientStop Color="#FF00FF" Offset="0.8333333" />
+                          <GradientStop Color="#FF0000" Offset="1" />
+                        </LinearGradientBrush>
+                      </Border.Background>
+                    </Border>
+                    <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="{TemplateBinding IsDirectionReversed}"
+                           Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                           Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                      <Track.DecreaseRepeatButton>
+                        <RepeatButton Command="{x:Static Slider.DecreaseLarge}" Focusable="False">
+                          <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" /></ControlTemplate></RepeatButton.Template>
+                        </RepeatButton>
+                      </Track.DecreaseRepeatButton>
+                      <Track.Thumb>
+                        <Thumb Height="8" Cursor="Hand">
+                          <Thumb.Template>
+                            <ControlTemplate TargetType="Thumb">
+                              <Border BorderBrush="Black" BorderThickness="1" CornerRadius="2">
+                                <Border BorderBrush="White" BorderThickness="2" CornerRadius="1" />
+                              </Border>
+                            </ControlTemplate>
+                          </Thumb.Template>
+                        </Thumb>
+                      </Track.Thumb>
+                      <Track.IncreaseRepeatButton>
+                        <RepeatButton Command="{x:Static Slider.IncreaseLarge}" Focusable="False">
+                          <RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" /></ControlTemplate></RepeatButton.Template>
+                        </RepeatButton>
+                      </Track.IncreaseRepeatButton>
+                    </Track>
+                  </Grid>
+                </ControlTemplate>
+              </Slider.Template>
+            </Slider>
+          </Grid>
+          <TextBlock Text="{loc:Loc Key=OverlayAppearance_SpectrumHelp}" Style="{StaticResource Description}" Margin="0,0,0,12" />
+          <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="40" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <Border x:Name="DraftSwatch" Height="32" Width="32" CornerRadius="4" BorderThickness="1"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <TextBox x:Name="HexInput" Grid.Column="1" TextChanged="HexInput_Changed" MaxLength="16"
+                     Style="{StaticResource SettingTextInput}" AutomationProperties.Name="{loc:Loc Key=OverlayAppearance_Hex}" />
+          </Grid>
+          <TextBlock Text="{Binding ErrorMessage}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+          <Grid Margin="0,16,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <ui:Button x:Name="ConfirmColorButton" Content="{loc:Loc Key=OverlayAppearance_Confirm}" Appearance="Primary" Click="Confirm_Click"
+                       Style="{StaticResource SettingsButton}" HorizontalAlignment="Stretch" />
+            <ui:Button x:Name="CancelColorButton" Content="{loc:Loc Key=OverlayAppearance_Cancel}" Grid.Column="2" Click="Cancel_Click"
+                       Style="{StaticResource SettingsButton}" HorizontalAlignment="Stretch" />
+          </Grid>
+        </StackPanel>
+      </Border>
+    </Popup>
+  </Grid>
+</UserControl>

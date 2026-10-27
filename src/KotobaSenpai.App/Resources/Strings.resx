@@ -367,4 +367,94 @@ Let the tool detect the protocol in this order: OpenAI Responses, Anthropic Mess
 Use the built-in real Japanese analysis test; configure already tests before saving. On success save and enable the complete configuration directly. On failure preserve the previous settings and decide whether to correct details, select another model or ask for missing information. Do not endlessly repeat the same error.
 
 Model discovery, detection and status leave the GUI running. Configure normally closes an already-running GUI and restores it afterward; do not kill the process yourself. Inspect applied and uiRestore separately: a saved configuration with failed GUI restoration is still saved, so do not save again for that reason. If application status is unknown, query status before retrying. Report only the outcome, service and model in the language of this prompt; never echo the API key.</value></data>
+  <data name="OverlayAppearance_Title" xml:space="preserve">
+    <value>Annotation appearance</value>
+  </data>
+  <data name="OverlayFuriganaColor" xml:space="preserve">
+    <value>Furigana</value>
+  </data>
+  <data name="OverlayFuriganaColor_Description" xml:space="preserve">
+    <value>Reading color when pitch information is unavailable.</value>
+  </data>
+  <data name="OverlayPitchHighColor" xml:space="preserve">
+    <value>H · High pitch</value>
+  </data>
+  <data name="OverlayPitchHighColor_Description" xml:space="preserve">
+    <value>Color of high-pitch readings and dots.</value>
+  </data>
+  <data name="OverlayPitchLowColor" xml:space="preserve">
+    <value>L · Low pitch</value>
+  </data>
+  <data name="OverlayPitchLowColor_Description" xml:space="preserve">
+    <value>Color of low-pitch readings and dots.</value>
+  </data>
+  <data name="OverlayUnderlineColor" xml:space="preserve">
+    <value>Underlines</value>
+  </data>
+  <data name="OverlayUnderlineColor_Description" xml:space="preserve">
+    <value>Annotation line color when not hovered.</value>
+  </data>
+  <data name="OverlayAppearance_Outline" xml:space="preserve">
+    <value>Annotation outlines</value>
+  </data>
+  <data name="OverlayAppearance_OutlineDescription" xml:space="preserve">
+    <value>Add outlines to readings, pitch markers, and underlines.</value>
+  </data>
+  <data name="OverlayAppearance_Preview" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="OverlayAppearance_PreviewDescription" xml:space="preserve">
+    <value>Saved colors immediately update the preview and current annotations.</value>
+  </data>
+  <data name="OverlayAppearance_ResetColors" xml:space="preserve">
+    <value>Reset colors</value>
+  </data>
+  <data name="OverlayAppearance_Hex" xml:space="preserve">
+    <value>HEX color</value>
+  </data>
+  <data name="OverlayAppearance_Hue" xml:space="preserve">
+    <value>Hue</value>
+  </data>
+  <data name="OverlayAppearance_Spectrum" xml:space="preserve">
+    <value>Saturation and brightness</value>
+  </data>
+  <data name="OverlayAppearance_SpectrumHelp" xml:space="preserve">
+    <value>Drag or use arrow keys to choose a color. Adjust hue on the right.</value>
+  </data>
+  <data name="OverlayAppearance_Confirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="OverlayAppearance_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="OverlayAppearance_InvalidColor" xml:space="preserve">
+    <value>Enter a six-digit HEX color, such as #4488FF.</value>
+  </data>
+  <data name="OverlayAppearance_SaveFailed" xml:space="preserve">
+    <value>Could not save. Your previous settings are unchanged. Check write access to the settings file and try again.</value>
+  </data>
+  <data name="OverlayAppearance_ColorsReset" xml:space="preserve">
+    <value>Default colors restored. Outlines and other settings are unchanged.</value>
+  </data>
+  <data name="OverlayAppearance_OutlineColorMode" xml:space="preserve">
+    <value>Outline color</value>
+  </data>
+  <data name="OverlayAppearance_OutlineColorModeDescription" xml:space="preserve">
+    <value>Use automatic contrast, or always use black or white.</value>
+  </data>
+  <data name="OverlayAppearance_OutlineAuto" xml:space="preserve">
+    <value>Automatic (based on fill color)</value>
+  </data>
+  <data name="OverlayAppearance_OutlineBlack" xml:space="preserve">
+    <value>Black</value>
+  </data>
+  <data name="OverlayAppearance_OutlineWhite" xml:space="preserve">
+    <value>White</value>
+  </data>
+  <data name="OverlayAppearance_OutlineThickness" xml:space="preserve">
+    <value>Outline thickness</value>
+  </data>
+  <data name="OverlayAppearance_OutlineThicknessDescription" xml:space="preserve">
+    <value>Adjust width from 0.5 to 3 DIP, scaled with your display.</value>
+  </data>
 </root>

@@ -11,6 +11,84 @@ namespace KotobaSenpai.App.Tests;
 public sealed class SettingsPageViewModelTests
 {
     [Theory]
+    [InlineData(0.1, "0.5")]
+    [InlineData(2.25, "2.25")]
+    [InlineData(10, "3")]
+    public void Outline_width_uses_a_bounded_range_and_invariant_storage(double requested, string expected)
+    {
+        var settings = new RecordingSettings();
+        using var page = Create(settings, new RecordingThemeStore());
+        var previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            page.OverlayAppearance.OutlineThickness = requested;
+            Assert.Equal(expected, settings.GetValue(OverlayAppearanceSettings.OutlineThicknessKey));
+            Assert.Equal(double.Parse(expected, CultureInfo.InvariantCulture), page.OverlayAppearance.OutlineThickness);
+        }
+        finally { CultureInfo.CurrentCulture = previousCulture; }
+    }
+
+    [Fact]
+    public void Appearance_colors_save_independently_and_reset_preserves_other_preferences()
+    {
+        var settings = new RecordingSettings();
+        settings.SetValue("ApiKey", "test-key");
+        using var page = Create(settings, new RecordingThemeStore());
+        var viewModel = page.OverlayAppearance;
+        var high = viewModel.Colors.Single(color => color.Key == "OverlayPitchHighColor");
+        var notifications = 0;
+        viewModel.Changed += (_, _) => notifications++;
+
+        Assert.True(viewModel.TrySaveColor(high, "#abcdef"));
+        Assert.Equal("#ABCDEF", high.Value);
+        Assert.Equal("#4488FF", viewModel.Appearance.PitchLowColor);
+        Assert.False(viewModel.TrySaveColor(high, "#123"));
+        Assert.Equal("#ABCDEF", settings.GetValue(high.Key));
+        Assert.NotEmpty(high.ErrorMessage);
+        viewModel.OutlineEnabled = false;
+        viewModel.OutlineColorMode = OverlayOutlineColorMode.White;
+        viewModel.OutlineThickness = 2.25;
+        viewModel.ResetColorsCommand.Execute(null);
+
+        Assert.Equal(new OverlayAppearance(OutlineEnabled: false,
+            OutlineColorMode: OverlayOutlineColorMode.White, OutlineThickness: 2.25), viewModel.Appearance);
+        Assert.Equal("false", settings.GetValue("OverlayOutlineEnabled"));
+        Assert.Equal("test-key", settings.GetValue("ApiKey"));
+        Assert.Equal(5, notifications);
+        using var reloaded = Create(settings, new RecordingThemeStore());
+        Assert.Equal(viewModel.Appearance, reloaded.OverlayAppearance.Appearance);
+    }
+
+    [Fact]
+    public void Appearance_save_failure_preserves_current_colors_and_does_not_notify_renderer()
+    {
+        var settings = new RecordingSettings();
+        using var page = Create(settings, new RecordingThemeStore());
+        var viewModel = page.OverlayAppearance;
+        var high = viewModel.Colors[1];
+        var original = viewModel.Appearance;
+        var notifications = 0;
+        viewModel.Changed += (_, _) => notifications++;
+        settings.FailWrites = true;
+
+        Assert.False(viewModel.TrySaveColor(high, "#000000"));
+        viewModel.OutlineEnabled = false;
+        viewModel.OutlineColorMode = OverlayOutlineColorMode.Black;
+        viewModel.OutlineThickness = 2;
+        viewModel.ResetColorsCommand.Execute(null);
+
+        Assert.Same(original, viewModel.Appearance);
+        Assert.NotEmpty(high.ErrorMessage);
+        Assert.NotEmpty(viewModel.OutlineError);
+        Assert.NotEmpty(viewModel.OutlineColorModeError);
+        Assert.NotEmpty(viewModel.OutlineThicknessError);
+        Assert.NotEmpty(viewModel.ResetStatus);
+        Assert.Null(settings.GetValue(high.Key));
+        Assert.Equal(0, notifications);
+    }
+
+    [Theory]
     [InlineData("en", null, "English")]
     [InlineData("zh-CN", null, "Simplified Chinese")]
     [InlineData("zh-CN", "French", "French")]
@@ -135,7 +213,8 @@ public sealed class SettingsPageViewModelTests
         var settings = new RecordingSettings();
         var theme = new RecordingThemeStore { Mode = AppThemeMode.Dark };
         using var llm = new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer);
-        using var viewModel = new SettingsPageViewModel(settings, theme, language, llm, localizer, language);
+        using var viewModel = new SettingsPageViewModel(settings, theme, language, llm, localizer, language,
+            new OverlayAppearanceViewModel(settings, localizer));
         var choice = viewModel.ThemeModes.Single(option => option.Mode == AppThemeMode.Dark);
         var originalName = choice.Name;
 
@@ -157,7 +236,8 @@ public sealed class SettingsPageViewModelTests
         var llm = new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer);
         var language = new LanguageService(LocalizerFactory.Create(new CultureInfo("en")),
             new RecordingLanguageStore(), () => new CultureInfo("en"), _ => { });
-        var viewModel = new SettingsPageViewModel(settings, new RecordingThemeStore(), language, llm, localizer, language);
+        var viewModel = new SettingsPageViewModel(settings, new RecordingThemeStore(), language, llm, localizer, language,
+            new OverlayAppearanceViewModel(settings, localizer));
         Assert.Equal(2, localizer.SubscriberCount);
 
         viewModel.Dispose();
@@ -172,13 +252,21 @@ public sealed class SettingsPageViewModelTests
         var language = new LanguageService(localizer, new RecordingLanguageStore(), () => new CultureInfo(culture), _ => { }, settings);
         language.Initialize();
         return new SettingsPageViewModel(settings, theme, language,
-            new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer), localizer, language);
+            new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer), localizer, language,
+            new OverlayAppearanceViewModel(settings, localizer));
     }
 
     private sealed class RecordingSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         public Dictionary<string, string?> Values { get; } = [];
         public int WriteCount { get; private set; }
+        public bool FailWrites { get; set; }
+        public override bool TryUpdate(IReadOnlyDictionary<string, string?> expected, IReadOnlyDictionary<string, string?> changes)
+        {
+            if (FailWrites)
+                throw new System.IO.IOException("Simulated storage failure.");
+            return base.TryUpdate(expected, changes);
+        }
         public override string? GetValue(string key) => Values.GetValueOrDefault(key);
         public override void SetValue(string key, string? value) { Values[key] = value; WriteCount++; }
     }
