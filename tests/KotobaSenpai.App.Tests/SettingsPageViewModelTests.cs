@@ -107,7 +107,7 @@ public sealed class SettingsPageViewModelTests
         viewModel.Language.CurrentCulture = new CultureInfo("en");
 
         Assert.Equal(customLanguage ?? "English", preferences.EffectiveLanguage);
-        Assert.Contains("Currently active:", viewModel.EffectiveExplanationLanguage);
+        Assert.Contains("Next recognition language:", viewModel.EffectiveExplanationLanguage);
         Assert.Contains("next recognition", viewModel.ExplanationLanguageStatus);
         Assert.Null(settings.GetValue("ApiKey"));
     }

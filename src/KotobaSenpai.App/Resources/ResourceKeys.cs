@@ -60,6 +60,8 @@ public static class ResourceKeys
     public const string Label_Language = nameof(Label_Language);
     public const string Label_ExplanationLanguage = nameof(Label_ExplanationLanguage);
     public const string Description_ExplanationLanguage = nameof(Description_ExplanationLanguage);
+    public const string ExplanationLanguage_InputHint = nameof(ExplanationLanguage_InputHint);
+    public const string ExplanationLanguage_Help = nameof(ExplanationLanguage_Help);
     public const string Button_SaveExplanationLanguage = nameof(Button_SaveExplanationLanguage);
     public const string ExplanationLanguage_Current = nameof(ExplanationLanguage_Current);
     public const string ExplanationLanguage_Saved = nameof(ExplanationLanguage_Saved);

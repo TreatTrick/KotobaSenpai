@@ -107,7 +107,7 @@
     <value>Actions</value>
   </data>
   <data name="Label_Language" xml:space="preserve">
-    <value>Language</value>
+    <value>Interface language</value>
   </data>
   <data name="Button_Recognize" xml:space="preserve">
     <value>Start recognition</value>
@@ -291,19 +291,25 @@
     <value>Off</value>
   </data>
   <data name="Label_ExplanationLanguage" xml:space="preserve">
-    <value>Explanation language</value>
+    <value>AI explanation language</value>
   </data>
   <data name="Description_ExplanationLanguage" xml:space="preserve">
-    <value>Leave blank to follow the interface language. Enter a clear language name in any language, such as French or français. Results depend on the selected model.</value>
+    <value>The language AI uses to explain Japanese word meanings, phrase meanings, and grammar. This does not change the interface language.</value>
+  </data>
+  <data name="ExplanationLanguage_InputHint" xml:space="preserve">
+    <value>For example: English, French, or 한국어. Leave blank to follow the interface language.</value>
+  </data>
+  <data name="ExplanationLanguage_Help" xml:space="preserve">
+    <value>Enter a clear language name in Chinese, English, or the language itself, such as 法语, French, or français. Language support depends on the selected model.</value>
   </data>
   <data name="Button_SaveExplanationLanguage" xml:space="preserve">
     <value>Save</value>
   </data>
   <data name="ExplanationLanguage_Current" xml:space="preserve">
-    <value>Currently active: {0}</value>
+    <value>Next recognition language: {0}</value>
   </data>
   <data name="ExplanationLanguage_Saved" xml:space="preserve">
-    <value>Explanation language saved. Takes effect on the next recognition.</value>
+    <value>Saved. Takes effect on the next recognition.</value>
   </data>
   <data name="ExplanationLanguage_Invalid" xml:space="preserve">
     <value>Use a single-line language name of up to 80 characters, without control characters, or leave it blank.</value>

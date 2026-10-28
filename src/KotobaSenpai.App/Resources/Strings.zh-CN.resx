@@ -107,7 +107,7 @@
     <value>操作</value>
   </data>
   <data name="Label_Language" xml:space="preserve">
-    <value>语言</value>
+    <value>界面语言</value>
   </data>
   <data name="Button_Recognize" xml:space="preserve">
     <value>开始识别</value>
@@ -291,19 +291,25 @@
     <value>关</value>
   </data>
   <data name="Label_ExplanationLanguage" xml:space="preserve">
-    <value>释义语言</value>
+    <value>AI 释义语言</value>
   </data>
   <data name="Description_ExplanationLanguage" xml:space="preserve">
-    <value>留空时跟随界面语言。可以填写中文名、英文名或该语言自己的名称，例如法语、French、français；请填写明确的语言名称。实际效果取决于所选模型。</value>
+    <value>AI 用哪种语言解释日语词语、短语的含义和语法。更改此项不会切换软件界面语言。</value>
+  </data>
+  <data name="ExplanationLanguage_InputHint" xml:space="preserve">
+    <value>例如：中文、English、한국어。留空跟随界面语言。</value>
+  </data>
+  <data name="ExplanationLanguage_Help" xml:space="preserve">
+    <value>请填写明确的语言名称，可使用中文名、英文名或该语言本名，例如：法语、French、français。语言支持取决于所选模型。</value>
   </data>
   <data name="Button_SaveExplanationLanguage" xml:space="preserve">
     <value>保存</value>
   </data>
   <data name="ExplanationLanguage_Current" xml:space="preserve">
-    <value>当前生效：{0}</value>
+    <value>下次识别使用：{0}</value>
   </data>
   <data name="ExplanationLanguage_Saved" xml:space="preserve">
-    <value>释义语言已保存，下次识别生效。</value>
+    <value>已保存，下次识别生效。</value>
   </data>
   <data name="ExplanationLanguage_Invalid" xml:space="preserve">
     <value>请填写不超过 80 个字符的单行语言名称，不要包含控制字符；也可以留空。</value>
