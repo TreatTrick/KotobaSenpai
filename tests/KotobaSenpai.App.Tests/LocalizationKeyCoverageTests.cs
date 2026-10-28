@@ -82,15 +82,17 @@ public sealed partial class LocalizationKeyCoverageTests
         }
     }
 
-    [Fact]
-    public void Every_llm_configuration_key_has_a_zh_cn_translation()
+    [Theory]
+    [InlineData("Llm_")]
+    [InlineData("WindowPicker_")]
+    public void Feature_keys_have_zh_cn_translations(string prefix)
     {
         var translated = Strings.GetResourceSet(CultureInfo.GetCultureInfo("zh-CN"), true, false);
         Assert.NotNull(translated);
         var keys = typeof(ResourceKeys)
             .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(field => field.IsLiteral && field.FieldType == typeof(string)
-                && (field.Name.StartsWith("Llm_", StringComparison.Ordinal)
+                && (field.Name.StartsWith(prefix, StringComparison.Ordinal)
                     || field.Name.StartsWith("Label_Llm", StringComparison.Ordinal)
                     || field.Name.StartsWith("Button_Llm", StringComparison.Ordinal)))
             .Select(field => (string)field.GetRawConstantValue()!);

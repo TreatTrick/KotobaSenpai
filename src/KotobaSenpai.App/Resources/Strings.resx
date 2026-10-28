@@ -109,9 +109,6 @@
   <data name="Label_Language" xml:space="preserve">
     <value>Language</value>
   </data>
-  <data name="Button_RefreshWindows" xml:space="preserve">
-    <value>Refresh windows</value>
-  </data>
   <data name="Button_Recognize" xml:space="preserve">
     <value>Start recognition</value>
   </data>
@@ -136,12 +133,6 @@
   </data>
   <data name="Status_Selected" xml:space="preserve">
     <value>Selected: {0}</value>
-  </data>
-  <data name="Status_NoWindows" xml:space="preserve">
-    <value>No available windows found.</value>
-  </data>
-  <data name="Status_WindowsFound" xml:space="preserve">
-    <value>Found {0} windows. Please select a target.</value>
   </data>
   <data name="Status_Recognizing" xml:space="preserve">
     <value>Capturing and recognizing Japanese text…</value>
@@ -258,7 +249,7 @@
     <value>On-screen annotations</value>
   </data>
   <data name="Description_TargetWindow" xml:space="preserve">
-    <value>Choose a running game or application.</value>
+    <value>Click Select window, then point to a window on your desktop and click it.</value>
   </data>
   <data name="Description_RecognizeText" xml:space="preserve">
     <value>Recognize Japanese and underline words for lookup.</value>
@@ -456,5 +447,47 @@ Model discovery, detection and status leave the GUI running. Configure normally 
   </data>
   <data name="OverlayAppearance_OutlineThicknessDescription" xml:space="preserve">
     <value>Adjust width from 0.5 to 3 DIP, scaled with your display.</value>
+  </data>
+  <data name="WindowPicker_Select" xml:space="preserve">
+    <value>Select window</value>
+  </data>
+  <data name="WindowPicker_Reselect" xml:space="preserve">
+    <value>Choose another window</value>
+  </data>
+  <data name="WindowPicker_Retry" xml:space="preserve">
+    <value>Retry preview</value>
+  </data>
+  <data name="WindowPicker_Hint" xml:space="preserve">
+    <value>Click a window to select it. Press Esc to cancel.</value>
+  </data>
+  <data name="WindowPicker_Empty" xml:space="preserve">
+    <value>No window selected</value>
+  </data>
+  <data name="WindowPicker_Untitled" xml:space="preserve">
+    <value>Untitled window</value>
+  </data>
+  <data name="WindowPicker_EmptyHint" xml:space="preserve">
+    <value>Choose a window to preview</value>
+  </data>
+  <data name="WindowPicker_Selected" xml:space="preserve">
+    <value>Selected. Start recognition when ready.</value>
+  </data>
+  <data name="WindowPicker_Picking" xml:space="preserve">
+    <value>Point to a window and click. Esc cancels.</value>
+  </data>
+  <data name="WindowPicker_Loading" xml:space="preserve">
+    <value>Capturing a preview…</value>
+  </data>
+  <data name="WindowPicker_Unavailable" xml:space="preserve">
+    <value>Window unavailable. Restore it to continue.</value>
+  </data>
+  <data name="WindowPicker_Closed" xml:space="preserve">
+    <value>The selected window has closed. Choose another window.</value>
+  </data>
+  <data name="WindowPicker_PreviewFailed" xml:space="preserve">
+    <value>Preview unavailable. Retry, or choose another window.</value>
+  </data>
+  <data name="WindowSelectionFailed" xml:space="preserve">
+    <value>Could not start window selection. Please try again.</value>
   </data>
 </root>

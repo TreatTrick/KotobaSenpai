@@ -7,6 +7,9 @@ namespace KotobaSenpai.Core.Errors;
 /// </summary>
 public static class ErrorCodes
 {
+    /// <summary>The desktop window picker could not initialize or complete.</summary>
+    public const string WindowSelectionFailed = nameof(WindowSelectionFailed);
+
     /// <summary>meikiocr local model missing (MeikiOcrWordRecognizer/MeikiOcrEngine).</summary>
     public const string OcrModelMissing = nameof(OcrModelMissing);
 

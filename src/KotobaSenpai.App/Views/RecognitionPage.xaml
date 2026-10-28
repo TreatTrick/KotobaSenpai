@@ -10,27 +10,47 @@
       <TextBlock Text="{loc:Loc Key=Page_RecognizeDescription}" Style="{StaticResource PageDescription}" />
       <TextBlock Text="{loc:Loc Key=Label_TargetAndRecognition}" Style="{StaticResource SectionTitle}" />
 
-      <controls:SettingsCard Header="{loc:Loc Key=Label_TargetWindow}" Description="{loc:Loc Key=Description_TargetWindow}"
-                             Icon="{ui:SymbolIcon Window24}">
-        <Grid Width="{StaticResource SettingsInputWidth}">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <ComboBox x:Name="TargetWindowComboBox" Style="{StaticResource SettingInput}" Width="Auto"
-                    ItemsSource="{Binding Windows}" SelectedItem="{Binding SelectedWindow}"
-                    ToolTip="{Binding SelectedWindow.Title}"
-                    DisplayMemberPath="Title" AutomationProperties.Name="{loc:Loc Key=Label_TargetWindow}">
-            <ComboBox.ItemContainerStyle>
-              <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
-                <Setter Property="MaxWidth" Value="460" />
-                <Setter Property="ToolTip" Value="{Binding Title}" />
-              </Style>
-            </ComboBox.ItemContainerStyle>
-          </ComboBox>
-          <ui:Button Grid.Column="1" Icon="{ui:SymbolIcon ArrowClockwise24}" Style="{StaticResource SettingsIconButton}" Command="{Binding RefreshCommand}"
-                     ToolTip="{loc:Loc Key=Button_RefreshWindows}" AutomationProperties.Name="{loc:Loc Key=Button_RefreshWindows}" />
-        </Grid>
+      <controls:SettingsCard x:Name="TargetWindowCard" Header="{loc:Loc Key=Label_TargetWindow}"
+                             Description="{loc:Loc Key=Description_TargetWindow}" AutomationProperties.Name="{Binding TargetTitle}">
+        <controls:SettingsCard.DescriptionContent>
+          <WrapPanel Margin="0,12,0,0">
+            <Border Width="144" Height="144" CornerRadius="8" BorderThickness="1" Margin="0,0,16,8"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    Background="{DynamicResource LayerFillColorDefaultBrush}"
+                    AutomationProperties.Name="{Binding TargetTitle}" AutomationProperties.HelpText="{Binding TargetStatus}">
+              <Grid>
+                <Image x:Name="TargetPreviewImage" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
+                       AutomationProperties.Name="{Binding TargetTitle}" AutomationProperties.HelpText="{Binding TargetStatus}">
+                  <Image.RenderTransform><ScaleTransform /></Image.RenderTransform>
+                </Image>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8">
+                  <StackPanel.Style>
+                    <Style TargetType="StackPanel">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasPreview}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </StackPanel.Style>
+                  <ui:SymbolIcon Symbol="Window24" FontSize="32" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding TargetStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
+                </StackPanel>
+              </Grid>
+            </Border>
+            <StackPanel Width="280" Margin="0,0,0,8" VerticalAlignment="Center">
+              <TextBlock Text="{Binding TargetTitle}" ToolTip="{Binding TargetTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding TargetStatus}" Style="{StaticResource Description}" AutomationProperties.LiveSetting="Polite" />
+              <TextBlock Text="{Binding PreviewError}" Style="{StaticResource Description}" />
+              <WrapPanel Margin="0,8,0,0">
+                <ui:Button x:Name="SelectWindowButton" Content="{Binding SelectionButtonText}" Command="{Binding SelectWindowCommand}"
+                           Style="{StaticResource SettingsActionButton}" Icon="{ui:SymbolIcon Window24}"
+                           AutomationProperties.Name="{Binding SelectionButtonText}" />
+                <ui:Button Content="{loc:Loc Key=WindowPicker_Retry}" Command="{Binding RetryPreviewCommand}"
+                           Style="{StaticResource SettingsButton}" Margin="8,0,0,0"
+                           Visibility="{Binding HasPreviewError, Converter={StaticResource BoolToVisibility}}" />
+              </WrapPanel>
+            </StackPanel>
+          </WrapPanel>
+        </controls:SettingsCard.DescriptionContent>
       </controls:SettingsCard>
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_RecognizeText}" Description="{loc:Loc Key=Description_RecognizeText}"

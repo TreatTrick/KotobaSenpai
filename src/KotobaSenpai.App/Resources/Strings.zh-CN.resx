@@ -109,9 +109,6 @@
   <data name="Label_Language" xml:space="preserve">
     <value>语言</value>
   </data>
-  <data name="Button_RefreshWindows" xml:space="preserve">
-    <value>刷新窗口</value>
-  </data>
   <data name="Button_Recognize" xml:space="preserve">
     <value>开始识别</value>
   </data>
@@ -136,12 +133,6 @@
   </data>
   <data name="Status_Selected" xml:space="preserve">
     <value>已选择：{0}</value>
-  </data>
-  <data name="Status_NoWindows" xml:space="preserve">
-    <value>没有找到可用的窗口。</value>
-  </data>
-  <data name="Status_WindowsFound" xml:space="preserve">
-    <value>找到 {0} 个窗口，请选择目标。</value>
   </data>
   <data name="Status_Recognizing" xml:space="preserve">
     <value>正在捕获并识别日语文字……</value>
@@ -258,7 +249,7 @@
     <value>屏幕标注</value>
   </data>
   <data name="Description_TargetWindow" xml:space="preserve">
-    <value>选择正在运行的游戏或应用。</value>
+    <value>点击“选择窗口”，将鼠标移到桌面上的目标窗口并单击。</value>
   </data>
   <data name="Description_RecognizeText" xml:space="preserve">
     <value>识别日语词汇，添加下划线以便查词。</value>
@@ -456,5 +447,47 @@ API Key：YOUR_API_KEY
   </data>
   <data name="OverlayAppearance_OutlineThicknessDescription" xml:space="preserve">
     <value>调整描边宽度，范围为 0.5–3 DIP，随屏幕缩放。</value>
+  </data>
+  <data name="WindowPicker_Select" xml:space="preserve">
+    <value>选择窗口</value>
+  </data>
+  <data name="WindowPicker_Reselect" xml:space="preserve">
+    <value>重新选择窗口</value>
+  </data>
+  <data name="WindowPicker_Retry" xml:space="preserve">
+    <value>重试预览</value>
+  </data>
+  <data name="WindowPicker_Hint" xml:space="preserve">
+    <value>点击窗口以选择，按 Esc 取消。</value>
+  </data>
+  <data name="WindowPicker_Empty" xml:space="preserve">
+    <value>尚未选择窗口</value>
+  </data>
+  <data name="WindowPicker_Untitled" xml:space="preserve">
+    <value>未命名窗口</value>
+  </data>
+  <data name="WindowPicker_EmptyHint" xml:space="preserve">
+    <value>选择窗口后显示预览</value>
+  </data>
+  <data name="WindowPicker_Selected" xml:space="preserve">
+    <value>已选择，可以开始识别。</value>
+  </data>
+  <data name="WindowPicker_Picking" xml:space="preserve">
+    <value>移动鼠标到目标窗口，点击选择；Esc 取消。</value>
+  </data>
+  <data name="WindowPicker_Loading" xml:space="preserve">
+    <value>正在获取窗口预览…</value>
+  </data>
+  <data name="WindowPicker_Unavailable" xml:space="preserve">
+    <value>窗口暂不可用，请恢复窗口后继续。</value>
+  </data>
+  <data name="WindowPicker_Closed" xml:space="preserve">
+    <value>目标窗口已关闭，请重新选择。</value>
+  </data>
+  <data name="WindowPicker_PreviewFailed" xml:space="preserve">
+    <value>预览获取失败，可重试或重新选择窗口。</value>
+  </data>
+  <data name="WindowSelectionFailed" xml:space="preserve">
+    <value>窗口选择失败，请重试。</value>
   </data>
 </root>

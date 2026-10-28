@@ -165,7 +165,7 @@ public partial class App : Application
     /// <summary>Registers domain ports and their platform adapters by port; the localization ports and language service have their dependencies resolved by the container.</summary>
     private static void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton<IWindowCatalog, Win32WindowCatalog>();
+        services.AddSingleton<IWindowPicker, Win32WindowPicker>();
         services.AddSingleton<IWindowFrameCapture, WgcWindowFrameCapture>();
         services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
         services.AddSingleton<ITargetWindowTracker, WinEventTargetWindowTracker>();

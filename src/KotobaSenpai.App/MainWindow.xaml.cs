@@ -55,12 +55,7 @@ public partial class MainWindow : FluentWindow
         _observedSettings.PropertyChanged += OnSettingsChanged;
         ApplySelectedTheme();
 
-        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-        if (handle == 0)
-            return;
 
-        viewModel.Recognition.ExcludeHandle = handle;
-        viewModel.Recognition.RefreshCommand.Execute(null);
     }
 
     private void StopObservingSettings()

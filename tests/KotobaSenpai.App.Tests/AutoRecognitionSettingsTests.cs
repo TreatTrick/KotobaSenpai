@@ -45,8 +45,7 @@ public sealed class AutoRecognitionSettingsTests
         var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
         var viewModel = Create(settings, controller, target);
 
-        viewModel.RefreshCommand.Execute(null);
-        viewModel.SelectedWindow = viewModel.Windows[0];
+        viewModel.SelectedWindow = target;
         viewModel.AutoRecognitionEnabled = true;
 
         await viewModel.RecognizeCommand.ExecuteAsync(null);
@@ -80,7 +79,7 @@ public sealed class AutoRecognitionSettingsTests
             new WordGroupingService(new FakeTokenizer(), new SentenceSegmenter(), new FakeSpanResolver()),
             new FakeOverlay(), KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
         return new RecognitionPageViewModel(
-            new FakeWindowCatalog(target),
+            new FakeWindowPicker(target),
             workflow,
             new FakeRegionSelector(),
             settings,
@@ -90,9 +89,10 @@ public sealed class AutoRecognitionSettingsTests
             autoRecognitionController: controller);
     }
 
-    private sealed class FakeWindowCatalog(WindowTarget? target) : IWindowCatalog
+    private sealed class FakeWindowPicker(WindowTarget? target) : IWindowPicker
     {
-        public IReadOnlyList<WindowTarget> ListVisibleWindows() => target is null ? [] : [target];
+        public void Highlight(WindowTarget? target) { }
+        public Task<WindowTarget?> PickAsync(CancellationToken cancellationToken = default) => Task.FromResult(target);
     }
 
     private sealed class FakeRegionSelector : IRegionSelector

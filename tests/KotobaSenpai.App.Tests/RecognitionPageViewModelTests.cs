@@ -19,6 +19,86 @@ namespace KotobaSenpai.App.Tests;
 
 public sealed class RecognitionPageViewModelTests
 {
+    [Fact]
+    public async Task Selection_stays_highlighted_through_preview_failure_and_retry_until_recognition_starts()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var picker = new FakeWindowPicker(target);
+        var capture = new PreviewCapture { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var recognizer = new DeferredRecognizer();
+        var (vm, _, _, _) = CreateVm(picker, capture: capture, recognizer: recognizer);
+        using var lifetime = vm;
+
+        var selecting = vm.SelectWindowCommand.ExecuteAsync(null);
+        Assert.True(vm.IsSelectingWindow);
+        Assert.Equal(target, picker.Highlighted);
+        capture.Pending.SetException(new InvalidOperationException("Preview failed."));
+        await selecting;
+        Assert.True(vm.HasPreviewError);
+        Assert.Equal(target, picker.Highlighted);
+
+        capture.Pending = null;
+        await vm.RetryPreviewCommand.ExecuteAsync(null);
+        Assert.True(vm.HasPreview);
+        Assert.Equal(target, picker.Highlighted);
+
+        var recognizing = vm.RecognizeCommand.ExecuteAsync(null);
+        Assert.Null(picker.Highlighted);
+        recognizer.Completion.SetResult(new WordRecognitionResult(100, 100, []));
+        await recognizing;
+        vm.HideCommand.Execute(null);
+        Assert.Null(picker.Highlighted);
+
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+        Assert.Equal(target, picker.Highlighted);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Cancelling_reselection_restores_only_a_highlight_that_was_waiting_for_recognition(bool alreadyRecognized)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var picker = new DeferredPicker();
+        var (vm, _, _, _) = CreateVm(picker);
+        using var lifetime = vm;
+        vm.SelectedWindow = target;
+        Assert.Equal(target, picker.Highlighted);
+        if (alreadyRecognized) await vm.RecognizeCommand.ExecuteAsync(null);
+
+        var selecting = vm.SelectWindowCommand.ExecuteAsync(null);
+        Assert.Null(picker.Highlighted);
+        picker.Completion.SetResult(null);
+        await selecting;
+
+        Assert.Equal(alreadyRecognized ? null : target, picker.Highlighted);
+    }
+
+    [Theory]
+    [InlineData("close")]
+    [InlineData("clear")]
+    [InlineData("dispose")]
+    public void A_pending_highlight_preserves_its_binding_while_unavailable_and_is_cleared_at_the_end_of_its_lifetime(string action)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var picker = new FakeWindowPicker(target);
+        var tracker = new FakeTargetWindowTracker();
+        var (vm, _, _, _) = CreateVm(picker, tracker);
+        using var lifetime = vm;
+        vm.SelectedWindow = target;
+        Assert.Equal(target, picker.Highlighted);
+
+        tracker.Publish(tracker.Current! with { IsMinimized = true });
+        Assert.Equal(target, picker.Highlighted);
+        tracker.Publish(tracker.Current! with { IsMinimized = false });
+        Assert.Equal(target, picker.Highlighted);
+
+        if (action == "close") tracker.Publish(tracker.Current! with { IsValid = false });
+        if (action == "clear") vm.SelectedWindow = null;
+        if (action == "dispose") vm.Dispose();
+        Assert.Null(picker.Highlighted);
+    }
+
     [Theory]
     [InlineData("hide")]
     [InlineData("switch")]
@@ -31,7 +111,7 @@ public sealed class RecognitionPageViewModelTests
         var capture = new RecordingCapture();
         var controller = new RecordingAutoController();
         var selector = new FakeRegionSelector();
-        var (vm, overlay, _, logger) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer, capture: capture, controller: controller, regionSelector: selector);
+        var (vm, overlay, _, logger) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer, capture: capture, controller: controller, regionSelector: selector);
         vm.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
         var stoppedBefore = capture.StopCount;
@@ -61,7 +141,7 @@ public sealed class RecognitionPageViewModelTests
         var recognizer = new DeferredRecognizer();
         recognizer.Completion.SetResult(new WordRecognitionResult(200, 100, []));
         var selector = new FakeRegionSelector();
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer,
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer,
             regionSelector: selector, settings: new FakeSettings(savedRegion));
         vm.SelectedWindow = target;
 
@@ -89,7 +169,7 @@ public sealed class RecognitionPageViewModelTests
         var recognizer = new SequenceRecognizer(manualStartsEmpty ? empty : text, empty, empty, text, empty, empty, empty);
         var selector = new FakeRegionSelector();
         var controller = new RecordingAutoController();
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer,
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer,
             controller: controller, regionSelector: selector);
         vm.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
@@ -124,7 +204,7 @@ public sealed class RecognitionPageViewModelTests
         var recognizer = new DeferredRecognizer();
         recognizer.Completion.SetResult(new WordRecognitionResult(200, 100, []));
         var selector = new FakeRegionSelector();
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), recognizer: recognizer, regionSelector: selector);
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer, regionSelector: selector);
         vm.SelectedWindow = target;
         await vm.RecognizeCommand.ExecuteAsync(null);
         var stoppedBefore = selector.StopFlashingCount;
@@ -142,7 +222,7 @@ public sealed class RecognitionPageViewModelTests
     {
         var recognizer = new DeferredRecognizer();
         var capture = new RecordingCapture();
-        var (vm, overlay, _, logger) = CreateVm(new FakeWindowCatalog(), recognizer: recognizer, capture: capture);
+        var (vm, overlay, _, logger) = CreateVm(new FakeWindowPicker(), recognizer: recognizer, capture: capture);
         vm.SelectedWindow = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
         var stoppedBefore = capture.StopCount;
         var pending = vm.RecognizeCommand.ExecuteAsync(null);
@@ -155,24 +235,16 @@ public sealed class RecognitionPageViewModelTests
     }
 
     [Fact]
-    public void Refresh_lists_windows_excluding_self()
+    public void A_new_view_model_has_no_implicit_selection()
     {
-        var self = new WindowTarget((nint)1, "Self", new ScreenRect(0, 0, 100, 100));
-        var other = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 100, 100));
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(self, other));
-        vm.ExcludeHandle = (nint)1;
-
-        vm.RefreshCommand.Execute(null);
-
-        Assert.Single(vm.Windows);
-        Assert.Equal("Other", vm.Windows[0].Title);
-        Assert.Equal($"{ResourceKeys.Status_WindowsFound}:1", vm.Status);
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100))));
+        Assert.Null(vm.SelectedWindow);
     }
 
     [Fact]
     public async Task Recognize_without_selection_warns_user()
     {
-        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog());
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowPicker());
 
         await vm.RecognizeCommand.ExecuteAsync(null);
 
@@ -185,9 +257,8 @@ public sealed class RecognitionPageViewModelTests
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
         var selector = new FakeRegionSelector();
-        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog(target), regionSelector: selector);
-        vm.RefreshCommand.Execute(null);
-        vm.SelectedWindow = vm.Windows[0];
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowPicker(target), regionSelector: selector);
+        vm.SelectedWindow = target;
 
         await vm.RecognizeCommand.ExecuteAsync(null);
 
@@ -200,7 +271,7 @@ public sealed class RecognitionPageViewModelTests
     [Fact]
     public void Hide_clears_overlay_and_updates_status()
     {
-        var (vm, overlay, _, _) = CreateVm(new FakeWindowCatalog());
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowPicker());
 
         vm.HideCommand.Execute(null);
 
@@ -212,7 +283,7 @@ public sealed class RecognitionPageViewModelTests
     public void Culture_changed_re_derives_status_from_current_state()
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
-        var (vm, _, localizer, _) = CreateVm(new FakeWindowCatalog(target));
+        var (vm, _, localizer, _) = CreateVm(new FakeWindowPicker(target));
         vm.SelectedWindow = target;
         Assert.Equal($"{ResourceKeys.Status_Selected}:Other", vm.Status);
 
@@ -228,7 +299,7 @@ public sealed class RecognitionPageViewModelTests
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
         var tracker = new FakeTargetWindowTracker();
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(), tracker);
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(), tracker);
 
         vm.SelectedWindow = target;
         vm.SelectedWindow = null;
@@ -243,9 +314,8 @@ public sealed class RecognitionPageViewModelTests
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
         var tracker = new FakeTargetWindowTracker();
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog(target), tracker);
-        vm.RefreshCommand.Execute(null);
-        vm.SelectedWindow = vm.Windows[0];
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), tracker);
+        vm.SelectedWindow = target;
         FakeRegionSelector.ShowCount = 0;
 
         vm.SetRecognitionRegionCommand.Execute(null);
@@ -258,7 +328,7 @@ public sealed class RecognitionPageViewModelTests
     [Fact]
     public void Set_recognition_region_without_window_shows_hint()
     {
-        var (vm, _, _, _) = CreateVm(new FakeWindowCatalog());
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker());
 
         vm.SetRecognitionRegionCommand.Execute(null);
 
@@ -270,9 +340,8 @@ public sealed class RecognitionPageViewModelTests
     {
         var target = new WindowTarget((nint)2, "Other", new ScreenRect(0, 0, 200, 100));
         var tracker = new FakeTargetWindowTracker { ThrowOnRefresh = true };
-        var (vm, _, _, logger) = CreateVm(new FakeWindowCatalog(target), tracker);
-        vm.RefreshCommand.Execute(null);
-        vm.SelectedWindow = vm.Windows[0];
+        var (vm, _, _, logger) = CreateVm(new FakeWindowPicker(target), tracker);
+        vm.SelectedWindow = target;
         FakeRegionSelector.ShowCount = 0;
 
         vm.SetRecognitionRegionCommand.Execute(null);
@@ -283,20 +352,236 @@ public sealed class RecognitionPageViewModelTests
     }
 
     [Fact]
-    public void Refresh_failure_logs_once_and_reports_error_status()
+    public async Task Picker_failure_logs_once_and_preserves_the_selection()
     {
-        var (vm, _, _, logger) = CreateVm(new ThrowingCatalog());
-        vm.ExcludeHandle = (nint)1;
+        var (vm, _, _, logger) = CreateVm(new ThrowingPicker());
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        vm.SelectedWindow = target;
 
-        vm.RefreshCommand.Execute(null);
+        await vm.SelectWindowCommand.ExecuteAsync(null);
 
-        // All error paths funnel into SetError, logging once; the status is mapped via the resolver to a fallback error code.
+        Assert.Equal(target, vm.SelectedWindow);
+        Assert.False(vm.IsSelectingWindow);
         Assert.Equal(1, logger.ErrorCount);
-        Assert.Equal(ErrorCodes.WindowEnumerationFailed, vm.Status);
+        Assert.Equal(ErrorCodes.WindowSelectionFailed, vm.Status);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_picker_keeps_the_active_session_and_thumbnail()
+    {
+        var picker = new DeferredPicker();
+        var controller = new RecordingAutoController();
+        var (vm, _, _, _) = CreateVm(picker, controller: controller);
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        vm.SelectedWindow = target;
+        vm.AutoRecognitionEnabled = true;
+        await vm.RecognizeCommand.ExecuteAsync(null);
+
+        var picking = vm.SelectWindowCommand.ExecuteAsync(null);
+        Assert.True(vm.IsPickingWindow);
+        Assert.False(vm.RecognizeCommand.CanExecute(null));
+        Assert.False(vm.SetRecognitionRegionCommand.CanExecute(null));
+        picker.Completion.SetResult(null);
+        await picking;
+
+        Assert.Equal(target, vm.SelectedWindow);
+        Assert.True(controller.IsRunning);
+        Assert.False(vm.IsSelectingWindow);
+    }
+
+    [Fact]
+    public async Task Selection_captures_the_full_client_once_without_recognition_and_stops_preview_capture()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(-200, 40, 100, 100));
+        var capture = new PreviewCapture();
+        var controller = new RecordingAutoController();
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowPicker(target), capture: capture, controller: controller);
+        var previews = new List<WindowPreviewEventArgs>();
+        vm.PreviewReady += (_, preview) => previews.Add(preview);
+        vm.AutoRecognitionEnabled = true;
+
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+
+        var preview = Assert.Single(previews);
+        Assert.Equal(target, vm.SelectedWindow);
+        Assert.Equal(target.Bounds, preview.Bounds);
+        Assert.Equal(vm.SelectionVersion, preview.Version);
+        Assert.True(preview.Animate);
+        Assert.True(vm.HasPreview);
+        Assert.Null(capture.Region);
+        Assert.Equal(1, capture.Calls);
+        Assert.True(capture.StopCount >= 1);
+        Assert.Equal(0, overlay.ShowCount);
+        Assert.Equal(0, controller.StartCount);
+    }
+
+    [Fact]
+    public async Task Reselecting_the_same_window_ends_recognition_and_replaces_the_preview()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var capture = new PreviewCapture();
+        var controller = new RecordingAutoController();
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), capture: capture, controller: controller);
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+        var version = vm.SelectionVersion;
+        vm.AutoRecognitionEnabled = true;
+        await vm.RecognizeCommand.ExecuteAsync(null);
+        Assert.True(controller.IsRunning);
+
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+
+        Assert.False(controller.IsRunning);
+        Assert.True(vm.SelectionVersion > version);
+        Assert.Equal(2, capture.Calls);
+        Assert.True(vm.HasPreview);
+    }
+
+    [Fact]
+    public async Task Failed_preview_keeps_the_new_target_and_retry_never_starts_recognition_or_flight()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var capture = new PreviewCapture { Failure = new InvalidOperationException("Capture failed.") };
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowPicker(target), capture: capture);
+        var previews = new List<WindowPreviewEventArgs>();
+        vm.PreviewReady += (_, preview) => previews.Add(preview);
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+
+        Assert.Equal(target, vm.SelectedWindow);
+        Assert.True(vm.HasPreviewError);
+        Assert.False(vm.HasPreview);
+        Assert.True(vm.RetryPreviewCommand.CanExecute(null));
+        capture.Failure = null;
+        await vm.RetryPreviewCommand.ExecuteAsync(null);
+
+        Assert.False(Assert.Single(previews).Animate);
+        Assert.True(vm.HasPreview);
+        Assert.False(vm.HasPreviewError);
+        Assert.Equal(0, overlay.ShowCount);
+    }
+
+    [Fact]
+    public async Task Disposing_during_capture_rejects_a_late_frame()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var capture = new PreviewCapture { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), capture: capture);
+        var published = 0;
+        vm.PreviewReady += (_, _) => published++;
+        var selecting = vm.SelectWindowCommand.ExecuteAsync(null);
+        Assert.Equal(1, capture.Calls);
+        vm.Dispose();
+        capture.Pending.SetResult(new CapturedFrame(100, 100, new byte[40000]));
+        await selecting;
+
+        Assert.Equal(0, published);
+        Assert.False(vm.HasPreview);
+        Assert.False(vm.IsSelectingWindow);
+    }
+
+    [Fact]
+    public async Task Minimizing_and_restoring_a_target_does_not_refresh_its_static_preview()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var tracker = new FakeTargetWindowTracker();
+        var capture = new PreviewCapture();
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), tracker, capture: capture);
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+        tracker.Publish(tracker.Current! with { IsMinimized = true });
+        Assert.True(vm.HasPreview);
+        Assert.Equal(ResourceKeys.WindowPicker_Unavailable, vm.TargetStatus);
+        tracker.Publish(tracker.Current! with { IsMinimized = false });
+        Assert.Equal(ResourceKeys.WindowPicker_Selected, vm.TargetStatus);
+        Assert.Equal(1, capture.Calls);
+    }
+
+    [Fact]
+    public async Task Closing_the_original_target_does_not_cancel_picking_another_window()
+    {
+        var original = new WindowTarget((nint)2, "Original", new ScreenRect(0, 0, 100, 100));
+        var next = new WindowTarget((nint)3, "Next", original.Bounds);
+        var picker = new DeferredPicker();
+        var tracker = new FakeTargetWindowTracker();
+        var (vm, _, _, _) = CreateVm(picker, tracker, capture: new PreviewCapture());
+        vm.SelectedWindow = original;
+        var selecting = vm.SelectWindowCommand.ExecuteAsync(null);
+        tracker.Publish(tracker.Current! with { IsValid = false });
+        Assert.Null(vm.SelectedWindow);
+        Assert.True(vm.IsPickingWindow);
+        picker.Completion.SetResult(next);
+        await selecting;
+        Assert.Equal(next, vm.SelectedWindow);
+        Assert.True(vm.HasPreview);
+    }
+
+    [Fact]
+    public async Task Closing_the_committed_target_rejects_a_late_preview()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var tracker = new FakeTargetWindowTracker();
+        var capture = new PreviewCapture { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), tracker, capture: capture);
+        var published = 0;
+        vm.PreviewReady += (_, _) => published++;
+        var selecting = vm.SelectWindowCommand.ExecuteAsync(null);
+        tracker.Publish(tracker.Current! with { IsValid = false });
+        capture.Pending.SetResult(new CapturedFrame(100, 100, new byte[40000]));
+        await selecting;
+        Assert.Null(vm.SelectedWindow);
+        Assert.False(vm.HasPreview);
+        Assert.Equal(0, published);
+        Assert.Equal(ResourceKeys.WindowPicker_Closed, vm.TargetStatus);
+    }
+
+    [Fact]
+    public async Task Preview_retry_cannot_stop_an_active_recognition_session()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var capture = new PreviewCapture { Failure = new InvalidOperationException("Capture failed.") };
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), capture: capture);
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+        await vm.RecognizeCommand.ExecuteAsync(null);
+        var stopped = capture.StopCount;
+        Assert.False(vm.RetryPreviewCommand.CanExecute(null));
+        await vm.RetryPreviewCommand.ExecuteAsync(null);
+        Assert.Equal(stopped, capture.StopCount);
+        vm.HideCommand.Execute(null);
+        Assert.True(vm.RetryPreviewCommand.CanExecute(null));
+    }
+
+    [Theory]
+    [InlineData(ErrorCodes.WindowCaptureTimedOut)]
+    [InlineData(ErrorCodes.WindowCaptureNotSupported)]
+    [InlineData(ErrorCodes.WindowCaptureFailed)]
+    public async Task Preview_failures_keep_their_stable_localized_code_and_stop_capture(string code)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var capture = new PreviewCapture { Failure = new WindowsPlatformException(code, "Native capture failed.") };
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), capture: capture);
+        await vm.SelectWindowCommand.ExecuteAsync(null);
+        Assert.Equal(target, vm.SelectedWindow);
+        Assert.True(vm.HasPreviewError);
+        Assert.Equal(code, vm.PreviewError);
+        Assert.True(capture.StopCount >= 1);
+    }
+
+    [Fact]
+    public async Task Cancelling_preview_preserves_the_committed_target_and_allows_retry()
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var capture = new PreviewCapture { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var (vm, _, _, logger) = CreateVm(new FakeWindowPicker(target), capture: capture);
+        var selecting = vm.SelectWindowCommand.ExecuteAsync(null);
+        vm.CancelWindowSelection();
+        capture.Pending.SetResult(new CapturedFrame(100, 100, new byte[40000]));
+        await selecting;
+        Assert.Equal(target, vm.SelectedWindow);
+        Assert.False(vm.HasPreview);
+        Assert.True(vm.RetryPreviewCommand.CanExecute(null));
+        Assert.Equal(0, logger.ErrorCount);
     }
 
     private static (RecognitionPageViewModel ViewModel, FakeOverlay Overlay, FakeStringLocalizer Localizer, FakeLogger Logger) CreateVm(
-        IWindowCatalog catalog,
+        IWindowPicker picker,
         ITargetWindowTracker? tracker = null,
         IWindowWordRecognizer? recognizer = null,
         IWindowFrameCapture? capture = null,
@@ -312,19 +597,47 @@ public sealed class RecognitionPageViewModelTests
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
-        return (new RecognitionPageViewModel(catalog, workflow, regionSelector ?? new FakeRegionSelector(), settings ?? new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
+        return (new RecognitionPageViewModel(picker, workflow, regionSelector ?? new FakeRegionSelector(), settings ?? new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
     }
 
-    private sealed class FakeWindowCatalog : IWindowCatalog
+    private sealed class FakeWindowPicker : IWindowPicker
     {
         private readonly IReadOnlyList<WindowTarget> _windows;
-        public FakeWindowCatalog(params WindowTarget[] windows) => _windows = windows;
-        public IReadOnlyList<WindowTarget> ListVisibleWindows() => _windows;
+        public FakeWindowPicker(params WindowTarget[] windows) => _windows = windows;
+        public WindowTarget? Highlighted { get; private set; }
+        public void Highlight(WindowTarget? target) => Highlighted = target;
+        public Task<WindowTarget?> PickAsync(CancellationToken cancellationToken = default) => Task.FromResult(_windows.FirstOrDefault());
     }
 
-    private sealed class ThrowingCatalog : IWindowCatalog
+    private sealed class ThrowingPicker : IWindowPicker
     {
-        public IReadOnlyList<WindowTarget> ListVisibleWindows() => throw new InvalidOperationException("boom");
+        public void Highlight(WindowTarget? target) { }
+        public Task<WindowTarget?> PickAsync(CancellationToken cancellationToken = default) => throw new InvalidOperationException("Picker failed.");
+    }
+
+    private sealed class DeferredPicker : IWindowPicker
+    {
+        public WindowTarget? Highlighted { get; private set; }
+        public void Highlight(WindowTarget? target) => Highlighted = target;
+        public TaskCompletionSource<WindowTarget?> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<WindowTarget?> PickAsync(CancellationToken cancellationToken = default) => Completion.Task;
+    }
+
+    private sealed class PreviewCapture : IWindowFrameCapture
+    {
+        public int Calls { get; private set; }
+        public int StopCount { get; private set; }
+        public ScreenRect? Region { get; private set; }
+        public Exception? Failure { get; set; }
+        public TaskCompletionSource<CapturedFrame>? Pending { get; set; }
+        public void Stop() => StopCount++;
+        public Task<CapturedFrame> CaptureAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null)
+        {
+            Calls++;
+            Region = region;
+            if (Failure is not null) throw Failure;
+            return Pending?.Task ?? Task.FromResult(new CapturedFrame(100, 100, new byte[40000]));
+        }
     }
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
@@ -446,6 +759,12 @@ public sealed class RecognitionPageViewModelTests
             if (ThrowOnRefresh)
                 throw new InvalidOperationException("refresh failed");
             return Current ?? throw new InvalidOperationException("No target attached.");
+        }
+
+        public void Publish(TargetWindowSnapshot snapshot)
+        {
+            Current = snapshot;
+            Changed?.Invoke(this, snapshot);
         }
 
         public void Detach()

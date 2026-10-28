@@ -1,7 +1,6 @@
 using KotobaSenpai.Core.Workflow;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Errors;
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using KotobaSenpai.App.Resources;
@@ -19,7 +18,6 @@ namespace KotobaSenpai.App.ViewModels;
 /// </summary>
 public sealed partial class RecognitionPageViewModel : ObservableObject, IDisposable
 {
-    private readonly IWindowCatalog _catalog;
     private readonly WordOverlayApplicationService _workflow;
     private readonly IRegionSelector _regionSelector;
     private readonly ISettingsService _settings;
@@ -38,7 +36,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private Func<string> _renderStatus = () => string.Empty;
 
     public RecognitionPageViewModel(
-        IWindowCatalog catalog,
+        IWindowPicker picker,
         WordOverlayApplicationService workflow,
         IRegionSelector regionSelector,
         ISettingsService settings,
@@ -49,7 +47,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         IAutoRecognitionController? autoRecognitionController = null,
         IWindowFrameCapture? capture = null)
     {
-        _catalog = catalog;
+        _picker = picker;
         _workflow = workflow;
         _regionSelector = regionSelector;
         _settings = settings;
@@ -62,11 +60,9 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         _autoRecognitionEnabled = IsEnabled(_settings.GetValue(AutoRecognitionSettings.EnabledKey));
 
         _localizer.CultureChanged += OnCultureChanged;
+        if (_tracker is not null) _tracker.Changed += OnTargetStateChanged;
         SetStatus(ResourceKeys.Status_SelectTarget);
     }
-
-    /// <summary>List of selectable target windows.</summary>
-    public ObservableCollection<WindowTarget> Windows { get; } = new();
 
     /// <summary>The currently selected target window.</summary>
     [ObservableProperty]
@@ -80,16 +76,13 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     [ObservableProperty]
     private string _status = string.Empty;
 
-    /// <summary>
-    /// The main window's own handle, used to exclude itself from the candidate list.
-    /// Set by the view after the window handle is created (HWND is a platform detail that should not leak into the domain).
-    /// </summary>
-    public nint ExcludeHandle { get; set; }
-
     /// <summary>Updates the status prompt after a window is selected.</summary>
     partial void OnSelectedWindowChanged(WindowTarget? value)
     {
+        if (!_committingSelection) _selectionCancellation?.Cancel();
+        InvalidatePreview();
         EndRecognitionSession();
+        _awaitingRecognition = value is not null;
         try
         {
             if (value is null)
@@ -102,48 +95,31 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
             _logger.LogError(ex, "Failed to attach the selected target window");
         }
 
+        if (!Equals(SelectedWindow, value)) return;
+        UpdateSelectionHighlight();
+        NotifySelectionState();
         SetStatus(value is null ? ResourceKeys.Status_SelectTarget : ResourceKeys.Status_Selected,
                   value?.Title ?? string.Empty);
     }
 
-    /// <summary>Re-enumerates visible windows and refreshes the candidate list.</summary>
-    [RelayCommand]
-    private void Refresh()
-    {
-        try
-        {
-            var previousHandle = SelectedWindow?.Handle;
-            var current = _catalog.ListVisibleWindows()
-                .Where(window => window.Handle != ExcludeHandle)
-                .OrderBy(window => window.Title, StringComparer.CurrentCultureIgnoreCase)
-                .ToArray();
-            Windows.Clear();
-            foreach (var window in current) Windows.Add(window);
-            SelectedWindow = Windows.FirstOrDefault(window => window.Handle == previousHandle)
-                ?? Windows.FirstOrDefault();
-            SetStatus(Windows.Count == 0 ? ResourceKeys.Status_NoWindows : ResourceKeys.Status_WindowsFound,
-                      Windows.Count);
-        }
-        catch (Exception ex)
-        {
-            SetError(ex, ErrorCodes.WindowEnumerationFailed);
-        }
-    }
-
     /// <summary>Captures and recognizes Japanese words in the current window, drawing underlines.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanOperate))]
     private async Task RecognizeAsync()
     {
+        if (!CanOperate()) return;
         if (SelectedWindow is null)
         {
             SetStatus(ResourceKeys.Status_SelectTargetFirst);
             return;
         }
 
+        _awaitingRecognition = false;
+        UpdateSelectionHighlight();
         var target = SelectedWindow;
         var version = ++_sessionVersion;
         using var cancellation = new CancellationTokenSource();
         _manualRecognition = cancellation;
+        NotifySelectionState();
         try
         {
             _autoRecognitionController?.Stop();
@@ -174,13 +150,15 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         finally
         {
             if (ReferenceEquals(_manualRecognition, cancellation)) _manualRecognition = null;
+            NotifySelectionState();
         }
     }
 
     /// <summary>Hides the underline overlay.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanOperate))]
     private void Hide()
     {
+        if (!CanOperate()) return;
         EndRecognitionSession();
         SetStatus(ResourceKeys.Status_Hidden);
     }
@@ -194,12 +172,17 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         _regionSelector.StopFlashing();
         _capture?.Stop();
         _workflow.Hide();
+        NotifySelectionState();
     }
 
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        UpdateSelectionHighlight();
+        CancelWindowSelection();
+        InvalidatePreview();
+        if (_tracker is not null) _tracker.Changed -= OnTargetStateChanged;
         _localizer.CultureChanged -= OnCultureChanged;
         EndRecognitionSession();
     }
@@ -247,9 +230,10 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Opens the interactive region selector over the selected window to set the recognition sub-region.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanOperate))]
     private void SetRecognitionRegion()
     {
+        if (!CanOperate()) return;
         if (SelectedWindow is null)
         {
             SetStatus(ResourceKeys.Status_SelectTargetFirst);
@@ -290,5 +274,8 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 
     /// <summary>On culture switch, re-derives <see cref="Status"/> from the current state and notifies the view.</summary>
     private void OnCultureChanged(object? sender, EventArgs e)
-        => Status = _renderStatus();
+    {
+        Status = _renderStatus();
+        NotifySelectionState();
+    }
 }

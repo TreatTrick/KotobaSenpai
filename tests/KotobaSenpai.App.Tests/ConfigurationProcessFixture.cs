@@ -10,6 +10,9 @@ public static class ConfigurationProcessFixture
     [STAThread]
     public static int Main()
     {
+        var pickerDirectory = Environment.GetEnvironmentVariable("KOTOBA_PICKER_FIXTURE_DIRECTORY");
+        if (pickerDirectory is not null)
+            return WindowPickerFixture.Run(pickerDirectory, Environment.GetEnvironmentVariable("KOTOBA_PICKER_FIXTURE_MODE") ?? "host");
         var directory = Environment.GetEnvironmentVariable("KOTOBA_PROCESS_TEST_DIRECTORY");
         var lockName = Environment.GetEnvironmentVariable("KOTOBA_PROCESS_TEST_LOCK");
         if (directory is null || lockName is null)

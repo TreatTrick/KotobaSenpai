@@ -61,6 +61,7 @@ public sealed class PhrasePopupThemeTests
                 Assert.NotEqual(backgrounds[0], backgrounds[1]);
                 Assert.Equal(backgrounds[0], backgrounds[2]);
                 CheckAgentSettingsPresentation(application);
+                CheckWindowSelectionPresentation(application);
                 completion.SetResult();
             }
             catch (Exception exception)
@@ -77,6 +78,77 @@ public sealed class PhrasePopupThemeTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         return completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    private static void CheckWindowSelectionPresentation(Application application)
+    {
+        var previousLocalizer = LocalizationHost.Localizer;
+        var localizer = new ResourceManagerStringLocalizer();
+        LocalizationHost.Localizer = localizer;
+        try
+        {
+            foreach (var culture in new[] { "en", "zh-CN" })
+            foreach (var theme in new[] { ApplicationTheme.Light, ApplicationTheme.Dark })
+            foreach (var width in new[] { 420, 660 })
+            {
+                localizer.ApplyCulture(CultureInfo.GetCultureInfo(culture));
+                ApplicationThemeManager.Apply(theme, WindowBackdropType.Mica, true);
+                var page = new RecognitionPage
+                {
+                    DataContext = new
+                    {
+                        HasPreview = true, HasPreviewError = false, TargetTitle = "Preview target", TargetStatus = "Selected",
+                        PreviewError = string.Empty, SelectionButtonText = localizer.Get("WindowPicker_Select"),
+                        SelectWindowCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }),
+                        RetryPreviewCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(() => { }),
+                    },
+                };
+                var image = Assert.IsType<System.Windows.Controls.Image>(page.FindName("TargetPreviewImage"));
+                var source = BitmapSource.Create(320, 180, 96, 96, PixelFormats.Bgra32, null,
+                    Enumerable.Repeat((byte)255, 320 * 180 * 4).ToArray(), 320 * 4);
+                image.Source = source;
+                var frame = new Border { Child = page, Background = (Brush)application.FindResource("SolidBackgroundFillColorBaseBrush") };
+                TextElement.SetForeground(frame, (Brush)application.FindResource("TextFillColorPrimaryBrush"));
+                var host = new Window { Content = frame, Width = width, Height = 720, Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
+                try
+                {
+                    host.Show();
+                    var settled = new DispatcherFrame();
+                    var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+                    timer.Tick += (_, _) => { timer.Stop(); settled.Continue = false; };
+                    timer.Start();
+                    Dispatcher.PushFrame(settled);
+                    image.Source = source;
+                    host.UpdateLayout();
+                    Assert.Same(source, image.Source);
+                    Assert.True(image.IsVisible);
+                    var card = Assert.IsType<KotobaSenpai.App.Controls.SettingsCard>(page.FindName("TargetWindowCard"));
+                    Assert.Same(application.FindResource("CardBackgroundFillColorDefaultBrush"), card.Background);
+                    Assert.Equal("Preview target", System.Windows.Automation.AutomationProperties.GetName(card));
+                    Assert.Equal("Preview target", System.Windows.Automation.AutomationProperties.GetName(image));
+                    Assert.Equal(Stretch.Uniform, image.Stretch);
+                    var preview = Assert.IsType<Border>(VisualTreeHelper.GetParent(VisualTreeHelper.GetParent(image)));
+                    Assert.Equal(144, preview.ActualWidth);
+                    Assert.Equal(preview.ActualWidth, preview.ActualHeight);
+                    Assert.Same(application.FindResource("LayerFillColorDefaultBrush"), preview.Background);
+                    Assert.Empty(Descendants(page).OfType<ComboBox>());
+                    var select = Assert.IsAssignableFrom<System.Windows.Controls.Button>(page.FindName("SelectWindowButton"));
+                    Assert.Equal(localizer.Get("WindowPicker_Select"), select.Content);
+                    Assert.Equal(select.Content, System.Windows.Automation.AutomationProperties.GetName(select));
+                    Assert.True(select.TranslatePoint(new Point(select.ActualWidth, 0), page).X <= page.ActualWidth);
+                    var bitmap = new RenderTargetBitmap(width, 720, 96, 96, PixelFormats.Pbgra32);
+                    bitmap.Render(frame);
+                    var previewDirectory = Path.Combine(AppContext.BaseDirectory, "previews");
+                    Directory.CreateDirectory(previewDirectory);
+                    using var file = File.Create(Path.Combine(previewDirectory, $"window-picker-{culture}-{theme}-{width}.png"));
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    encoder.Save(file);
+                }
+                finally { host.Close(); }
+            }
+        }
+        finally { LocalizationHost.Localizer = previousLocalizer; }
     }
 
     private static void CheckAgentSettingsPresentation(Application application)

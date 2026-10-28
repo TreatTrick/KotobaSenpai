@@ -9,6 +9,20 @@ namespace KotobaSenpai.App.Resources;
 /// </summary>
 public static class ResourceKeys
 {
+    public const string WindowPicker_Select = nameof(WindowPicker_Select);
+    public const string WindowPicker_Reselect = nameof(WindowPicker_Reselect);
+    public const string WindowPicker_Retry = nameof(WindowPicker_Retry);
+    public const string WindowPicker_Hint = nameof(WindowPicker_Hint);
+    public const string WindowPicker_Empty = nameof(WindowPicker_Empty);
+    public const string WindowPicker_Untitled = nameof(WindowPicker_Untitled);
+    public const string WindowPicker_EmptyHint = nameof(WindowPicker_EmptyHint);
+    public const string WindowPicker_Selected = nameof(WindowPicker_Selected);
+    public const string WindowPicker_Picking = nameof(WindowPicker_Picking);
+    public const string WindowPicker_Loading = nameof(WindowPicker_Loading);
+    public const string WindowPicker_Unavailable = nameof(WindowPicker_Unavailable);
+    public const string WindowPicker_Closed = nameof(WindowPicker_Closed);
+    public const string WindowPicker_PreviewFailed = nameof(WindowPicker_PreviewFailed);
+
     public const string OverlayAppearance_OutlineColorMode = nameof(OverlayAppearance_OutlineColorMode);
     public const string OverlayAppearance_OutlineColorModeDescription = nameof(OverlayAppearance_OutlineColorModeDescription);
     public const string OverlayAppearance_OutlineAuto = nameof(OverlayAppearance_OutlineAuto);
@@ -51,7 +65,6 @@ public static class ResourceKeys
     public const string ExplanationLanguage_Saved = nameof(ExplanationLanguage_Saved);
     public const string ExplanationLanguage_Invalid = nameof(ExplanationLanguage_Invalid);
     public const string ExplanationLanguage_SaveFailed = nameof(ExplanationLanguage_SaveFailed);
-    public const string Button_RefreshWindows = nameof(Button_RefreshWindows);
     public const string Button_Recognize = nameof(Button_Recognize);
     public const string Button_Hide = nameof(Button_Hide);
     public const string Button_SetRecognitionRegion = nameof(Button_SetRecognitionRegion);
@@ -82,8 +95,6 @@ public static class ResourceKeys
     public const string Status_SelectTarget = nameof(Status_SelectTarget);
     public const string Status_SelectTargetFirst = nameof(Status_SelectTargetFirst);
     public const string Status_Selected = nameof(Status_Selected);
-    public const string Status_NoWindows = nameof(Status_NoWindows);
-    public const string Status_WindowsFound = nameof(Status_WindowsFound);
     public const string Status_Recognizing = nameof(Status_Recognizing);
     public const string Status_NoWords = nameof(Status_NoWords);
     public const string Status_WordsRecognized = nameof(Status_WordsRecognized);
