@@ -7,27 +7,32 @@ Reuse successful sentence-level LLM analysis within recognition sessions using a
 ## Requirements
 
 ### Requirement: 句子级 LLM 结果内存缓存
-系统 SHALL 在 `PhraseAnalysisOrchestrator` 层维护一个基于内存的 LLM 分析结果缓存，以句子文本（`SegmentText`）为 key，缓存成功完成的 `PhraseAnalysisResult`。缓存 SHALL NOT 持久化到磁盘，仅在内存中存在。
 
-#### Scenario: 缓存成功结果
-- **WHEN** 某句子分段的 LLM 分析成功完成（`Succeeded == true`）
-- **THEN** 该分段的 `SegmentText` → `PhraseAnalysisResult` 映射 SHALL 被写入缓存
+系统 SHALL 在 `PhraseAnalysisOrchestrator` 中维护仅驻留内存的成功分析结果缓存，匹配条件为句子原文 `SegmentText` 和该请求使用的语言名称。成功结果 SHALL 按请求使用的语言写入缓存；失败结果不得缓存。缓存 SHALL 不持久化到磁盘，并继续遵守原有 50 条上限和先进先出淘汰规则。
+
+#### Scenario: 按请求语言保存成功结果
+- **WHEN** 句段分析成功
+- **THEN** 系统按句子原文和该请求实际使用的语言名称保存结果
 
 #### Scenario: 不缓存失败结果
-- **WHEN** 某句子分段的 LLM 分析失败
-- **THEN** 该分段的结果 SHALL NOT 被写入缓存，下次请求时仍会重新调用 LLM
+- **WHEN** 句段分析失败
+- **THEN** 结果不进入缓存，下次识别仍可重新请求
 
-#### Scenario: 缓存命中
-- **WHEN** 新一轮分析中某分段的 `SegmentText` 与缓存中某条目的 key 完全匹配
-- **THEN** 系统 SHALL 直接返回缓存的 `PhraseAnalysisResult`，SHALL NOT 向 LLM 发送请求
+#### Scenario: 同语言缓存命中
+- **WHEN** 新分析中的句子原文和语言名称与现有缓存完全匹配
+- **THEN** 系统直接复用分析结果，不向模型发送请求
 
 #### Scenario: 缓存未命中
-- **WHEN** 新一轮分析中某分段的 `SegmentText` 不在缓存中
-- **THEN** 系统 SHALL 向 LLM 发送请求，并在成功后将结果写入缓存
+- **WHEN** 缓存中不存在匹配的句子原文与语言名称组合
+- **THEN** 系统发出模型请求，并在成功后按该请求使用的语言写入缓存
 
-#### Scenario: 跨轮次保持缓存
-- **WHEN** 第一轮识别缓存了句子 A 的结果，第二轮识别（增量模式）仍然包含句子 A
-- **THEN** 第二轮识别 SHALL 直接使用第一轮的缓存结果
+#### Scenario: 同语言跨轮复用
+- **WHEN** 第一轮已缓存句子，第二轮增量识别仍有该句子，且有效语言未改变
+- **THEN** 第二轮复用第一轮缓存，不重复调用模型
+
+#### Scenario: 相同原文但语言不同
+- **WHEN** 句子原文已有中文缓存，新分析要求法语
+- **THEN** 中文缓存不能作为法语结果使用
 
 ### Requirement: 缓存容量上限
 缓存 SHALL 设置最大容量上限（默认 50 条），当缓存满时 SHALL 淘汰最早的条目（FIFO）。
@@ -41,12 +46,17 @@ Reuse successful sentence-level LLM analysis within recognition sessions using a
 - **THEN** 系统 SHALL 移除最早的条目，为新结果腾出空间
 
 ### Requirement: 缓存随新会话重置
-当系统执行全变模式识别时，LLM 结果缓存 SHALL 被完全清空。
 
-#### Scenario: 全变模式清空缓存
-- **WHEN** 自动检测到文本全变或用户手动触发全新识别
-- **THEN** 所有缓存条目 SHALL 被清除
+全变模式识别、用户手动发起全新识别或有效释义语言变化时，系统 SHALL 清空缓存及关联的会话分组标识。有效语言不变的普通增量识别 SHALL 保留缓存。清空与结果写入继续使用原有流程，语言设置不新增请求拦截机制。
 
-#### Scenario: 增量模式保留缓存
-- **WHEN** 系统执行增量模式识别
-- **THEN** 缓存 SHALL 不被清空，未变化的句子继续使用缓存
+#### Scenario: 全变或全新识别清空缓存
+- **WHEN** 自动识别判定文本全变，或用户手动发起全新识别
+- **THEN** 缓存和关联会话分组标识被清空
+
+#### Scenario: 普通增量识别保留缓存
+- **WHEN** 增量识别开始且有效语言未改变
+- **THEN** 缓存不被清空，未变化句子继续复用
+
+#### Scenario: 释义语言改变时清空缓存
+- **WHEN** 自定义设置或跟随模式下的界面切换使有效语言改变
+- **THEN** 清空缓存和关联会话分组标识，之后的分析按新的语言名称查询和保存结果

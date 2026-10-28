@@ -23,15 +23,27 @@ TBD - created by archiving change phase1-window-word-overlay. Update Purpose aft
 - **THEN** 覆盖层仍允许显示，保持目标相邻的非置顶 Z 顺序，不在遮挡窗口上方绘制目标标记
 
 ### Requirement: Window selection
-系统 SHALL 枚举当前可见的顶层窗口，并允许用户选择一个具有有效窗口句柄的目标窗口。选择结果 SHALL 只保存在当前进程内，不得写入截图或原始窗口内容。
+系统 SHALL 通过显式桌面拾取允许用户选择一个具有有效 HWND 和客户区的可见顶层窗口，并遵循 `visual-window-picker` 的候选、输入、取消和预览规则。系统 SHALL 移除目标窗口下拉列表、刷新入口及启动时自动选择首个窗口的行为。选择结果和用于确认选择的静态缩略图 SHALL 只保存在当前进程内，不得将窗口截图或原始内容持久化或上传。选择只绑定目标和获取预览，SHALL NOT 自动启动 OCR、LLM 或自动识别。
 
 #### Scenario: Select a visible window
-- **WHEN** 用户打开窗口选择列表并选择一个可见顶层窗口
-- **THEN** 系统返回该窗口的句柄、标题和屏幕边界，并将其设为当前目标窗口
+- **WHEN** 用户点击选择按钮、移动到一个有效可见顶层窗口并单击确认
+- **THEN** 系统返回该窗口的句柄、标题和客户区屏幕边界，将其设为当前目标，并按视觉拾取规格获取预览
 
 #### Scenario: Ignore unusable windows
-- **WHEN** 枚举过程中窗口不可见、已销毁或没有有效客户区
-- **THEN** 系统不把该窗口放入可选列表，并继续枚举其他窗口
+- **WHEN** 拾取候选不可见、已销毁、已最小化或没有有效客户区
+- **THEN** 系统不允许确认该候选，并继续允许选择其他有效窗口或取消
+
+#### Scenario: Start without an implicit target
+- **WHEN** 主窗口初始化且用户尚未显式选择窗口
+- **THEN** 当前目标为空，界面显示选择提示，不枚举并自动选中首个窗口
+
+#### Scenario: Cancel without replacing the selection
+- **WHEN** 用户进入拾取后按 Esc，且原目标仍然有效
+- **THEN** 系统恢复主窗口并保留原目标及原静态缩略图，不提交悬停候选
+
+#### Scenario: Recognize only after an explicit recognition request
+- **WHEN** 用户完成窗口选择或预览重试，但未请求开始识别
+- **THEN** 系统保持待识别状态和彩虹边框，不调用 OCR 或 LLM，也不因自动识别设置已开启而启动新的识别会话；用户请求开始识别时先移除彩虹边框
 
 ### Requirement: OCR words with coordinates
 系统 SHALL 对当前目标窗口执行一次日语 OCR，并为每个非空识别字符返回原文、字符框和相对于捕获帧的坐标。字符框坐标 SHALL 使用非负宽高的物理像素矩形。识别字符 SHALL 按阅读顺序排列（第一阶段仅横排，自左向右；竖排属第二阶段）。
@@ -60,14 +72,14 @@ TBD - created by archiving change phase1-window-word-overlay. Update Purpose aft
 - **THEN** 系统依据实际捕获像素与屏幕物理像素比例转换，而不是直接把 DIP 当成像素
 
 ### Requirement: Word underline overlay
-系统 SHALL 在目标窗口客户区上方显示透明、点击穿透的覆盖层,并为每个本地分词词的**每个 rect** 在其对应行的词框下方绘制横线(跨行词因此有多条下划线,各贴各自行底);对每个已验证 phrase group,系统 SHALL 为其每个 part 的每个行内几何绘制可识别的组合词块标记。覆盖层 SHALL 使用目标 HWND owner 和非置顶 Z 顺序，目标被其他窗口遮挡时不得显示在遮挡窗口上方。覆盖层刷新时 SHALL 整体替换当前词和 group 列表,隐藏时 SHALL 清除已绘制标记并恢复点击穿透；临时隐藏 SHALL 保留保存的会话数据，显式结束会话 SHALL 清理保存的数据并阻止晚到结果重新发布。悬停一个词的**任一 rect** 时,系统 SHALL 高亮该词的**全部 rect**(整词一起变色);悬停 group 的任一 part 时,系统 SHALL 高亮该 group 的全部 parts。启用短语分析时，覆盖层 MAY 先显示本地振假名而暂不绘制下划线；分析批次完成后的刷新 SHALL 仅为成功句段中的词绘制下划线。关闭短语分析时 SHALL 保持原有本地下划线行为。目标窗口移动、缩放或 DPI 变化时，覆盖层 SHALL 按目标跟踪快照重映射已有归一化几何，跟踪事件本身不得重新 OCR；独立启用的自动识别仍按采样和像素变化规则运行。目标被隐藏、最小化或完整客户区的合并遮挡比例严格超过 30% 时 SHALL 隐藏覆盖层并停止 hover 交互但保留当前会话，目标恢复可见、未最小化且合并遮挡比例不超过 30% 时 SHALL 恢复最新保存的会话；目标失效、销毁或切换时 SHALL 清理当前会话。
+系统 SHALL 在目标窗口客户区上方显示透明、点击穿透的覆盖层,并为每个可下划线的本地分词词的**每个 rect** 在其对应行的词框下方绘制横线(跨行词因此有多条下划线,各贴各自行底);对每个已验证 phrase group,系统 SHALL 为其每个 part 的每个行内几何绘制可识别的组合词块标记。覆盖层 SHALL 使用目标 HWND owner 和非置顶 Z 顺序，目标被其他窗口遮挡时不得显示在遮挡窗口上方。覆盖层刷新时 SHALL 整体替换当前词和 group 列表,隐藏时 SHALL 清除已绘制标记并恢复点击穿透；临时隐藏 SHALL 保留保存的会话数据，显式结束会话 SHALL 清理保存的数据并阻止晚到结果重新发布。悬停一个词的**任一 rect** 时,系统 SHALL 高亮该词的**全部 rect**(整词一起变色);悬停 group 的任一 part 时,系统 SHALL 高亮该 group 的全部 parts。短语分析 SHALL 作为识别的必需阶段；覆盖层 MAY 先显示本地振假名而暂不绘制下划线，分析批次完成后的刷新 SHALL 仅为成功句段中的词绘制下划线。旧配置中的禁用值 SHALL NOT 绕过云端分析或提前生成成功下划线。目标窗口移动、缩放或 DPI 变化时，覆盖层 SHALL 按目标跟踪快照重映射已有归一化几何，跟踪事件本身不得重新 OCR；独立启用的自动识别仍按采样和像素变化规则运行。目标被隐藏、最小化或完整客户区的合并遮挡比例严格超过 30% 时 SHALL 隐藏覆盖层并停止 hover 交互但保留当前会话，目标恢复可见、未最小化且合并遮挡比例不超过 30% 时 SHALL 恢复最新保存的会话；目标失效、销毁或切换时 SHALL 清理当前会话。
 
 #### Scenario: Draw one underline per eligible word
 - **WHEN** 当前会话包含一个或多个可下划线的本地分词词
 - **THEN** 覆盖层为每个词的每个 rect 各绘制一条与词框宽度对齐的横线(跨行词每行一条),线条位于各自词框底部内侧且至少有 1px 可见线宽
 
 #### Scenario: Draw one underline per word
-- **WHEN** 当前会话包含一个或多个本地分词词
+- **WHEN** 当前会话包含一个或多个已通过云端分析、可下划线的本地分词词
 - **THEN** 覆盖层为每个词的每个 rect 各绘制一条与词框宽度对齐的横线(跨行词每行一条),线条位于各自词框底部内侧且至少有 1px 可见线宽
 
 #### Scenario: Draw local word and phrase markers
@@ -75,16 +87,16 @@ TBD - created by archiving change phase1-window-word-overlay. Update Purpose aft
 - **THEN** 覆盖层绘制本地词横线,并为 group 的所有 part 几何绘制对应标记
 
 #### Scenario: Show furigana while analysis is pending
-- **WHEN** 首次或全变识别的短语分析已启用但尚未完成，且目标满足显示资格
+- **WHEN** 首次或全变识别的必需短语分析尚未完成，且目标满足显示资格
 - **THEN** 覆盖层显示本地振假名,不绘制下划线或 group 标记
 
 #### Scenario: Restrict lines after partial analysis
 - **WHEN** 最终会话同时包含成功句段词和失败句段词
 - **THEN** 只有成功句段词绘制下划线,失败句段词仍可显示振假名但没有下划线
 
-#### Scenario: Preserve disabled-analysis behavior
-- **WHEN** 短语分析未启用
-- **THEN** 本地词和振假名按原有行为同时显示下划线
+#### Scenario: Ignore legacy disabled-analysis settings
+- **WHEN** 旧配置包含短语分析禁用值且用户开始识别
+- **THEN** 系统仍执行必需的云端分析，本地振假名可先显示，只有成功句段中的词显示下划线
 
 #### Scenario: Refresh and hide overlay
 - **WHEN** 用户重新识别窗口或关闭覆盖层

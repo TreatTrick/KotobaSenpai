@@ -29,16 +29,17 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 - **WHEN** 所有回退键都未命中
 - **THEN** 系统返回空结果，不抛未处理异常
 
-### Requirement: Dictionary popup on hover
-系统 SHALL 在覆盖层悬停某个本地合并词时，弹出释义小窗，显示`头词 + [词性] + [读音] + LLM 最佳中文释义 + 语法`，并定位在该词包围盒下方且不遮挡该词。头词、读音与活用型由本地 jmdic/UniDic 提供，语境词性、最佳中文释义与语法来自 `llm-word-meanings`。本地 JMdict 的英文释义不再作为弹窗语义来源。
+### Requirement: 词典悬停弹窗使用模型目标语言释义
 
-#### Scenario: Show popup on hover
-- **WHEN** 鼠标悬停在某个有本地合并词的词上
-- **THEN** 系统弹出释义窗，展示头词、语境词性、读音与 LLM 返回的最佳中文释义与语法
+系统 SHALL 在覆盖层悬停本地合并词时展示词头、词性、读音、模型最佳释义和语法说明，并将弹窗定位在词的包围盒下方且不遮挡词。词头、读音和活用型 SHALL 继续由本地 JMdict 与 UniDic 提供；语境词性、释义及语法 SHALL 遵守 `llm-word-meanings` 的约定，其中解释字段使用对应请求的目标语言。JMdict 的英文释义 SHALL 不重新成为弹窗的解释来源。
 
-#### Scenario: No entry shows minimal content
-- **WHEN** 悬停词无词典条目或 LLM 词条
-- **THEN** 系统展示该词的读音与"未收录/无释义"提示，而不是空白或崩溃
+#### Scenario: 悬停后显示目标语言解释
+- **WHEN** 鼠标悬停在已有本地合并结果和有效模型词项的词上
+- **THEN** 弹窗显示词头、语境词性、读音及模型返回的目标语言释义和语法说明
+
+#### Scenario: 无有效词项时保留最小内容
+- **WHEN** 悬停词缺少词典条目或模型词项
+- **THEN** 弹窗按现有回退规则显示本地读音及界面语言的“未收录／无释义”提示，不为空白或崩溃，也不改用本地英文释义
 
 ### Requirement: Precomputed span lookup
 系统 SHALL 使用识别阶段生成的完整词块 span 和词典结果进行悬停查词。已确认未命中的 span 也 SHALL 直接显示未收录，不得再次按鼠标所在字符发起单字符最长匹配。
@@ -61,4 +62,3 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 #### Scenario: Update on word switch
 - **WHEN** 悬停切换到另一个词
 - **THEN** 弹窗内容更新为新词的释义，不残留旧词内容
-

@@ -125,14 +125,18 @@ At startup the system SHALL set `Thread.CurrentThread.CurrentUICulture` and `Cul
 - **WHEN** the application is starting up
 - **THEN** `CurrentUICulture` and `DefaultThreadCurrentUICulture` MUST be configured prior to the first `IStringLocalizer.Get` call or XAML localization resolution.
 
-### Requirement: 本地化器被非 View 消费方使用
-`IStringLocalizer` 端口 SHALL 可供 ViewModel 之外的消费方使用，包括 Platform 层服务（如 LLM prompt 构建器），以便在不将资源文件放入 Core 或 Platform 的前提下，按当前激活文化解析长文本本地化资源（例如 system prompt 文本）。解析 SHALL 在调用时继续反映当前文化。
+### Requirement: 界面本地化与模型指令分别处理
 
-#### Scenario: LLM prompt 构建器按键解析
-- **WHEN** 当前激活文化为 `en` 时，LLM prompt 构建器以某个 prompt 资源键调用 `IStringLocalizer.Get`
-- **THEN** 返回的字符串 MUST 为该 prompt 的英文资源值。
+`IStringLocalizer` SHALL 继续定义在 Core、实现在 App，并供视图模型及其他需要界面语言文本的消费方使用；Core 和 Platform SHALL 不新增界面本地化资源或界面文化解析逻辑。本地化文本 SHALL 在调用时反映当前界面文化。模型分析指令 SHALL 改为独立的英文模板；模型的回答语言 SHALL 来自句段分析开始时读取的当前生效设置。设置页、弹窗标题、错误和状态提示 SHALL 继续按界面语言本地化。
 
-#### Scenario: 构建器在下次请求时反映文化切换
-- **WHEN** 两次短语分析请求之间激活文化发生变化
-- **THEN** 第二次请求 MUST 针对新文化解析 prompt，因为解析发生在调用时而非构造时。
+#### Scenario: 界面消费方按当前语言解析资源
+- **WHEN** 界面为英文，消费方通过 `IStringLocalizer.Get` 读取设置说明或状态资源
+- **THEN** 返回对应英文资源值；现有中性英文回退规则继续适用
 
+#### Scenario: 切换界面后刷新界面文本
+- **WHEN** 界面语言从中文切换为英文
+- **THEN** 设置标签、按钮、状态和弹窗标题刷新为英文；分析指令仍使用英文模板，不重新翻译整份提示词
+
+#### Scenario: 回答语言可以独立于界面
+- **WHEN** 界面为中文、自定义释义语言为“法语”
+- **THEN** 弹窗标题和无释义提示仍为中文，模型的释义和语法说明按法语要求生成

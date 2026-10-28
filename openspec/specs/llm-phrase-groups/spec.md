@@ -3,39 +3,41 @@
 ## Purpose
 TBD - created by archiving change add-llm-phrase-groups. Update Purpose after archive.
 ## Requirements
-### Requirement: Analyze grounded sentence segments with an LLM
-The system SHALL submit one locally segmented OCR sentence segment at a time to a provider-neutral phrase analysis port. The request SHALL include the segment text, stable token references with UniDic metadata, and locally resolved continuous JMdict span summaries. The request SHALL NOT include screenshots, window coordinates, window titles, or API keys. The provider transport SHALL be wire-protocol-pluggable: the same semantic request SHALL be deliverable over OpenAI Chat Completions, Anthropic Messages, or OpenAI Responses wire formats, selected by configuration, without changing the port contract. 在增量识别场景中，系统 SHALL 在发送 LLM 请求前检查该分段的 `SegmentText` 是否命中 LLM 结果缓存；命中时 SHALL NOT 发送请求，而是直接使用缓存结果。
+### Requirement: 按当前语言分析有本地依据的句段
 
-#### Scenario: Build a grounded phrase request
-- **WHEN** a sentence segment has UniDic tokens and local continuous spans
-- **THEN** the analyzer request contains the original segment text, unique token IDs, each token's surface/lemma/reading/POS/conjugation metadata, and the local span summaries
+系统 SHALL 通过与提供方无关的分析接口按句段提交 OCR 原文、稳定词元引用、UniDic 元数据及本地连续 JMdict 词块摘要，并携带该次分析开始时读取的当前语言名称。语义请求内容 SHALL 不包含截图、坐标、窗口标题或 API Key。相同语义内容 SHALL 可以按配置通过三种现有协议发送。调用模型前 SHALL 检查句子原文和语言名称是否匹配现有缓存；只有两者都匹配时才直接复用。
 
-#### Scenario: Do not send screenshot data
-- **WHEN** phrase analysis is requested for OCR output
-- **THEN** the provider payload contains no image bytes, screen rectangles, target window title, or API key
+#### Scenario: 请求具有完整本地依据
+- **WHEN** 句段具有 UniDic 词元和本地连续词块
+- **THEN** 请求包含原文、唯一词元标识、表面形式、词典形、读音、词性、活用信息、本地词块摘要和语言名称
 
-#### Scenario: Deliver the request over any supported protocol
-- **WHEN** the configured protocol is OpenAI Chat Completions, Anthropic Messages, or OpenAI Responses
-- **THEN** the same semantic request is serialized into that protocol's wire envelope and delivered to that protocol's endpoint path
+#### Scenario: 不发送截图等无关数据
+- **WHEN** 应用请求模型分析 OCR 结果
+- **THEN** 语义请求不含图片字节、屏幕矩形、窗口标题或 API Key；认证继续按协议放在请求头中
 
-#### Scenario: Cache hit bypasses LLM call
-- **WHEN** a sentence segment's `SegmentText` matches a cached LLM result
-- **THEN** the system SHALL NOT send a provider request and SHALL use the cached `PhraseAnalysisResult` as if it were freshly returned
+#### Scenario: 三种协议均能传递相同语义
+- **WHEN** 配置为 OpenAI Chat Completions、Anthropic Messages 或 OpenAI Responses
+- **THEN** 同一份语义请求被包装为对应协议的请求格式，并发送到对应接口
 
-#### Scenario: Cache miss still calls LLM
-- **WHEN** a sentence segment's `SegmentText` does not match any cached entry
-- **THEN** the system SHALL send a provider request and cache the result on success
+#### Scenario: 相同句子和语言命中缓存
+- **WHEN** 句子原文与有效语言都匹配当前有效缓存
+- **THEN** 系统直接复用缓存结果，不调用模型
 
-### Requirement: Return only combination groups
-The LLM response SHALL contain zero or more meaningful combination groups and SHALL NOT be required to repeat ordinary tokens or continuous spans already supplied by local analysis. The response SHALL include a request-local model group ID, group type, one or more parts, a label, a Chinese meaning, and a Chinese grammar explanation.
+#### Scenario: 文本或语言不匹配时重新分析
+- **WHEN** 缓存不存在，或句子原文、有效语言任一不匹配
+- **THEN** 系统按该次分析读取的语言调用模型，并按该请求使用的语言缓存成功结果
 
-#### Scenario: Return a non-continuous group
-- **WHEN** the segment contains a meaningful expression whose parts are separated by other tokens
-- **THEN** the response contains one group with multiple parts, a label, a Chinese meaning, and a Chinese grammar explanation
+### Requirement: 只返回有解释价值的组合组
 
-#### Scenario: Return no combination
-- **WHEN** the segment contains no combination worth explaining
-- **THEN** the response contains an empty group list and local token/span results remain usable
+`groups[]` SHALL 包含零个或多个有教学价值的组合，不要求在组数组中重复本地已知的普通词或连续词块。每个组 SHALL 包含请求内组标识、组类型、一个或多个组成部分、原文标签，以及用请求有效语言书写的 `meaning` 和 `grammar`。词级解释 SHALL 继续由独立的 `words[]` 承载。
+
+#### Scenario: 返回不连续组合
+- **WHEN** 句段中存在被其他词元隔开的有意义表达
+- **THEN** 结果包含带有多个部分的组、原文标签，以及目标语言的释义和语法说明
+
+#### Scenario: 没有组合时保留本地结果
+- **WHEN** 句段不存在值得解释的组合
+- **THEN** 返回空的组数组，本地词元和词块结果继续可用
 
 ### Requirement: Reference existing contiguous token parts
 Every group part SHALL be a non-empty, ordered list of token IDs from the same request segment. Token IDs within one part SHALL represent a contiguous token sequence. A group SHALL contain one or more parts, and a token SHALL NOT be repeated within the same group. Different groups MAY reference overlapping tokens.
@@ -71,23 +73,23 @@ The provider SHALL return only a request-local model group ID. After validation,
 - **THEN** the application assigns different session group IDs and does not merge their highlights
 
 ### Requirement: Preserve local fallback
-The system SHALL complete and expose local UniDic/JMdict words and continuous spans even when phrase analysis is unavailable. Missing API key, cancellation, timeout, transport failure, provider refusal, malformed JSON, and an all-invalid response SHALL produce a retryable warning state without crashing. When analysis is enabled, local words SHALL remain visible as furigana during the provider wait; only successful sentence segments SHALL receive underlines and provider-derived presentation after the complete batch. When analysis is disabled, the existing local underlines and readings SHALL be shown.
+识别 SHALL 始终执行云端短语分析流程，分析器作为识别服务的必需依赖，不提供独立本地分析的禁用分支。等待云端响应时 SHALL 先显示本地读音，不提前显示成功分析的下划线。缺少配置、取消、超时、传输失败、服务拒绝或无效响应 SHALL 返回可重试状态，不使应用崩溃，也不将本地结果伪装成完整分析成功。只有成功句段 SHALL 获得分析下划线和服务商解释。历史启用开关 SHALL 不影响该流程。
 
 #### Scenario: Provider timeout
-- **WHEN** the phrase provider times out
-- **THEN** the local overlay remains visible with furigana only, no invalid phrase group is rendered, and the UI exposes a retryable phrase-analysis failure state
+- **WHEN** 云端请求超时
+- **THEN** 保留本地读音且不渲染无效组合组，显示可重试失败状态，不进入独立本地模式
 
 #### Scenario: Missing API key
-- **WHEN** no provider key is configured while phrase analysis is enabled
-- **THEN** the application skips the provider call, keeps local furigana visible without underlines, and reports that phrase analysis requires configuration
+- **WHEN** 没有配置 API Key
+- **THEN** 分析流程返回需要配置的状态，保留读音预览而不显示分析成功的下划线，不发送缺少凭据的请求
 
-#### Scenario: Disabled provider analysis
-- **WHEN** phrase analysis is disabled
-- **THEN** the application keeps the existing local words, furigana, and underlines without waiting for a provider
+#### Scenario: Historical disabled value
+- **WHEN** 历史设置中的启用值为 false 或缺失
+- **THEN** 仍进入相同云端分析流程，不保留绕过分析的本地分支
 
 #### Scenario: Partial sentence failure
-- **WHEN** one sentence request succeeds and another request fails
-- **THEN** the final overlay underlines only words from the successful sentence, keeps furigana for both sentences, and reports a retryable warning
+- **WHEN** 一个句段成功而另一个句段失败
+- **THEN** 最终只对成功句段显示下划线，保留所有句段的读音，并报告可重试警告
 
 ### Requirement: Indicate group membership by member-word underline on hover
 系统 SHALL NOT 为语法组合组绘制独立的上划线。组的成员关系 SHALL 通过高亮其成员本地合并词的下划线来呈现：当某个组被悬停/选中时，覆盖该组 parts 所引用 token 的本地合并词 SHALL 将其下划线渲染为高亮样式，并显示该组的详情弹窗；组未被悬停时，成员词 SHALL 仅显示普通下划线，不呈现任何组信号。
@@ -122,4 +124,3 @@ The system SHALL complete and expose local UniDic/JMdict words and continuous sp
 #### Scenario: Each request carries only its segment's tokens
 - **WHEN** 一个句段发起 LLM 请求
 - **THEN** 该请求的 token 表只含本句段的 token,不含其他句段
-

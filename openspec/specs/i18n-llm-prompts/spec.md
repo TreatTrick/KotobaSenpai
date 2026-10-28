@@ -3,31 +3,63 @@
 ## Purpose
 TBD - created by archiving change i18n-llm-prompts. Update Purpose after archive.
 ## Requirements
-### Requirement: 本地化的请求 prompt
-LLM 短语分析请求 SHALL 通过 Core 的 `IStringLocalizer` 端口按当前激活的 UI 文化解析其 system prompt、用户指令与用户内容标签，而非使用硬编码文本。`zh-CN` 的 prompt 文本 SHALL 为简体中文，`en` 的 SHALL 为英文。
+### Requirement: 统一的英文分析提示词
 
-#### Scenario: 激活中文文化时生成中文 prompt
-- **WHEN** 当前 UI 文化为 `zh-CN` 且构建一个短语分析请求
-- **THEN** system prompt、用户指令与用户内容标签 MUST 为简体中文资源值。
+系统 SHALL 为短语分析使用统一维护的英文系统指令、用户指令和内容标签，独立于当前界面文化；日语原文、词元数据及用户填写的目标语言名称不受此限制。构建器 SHALL 使用该次句段分析开始时读取的语言名称字符串作为目标语言，不从提示词资源重新推断。系统 SHALL 不预先调用模型翻译提示词，也不保存生成的语言模板。
 
-#### Scenario: 激活英文文化时生成英文 prompt
-- **WHEN** 当前 UI 文化为 `en` 且构建一个短语分析请求
-- **THEN** system prompt、用户指令与用户内容标签 MUST 为英文资源值。
+#### Scenario: 中文界面仍使用英文指令
+- **WHEN** 界面为中文且构建短语分析请求
+- **THEN** 指令和内容标签为英文，目标语言使用该次句段分析读取的当前有效语言
 
-#### Scenario: 缺失翻译时回退到英文
-- **WHEN** 某个 prompt 资源键在当前激活文化下无对应值，但存在英文（中性）值
-- **THEN** prompt MUST 使用该英文值，与中性文化回退规则一致。
+#### Scenario: 英文界面使用同一套模板
+- **WHEN** 有效释义语言和协议相同，仅界面由中文切换为英文
+- **THEN** 分析指令与内容标签不因界面文化而换成另一套模板
 
-### Requirement: 本地化的响应
-system prompt SHALL 指示 LLM 以当前激活的 UI 语言书写每个 group 的 meaning 与 grammar 释义字段。`zh-CN` 的 prompt SHALL 指示简体中文，`en` 的 prompt SHALL 指示英文。
+#### Scenario: 不依赖缺失的本地化提示词资源
+- **WHEN** 当前界面资源不再含旧分析提示词键
+- **THEN** 构建器仍取得真实的英文指令，不发送资源键名或空提示词
 
-#### Scenario: 中文 prompt 产出中文释义
-- **WHEN** 当前 UI 文化为 `zh-CN`
-- **THEN** system prompt 指示 LLM 以简体中文书写 meaning 与 grammar 字段。
+### Requirement: 按有效语言生成释义和语法说明
 
-#### Scenario: 英文 prompt 产出英文释义
-- **WHEN** 当前 UI 文化为 `en`
-- **THEN** system prompt 指示 LLM 以英文书写 meaning 与 grammar 字段。
+系统 SHALL 在英文指令中明确要求 `groups[]` 与 `words[]` 的 `meaning` 和 `grammar` 都使用请求中的目标语言，不保留与该语言冲突的固定中文或英文释义要求。JSON 字段名、标识、日语词头、组标签、读音及现有词性标记 SHALL 保持既有约定。目标语言名称 SHALL 作为转义后的独立数据值放入固定指令，不作为任意模板内容执行。结构正确但语言不符的回答 SHALL 不触发新增的自动语言检测、静默语言回退或额外重试。
+
+固定系统指令 SHALL 说明：目标语言名称可以用中文、英文或该语言自己的文字填写，应按名称所指的语言生成解释，而非按名称的书写文字选择回答语言。指令 SHALL 明确要求解释字段统一使用目标语言，不因界面、英文提示词、日语原文或结构示例而更换语言，不额外附加双语解释；必要的日语原文引用可以保留，但解释文字仍使用目标语言。指令 SHALL 保留原有结构化输出要求，不因语言规则新增字段或输出结构之外的说明。验收 SHALL 检查这些指令是否存在，不将 JSON 结构校验当作实际输出语言正确的证明。
+
+#### Scenario: 简体中文释义覆盖词和组
+- **WHEN** 请求的有效语言为简体中文
+- **THEN** 指令同时要求词级和短语级的释义、语法说明使用简体中文
+
+#### Scenario: 英文释义不再被词级指令改回中文
+- **WHEN** 请求的有效语言为英文
+- **THEN** 词级和短语级指令统一要求英文，不出现固定生成中文释义的冲突指令
+
+#### Scenario: 自定义语言覆盖全部解释字段
+- **WHEN** 用户选择“法语”后开始新识别
+- **THEN** 指令同时要求两组数组中的 `meaning`、`grammar` 使用法语，而日语原文、词性标记和字段名不翻译
+
+#### Scenario: 中文名称也要求其所指语言
+- **WHEN** 目标名称为“法语”，系统指令是英文、界面是中文、被分析原文是日语
+- **THEN** 请求保留“法语”这个目标值，并含有按名称所指语言输出的明确规则，不要求模型跟随名称文字、界面或原文的语言
+
+#### Scenario: 英文名称与语言自称采用相同理解规则
+- **WHEN** 目标名称为“French”或“français”
+- **THEN** 请求保留对应目标值，固定指令使用相同的名称理解规则，不要求用户把名称转换成某种固定拼写
+
+#### Scenario: 结构示例不决定解释语言
+- **WHEN** 结构示例包含英文值，而请求的目标语言为法语
+- **THEN** 指令明确示例仅供结构参考，全部解释字段仍要求法语，不照抄英文示例值，也不额外附加英法双语解释
+
+#### Scenario: 日语引用与目标语言解释分别处理
+- **WHEN** 目标语言为法语，语法说明需要引用日语原词或例句
+- **THEN** 指令允许引用保留日语，但说明性文字仍要求法语，字段名和原文标记保持既有约定
+
+#### Scenario: 语言名称中的引号不破坏请求
+- **WHEN** 合法长度的语言名称包含引号或反斜杠
+- **THEN** 名称以转义后的数据值表示，不改变固定指令分隔或 JSON 请求结构
+
+#### Scenario: 不额外验证模型回答的语言
+- **WHEN** 模型返回通过既有结构和语义校验、但释义语言不符合要求的内容
+- **THEN** 首版不因此发出额外请求，不静默替换目标语言，继续按既有解析结果处理
 
 ### Requirement: 语言中性的 group 字段
 短语 group 的结构化输出 SHALL 对散文释义字段使用语言中性的字段名 `meaning` 与 `grammar`，与 LLM 被指示书写的语言无关。旧的 `meaningZh`/`grammarZh` 字段名 SHALL 不再被使用。
@@ -39,4 +71,3 @@ system prompt SHALL 指示 LLM 以当前激活的 UI 语言书写每个 group �
 #### Scenario: 解析器读取中性字段名
 - **WHEN** 解析一条提供方响应
 - **THEN** 解析器 SHALL 从每个 group 中读取 `meaning` 与 `grammar` 字段。
-
