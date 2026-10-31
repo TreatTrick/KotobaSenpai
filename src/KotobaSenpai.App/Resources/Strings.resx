@@ -318,7 +318,7 @@
     <value>Could not save the explanation language. Please try again.</value>
   </data>
   <data name="Agent_Title" xml:space="preserve"><value>Let AI configure your API</value></data>
-  <data name="Agent_Description" xml:space="preserve"><value>Copy the prompt to Codex, Claude Code, Cursor, WorkBuddy or another Agent and add your provider details and API key. Saving through the tool temporarily closes this app, interrupts recognition and reopens it afterward.</value></data>
+  <data name="Agent_Description" xml:space="preserve"><value>Copy the prompt to Codex, Claude Code, Cursor, WorkBuddy, DeepSeek Harness or another Agent and add your provider details and API key. Saving through the tool temporarily closes this app, interrupts recognition and reopens it afterward.</value></data>
   <data name="Agent_CopyPrompt" xml:space="preserve"><value>Copy setup prompt</value></data>
   <data name="Agent_Advanced" xml:space="preserve"><value>Advanced manual configuration</value></data>
   <data name="Agent_CheckConfiguration" xml:space="preserve"><value>Check configuration</value></data>

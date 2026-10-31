@@ -318,7 +318,7 @@
     <value>无法保存释义语言，请重试。</value>
   </data>
   <data name="Agent_Title" xml:space="preserve"><value>让 AI 帮我配置 API</value></data>
-  <data name="Agent_Description" xml:space="preserve"><value>复制提示词给 Codex、Claude Code、Cursor、WorkBuddy 等，补充服务商资料和 API Key 即可。工具保存配置时会暂时退出应用、中断当前识别，结束后重新打开。</value></data>
+  <data name="Agent_Description" xml:space="preserve"><value>复制提示词给 Codex、Claude Code、Cursor、WorkBuddy、DeepSeek Harness 等，补充服务商资料和 API Key 即可。工具保存配置时会暂时退出应用、中断当前识别，结束后重新打开。</value></data>
   <data name="Agent_CopyPrompt" xml:space="preserve"><value>复制配置提示词</value></data>
   <data name="Agent_Advanced" xml:space="preserve"><value>高级手动配置</value></data>
   <data name="Agent_CheckConfiguration" xml:space="preserve"><value>检测配置是否可用</value></data>
