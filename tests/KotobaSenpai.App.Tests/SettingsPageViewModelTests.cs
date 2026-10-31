@@ -11,6 +11,49 @@ namespace KotobaSenpai.App.Tests;
 public sealed class SettingsPageViewModelTests
 {
     [Theory]
+    [InlineData(0, "0")]
+    [InlineData(1, "1")]
+    [InlineData(0.75, "0.75")]
+    [InlineData(-1, "0")]
+    [InlineData(2, "1")]
+    public void Popup_transparency_saves_invariant_values_and_notifies_the_renderer(double requested, string expected)
+    {
+        var settings = new RecordingSettings();
+        using var page = Create(settings, new RecordingThemeStore());
+        Assert.Equal(0.5, page.OverlayAppearance.PopupBackgroundTransparency);
+        var notifications = 0;
+        page.OverlayAppearance.Changed += (_, _) => notifications++;
+        var previousCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            page.OverlayAppearance.PopupBackgroundTransparency = requested;
+            Assert.Equal(expected, settings.GetValue("PhrasePopupBackgroundTransparency"));
+            Assert.Equal(1, notifications);
+            page.OverlayAppearance.ResetColorsCommand.Execute(null);
+            using var restored = Create(settings, new RecordingThemeStore());
+            Assert.Equal(double.Parse(expected, CultureInfo.InvariantCulture), restored.OverlayAppearance.PopupBackgroundTransparency);
+        }
+        finally { CultureInfo.CurrentCulture = previousCulture; }
+    }
+
+    [Fact]
+    public void Failed_popup_transparency_save_preserves_the_committed_preference()
+    {
+        var settings = new RecordingSettings { FailWrites = true };
+        using var page = Create(settings, new RecordingThemeStore());
+        var notifications = 0;
+        page.OverlayAppearance.Changed += (_, _) => notifications++;
+
+        page.OverlayAppearance.PopupBackgroundTransparency = 0.75;
+
+        Assert.Equal(0.5, page.OverlayAppearance.PopupBackgroundTransparency);
+        Assert.Null(settings.GetValue("PhrasePopupBackgroundTransparency"));
+        Assert.NotEmpty(page.OverlayAppearance.PopupBackgroundTransparencyError);
+        Assert.Equal(0, notifications);
+    }
+
+    [Theory]
     [InlineData(0.1, "0.5")]
     [InlineData(2.25, "2.25")]
     [InlineData(10, "3")]

@@ -648,4 +648,10 @@ Meet your next word.</value>
   <data name="support.usage" xml:space="preserve"><value>You've used KotobaSenpai's recognition {0} times.</value></data>
   <data name="support.save.failed" xml:space="preserve"><value>Could not save support status. Please try again.</value></data>
   <data name="support.payment.payPal" xml:space="preserve"><value>PayPal</value></data>
+  <data name="PhrasePopup_BackgroundTransparency" xml:space="preserve">
+    <value>Popup background transparency</value>
+  </data>
+  <data name="PhrasePopup_BackgroundTransparencyDescription" xml:space="preserve">
+    <value>Adjust the word and phrase popup background. 0% is opaque, 100% is transparent. Text stays clear.</value>
+  </data>
 </root>

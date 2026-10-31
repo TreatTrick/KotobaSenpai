@@ -31,6 +31,8 @@ public static class ResourceKeys
     public const string OverlayAppearance_OutlineThickness = nameof(OverlayAppearance_OutlineThickness);
     public const string OverlayAppearance_OutlineThicknessDescription = nameof(OverlayAppearance_OutlineThicknessDescription);
     public const string OverlayAppearance_Title = nameof(OverlayAppearance_Title);
+    public const string PhrasePopup_BackgroundTransparency = nameof(PhrasePopup_BackgroundTransparency);
+    public const string PhrasePopup_BackgroundTransparencyDescription = nameof(PhrasePopup_BackgroundTransparencyDescription);
     public const string OverlayFuriganaColor = nameof(OverlayFuriganaColor);
     public const string OverlayFuriganaColor_Description = nameof(OverlayFuriganaColor_Description);
     public const string OverlayPitchHighColor = nameof(OverlayPitchHighColor);

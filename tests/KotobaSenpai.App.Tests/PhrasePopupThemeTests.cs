@@ -60,6 +60,18 @@ public sealed partial class PhrasePopupThemeTests
                     Assert.Same(content, popup.DataContext);
                     Assert.True(popup.IsVisible);
                     backgrounds.Add(Assert.IsType<SolidColorBrush>(frame.Background).Color);
+                    var bitmap = new RenderTargetBitmap((int)Math.Ceiling(popup.ActualWidth),
+                        (int)Math.Ceiling(popup.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+                    bitmap.Render(popup);
+                    var pixel = new byte[4];
+                    bitmap.CopyPixels(new Int32Rect(10, 10, 1, 1), pixel, 4, 0);
+                    Assert.InRange(pixel[3], (byte)127, (byte)128);
+                    var directory = Path.Combine(AppContext.BaseDirectory, "previews");
+                    Directory.CreateDirectory(directory);
+                    using var file = File.Create(Path.Combine(directory, $"phrase-popup-{theme}.png"));
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    encoder.Save(file);
                 }
                 Assert.NotEqual(backgrounds[0], backgrounds[1]);
                 Assert.Equal(backgrounds[0], backgrounds[2]);
@@ -505,6 +517,14 @@ public sealed partial class PhrasePopupThemeTests
     private static void CheckOverlayAppearancePresentation(Application application, SettingsPage page, Border frame,
         SettingsPageViewModel viewModel, string culture, ApplicationTheme theme)
     {
+        var transparency = Assert.IsType<Slider>(page.FindName("PopupTransparencySlider"));
+        Assert.Equal(0, transparency.Minimum);
+        Assert.Equal(1, transparency.Maximum);
+        Assert.Equal(viewModel.OverlayAppearance.PopupBackgroundTransparency, transparency.Value);
+        Assert.Empty(viewModel.OverlayAppearance.PopupBackgroundTransparencyError);
+        transparency.Value = 0.75;
+        Assert.Equal(0.75, viewModel.OverlayAppearance.PopupBackgroundTransparency);
+        transparency.Value = 0.5;
         var items = Assert.IsType<ItemsControl>(page.FindName("OverlayColorSettings"));
         Assert.Equal(4, items.Items.Count);
         var container = Assert.IsType<ContentPresenter>(items.ItemContainerGenerator.ContainerFromIndex(1));
@@ -603,7 +623,7 @@ public sealed partial class PhrasePopupThemeTests
         outlineThickness.Value = 1;
 
         var scroll = Assert.IsType<ScrollViewer>(page.FindName("SettingsScrollViewer"));
-        scroll.ScrollToVerticalOffset(((FrameworkElement)page.FindName("OverlayOutlineCard")).TranslatePoint(new Point(), (UIElement)scroll.Content).Y - 40);
+        scroll.ScrollToVerticalOffset(((FrameworkElement)page.FindName("PopupTransparencyCard")).TranslatePoint(new Point(), (UIElement)scroll.Content).Y - 40);
         var settled = new DispatcherFrame();
         var settleTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         settleTimer.Tick += (_, _) => { settleTimer.Stop(); settled.Continue = false; };

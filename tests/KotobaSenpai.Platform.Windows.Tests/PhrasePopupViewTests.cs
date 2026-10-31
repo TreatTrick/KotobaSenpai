@@ -21,6 +21,79 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 {
     [Fact]
+    public Task Background_defaults_to_half_transparency_without_fading_content() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            popup.ShowResult("Phrase", "Meaning", "", new ScreenRect(100, 100, 100, 30));
+            var background = Assert.IsType<Border>(popup.FindName("PopupFrame"));
+            var viewer = Assert.IsType<ScrollViewer>(popup.FindName("PopupScrollViewer"));
+            Assert.Equal(0.5, background.Opacity);
+            Assert.Equal(1, popup.Opacity);
+            Assert.Equal(1, viewer.Opacity);
+            Assert.False(background.IsAncestorOf(viewer), "Text must render outside the translucent background layer.");
+        }
+        finally { popup.Close(); }
+    });
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(0.75, 0.25)]
+    [InlineData(1, 0)]
+    public Task Background_transparency_changes_preserve_opaque_content(double transparency, double opacity) => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            popup.ShowResult("Phrase", "Meaning", "", new ScreenRect(100, 100, 100, 30));
+            var content = popup.DataContext;
+            popup.ApplyAppearance(new KotobaSenpai.Core.Settings.OverlayAppearance(PopupBackgroundTransparency: transparency));
+
+            Assert.Equal(opacity, Assert.IsType<Border>(popup.FindName("PopupFrame")).Opacity);
+            Assert.Equal(1, popup.Opacity);
+            Assert.Equal(1, Assert.IsType<TextBlock>(popup.FindName("Heading")).Opacity);
+            Assert.Same(content, popup.DataContext);
+            Assert.True(popup.IsVisible);
+        }
+        finally { popup.Close(); }
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Wrapped_sources_anchor_the_popup_to_the_hovered_line(bool phrase) => RunSta(() =>
+    {
+        var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 600 };
+        var overlay = new WpfOverlayRenderer.OverlayWindow();
+        try
+        {
+            target.Show();
+            var handle = new WindowInteropHelper(target).Handle;
+            Assert.True(Native.GetWindowRect(handle, out var targetBounds));
+            var first = new ScreenRect(targetBounds.Left + 100, targetBounds.Top + 50, 100, 40);
+            var hovered = new ScreenRect(targetBounds.Left + 300, targetBounds.Top + 200, 100, 40);
+            var word = new GroupedWord(new Token("Word", "Word", "Word", "", "", "",
+                new PartsOfSpeech("Noun", "", "", ""), "", "", "", 0), [first, hovered]);
+            var groups = phrase
+                ? new[] { new PhraseGroupView(Guid.NewGuid(), "Phrase", "Type", "Meaning", "", 0, 1, [new([first, hovered])]) }
+                : Array.Empty<PhraseGroupView>();
+            overlay.Render(WordOverlaySession.Start(new WindowTarget(handle, "Target",
+                new ScreenRect(targetBounds.Left, targetBounds.Top, targetBounds.Right - targetBounds.Left, targetBounds.Bottom - targetBounds.Top)),
+                [word], groups), 1d / 3);
+
+            overlay.PollHover(hovered.X + 20, hovered.Y + 10);
+
+            var popup = Assert.Single(overlay.OwnedWindows.OfType<PhrasePopup>());
+            Assert.True(popup.IsVisible);
+            Assert.True(Native.GetWindowRect(new WindowInteropHelper(popup).Handle, out var bounds));
+            Assert.Equal(hovered.Y, bounds.Top);
+            Assert.True(bounds.Left > hovered.Right || bounds.Right < hovered.X);
+        }
+        finally { overlay.Close(); target.Close(); }
+    });
+
+    [Fact]
     public Task Appearance_roles_share_the_live_renderer_and_edges_keep_source_alignment() => RunSta(() =>
     {
         var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 500 };
@@ -278,7 +351,8 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             popup.ShowResult("At edge", "Meaning text", "", edge);
             Assert.True(Native.GetWindowRect(handle, out bounds));
             Assert.True(bounds.Left >= workArea.Left && bounds.Right <= workArea.Right);
-            Assert.True(bounds.Top >= workArea.Top && bounds.Bottom <= edge.Y);
+            Assert.True(bounds.Top >= workArea.Top && bounds.Bottom <= workArea.Bottom);
+            Assert.True(bounds.Right <= edge.X || bounds.Bottom <= edge.Y);
             output.WriteLine("Native popup smoke: DPI={0}, work area=({1},{2})-({3},{4}).",
                 Native.GetDpiForWindow(handle), workArea.Left, workArea.Top, workArea.Right, workArea.Bottom);
         }
@@ -321,7 +395,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
     [InlineData(true, false)]
     [InlineData(false, true)]
     [InlineData(true, true)]
-    public Task Hover_retains_the_popup_during_transfer_and_after_entry(bool phrase, bool initiallyInside) => RunSta(() =>
+    public Task Hover_retains_the_popup_during_transfer_and_after_entry(bool phrase, bool longContent) => RunSta(() =>
     {
         var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 600 };
         var overlay = new WpfOverlayRenderer.OverlayWindow();
@@ -338,7 +412,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             var behind = new GroupedWord(new Token("Other", "Other", "Other", "", "", "",
                 new PartsOfSpeech("Noun", "", "", ""), "", "", "", 0),
                 new ScreenRect(source.X, source.Bottom + 10, 100, 30));
-            var meaning = initiallyInside
+            var meaning = longContent
                 ? string.Join(" ", Enumerable.Repeat("An explanation that exceeds the available monitor height.", 500))
                 : "Meaning";
             var groups = phrase
@@ -359,9 +433,11 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.True(popup.IsVisible);
             var snapshot = popup.DataContext;
             overlay.ApplyAppearance(new KotobaSenpai.Core.Settings.OverlayAppearance(UnderlineColor: "#000000",
-                OutlineColorMode: KotobaSenpai.Core.Settings.OverlayOutlineColorMode.White, OutlineThickness: 3));
+                OutlineColorMode: KotobaSenpai.Core.Settings.OverlayOutlineColorMode.White, OutlineThickness: 3,
+                PopupBackgroundTransparency: 0.75));
             Assert.True(popup.IsVisible);
             Assert.Same(snapshot, popup.DataContext);
+            Assert.Equal(0.25, Assert.IsType<Border>(popup.FindName("PopupFrame")).Opacity);
             Assert.Equal(annotations, canvas.Children.OfType<OverlayAnnotation>());
             Assert.Equal(positions, annotations.Select(element => (Canvas.GetLeft(element), Canvas.GetTop(element))));
             Assert.Contains(annotations, element => element.Role == OverlayColorRole.Hover);
@@ -370,43 +446,32 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.True(Native.GetWindowRect(handle, out var bounds));
             var margin = (int)Math.Floor(10 * Native.GetDpiForWindow(handle) / 96d);
 
-            if (initiallyInside)
-            {
-                Assert.InRange(source.Y + 10, bounds.Top, bounds.Bottom);
-                overlay.PollHover(bounds.Left - margin, source.Y + 10);
-                Assert.True(popup.IsVisible, "Initial overlap must use the entered popup's exit margin.");
-                Assert.Same(snapshot, popup.DataContext);
-                overlay.PollHover(bounds.Left - margin - 1, source.Y + 10);
-                Assert.False(popup.IsVisible);
-            }
-            else
-            {
-                overlay.PollHover(source.X + 20, source.Bottom + 1);
-                Assert.True(popup.IsVisible, "Moving across the gap toward the popup must not close it.");
-                Assert.Same(snapshot, popup.DataContext);
-                overlay.PollHover(bounds.Left + 20, bounds.Top + 20);
-                Assert.True(popup.IsVisible);
-                Assert.Same(snapshot, popup.DataContext);
-                overlay.PollHover(bounds.Left + 20, bounds.Bottom + margin);
-                Assert.True(popup.IsVisible, "The DPI-scaled exit margin must preserve the popup.");
-                overlay.PollHover(bounds.Left + 20, bounds.Bottom + margin + 1);
-                Assert.False(popup.IsVisible);
+            Assert.True(bounds.Left > source.Right, "The popup must open beside the source with a gap.");
+            overlay.PollHover(source.Right + 1, source.Y + 10);
+            Assert.True(popup.IsVisible, "Moving across the gap toward the popup must not close it.");
+            Assert.Same(snapshot, popup.DataContext);
+            overlay.PollHover(bounds.Left + 20, bounds.Top + 20);
+            Assert.True(popup.IsVisible);
+            Assert.Same(snapshot, popup.DataContext);
+            overlay.PollHover(bounds.Left + 20, bounds.Bottom + margin);
+            Assert.True(popup.IsVisible, "The DPI-scaled exit margin must preserve the popup.");
+            overlay.PollHover(bounds.Left + 20, bounds.Bottom + margin + 1);
+            Assert.False(popup.IsVisible);
 
-                overlay.PollHover(source.X + 20, source.Y + 10);
-                Assert.True(popup.IsVisible);
-                overlay.PollHover(bounds.Left + 20, bounds.Top + 20);
-                var returnY = bounds.Top - margin - 1;
-                Assert.InRange(returnY, source.Y, source.Bottom);
-                overlay.PollHover(source.X + 20, returnY);
-                Assert.False(popup.IsVisible, "Exiting onto the original source must not immediately reopen the popup.");
-                overlay.PollHover(source.X + 20, returnY);
-                Assert.False(popup.IsVisible);
-                overlay.PollHover(source.X - 10, source.Y + 10);
-                overlay.PollHover(source.X + 20, source.Y + 10);
-                Assert.True(popup.IsVisible);
-                overlay.PollHover(source.X + 20, source.Y - 10);
-                Assert.False(popup.IsVisible, "Moving away before entry must close the popup.");
-            }
+            overlay.PollHover(source.X + 20, source.Y + 10);
+            Assert.True(popup.IsVisible);
+            overlay.PollHover(bounds.Left + 20, bounds.Top + 20);
+            var returnX = bounds.Left - margin - 1;
+            Assert.InRange(returnX, source.X, source.Right);
+            overlay.PollHover(returnX, source.Y + 10);
+            Assert.False(popup.IsVisible, "Exiting onto the original source must not immediately reopen the popup.");
+            overlay.PollHover(returnX, source.Y + 10);
+            Assert.False(popup.IsVisible);
+            overlay.PollHover(source.X - 10, source.Y + 10);
+            overlay.PollHover(source.X + 20, source.Y + 10);
+            Assert.True(popup.IsVisible);
+            overlay.PollHover(source.X + 20, source.Y - 10);
+            Assert.False(popup.IsVisible, "Moving away before entry must close the popup.");
             overlay.PollHover(source.X + 20, source.Y + 10);
             Assert.True(popup.IsVisible);
             overlay.ClearSession();
@@ -442,6 +507,10 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 
             var handle = new WindowInteropHelper(popup).Handle;
             Assert.True(Native.GetWindowRect(handle, out var bounds));
+            var monitor = Native.MonitorFromWindow(handle, 2);
+            var info = new Native.MonitorInfo { Size = Marshal.SizeOf<Native.MonitorInfo>() };
+            Assert.True(Native.GetMonitorInfo(monitor, ref info));
+            Assert.InRange(bounds.Bottom - bounds.Top, 1, (int)Math.Floor((info.WorkArea.Bottom - info.WorkArea.Top) * 2d / 3));
             var point = (nint)(((bounds.Top + 40) << 16) | ((bounds.Left + 40) & 0xffff));
             Native.SendMessage(handle, 0x020A, (nint)unchecked((int)0xFF880000), point);
             Pump();

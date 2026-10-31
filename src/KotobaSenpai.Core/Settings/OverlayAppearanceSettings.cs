@@ -4,7 +4,7 @@ namespace KotobaSenpai.Core.Settings;
 
 public enum OverlayOutlineColorMode { Auto, Black, White }
 
-/// <summary>An immutable, platform-independent set of annotation colors and outline preferences.</summary>
+/// <summary>An immutable, platform-independent set of annotation and popup appearance preferences.</summary>
 public sealed record OverlayAppearance(
     string FuriganaColor = "#00BFFF",
     string PitchHighColor = "#FF4444",
@@ -12,7 +12,8 @@ public sealed record OverlayAppearance(
     string UnderlineColor = "#00BFFF",
     bool OutlineEnabled = true,
     OverlayOutlineColorMode OutlineColorMode = OverlayOutlineColorMode.Auto,
-    double OutlineThickness = 1);
+    double OutlineThickness = 1,
+    double PopupBackgroundTransparency = 0.5);
 
 public static class OverlayAppearanceSettings
 {
@@ -23,12 +24,14 @@ public static class OverlayAppearanceSettings
     public const string OutlineEnabledKey = "OverlayOutlineEnabled";
     public const string OutlineColorModeKey = "OverlayOutlineColorMode";
     public const string OutlineThicknessKey = "OverlayOutlineThickness";
+    public const string PopupBackgroundTransparencyKey = "PhrasePopupBackgroundTransparency";
     public const double MinimumOutlineThickness = 0.5;
     public const double MaximumOutlineThickness = 3;
     public static OverlayAppearance Default { get; } = new();
     public static IReadOnlyList<string> ColorKeys { get; } =
         [FuriganaColorKey, PitchHighColorKey, PitchLowColorKey, UnderlineColorKey];
-    public static IReadOnlyList<string> Keys { get; } = [.. ColorKeys, OutlineEnabledKey, OutlineColorModeKey, OutlineThicknessKey];
+    public static IReadOnlyList<string> Keys { get; } =
+        [.. ColorKeys, OutlineEnabledKey, OutlineColorModeKey, OutlineThicknessKey, PopupBackgroundTransparencyKey];
 
     public static OverlayAppearance Load(ISettingsService settings)
     {
@@ -47,7 +50,10 @@ public static class OverlayAppearanceSettings
             },
             double.TryParse(values[OutlineThicknessKey], NumberStyles.Float, CultureInfo.InvariantCulture, out var thickness)
                 && double.IsFinite(thickness) && thickness >= MinimumOutlineThickness && thickness <= MaximumOutlineThickness
-                ? thickness : Default.OutlineThickness);
+                ? thickness : Default.OutlineThickness,
+            double.TryParse(values[PopupBackgroundTransparencyKey], NumberStyles.Float, CultureInfo.InvariantCulture, out var transparency)
+                && double.IsFinite(transparency) && transparency >= 0 && transparency <= 1
+                ? transparency : Default.PopupBackgroundTransparency);
     }
 
     public static IReadOnlyDictionary<string, string?> Colors(OverlayAppearance appearance) => new Dictionary<string, string?>

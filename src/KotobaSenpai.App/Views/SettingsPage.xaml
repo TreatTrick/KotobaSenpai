@@ -49,6 +49,23 @@
         </Grid>
       </controls:SettingsCard>
       <TextBlock Text="{loc:Loc Key=OverlayAppearance_Title}" Style="{StaticResource SectionTitle}" />
+      <controls:SettingsCard x:Name="PopupTransparencyCard" Header="{loc:Loc Key=PhrasePopup_BackgroundTransparency}"
+                             Description="{loc:Loc Key=PhrasePopup_BackgroundTransparencyDescription}" Icon="{ui:SymbolIcon PaintBrush24}">
+        <controls:SettingsCard.DescriptionContent>
+          <TextBlock Text="{Binding OverlayAppearance.PopupBackgroundTransparencyError}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+        </controls:SettingsCard.DescriptionContent>
+        <Grid Width="{StaticResource SettingsInputWidth}">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="48" /></Grid.ColumnDefinitions>
+          <Slider x:Name="PopupTransparencySlider" Minimum="0" Maximum="1"
+                  Value="{Binding OverlayAppearance.PopupBackgroundTransparency, Mode=TwoWay}"
+                  TickFrequency="0.01" IsSnapToTickEnabled="True" SmallChange="0.01" LargeChange="0.1"
+                  VerticalAlignment="Center" MinHeight="{StaticResource FluentControlHeight}"
+                  AutomationProperties.Name="{loc:Loc Key=PhrasePopup_BackgroundTransparency}" />
+          <TextBlock Grid.Column="1" Text="{Binding OverlayAppearance.PopupBackgroundTransparency, StringFormat={}{0:P0}}"
+                     HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource Description}" Margin="0" />
+        </Grid>
+      </controls:SettingsCard>
       <ItemsControl x:Name="OverlayColorSettings" ItemsSource="{Binding OverlayAppearance.Colors}">
         <ItemsControl.ItemTemplate>
           <DataTemplate>

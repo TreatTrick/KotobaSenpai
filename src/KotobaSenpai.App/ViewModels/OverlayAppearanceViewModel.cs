@@ -37,7 +37,7 @@ public sealed partial class OutlineColorModeChoice(OverlayOutlineColorMode mode)
     [ObservableProperty] private string _name = string.Empty;
 }
 
-/// <summary>Saves annotation preferences atomically and publishes only successfully saved appearances.</summary>
+/// <summary>Saves overlay preferences atomically and publishes only successfully saved appearances.</summary>
 public sealed partial class OverlayAppearanceViewModel : ObservableObject
 {
     private readonly ISettingsService _settings;
@@ -45,6 +45,7 @@ public sealed partial class OverlayAppearanceViewModel : ObservableObject
     private string? _outlineErrorKey;
     private string? _outlineColorModeErrorKey;
     private string? _outlineThicknessErrorKey;
+    private string? _popupBackgroundTransparencyErrorKey;
     private string? _resetStatusKey;
 
     public OverlayAppearanceViewModel(ISettingsService settings, IStringLocalizer localizer)
@@ -65,6 +66,8 @@ public sealed partial class OverlayAppearanceViewModel : ObservableObject
     public string OutlineError => _outlineErrorKey is null ? string.Empty : _localizer.Get(_outlineErrorKey);
     public string OutlineColorModeError => _outlineColorModeErrorKey is null ? string.Empty : _localizer.Get(_outlineColorModeErrorKey);
     public string OutlineThicknessError => _outlineThicknessErrorKey is null ? string.Empty : _localizer.Get(_outlineThicknessErrorKey);
+    public string PopupBackgroundTransparencyError => _popupBackgroundTransparencyErrorKey is null
+        ? string.Empty : _localizer.Get(_popupBackgroundTransparencyErrorKey);
     public string ResetStatus => _resetStatusKey is null ? string.Empty : _localizer.Get(_resetStatusKey);
 
     public bool OutlineEnabled
@@ -112,6 +115,22 @@ public sealed partial class OverlayAppearanceViewModel : ObservableObject
                 ? null : ResourceKeys.OverlayAppearance_SaveFailed;
             OnPropertyChanged(nameof(OutlineThickness));
             OnPropertyChanged(nameof(OutlineThicknessError));
+        }
+    }
+
+    public double PopupBackgroundTransparency
+    {
+        get => Appearance.PopupBackgroundTransparency;
+        set
+        {
+            var transparency = Math.Clamp(double.IsFinite(value) ? value : OverlayAppearanceSettings.Default.PopupBackgroundTransparency, 0, 1);
+            if (transparency == PopupBackgroundTransparency)
+                return;
+            _popupBackgroundTransparencyErrorKey = Commit(new Dictionary<string, string?>
+                { [OverlayAppearanceSettings.PopupBackgroundTransparencyKey] = transparency.ToString(CultureInfo.InvariantCulture) })
+                ? null : ResourceKeys.OverlayAppearance_SaveFailed;
+            OnPropertyChanged(nameof(PopupBackgroundTransparency));
+            OnPropertyChanged(nameof(PopupBackgroundTransparencyError));
         }
     }
 
@@ -175,6 +194,7 @@ public sealed partial class OverlayAppearanceViewModel : ObservableObject
         OnPropertyChanged(nameof(OutlineError));
         OnPropertyChanged(nameof(OutlineColorModeError));
         OnPropertyChanged(nameof(OutlineThicknessError));
+        OnPropertyChanged(nameof(PopupBackgroundTransparencyError));
         OnPropertyChanged(nameof(ResetStatus));
     }
 }

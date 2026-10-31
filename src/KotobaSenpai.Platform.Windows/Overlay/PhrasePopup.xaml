@@ -178,67 +178,68 @@
     </ResourceDictionary>
   </Window.Resources>
 
-  <Border x:Name="PopupFrame" CornerRadius="{StaticResource FluentWindowRadius}"
-          Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
-          BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1">
-    <Border CornerRadius="{StaticResource FluentWindowRadius}" Background="{DynamicResource LayerFillColorDefaultBrush}">
-      <ScrollViewer x:Name="PopupScrollViewer" VerticalScrollBarVisibility="Auto"
-                    HorizontalScrollBarVisibility="Disabled" Padding="0">
-        <StackPanel x:Name="ContentPanel" Margin="{StaticResource FluentPopupPadding}">
-          <StackPanel Margin="0,0,0,24">
-            <TextBlock x:Name="Heading"
-                       Style="{StaticResource BodyText}" FontSize="{StaticResource FluentTitleFontSize}"
-                       LineHeight="{StaticResource FluentTitleLineHeight}" FontWeight="SemiBold">
-              <Run Text="{Binding Heading, Mode=OneTime}" /><Run Text="{Binding PitchMarker, Mode=OneTime}" Style="{StaticResource PitchAnnotation}" />
-            </TextBlock>
-            <WrapPanel>
-              <ContentControl x:Name="Reading" Content="{Binding Pronunciation, Mode=OneTime}" Style="{StaticResource PronunciationMetadata}" />
-              <ContentControl x:Name="PitchSection" Content="{Binding Pitch, Mode=OneTime}"
-                              Style="{StaticResource PitchMetadata}" />
-              <ContentControl x:Name="PosSection" Content="{Binding Pos, Mode=OneTime}"
-                              Style="{StaticResource PosMetadata}" />
-            </WrapPanel>
-          </StackPanel>
-          <ContentControl x:Name="MeaningSection" Content="{Binding Meaning, Mode=OneTime}"
-                          Tag="{Binding MeaningLabel, Mode=OneTime}" Style="{StaticResource Section}" />
-          <ContentControl x:Name="GrammarSection" Content="{Binding Grammar, Mode=OneTime}"
-                          Tag="{Binding GrammarLabel, Mode=OneTime}" Style="{StaticResource Section}"
-                          ContentTemplate="{StaticResource SecondaryCardContent}" />
-          <Border x:Name="WordsDivider" Height="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}">
-            <Border.Style>
-              <Style TargetType="Border">
-                <Setter Property="Margin" Value="-20,4,-20,20" />
-                <Style.Triggers>
-                  <DataTrigger Binding="{Binding Words.Count, Mode=OneTime}" Value="0">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                  </DataTrigger>
-                </Style.Triggers>
-              </Style>
-            </Border.Style>
-          </Border>
-          <ContentControl x:Name="WordsSection" Content="{Binding Words, Mode=OneTime}"
-                          Tag="{Binding WordsLabel, Mode=OneTime}">
-            <ContentControl.Style>
-              <Style TargetType="ContentControl" BasedOn="{StaticResource Section}">
-                <Setter Property="Margin" Value="0" />
-                <Style.Triggers>
-                  <DataTrigger Binding="{Binding Words.Count, Mode=OneTime}" Value="0">
-                    <Setter Property="Visibility" Value="Collapsed" />
-                  </DataTrigger>
-                </Style.Triggers>
-              </Style>
-            </ContentControl.Style>
-            <ContentControl.ContentTemplate>
-              <DataTemplate>
-                <ItemsControl ItemsSource="{Binding Mode=OneTime}" ItemTemplate="{StaticResource MemberWord}" />
-              </DataTemplate>
-            </ContentControl.ContentTemplate>
-          </ContentControl>
-          <ContentControl x:Name="NoMeaningHint" Content="{Binding NoMeaningHint, Mode=OneTime}"
-                          Style="{StaticResource Section}" Margin="0"
-                          ContentTemplate="{StaticResource SecondaryCardContent}" />
-        </StackPanel>
-      </ScrollViewer>
+  <Grid x:Name="PopupLayout">
+    <Border x:Name="PopupFrame" CornerRadius="{StaticResource FluentWindowRadius}"
+            Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+            BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1">
+      <Border CornerRadius="{StaticResource FluentWindowRadius}" Background="{DynamicResource LayerFillColorDefaultBrush}" />
     </Border>
-  </Border>
+    <ScrollViewer x:Name="PopupScrollViewer" VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled" Padding="0" Margin="1">
+      <StackPanel x:Name="ContentPanel" Margin="{StaticResource FluentPopupPadding}">
+        <StackPanel Margin="0,0,0,24">
+          <TextBlock x:Name="Heading"
+                     Style="{StaticResource BodyText}" FontSize="{StaticResource FluentTitleFontSize}"
+                     LineHeight="{StaticResource FluentTitleLineHeight}" FontWeight="SemiBold">
+            <Run Text="{Binding Heading, Mode=OneTime}" /><Run Text="{Binding PitchMarker, Mode=OneTime}" Style="{StaticResource PitchAnnotation}" />
+          </TextBlock>
+          <WrapPanel>
+            <ContentControl x:Name="Reading" Content="{Binding Pronunciation, Mode=OneTime}" Style="{StaticResource PronunciationMetadata}" />
+            <ContentControl x:Name="PitchSection" Content="{Binding Pitch, Mode=OneTime}"
+                            Style="{StaticResource PitchMetadata}" />
+            <ContentControl x:Name="PosSection" Content="{Binding Pos, Mode=OneTime}"
+                            Style="{StaticResource PosMetadata}" />
+          </WrapPanel>
+        </StackPanel>
+        <ContentControl x:Name="MeaningSection" Content="{Binding Meaning, Mode=OneTime}"
+                        Tag="{Binding MeaningLabel, Mode=OneTime}" Style="{StaticResource Section}" />
+        <ContentControl x:Name="GrammarSection" Content="{Binding Grammar, Mode=OneTime}"
+                        Tag="{Binding GrammarLabel, Mode=OneTime}" Style="{StaticResource Section}"
+                        ContentTemplate="{StaticResource SecondaryCardContent}" />
+        <Border x:Name="WordsDivider" Height="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}">
+          <Border.Style>
+            <Style TargetType="Border">
+              <Setter Property="Margin" Value="-20,4,-20,20" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Words.Count, Mode=OneTime}" Value="0">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
+        </Border>
+        <ContentControl x:Name="WordsSection" Content="{Binding Words, Mode=OneTime}"
+                        Tag="{Binding WordsLabel, Mode=OneTime}">
+          <ContentControl.Style>
+            <Style TargetType="ContentControl" BasedOn="{StaticResource Section}">
+              <Setter Property="Margin" Value="0" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding Words.Count, Mode=OneTime}" Value="0">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ContentControl.Style>
+          <ContentControl.ContentTemplate>
+            <DataTemplate>
+              <ItemsControl ItemsSource="{Binding Mode=OneTime}" ItemTemplate="{StaticResource MemberWord}" />
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
+        <ContentControl x:Name="NoMeaningHint" Content="{Binding NoMeaningHint, Mode=OneTime}"
+                        Style="{StaticResource Section}" Margin="0"
+                        ContentTemplate="{StaticResource SecondaryCardContent}" />
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
 </Window>

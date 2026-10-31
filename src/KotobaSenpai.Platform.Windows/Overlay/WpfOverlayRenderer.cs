@@ -257,6 +257,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         {
             if (_annotationStyle.Appearance == appearance)
                 return;
+            _phrasePopup.ApplyAppearance(appearance);
             _annotationStyle = new OverlayAnnotationStyle(appearance);
             foreach (var annotation in _canvas.Children.OfType<OverlayAnnotation>())
                 annotation.ApplyStyle(_annotationStyle);
@@ -795,7 +796,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                     foreach (var i in _hoveredGroupLines)
                         if (i >= 0 && i < _lineElements.Count)
                             _lineElements[i].Role = OverlayColorRole.Hover;
-                    ShowPhrasePopup(session.PhraseGroups[groupHit]);
+                    ShowPhrasePopup(session.PhraseGroups[groupHit], cursor);
                 }
                 else
                 {
@@ -820,7 +821,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 foreach (var li in WordLineIndices(hit))
                     if (li < _lineElements.Count)
                         _lineElements[li].Role = OverlayColorRole.Hover;
-            UpdatePopup(hit);
+            UpdatePopup(hit, cursor);
             _phrasePopup.ShouldRemainOpen(cursor.X, cursor.Y, isOverSource: true);
         }
 
@@ -862,9 +863,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private static bool Contains(ScreenRect rect, NativeMethods.POINT p)
             => p.X >= rect.X && p.X <= rect.Right && p.Y >= rect.Y && p.Y <= rect.Bottom;
 
-        private void ShowPhrasePopup(PhraseGroupView group)
+        private void ShowPhrasePopup(PhraseGroupView group, NativeMethods.POINT cursor)
         {
-            var anchor = group.Parts.SelectMany(part => part.Rects).FirstOrDefault();
+            var anchor = group.Parts.SelectMany(part => part.Rects).FirstOrDefault(rect => Contains(rect, cursor));
             if (anchor == default)
             {
                 _phrasePopup.HidePopup();
@@ -879,7 +880,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         }
 
         /// <summary>Shows the hovered word's LLM meaning popup, or headword + reading + "no meaning" when the provider returned none.</summary>
-        private void UpdatePopup(int hit)
+        private void UpdatePopup(int hit, NativeMethods.POINT cursor)
         {
             var session = _session;
             if (session is null || hit < 0 || hit >= session.Words.Count)
@@ -889,11 +890,12 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             }
 
             var word = session.Words[hit];
+            var anchor = word.Rects.First(rect => Contains(rect, cursor));
             var meaning = session.TryGetMeaning(word);
             if (meaning is not null)
-                _phrasePopup.ShowWordMeaning(meaning, word.Bounds);
+                _phrasePopup.ShowWordMeaning(meaning, anchor);
             else
-                _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), word.Bounds);
+                _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), anchor);
         }
 
         private void SetClickThrough()

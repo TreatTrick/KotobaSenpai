@@ -648,4 +648,10 @@ API Key：YOUR_API_KEY
   <data name="support.usage" xml:space="preserve"><value>你已经使用 KotobaSenpai 的识别功能 {0} 次。</value></data>
   <data name="support.save.failed" xml:space="preserve"><value>无法保存支持状态，请重试。</value></data>
   <data name="support.payment.payPal" xml:space="preserve"><value>PayPal</value></data>
+  <data name="PhrasePopup_BackgroundTransparency" xml:space="preserve">
+    <value>弹出框背景透明度</value>
+  </data>
+  <data name="PhrasePopup_BackgroundTransparencyDescription" xml:space="preserve">
+    <value>调整单词和词组弹出框的背景。0% 为不透明，100% 为完全透明，文字保持清晰。</value>
+  </data>
 </root>

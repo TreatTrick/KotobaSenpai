@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
+using KotobaSenpai.Core.Settings;
 using System.Runtime.InteropServices;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
@@ -26,6 +27,7 @@ public sealed partial class PhrasePopup : Window
     public PhrasePopup(IStringLocalizer? localizer = null, ILogger? logger = null)
     {
         InitializeComponent();
+        ApplyAppearance(OverlayAppearanceSettings.Default);
         // Resolve dynamic Fluent brushes from the host while keeping standalone use self-contained.
         if (Application.Current?.TryFindResource("TextFillColorPrimaryBrush") is System.Windows.Media.Brush
             && Application.Current.TryFindResource("SolidBackgroundFillColorBaseBrush") is System.Windows.Media.Brush)
@@ -76,6 +78,9 @@ public sealed partial class PhrasePopup : Window
             Hide();
     }
 
+    internal void ApplyAppearance(OverlayAppearance appearance)
+        => PopupFrame.Opacity = 1 - appearance.PopupBackgroundTransparency;
+
     protected override void OnMouseEnter(MouseEventArgs e)
     {
         base.OnMouseEnter(e);
@@ -105,22 +110,23 @@ public sealed partial class PhrasePopup : Window
     private void MeasureContent(ScreenRect workArea, double scale)
     {
         var availableWidth = workArea.Width / scale;
-        var availableHeight = workArea.Height / scale;
+        var availableHeight = Math.Floor(workArea.Height * 2d / 3) / scale;
+        MaxHeight = availableHeight;
         var padding = PopupScrollViewer.Padding.Left + PopupScrollViewer.Padding.Right
             + ContentPanel.Margin.Left + ContentPanel.Margin.Right
             + PopupFrame.BorderThickness.Left + PopupFrame.BorderThickness.Right;
 
         // Realize the current templates before choosing a readable column or a wider headword.
-        PopupFrame.Measure(new Size(availableWidth, double.PositiveInfinity));
-        PopupFrame.UpdateLayout();
+        PopupLayout.Measure(new Size(availableWidth, double.PositiveInfinity));
+        PopupLayout.UpdateLayout();
         Heading.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var readingWidth = Math.Min(availableWidth, Math.Max(ReadingWidth, Heading.DesiredSize.Width + padding));
-        PopupFrame.Measure(new Size(readingWidth, double.PositiveInfinity));
-        PopupFrame.UpdateLayout();
-        PopupFrame.Measure(new Size(readingWidth, double.PositiveInfinity));
-        Width = Math.Min(availableWidth, Math.Max(MinimumWidth, PopupFrame.DesiredSize.Width));
-        PopupFrame.Measure(new Size(Width, double.PositiveInfinity));
-        Height = Math.Min(availableHeight, PopupFrame.DesiredSize.Height);
+        PopupLayout.Measure(new Size(readingWidth, double.PositiveInfinity));
+        PopupLayout.UpdateLayout();
+        PopupLayout.Measure(new Size(readingWidth, double.PositiveInfinity));
+        Width = Math.Min(availableWidth, Math.Max(MinimumWidth, PopupLayout.DesiredSize.Width));
+        PopupLayout.Measure(new Size(Width, double.PositiveInfinity));
+        Height = Math.Min(availableHeight, PopupLayout.DesiredSize.Height);
     }
 
     private void Position(ScreenRect anchor)
@@ -152,8 +158,9 @@ public sealed partial class PhrasePopup : Window
                 HidePopup();
                 return;
             }
-            var gap = (int)Math.Ceiling(4 * scale);
+            var gap = (int)Math.Ceiling(8 * scale);
             var placement = CalculatePlacement(anchor, workArea, window.Right - window.Left, window.Bottom - window.Top, gap);
+            Height = placement.Height / scale;
             if (!Native.SetWindowPos(handle, nint.Zero, placement.X, placement.Y, placement.Width, placement.Height,
                 Native.SwpNoActivate | Native.SwpNoZOrder))
             {
@@ -171,11 +178,25 @@ public sealed partial class PhrasePopup : Window
     internal static ScreenRect CalculatePlacement(ScreenRect anchor, ScreenRect workArea, int width, int height, int gap)
     {
         width = Math.Min(width, workArea.Width);
-        height = Math.Min(height, workArea.Height);
+        height = Math.Min(height, (int)Math.Floor(workArea.Height * 2d / 3));
+        var leftSpace = anchor.X - gap - workArea.X;
+        var rightSpace = workArea.Right - anchor.Right - gap;
+        if (Math.Max(leftSpace, rightSpace) >= width)
+        {
+            var sideX = rightSpace >= leftSpace ? anchor.Right + gap : anchor.X - gap - width;
+            sideX = Math.Clamp(sideX, workArea.X, workArea.Right - width);
+            return new ScreenRect(sideX, Math.Clamp(anchor.Y, workArea.Y, workArea.Bottom - height), width, height);
+        }
+
+        // If neither side fits, use a vertical slot without clamping the popup over its source.
+        var aboveSpace = Math.Max(0, anchor.Y - gap - workArea.Y);
+        var belowSpace = Math.Max(0, workArea.Bottom - anchor.Bottom - gap);
+        var below = belowSpace >= height || belowSpace >= aboveSpace;
+        var verticalSpace = below ? belowSpace : aboveSpace;
+        if (verticalSpace > 0)
+            height = Math.Min(height, verticalSpace);
         var x = Math.Clamp(anchor.X, workArea.X, workArea.Right - width);
-        var y = anchor.Bottom + gap;
-        if (y + height > workArea.Bottom)
-            y = anchor.Y - height - gap;
+        var y = below ? anchor.Bottom + gap : anchor.Y - height - gap;
         y = Math.Clamp(y, workArea.Y, workArea.Bottom - height);
         return new ScreenRect(x, y, width, height);
     }
