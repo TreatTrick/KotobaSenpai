@@ -7,7 +7,7 @@ using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.ViewModels;
 
-public sealed record OnboardingProgressItem(string Label, string Marker, bool IsCurrent);
+public sealed record OnboardingProgressItem(string Label, string Marker, bool IsCurrent, bool HasPrevious, bool HasNext);
 
 /// <summary>Adapts the onboarding state machine to commands and localized presentation properties.</summary>
 public sealed partial class OnboardingViewModel : ObservableObject, IDisposable
@@ -43,7 +43,8 @@ public sealed partial class OnboardingViewModel : ObservableObject, IDisposable
     public string PrimaryActionText => _localizer.Get(Step == OnboardingStep.Ready ? "Onboarding_Start" : "Onboarding_Next");
     public IReadOnlyList<OnboardingProgressItem> Progress => Enumerable.Range(0, 4)
         .Select(index => new OnboardingProgressItem(_localizer.Get("Onboarding_Step" + (index + 1)),
-            (int)Step > index ? "✓" : (index + 1).ToString(CultureInfo.InvariantCulture), (int)Step == index)).ToArray();
+            (int)Step > index ? "✓" : (index + 1).ToString(CultureInfo.InvariantCulture), (int)Step == index,
+            index > 0, index < 3)).ToArray();
 
     private bool CanInitialize() => _flow.CanInitialize;
     [RelayCommand(CanExecute = nameof(CanInitialize))]

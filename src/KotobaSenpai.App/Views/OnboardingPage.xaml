@@ -52,7 +52,6 @@
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <Grid MaxWidth="650" Margin="42,25,42,0" Visibility="{Binding Onboarding.IsGuideVisible, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="{Binding Onboarding.ProgressText}">
-          <Border Height="1" Margin="80,14,80,0" VerticalAlignment="Top" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
           <ItemsControl ItemsSource="{Binding Onboarding.Progress}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
@@ -62,10 +61,38 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <StackPanel>
-                  <Grid Width="36" Height="28" HorizontalAlignment="Center">
-                    <Border Width="36" Height="36" CornerRadius="18" Background="{DynamicResource LayerFillColorDefaultBrush}" />
-                    <Border x:Name="ProgressBadge" HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource OnboardingStepBadge}" Tag="{Binding IsCurrent}">
+                  <Grid Height="28">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="28" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="ProgressConnectorPrevious" Grid.Column="0" Height="1" Margin="0,0,3,0" VerticalAlignment="Center" Background="{DynamicResource DividerStrokeColorDefaultBrush}">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="Visibility" Value="Visible" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasPrevious}" Value="False">
+                              <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Border.Style>
+                    </Border>
+                    <Border x:Name="ProgressBadge" Grid.Column="1" Style="{StaticResource OnboardingStepBadge}" Tag="{Binding IsCurrent}">
                       <TextBlock Text="{Binding Marker}" TextAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <Border x:Name="ProgressConnectorNext" Grid.Column="2" Height="1" Margin="3,0,0,0" VerticalAlignment="Center" Background="{DynamicResource DividerStrokeColorDefaultBrush}">
+                      <Border.Style>
+                        <Style TargetType="Border">
+                          <Setter Property="Visibility" Value="Visible" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasNext}" Value="False">
+                              <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Border.Style>
                     </Border>
                   </Grid>
                   <TextBlock Text="{Binding Label}" Margin="0,9,0,0" TextAlignment="Center" Style="{StaticResource OnboardingCaption}" />

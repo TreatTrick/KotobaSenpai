@@ -455,6 +455,7 @@ public sealed partial class PhrasePopupThemeTests
                         var badge = Assert.Single(Descendants(page).OfType<Border>(),
                             border => border.Name == "ProgressBadge" && border.Tag is true);
                         Assert.Same(application.FindResource("AccentFillColorDefaultBrush"), badge.Background);
+                        CheckOnboardingProgressConnectors(page);
                         Assert.True(footer.TranslatePoint(new Point(0, footer.ActualHeight), page).Y <= page.ActualHeight);
                         Assert.True(selector.TranslatePoint(new Point(selector.ActualWidth, 0), page).X <= page.ActualWidth);
                         var bitmap = new RenderTargetBitmap(width, (int)host.Height, 96, 96, PixelFormats.Pbgra32);
@@ -513,6 +514,39 @@ public sealed partial class PhrasePopupThemeTests
             Assert.Equal(2, preparations);
         }
         finally { host.Close(); }
+    }
+
+    private static void CheckOnboardingProgressConnectors(OnboardingPage page)
+    {
+        var badges = Descendants(page).OfType<Border>().Where(border => border.Name == "ProgressBadge").ToArray();
+        Assert.Equal(4, badges.Length);
+
+        for (var index = 0; index < badges.Length; index++)
+        {
+            var badge = badges[index];
+            var cell = Assert.IsType<Grid>(VisualTreeHelper.GetParent(badge));
+            var previous = Assert.Single(cell.Children.OfType<Border>(), border => border.Name == "ProgressConnectorPrevious");
+            var next = Assert.Single(cell.Children.OfType<Border>(), border => border.Name == "ProgressConnectorNext");
+
+            Assert.Equal(index > 0 ? Visibility.Visible : Visibility.Collapsed, previous.Visibility);
+            Assert.Equal(index < badges.Length - 1 ? Visibility.Visible : Visibility.Collapsed, next.Visibility);
+
+            if (previous.Visibility == Visibility.Visible)
+            {
+                var lineEnd = previous.TranslatePoint(new Point(previous.ActualWidth, previous.ActualHeight / 2), page);
+                var badgeStart = badge.TranslatePoint(new Point(0, badge.ActualHeight / 2), page);
+                Assert.InRange(Math.Abs((badgeStart.X - lineEnd.X) - 3), 0, 0.5);
+                Assert.InRange(Math.Abs(lineEnd.Y - badgeStart.Y), 0, 0.5);
+            }
+
+            if (next.Visibility == Visibility.Visible)
+            {
+                var lineStart = next.TranslatePoint(new Point(0, next.ActualHeight / 2), page);
+                var badgeEnd = badge.TranslatePoint(new Point(badge.ActualWidth, badge.ActualHeight / 2), page);
+                Assert.InRange(Math.Abs((lineStart.X - badgeEnd.X) - 3), 0, 0.5);
+                Assert.InRange(Math.Abs(lineStart.Y - badgeEnd.Y), 0, 0.5);
+            }
+        }
     }
 
     private static void VerifyRainbowProgressBorderAnimation(OnboardingPage page)
