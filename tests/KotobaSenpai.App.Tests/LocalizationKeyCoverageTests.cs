@@ -71,6 +71,8 @@ public sealed partial class LocalizationKeyCoverageTests
     [InlineData("src/KotobaSenpai.App/Views/OnboardingModelView.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/TargetSelectionView.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/MainContentView.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Support/SupportWindow.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Support/SupportCompanion.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/OnboardingPage.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingStepLayout.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingDictionaryStep.xaml")]
@@ -134,6 +136,6 @@ public sealed partial class LocalizationKeyCoverageTests
         throw new FileNotFoundException($"source file not found: {relativePathFromRepo}", relativePathFromRepo);
     }
 
-    [GeneratedRegex(@"loc:Loc\s+Key\s*=\s*([A-Za-z_][A-Za-z0-9_]*)")]
+    [GeneratedRegex(@"loc:Loc\s+Key\s*=\s*([A-Za-z_][A-Za-z0-9_.]*)")]
     private static partial Regex LocKeyRegex();
 }

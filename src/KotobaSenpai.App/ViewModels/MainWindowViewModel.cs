@@ -1,16 +1,18 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using KotobaSenpai.App.Japanese;
+using KotobaSenpai.App.Support;
 
 namespace KotobaSenpai.App.ViewModels;
 
 /// <summary>Composes the main window's page state and coordinates its lifetime.</summary>
 public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, UniDicInstallController dictionary,
-    OnboardingViewModel onboarding) : ObservableObject, IDisposable
+    OnboardingViewModel onboarding, SupportService? support = null) : ObservableObject, IDisposable
 {
     private bool _disposed;
     public SettingsPageViewModel Settings { get; } = settings;
     public UniDicInstallController Dictionary { get; } = dictionary;
     public OnboardingViewModel Onboarding { get; } = onboarding;
+    public SupportService? Support { get; } = support;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(Selection))]
     private RecognitionPageViewModel? _recognition;
     public TargetSelectionViewModel? Selection => Recognition?.Selection;
@@ -32,6 +34,7 @@ public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, 
     {
         if (_disposed) return;
         _disposed = true;
+        Support?.Dispose();
         Onboarding.Dispose();
         Recognition?.Dispose();
         Settings.Dispose();

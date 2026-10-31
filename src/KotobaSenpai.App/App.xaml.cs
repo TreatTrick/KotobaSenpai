@@ -1,4 +1,5 @@
 using KotobaSenpai.App.Onboarding;
+using KotobaSenpai.App.Support;
 using KotobaSenpai.Core.Workflow;
 using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.Core.Diagnostics;
@@ -49,6 +50,7 @@ public partial class App : Application
     private ServiceProvider? _services;
     private FileLogger? _logger;
     private MainWindowViewModel? _mainViewModel;
+    private SupportCoordinator? _support;
     private ConfigurationProcessLock? _settingsLease;
     private bool _exiting;
     private bool _closing;
@@ -103,6 +105,8 @@ public partial class App : Application
             DataContext = _mainViewModel,
         };
         MainWindow = window;
+        _support = new SupportCoordinator(_mainViewModel.Support!, _mainViewModel, window,
+            _services.GetRequiredService<IStringLocalizer>(), _logger);
         window.Closing += OnMainWindowClosing;
         window.Show();
         _ = _mainViewModel.Onboarding.InitializeCommand.ExecuteAsync(null);
@@ -165,6 +169,7 @@ public partial class App : Application
         e.Cancel = true;
         if (_closing || sender is not Window window) return;
         _closing = true;
+        _support?.Dispose();
         window.IsEnabled = false;
         try { await _mainViewModel.StopAsync(); }
         catch (Exception ex) { _logger?.LogError(ex, "Failed to finish cancellation during shutdown."); }
@@ -177,6 +182,7 @@ public partial class App : Application
         try
         {
             _exiting = true;
+            _support?.Dispose();
             if (_mainViewModel is not null)
             {
                 _mainViewModel.Settings.OverlayAppearance.Changed -= OnOverlayAppearanceChanged;
@@ -298,6 +304,7 @@ public partial class App : Application
             sp.GetRequiredService<ILogger>(), Controls.WindowPreviewFlight.CreateThumbnailFrame,
             sp.GetRequiredService<ITargetWindowTracker>(), sp.GetRequiredService<IWindowFrameCapture>()));
         services.AddSingleton<RecognitionPageViewModel>();
+        services.AddSingleton<SupportService>();
         services.AddSingleton<MainWindowViewModel>();
     }
 

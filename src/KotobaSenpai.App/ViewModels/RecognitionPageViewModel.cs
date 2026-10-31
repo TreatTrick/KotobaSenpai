@@ -8,6 +8,7 @@ using KotobaSenpai.App.Resources;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.App.Support;
 
 namespace KotobaSenpai.App.ViewModels;
 
@@ -28,6 +29,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private readonly ITargetWindowTracker? _tracker;
     private readonly IAutoRecognitionController? _autoRecognitionController;
     private readonly IWindowFrameCapture? _capture;
+    private readonly SupportService? _support;
     private bool _recognitionSessionActive;
     private CancellationTokenSource? _manualRecognition;
     private int _sessionVersion;
@@ -46,7 +48,8 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         ILogger logger,
         ITargetWindowTracker? tracker = null,
         IAutoRecognitionController? autoRecognitionController = null,
-        IWindowFrameCapture? capture = null)
+        IWindowFrameCapture? capture = null,
+        SupportService? support = null)
     {
         Selection = selection;
         Selection.SelectionCommitted += OnSelectionCommitted;
@@ -60,6 +63,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         _tracker = tracker;
         _autoRecognitionController = autoRecognitionController;
         _capture = capture;
+        _support = support;
         _autoRecognitionEnabled = IsEnabled(_settings.GetValue(AutoRecognitionSettings.EnabledKey));
 
         _localizer.CultureChanged += OnCultureChanged;
@@ -80,6 +84,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 
     private void OnSelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (Selection.IsSelectingWindow) _support?.CancelStartupReminder();
         if (e.PropertyName == nameof(TargetSelectionViewModel.Status))
         {
             _renderStatus = () => Selection.Status;
@@ -110,6 +115,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         }
 
         Selection.BeginRecognition();
+        _support?.CancelStartupReminder();
         var target = Selection.SelectedWindow;
         var version = ++_sessionVersion;
         using var cancellation = new CancellationTokenSource();
@@ -123,6 +129,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
             SetStatus(ResourceKeys.Status_Recognizing);
             var result = await _workflow.RecognizeAndShowAsync(target, cancellation.Token);
             if (cancellation.IsCancellationRequested || version != _sessionVersion) return;
+            _support?.RecordRecognition(DateTime.Now);
             _recognitionSessionActive = true;
             var wordCount = result.Lines.Sum(line => line.Words.Count);
             if (wordCount == 0)
@@ -184,6 +191,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 
     partial void OnAutoRecognitionEnabledChanged(bool value)
     {
+        if (value) _support?.CancelStartupReminder();
         _settings.SetValue(AutoRecognitionSettings.EnabledKey, value ? "true" : "false");
         if (value)
             StartAutoRecognitionIfEnabled();
@@ -207,9 +215,11 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         {
             var result = await _workflow.RecognizeChangedAndShowAsync(target, cancellationToken).ConfigureAwait(true);
             cancellationToken.ThrowIfCancellationRequested();
-            if (result is not null && version == _sessionVersion && _recognitionSessionActive
-                && result.Lines.Any(line => line.Words.Count > 0))
-                _regionSelector.StopFlashing();
+            if (result is not null && version == _sessionVersion && _recognitionSessionActive)
+            {
+                _support?.RecordRecognition(DateTime.Now);
+                if (result.Lines.Any(line => line.Words.Count > 0)) _regionSelector.StopFlashing();
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -229,6 +239,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private void SetRecognitionRegion()
     {
         if (!CanOperate()) return;
+        _support?.CancelStartupReminder();
         if (Selection.SelectedWindow is null)
         {
             SetStatus(ResourceKeys.Status_SelectTargetFirst);

@@ -617,4 +617,35 @@ Meet your next word.</value>
     <value>Set up once. Go straight to the app next time.</value>
   </data>
   <data name="Onboarding_ConfigurationUsable" xml:space="preserve"><value>Configuration ready</value></data>
+  <data name="payment.alipay" xml:space="preserve"><value>Alipay</value></data>
+  <data name="payment.alipay.caption" xml:space="preserve"><value>Scan with Alipay to tip any amount.</value></data>
+  <data name="payment.payPal.caption" xml:space="preserve"><value>Scan with your phone, or open PayPal in the browser.</value></data>
+  <data name="payment.wechat" xml:space="preserve"><value>WeChat</value></data>
+  <data name="payment.wechat.caption" xml:space="preserve"><value>Scan with WeChat to tip any amount.</value></data>
+  <data name="support.already" xml:space="preserve"><value>I've Supported</value></data>
+  <data name="support.back" xml:space="preserve"><value>Back</value></data>
+  <data name="support.button" xml:space="preserve"><value>Buy me a coffee</value></data>
+  <data name="support.close" xml:space="preserve"><value>Close</value></data>
+  <data name="support.confirm.help" xml:space="preserve"><value>Remember my support and stop automatic support reminders.</value></data>
+  <data name="support.confirmed.detail" xml:space="preserve"><value>Your support is remembered. No more automatic reminders.</value></data>
+  <data name="support.debug.reset.help" xml:space="preserve"><value>Debug: Alt-click to reset local support and reminder records.</value></data>
+  <data name="support.github.detail" xml:space="preserve"><value>A free Star helps more people discover KotobaSenpai.</value></data>
+  <data name="support.github.help" xml:space="preserve"><value>Open KotobaSenpai's GitHub page. Giving a Star is optional.</value></data>
+  <data name="support.github.opened" xml:space="preserve"><value>GitHub is open. Give KotobaSenpai a Star there if you'd like!</value></data>
+  <data name="support.link.failed" xml:space="preserve"><value>Couldn't open the link. Please try again.</value></data>
+  <data name="support.method" xml:space="preserve"><value>Payment method</value></data>
+  <data name="support.payment.show" xml:space="preserve"><value>View payment codes</value></data>
+  <data name="support.paypal.open" xml:space="preserve"><value>Open PayPal</value></data>
+  <data name="support.paypal.opened" xml:space="preserve"><value>PayPal is open. After tipping, choose “I've Supported”.</value></data>
+  <data name="support.qr" xml:space="preserve"><value>{0} QR code</value></data>
+  <data name="support.received" xml:space="preserve"><value>Coffee received. Thank you!</value></data>
+  <data name="support.star" xml:space="preserve"><value>Star on GitHub</value></data>
+  <data name="support.subtitle" xml:space="preserve"><value>KotobaSenpai is free and open source. A small tip helps it go further.</value></data>
+  <data name="support.supported.help" xml:space="preserve"><value>Thank you! You can still visit GitHub and give KotobaSenpai a Star.</value></data>
+  <data name="support.thanks.detail" xml:space="preserve"><value>Your support keeps KotobaSenpai going. You made a dragon maid very happy.</value></data>
+  <data name="support.thanks.title" xml:space="preserve"><value>Thanks for the coffee!</value></data>
+  <data name="support.title" xml:space="preserve"><value>Buy me a coffee?</value></data>
+  <data name="support.usage" xml:space="preserve"><value>You've used KotobaSenpai's recognition {0} times.</value></data>
+  <data name="support.save.failed" xml:space="preserve"><value>Could not save support status. Please try again.</value></data>
+  <data name="support.payment.payPal" xml:space="preserve"><value>PayPal</value></data>
 </root>

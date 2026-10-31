@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:support="clr-namespace:KotobaSenpai.App.Views.Support"
              xmlns:views="clr-namespace:KotobaSenpai.App.Views">
   <UserControl.Resources>
     <Style x:Key="NavigationTab" TargetType="TabItem">
@@ -54,8 +55,15 @@
               <ColumnDefinition Width="224" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <TabPanel IsItemsHost="True" Margin="12,96,12,16" KeyboardNavigation.TabIndex="1"
-                      KeyboardNavigation.DirectionalNavigation="Cycle" />
+            <Grid Margin="12,96,12,20">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+              <TabPanel IsItemsHost="True" KeyboardNavigation.TabIndex="1"
+                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+              <support:SupportCompanion Grid.Row="1" DataContext="{Binding Support}" Margin="0,16,0,0" />
+            </Grid>
             <Border Grid.Column="1" CornerRadius="8,0,0,0"
                     Background="{DynamicResource LayerFillColorDefaultBrush}"
                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1,1,0,0">

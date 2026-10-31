@@ -617,4 +617,35 @@ API Key：YOUR_API_KEY
     <value>只需设置一次，以后直接进入主界面。</value>
   </data>
   <data name="Onboarding_ConfigurationUsable" xml:space="preserve"><value>配置可用</value></data>
+  <data name="payment.alipay" xml:space="preserve"><value>支付宝</value></data>
+  <data name="payment.alipay.caption" xml:space="preserve"><value>用支付宝扫一扫，金额随意。</value></data>
+  <data name="payment.payPal.caption" xml:space="preserve"><value>用手机扫码，或在浏览器中打开 PayPal。</value></data>
+  <data name="payment.wechat" xml:space="preserve"><value>微信</value></data>
+  <data name="payment.wechat.caption" xml:space="preserve"><value>用微信扫一扫，金额随意。</value></data>
+  <data name="support.already" xml:space="preserve"><value>我已支持</value></data>
+  <data name="support.back" xml:space="preserve"><value>返回</value></data>
+  <data name="support.button" xml:space="preserve"><value>请我喝杯咖啡</value></data>
+  <data name="support.close" xml:space="preserve"><value>关闭</value></data>
+  <data name="support.confirm.help" xml:space="preserve"><value>记住我的支持，不再自动提醒打赏。</value></data>
+  <data name="support.confirmed.detail" xml:space="preserve"><value>已记下你的支持，不再自动提醒打赏。</value></data>
+  <data name="support.debug.reset.help" xml:space="preserve"><value>调试：按住 Alt 点击，重置本地支持状态和提醒记录。</value></data>
+  <data name="support.github.detail" xml:space="preserve"><value>免费点一颗 Star，也能让更多人发现 KotobaSenpai。</value></data>
+  <data name="support.github.help" xml:space="preserve"><value>打开 KotobaSenpai 的 GitHub 项目页，点 Star 完全自愿。</value></data>
+  <data name="support.github.opened" xml:space="preserve"><value>已打开 GitHub，喜欢的话可以在那里点一颗 Star！</value></data>
+  <data name="support.link.failed" xml:space="preserve"><value>暂时无法打开链接，请重试。</value></data>
+  <data name="support.method" xml:space="preserve"><value>支付方式</value></data>
+  <data name="support.payment.show" xml:space="preserve"><value>查看收款码</value></data>
+  <data name="support.paypal.open" xml:space="preserve"><value>打开 PayPal</value></data>
+  <data name="support.paypal.opened" xml:space="preserve"><value>已打开 PayPal，打赏后可点击“我已支持”。</value></data>
+  <data name="support.qr" xml:space="preserve"><value>{0} 收款二维码</value></data>
+  <data name="support.received" xml:space="preserve"><value>咖啡收到啦，谢谢你！</value></data>
+  <data name="support.star" xml:space="preserve"><value>去 GitHub 点 Star</value></data>
+  <data name="support.subtitle" xml:space="preserve"><value>KotobaSenpai 免费开源，一点小小的打赏，就能让它走得更远。</value></data>
+  <data name="support.supported.help" xml:space="preserve"><value>感谢支持！仍可打开 GitHub 为 KotobaSenpai 点 Star。</value></data>
+  <data name="support.thanks.detail" xml:space="preserve"><value>你的支持让 KotobaSenpai 走得更远，龙女仆也开心得跳起来了。</value></data>
+  <data name="support.thanks.title" xml:space="preserve"><value>谢谢你的咖啡！</value></data>
+  <data name="support.title" xml:space="preserve"><value>请我喝杯咖啡吧？</value></data>
+  <data name="support.usage" xml:space="preserve"><value>你已经使用 KotobaSenpai 的识别功能 {0} 次。</value></data>
+  <data name="support.save.failed" xml:space="preserve"><value>无法保存支持状态，请重试。</value></data>
+  <data name="support.payment.payPal" xml:space="preserve"><value>PayPal</value></data>
 </root>

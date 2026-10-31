@@ -1,0 +1,51 @@
+<UserControl x:Class="KotobaSenpai.App.Views.Support.SupportCompanion"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:support="clr-namespace:KotobaSenpai.App.Views.Support">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Viewbox Stretch="Uniform" StretchDirection="DownOnly" VerticalAlignment="Bottom" Margin="0,0,0,12">
+      <support:MascotControl Height="300" Width="134" IsSupported="{Binding IsSupported}"
+                             TargetElement="{Binding ElementName=CoffeeButton}" />
+    </Viewbox>
+    <Button x:Name="CoffeeButton" Grid.Row="1" Command="{Binding OpenCommand}" Content="{Binding EntryText}"
+            ToolTip="{Binding EntryHelp}" HorizontalAlignment="Center" Padding="12,7" FontSize="13"
+            AutomationProperties.Name="{Binding EntryText}">
+      <Button.Style>
+        <Style TargetType="Button">
+          <Setter Property="Foreground" Value="#6B4014" />
+          <Setter Property="Background" Value="#E0FFCC3D" />
+          <Setter Property="BorderBrush" Value="Transparent" />
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate TargetType="Button">
+                <Border x:Name="Pill" CornerRadius="20" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
+                        BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="CoffeeIcon" Text="☕" Margin="0,0,6,0" VerticalAlignment="Center" />
+                    <ContentPresenter VerticalAlignment="Center" />
+                  </StackPanel>
+                </Border>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Pill" Property="Background" Value="#FFFFCC3D" /></Trigger>
+                  <DataTrigger Binding="{Binding IsSupported}" Value="True">
+                    <Setter TargetName="Pill" Property="Background" Value="#1F55B95E" />
+                    <Setter TargetName="CoffeeIcon" Property="Text" Value="✓" />
+                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                  </DataTrigger>
+                  <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions><Condition Binding="{Binding IsSupported}" Value="True" /><Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource TemplatedParent}}" Value="True" /></MultiDataTrigger.Conditions>
+                    <Setter TargetName="Pill" Property="Background" Value="#3355B95E" />
+                  </MultiDataTrigger>
+                  <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Pill" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" /></Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
+        </Style>
+      </Button.Style>
+    </Button>
+    <TextBlock Grid.Row="2" Text="{Binding Error}" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+               HorizontalAlignment="Center" MaxWidth="196" AutomationProperties.LiveSetting="Polite" />
+  </Grid>
+</UserControl>

@@ -19,6 +19,86 @@ namespace KotobaSenpai.App.Tests;
 
 public sealed class RecognitionPageViewModelTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Manual_and_actual_automatic_completions_each_count_once_even_without_words(bool hasWords)
+    {
+        var settings = new SupportSettings();
+        using var support = new KotobaSenpai.App.Support.SupportService(settings, new FakeStringLocalizer(), new FakeLogger());
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var result = hasWords
+            ? new WordRecognitionResult(100, 100, [new OcrLine([new OcrWord("日", new ScreenRect(0, 0, 10, 10))])])
+            : new WordRecognitionResult(100, 100, []);
+        var controller = new RecordingAutoController();
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: new SequenceRecognizer(result, result),
+            controller: controller, support: support);
+        using var lifetime = vm;
+        vm.Selection.SelectedWindow = target;
+        vm.AutoRecognitionEnabled = true;
+        await vm.StartRecognitionAsync();
+        Assert.Equal(1, support.State.RecognitionCount);
+        await controller.ChangeAsync();
+        Assert.Equal(2, support.State.RecognitionCount);
+        Assert.Single(support.State.ActiveDays);
+    }
+
+    [Fact]
+    public async Task Cancelled_manual_results_do_not_count_as_support_usage()
+    {
+        using var support = new KotobaSenpai.App.Support.SupportService(new SupportSettings(), new FakeStringLocalizer(), new FakeLogger());
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var recognizer = new DeferredRecognizer();
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer, support: support);
+        using var lifetime = vm;
+        vm.Selection.SelectedWindow = target;
+        var pending = vm.StartRecognitionAsync();
+        vm.HideCommand.Execute(null);
+        recognizer.Completion.SetResult(new WordRecognitionResult(100, 100, []));
+        await pending;
+        Assert.Equal(0, support.State.RecognitionCount);
+    }
+
+    private sealed class SupportSettings : KotobaSenpai.TestSupport.SettingsStub
+    {
+        private string? _raw;
+        public override string? GetValue(string key) => _raw;
+        public override void SetValue(string key, string? value) => _raw = value;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Failed_or_expired_automatic_results_do_not_increase_usage(bool cancelSession)
+    {
+        using var support = new KotobaSenpai.App.Support.SupportService(new SupportSettings(), new FakeStringLocalizer(), new FakeLogger());
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        var pending = new TaskCompletionSource<WordRecognitionResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var recognizer = new QueuedRecognizer(Task.FromResult(new WordRecognitionResult(100, 100, [])), pending.Task);
+        var controller = new RecordingAutoController();
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer, controller: controller, support: support);
+        using var lifetime = vm;
+        vm.Selection.SelectedWindow = target;
+        vm.AutoRecognitionEnabled = true;
+        await vm.StartRecognitionAsync();
+        var automatic = controller.ChangeAsync();
+        if (cancelSession)
+        {
+            vm.HideCommand.Execute(null);
+            pending.SetResult(new WordRecognitionResult(100, 100, []));
+        }
+        else pending.SetException(new InvalidOperationException("Automatic recognition failed."));
+        await automatic;
+        Assert.Equal(1, support.State.RecognitionCount);
+    }
+
+    private sealed class QueuedRecognizer(params Task<WordRecognitionResult>[] results) : IWindowWordRecognizer
+    {
+        private readonly Queue<Task<WordRecognitionResult>> _results = new(results);
+        public Task<WordRecognitionResult> RecognizeAsync(Guid recognitionId, WindowTarget target,
+            CancellationToken cancellationToken = default, ScreenRect? region = null) => _results.Dequeue();
+    }
+
     [Fact]
     public async Task Shared_selection_retains_a_small_preview_without_a_page_or_an_event_subscriber()
     {
@@ -603,7 +683,8 @@ public sealed class RecognitionPageViewModelTests
         IWindowFrameCapture? capture = null,
         IAutoRecognitionController? controller = null,
         IRegionSelector? regionSelector = null,
-        ISettingsService? settings = null)
+        ISettingsService? settings = null,
+        KotobaSenpai.App.Support.SupportService? support = null)
     {
         var overlay = new FakeOverlay();
         var workflow = new WordOverlayApplicationService(
@@ -613,7 +694,7 @@ public sealed class RecognitionPageViewModelTests
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
-        return (new RecognitionPageViewModel(new TargetSelectionViewModel(picker, localizer, resolver, logger, frame => frame, tracker, capture), workflow, regionSelector ?? new FakeRegionSelector(), settings ?? new FakeSettings(), localizer, resolver, logger, tracker, controller, capture), overlay, localizer, logger);
+        return (new RecognitionPageViewModel(new TargetSelectionViewModel(picker, localizer, resolver, logger, frame => frame, tracker, capture), workflow, regionSelector ?? new FakeRegionSelector(), settings ?? new FakeSettings(), localizer, resolver, logger, tracker, controller, capture, support), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowPicker : IWindowPicker

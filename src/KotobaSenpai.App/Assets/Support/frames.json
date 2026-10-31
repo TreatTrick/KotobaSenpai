@@ -1,0 +1,17 @@
+{
+  "fps": 24,
+  "clips": {
+    "A": {
+      "frames": 121,
+      "width": 249,
+      "height": 560,
+      "sourceSha256": "7179100ea0f7b9c475e7bce5b4f88e2c9b8aac82eb2a83680dd2eabe933eb0b5"
+    },
+    "B": {
+      "frames": 121,
+      "width": 249,
+      "height": 560,
+      "sourceSha256": "2a4831dc4c5e308c34c80716dcd3fbb89dfa5867cfdece362f3e88eb2f4a0b65"
+    }
+  }
+}

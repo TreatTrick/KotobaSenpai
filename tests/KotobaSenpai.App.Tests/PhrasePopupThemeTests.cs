@@ -25,7 +25,7 @@ using Wpf.Ui.Controls;
 
 namespace KotobaSenpai.App.Tests;
 
-public sealed class PhrasePopupThemeTests
+public sealed partial class PhrasePopupThemeTests
 {
     [Fact]
     public Task Open_popup_follows_application_theme_changes_without_replacing_content()
@@ -66,6 +66,7 @@ public sealed class PhrasePopupThemeTests
                 CheckAgentSettingsPresentation(application);
                 CheckWindowSelectionPresentation(application);
                 CheckMainContentStartup(application);
+                CheckSupportPresentation(application);
                 completion.SetResult();
             }
             catch (Exception exception)
