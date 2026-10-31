@@ -131,8 +131,11 @@ public sealed partial class UniDicInstallController : ObservableObject, IDisposa
     private void ReportStage(DictionaryInstallProgress value)
     {
         Stage = value.Stage;
-        IsIndeterminate = value.Stage != DictionaryInstallStage.Ready && value.Fraction is null;
-        Progress = value.Stage == DictionaryInstallStage.Ready ? 1 : value.Fraction ?? 0;
+        IsIndeterminate = value.Stage == DictionaryInstallStage.Downloading && value.Fraction is null;
+        if (value.Fraction.HasValue)
+            Progress = value.Fraction.Value;
+        else if (value.Stage == DictionaryInstallStage.Ready)
+            Progress = 1;
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)

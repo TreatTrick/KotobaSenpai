@@ -1,6 +1,7 @@
 using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.Core.Japanese;
@@ -99,6 +100,19 @@ public sealed class UniDicInstallControllerTests
         Assert.False(controller.HasError);
         Assert.False(controller.IsBlocking);
         Assert.True(controller.IsInstalled);
+    }
+
+    [Fact]
+    public void Validation_after_known_download_progress_keeps_progress_determinate()
+    {
+        using var controller = Create((_, _) => Task.CompletedTask);
+        var reportStage = typeof(UniDicInstallController).GetMethod("ReportStage", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        reportStage.Invoke(controller, [new DictionaryInstallProgress(DictionaryInstallStage.Downloading, 0.6)]);
+        reportStage.Invoke(controller, [new DictionaryInstallProgress(DictionaryInstallStage.Validating)]);
+
+        Assert.Equal(0.6, controller.Progress);
+        Assert.False(controller.IsIndeterminate);
     }
 
     private sealed class FakeLocalizer : IStringLocalizer

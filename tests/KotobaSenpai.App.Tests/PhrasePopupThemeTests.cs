@@ -368,6 +368,7 @@ public sealed partial class PhrasePopupThemeTests
         {
             host.Show();
             page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            VerifyRainbowProgressBorderAnimation(page);
             var selector = Assert.IsType<ComboBox>(page.FindName("OnboardingLanguageSelector"));
             Assert.Equal(language.AvailableCultures, selector.Items.Cast<CultureInfo>());
             Assert.Equal("NativeName", selector.DisplayMemberPath);
@@ -512,6 +513,34 @@ public sealed partial class PhrasePopupThemeTests
             Assert.Equal(2, preparations);
         }
         finally { host.Close(); }
+    }
+
+    private static void VerifyRainbowProgressBorderAnimation(OnboardingPage page)
+    {
+        if (!SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast) return;
+
+        var step = Assert.Single(Descendants(page).OfType<OnboardingDictionaryStep>());
+        var border = Assert.Single(Descendants(step).OfType<Border>(), item => item.BorderThickness.Top == 1.5);
+        var before = CaptureBorder(border);
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
+        timer.Start();
+        Dispatcher.PushFrame(frame);
+        var after = CaptureBorder(border);
+
+        Assert.False(before.SequenceEqual(after));
+    }
+
+    private static byte[] CaptureBorder(Border border)
+    {
+        var width = (int)Math.Ceiling(border.ActualWidth);
+        var height = (int)Math.Ceiling(border.ActualHeight);
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(border);
+        var pixels = new byte[width * height * 4];
+        bitmap.CopyPixels(pixels, width * 4, 0);
+        return pixels;
     }
 
     private static void CheckOverlayAppearancePresentation(Application application, SettingsPage page, Border frame,

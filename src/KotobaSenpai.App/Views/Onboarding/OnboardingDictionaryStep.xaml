@@ -29,7 +29,34 @@
           </TextBlock>
           <TextBlock Text="{Binding Dictionary.StageText}" FontSize="13" AutomationProperties.LiveSetting="Polite" />
         </DockPanel>
-        <ProgressBar Value="{Binding Dictionary.Progress}" Maximum="1" Height="4" Margin="0,12,0,10" IsIndeterminate="{Binding Dictionary.IsIndeterminate}" AutomationProperties.Name="{Binding Dictionary.StageText}" />
+        <Grid Height="18" Margin="0,12,0,10">
+          <ProgressBar Value="{Binding Dictionary.Progress}" Maximum="1" Height="18" IsIndeterminate="{Binding Dictionary.IsIndeterminate}" Background="{DynamicResource ControlFillColorSecondaryBrush}" AutomationProperties.Name="{Binding Dictionary.StageText}">
+            <ProgressBar.Foreground>
+              <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                <GradientStop Color="#EF476F" Offset="0" />
+                <GradientStop Color="#FF9F1C" Offset="0.17" />
+                <GradientStop Color="#FFD166" Offset="0.34" />
+                <GradientStop Color="#06D6A0" Offset="0.5" />
+                <GradientStop Color="#118AB2" Offset="0.67" />
+                <GradientStop Color="#4361EE" Offset="0.83" />
+                <GradientStop Color="#A855F7" Offset="1" />
+              </LinearGradientBrush>
+            </ProgressBar.Foreground>
+          </ProgressBar>
+          <Border BorderThickness="1.5" CornerRadius="3" IsHitTestVisible="False" Loaded="OnRainbowProgressBorderLoaded" Unloaded="OnRainbowProgressBorderUnloaded">
+            <Border.BorderBrush>
+              <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#EF476F" Offset="0" />
+                <GradientStop Color="#FF9F1C" Offset="0.17" />
+                <GradientStop Color="#FFD166" Offset="0.34" />
+                <GradientStop Color="#06D6A0" Offset="0.5" />
+                <GradientStop Color="#118AB2" Offset="0.67" />
+                <GradientStop Color="#4361EE" Offset="0.83" />
+                <GradientStop Color="#A855F7" Offset="1" />
+              </LinearGradientBrush>
+            </Border.BorderBrush>
+          </Border>
+        </Grid>
         <TextBlock Text="{loc:Loc Key=Onboarding_DictionaryHint}" Style="{StaticResource OnboardingCaption}" FontSize="11" />
         <TextBlock Text="{Binding Dictionary.Error}" Style="{StaticResource ModelStatus}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
       </StackPanel>

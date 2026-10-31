@@ -3,6 +3,7 @@ using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Net;
 using System.Security.Cryptography;
 using KotobaSenpai.App.Japanese;
 using KotobaSenpai.Core.Japanese;
@@ -52,6 +53,22 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
             && (knownLength ? item.Fraction == 1 : item.Fraction is null));
         Assert.Equal(DictionaryInstallStage.Ready, progress[^1].Stage);
         Assert.True(installer.IsInstalled);
+    }
+
+    [Fact]
+    public async Task Known_length_download_coalesces_frequent_progress_reports()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true, payloadBytes: 512 * 1024);
+        using var http = new HttpClient(new ChunkedArchiveHandler(File.ReadAllBytes(fixture.ZipPath)));
+        using var installer = new UniDicDictionaryInstaller(http, cacheRoot, Manif(cacheRoot, fixture.Sha));
+        var progress = new List<DictionaryInstallProgress>();
+
+        await installer.EnsureInstalledAsync(stages: new InlineProgress<DictionaryInstallProgress>(progress.Add));
+
+        var downloadUpdates = progress.Where(item => item.Stage == DictionaryInstallStage.Downloading
+            && item.Fraction.HasValue).ToArray();
+        Assert.InRange(downloadUpdates.Length, 1, 32);
+        Assert.Equal(1, downloadUpdates[^1].Fraction);
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
@@ -179,7 +196,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
         => new(UniDicAssets.Version, "https://example.test/unidic.zip", sha, UniDicAssets.Format, UniDicAssets.RequiredRuntimeFiles);
 
     /// <summary>Builds a zip fixture containing dicdir/ (four runtime files + version + dicrc); returns its path and SHA-256.</summary>
-    private (string CacheRoot, (string ZipPath, string Sha) Fixture) CreateFixture(bool populate)
+    private (string CacheRoot, (string ZipPath, string Sha) Fixture) CreateFixture(bool populate, int payloadBytes = 0)
     {
         var cacheRoot = NewDir();
         var buildDir = NewDir();
@@ -189,7 +206,13 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
         if (populate)
         {
             foreach (var f in UniDicAssets.RequiredRuntimeFiles)
-                File.WriteAllText(Path.Combine(dicDir, f), $"{f}-data");
+            {
+                var path = Path.Combine(dicDir, f);
+                if (f == "char.bin" && payloadBytes > 0)
+                    File.WriteAllBytes(path, RandomNumberGenerator.GetBytes(payloadBytes));
+                else
+                    File.WriteAllText(path, $"{f}-data");
+            }
             File.WriteAllText(Path.Combine(dicDir, UniDicAssets.DicrcFileName), $"output-format-type = {UniDicAssets.Format}");
         }
 
@@ -229,5 +252,61 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
         private ThrowingHandler() { }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             => throw new InvalidOperationException("Network must not be contacted while dictionary is already installed.");
+    }
+
+    private sealed class ChunkedArchiveHandler(byte[] bytes) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new ChunkedArchiveContent(bytes),
+            });
+    }
+
+    private sealed class ChunkedArchiveContent(byte[] bytes) : HttpContent
+    {
+        protected override bool TryComputeLength(out long length)
+        {
+            length = bytes.Length;
+            return true;
+        }
+
+        protected override Task<Stream> CreateContentReadStreamAsync()
+            => Task.FromResult<Stream>(new ChunkedReadStream(bytes, 1024));
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+            => stream.WriteAsync(bytes).AsTask();
+    }
+
+    private sealed class ChunkedReadStream(byte[] bytes, int chunkSize) : Stream
+    {
+        private readonly MemoryStream _inner = new(bytes, writable: false);
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => _inner.Length;
+        public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            return await _inner.ReadAsync(buffer[..Math.Min(buffer.Length, chunkSize)], cancellationToken);
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        public override int Read(byte[] buffer, int offset, int count)
+            => _inner.Read(buffer, offset, Math.Min(count, chunkSize));
+
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
     }
 }

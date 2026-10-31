@@ -2,6 +2,7 @@ using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using KotobaSenpai.Core.Japanese;
@@ -240,14 +241,20 @@ public sealed class UniDicDictionaryInstaller : IDisposable
 
         var buffer = new byte[1 << 16];
         long received = 0;
+        var lastProgressReportAt = Stopwatch.GetTimestamp();
         int read;
         while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
         {
             await target.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             received += read;
-            stages?.Report(new(DictionaryInstallStage.Downloading, total is > 0 ? (double)received / total.Value : null));
-            if (total.HasValue && progress is not null)
-                progress.Report(total.Value == 0 ? 0 : (double)received / total.Value);
+            if (total is > 0 && (received >= total.Value
+                || Stopwatch.GetElapsedTime(lastProgressReportAt) >= TimeSpan.FromMilliseconds(100)))
+            {
+                var fraction = (double)received / total.Value;
+                stages?.Report(new(DictionaryInstallStage.Downloading, fraction));
+                progress?.Report(fraction);
+                lastProgressReportAt = Stopwatch.GetTimestamp();
+            }
         }
         progress?.Report(1.0);
     }
