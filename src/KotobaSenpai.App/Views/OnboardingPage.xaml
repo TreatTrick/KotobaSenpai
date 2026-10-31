@@ -62,9 +62,12 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <StackPanel>
-                  <Border x:Name="ProgressBadge" Style="{StaticResource OnboardingStepBadge}" Tag="{Binding IsCurrent}">
-                    <TextBlock Text="{Binding Marker}" TextAlignment="Center" VerticalAlignment="Center" />
-                  </Border>
+                  <Grid Width="36" Height="28" HorizontalAlignment="Center">
+                    <Border Width="36" Height="36" CornerRadius="18" Background="{DynamicResource LayerFillColorDefaultBrush}" />
+                    <Border x:Name="ProgressBadge" HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource OnboardingStepBadge}" Tag="{Binding IsCurrent}">
+                      <TextBlock Text="{Binding Marker}" TextAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                  </Grid>
                   <TextBlock Text="{Binding Label}" Margin="0,9,0,0" TextAlignment="Center" Style="{StaticResource OnboardingCaption}" />
                 </StackPanel>
               </DataTemplate>
