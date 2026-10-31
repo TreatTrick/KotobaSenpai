@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:views="clr-namespace:KotobaSenpai.App.Views"
              xmlns:controls="clr-namespace:KotobaSenpai.App.Controls">
   <ScrollViewer Style="{StaticResource SettingsPageScrollViewer}">
     <StackPanel>
@@ -10,48 +11,7 @@
       <TextBlock Text="{loc:Loc Key=Page_RecognizeDescription}" Style="{StaticResource PageDescription}" />
       <TextBlock Text="{loc:Loc Key=Label_TargetAndRecognition}" Style="{StaticResource SectionTitle}" />
 
-      <controls:SettingsCard x:Name="TargetWindowCard" Header="{loc:Loc Key=Label_TargetWindow}"
-                             Description="{loc:Loc Key=Description_TargetWindow}" AutomationProperties.Name="{Binding TargetTitle}">
-        <controls:SettingsCard.DescriptionContent>
-          <WrapPanel Margin="0,12,0,0">
-            <Border Width="144" Height="144" CornerRadius="8" BorderThickness="1" Margin="0,0,16,8"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                    Background="{DynamicResource LayerFillColorDefaultBrush}"
-                    AutomationProperties.Name="{Binding TargetTitle}" AutomationProperties.HelpText="{Binding TargetStatus}">
-              <Grid>
-                <Image x:Name="TargetPreviewImage" Stretch="Uniform" RenderTransformOrigin="0.5,0.5"
-                       AutomationProperties.Name="{Binding TargetTitle}" AutomationProperties.HelpText="{Binding TargetStatus}">
-                  <Image.RenderTransform><ScaleTransform /></Image.RenderTransform>
-                </Image>
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8">
-                  <StackPanel.Style>
-                    <Style TargetType="StackPanel">
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding HasPreview}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </StackPanel.Style>
-                  <ui:SymbolIcon Symbol="Window24" FontSize="32" HorizontalAlignment="Center" />
-                  <TextBlock Text="{Binding TargetStatus}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" />
-                </StackPanel>
-              </Grid>
-            </Border>
-            <StackPanel Width="280" Margin="0,0,0,8" VerticalAlignment="Center">
-              <TextBlock Text="{Binding TargetTitle}" ToolTip="{Binding TargetTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-              <TextBlock Text="{Binding TargetStatus}" Style="{StaticResource Description}" AutomationProperties.LiveSetting="Polite" />
-              <TextBlock Text="{Binding PreviewError}" Style="{StaticResource Description}" />
-              <WrapPanel Margin="0,8,0,0">
-                <ui:Button x:Name="SelectWindowButton" Content="{Binding SelectionButtonText}" Command="{Binding SelectWindowCommand}"
-                           Style="{StaticResource SettingsActionButton}" Icon="{ui:SymbolIcon Window24}"
-                           AutomationProperties.Name="{Binding SelectionButtonText}" />
-                <ui:Button Content="{loc:Loc Key=WindowPicker_Retry}" Command="{Binding RetryPreviewCommand}"
-                           Style="{StaticResource SettingsButton}" Margin="8,0,0,0"
-                           Visibility="{Binding HasPreviewError, Converter={StaticResource BoolToVisibility}}" />
-              </WrapPanel>
-            </StackPanel>
-          </WrapPanel>
-        </controls:SettingsCard.DescriptionContent>
-      </controls:SettingsCard>
+      <views:TargetSelectionView DataContext="{Binding Selection}" />
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_RecognizeText}" Description="{loc:Loc Key=Description_RecognizeText}"
                              Icon="{ui:SymbolIcon ScanText24}">

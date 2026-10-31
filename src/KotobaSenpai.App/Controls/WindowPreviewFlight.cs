@@ -4,12 +4,25 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Platform.Windows.Overlay;
 
 namespace KotobaSenpai.App.Controls;
 
 internal static class WindowPreviewFlight
 {
+    internal static CapturedFrame CreateThumbnailFrame(CapturedFrame frame)
+    {
+        var image = BitmapSource.Create(frame.Width, frame.Height, 96, 96, PixelFormats.Bgra32, null,
+            frame.Bgra32.ToArray(), checked(frame.Width * 4));
+        image.Freeze();
+        var thumbnail = CreateThumbnail(image, 640);
+        var stride = checked(thumbnail.PixelWidth * 4);
+        var pixels = new byte[checked(stride * thumbnail.PixelHeight)];
+        thumbnail.CopyPixels(pixels, stride, 0);
+        return new CapturedFrame(thumbnail.PixelWidth, thumbnail.PixelHeight, pixels);
+    }
+
     internal static Rect Fit(Rect container, double aspectRatio)
     {
         var width = Math.Min(container.Width, container.Height * aspectRatio);

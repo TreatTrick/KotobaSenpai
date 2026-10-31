@@ -11,45 +11,7 @@
         FontFamily="{StaticResource FluentFontFamily}" FontSize="{StaticResource FluentBodyFontSize}"
         WindowStartupLocation="CenterScreen"
         ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" UseLayoutRounding="True">
-  <ui:FluentWindow.Resources>
-    <Style x:Key="NavigationTab" TargetType="TabItem">
-      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="Margin" Value="0,0,0,4" />
-      <Setter Property="FocusVisualStyle" Value="{DynamicResource DefaultControlFocusVisualStyle}" />
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="TabItem">
-            <Border x:Name="NavigationBackground" Background="{TemplateBinding Background}"
-                    CornerRadius="4" MinHeight="40">
-              <Grid>
-                <Border x:Name="SelectionIndicator" Width="3" Height="16" CornerRadius="2"
-                        Background="{DynamicResource AccentFillColorDefaultBrush}"
-                        HorizontalAlignment="Left" Visibility="Collapsed" />
-                <ContentPresenter ContentSource="Header" Margin="16,10"
-                                  VerticalAlignment="Center" RecognizesAccessKey="True" />
-              </Grid>
-            </Border>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="NavigationBackground" Property="Background"
-                        Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
-              </Trigger>
-              <Trigger Property="IsSelected" Value="True">
-                <Setter TargetName="NavigationBackground" Property="Background"
-                        Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
-                <Setter TargetName="SelectionIndicator" Property="Visibility" Value="Visible" />
-              </Trigger>
-              <Trigger Property="IsEnabled" Value="False">
-                <Setter Property="Foreground" Value="{DynamicResource TextFillColorDisabledBrush}" />
-              </Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
-  </ui:FluentWindow.Resources>
+
 
   <Grid>
     <Grid.RowDefinitions>
@@ -62,104 +24,21 @@
       </ui:TitleBar.Icon>
     </ui:TitleBar>
 
-    <TabControl x:Name="MainNavigation" Grid.Row="1" SelectedIndex="0" TabStripPlacement="Left"
-                Background="Transparent" BorderThickness="0" Padding="0"
-                ItemContainerStyle="{StaticResource NavigationTab}">
-      <TabControl.Template>
-        <ControlTemplate TargetType="TabControl">
-          <Grid KeyboardNavigation.TabNavigation="Local">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="224" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <TabPanel IsItemsHost="True" Margin="12,96,12,16" KeyboardNavigation.TabIndex="1"
-                      KeyboardNavigation.DirectionalNavigation="Cycle" />
-            <Border Grid.Column="1" CornerRadius="8,0,0,0"
-                    Background="{DynamicResource LayerFillColorDefaultBrush}"
-                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1,1,0,0">
-              <Grid>
-                <Grid.RowDefinitions>
-                  <RowDefinition Height="*" />
-                  <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"
-                                  KeyboardNavigation.TabIndex="2" />
-                <Border Grid.Row="1" Padding="32,12,32,16"
-                        BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
-                  <Grid>
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="Auto" />
-                      <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <ui:SymbolIcon Symbol="Info24" FontSize="16" Margin="0,2,10,0"
-                                   VerticalAlignment="Top" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    <TextBlock Grid.Column="1" Text="{Binding Recognition.Status}" Style="{StaticResource Description}" Margin="0"
-                               AutomationProperties.LiveSetting="Polite" />
-                  </Grid>
-                </Border>
-              </Grid>
-            </Border>
-          </Grid>
-        </ControlTemplate>
-      </TabControl.Template>
-
-      <TabItem AutomationProperties.Name="{loc:Loc Key=Tab_Recognize}">
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal">
-            <Image Source="{StaticResource ScanColorIcon}" Width="24" Height="24" Margin="0,0,12,0" />
-            <TextBlock Text="{loc:Loc Key=Tab_Recognize}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <views:RecognitionPage DataContext="{Binding Recognition}" />
-      </TabItem>
-
-      <TabItem AutomationProperties.Name="{loc:Loc Key=Tab_Settings}">
-        <TabItem.Header>
-          <StackPanel Orientation="Horizontal">
-            <Image Source="{StaticResource SettingsColorIcon}" Width="24" Height="24" Margin="0,0,12,0" />
-            <TextBlock Text="{loc:Loc Key=Tab_Settings}" VerticalAlignment="Center" />
-          </StackPanel>
-        </TabItem.Header>
-        <views:SettingsPage x:Name="SettingsView" DataContext="{Binding Settings}" />
-      </TabItem>
-    </TabControl>
-
-    <Grid Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Width="184" Margin="20,20,0,0">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="Auto" />
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
-      <Image Source="Assets/Branding/app-icon.png" Width="40" Height="40"
-             RenderOptions.BitmapScalingMode="HighQuality" />
-      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-        <TextBlock Text="KotobaSenpai" FontWeight="SemiBold" FontSize="{StaticResource FluentEmphasisFontSize}" />
-        <TextBlock Text="{loc:Loc Key=App_Subtitle}" Style="{StaticResource Description}" />
-      </StackPanel>
-    </Grid>
-
-    <!-- Dictionary installation blocks the content while keeping window controls accessible. -->
-    <Grid Grid.Row="1" Background="{DynamicResource SmokeFillColorDefaultBrush}"
-          Visibility="{Binding InstallController.IsBlocking, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}">
-      <ui:Card Width="400" Padding="24" HorizontalAlignment="Center" VerticalAlignment="Center">
-        <StackPanel>
-          <Image Source="{StaticResource BookOpenColorIcon}" Width="40" Height="40" Margin="0,0,0,16" />
-          <TextBlock Text="{loc:Loc Key=Install_Title}" FontWeight="SemiBold" FontSize="{StaticResource FluentSubtitleFontSize}"
-                     TextAlignment="Center" Margin="0,0,0,24" />
-          <ProgressBar Value="{Binding InstallController.Progress, RelativeSource={RelativeSource AncestorType=Window}}"
-                       Maximum="1" Height="4" />
-          <TextBlock Text="{loc:Loc Key=Install_Progress}" Style="{StaticResource Description}"
-                     TextAlignment="Center" Margin="0,12,0,0" />
-          <TextBlock Text="{Binding InstallController.Error, RelativeSource={RelativeSource AncestorType=Window}}"
-                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap"
-                     TextAlignment="Center" Margin="0,16,0,0"
-                     Visibility="{Binding InstallController.HasError, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}" />
-          <ui:Button Content="{loc:Loc Key=Install_Retry}"
-                     Command="{Binding InstallController.InstallCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                     Style="{StaticResource SettingsButton}"
-                     Appearance="Primary" HorizontalAlignment="Center" Margin="0,20,0,0"
-                     Visibility="{Binding InstallController.HasError, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}" />
-        </StackPanel>
-      </ui:Card>
-    </Grid>
+    <ContentControl Grid.Row="1" Content="{Binding}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+      <ContentControl.Resources>
+        <DataTemplate x:Key="GuideContent"><views:OnboardingPage /></DataTemplate>
+        <DataTemplate x:Key="MainContent"><views:MainContentView /></DataTemplate>
+      </ContentControl.Resources>
+      <ContentControl.Style>
+        <Style TargetType="ContentControl">
+          <Setter Property="ContentTemplate" Value="{StaticResource GuideContent}" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding Onboarding.IsMain}" Value="True">
+              <Setter Property="ContentTemplate" Value="{StaticResource MainContent}" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </ContentControl.Style>
+    </ContentControl>
   </Grid>
 </ui:FluentWindow>

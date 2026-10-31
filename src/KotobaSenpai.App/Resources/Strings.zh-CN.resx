@@ -496,4 +496,125 @@ API Key：YOUR_API_KEY
   <data name="WindowSelectionFailed" xml:space="preserve">
     <value>窗口选择失败，请重试。</value>
   </data>
+  <data name="Onboarding_Step1" xml:space="preserve">
+    <value>准备词典</value>
+  </data>
+  <data name="Onboarding_Step2" xml:space="preserve">
+    <value>配置大模型</value>
+  </data>
+  <data name="Onboarding_Step3" xml:space="preserve">
+    <value>选择窗口</value>
+  </data>
+  <data name="Onboarding_Step4" xml:space="preserve">
+    <value>开始识别</value>
+  </data>
+  <data name="Onboarding_Description1" xml:space="preserve">
+    <value>先准备好日语词典。分词、读音和词形分析，从这里开始。只需下载一次，之后即可在本地使用。</value>
+  </data>
+  <data name="Onboarding_Description2" xml:space="preserve">
+    <value>连接你常用的大模型，为词句补上语境、含义与细微的表达。配置检测通过后，就可以继续。</value>
+  </data>
+  <data name="Onboarding_Description3" xml:space="preserve">
+    <value>游戏、视频或阅读器，都可以成为你的日语课堂。选择一个正在显示日语的窗口。</value>
+  </data>
+  <data name="Onboarding_Description4" xml:space="preserve">
+    <value>词典、模型和窗口都已就绪。点下开始，让文字变得可以理解。</value>
+  </data>
+  <data name="Onboarding_Progress" xml:space="preserve">
+    <value>第 {0} 步，共 {1} 步</value>
+  </data>
+  <data name="Onboarding_Back" xml:space="preserve">
+    <value>上一步</value>
+  </data>
+  <data name="Onboarding_Next" xml:space="preserve">
+    <value>继续</value>
+  </data>
+  <data name="Onboarding_Start" xml:space="preserve">
+    <value>开始识别</value>
+  </data>
+  <data name="Onboarding_Preparing" xml:space="preserve">
+    <value>准备就绪</value>
+  </data>
+  <data name="Onboarding_PreparingDescription" xml:space="preserve">
+    <value>正在准备识别所需资源，已有引导完成状态将保留。</value>
+  </data>
+  <data name="Onboarding_RuntimePreparing" xml:space="preserve">
+    <value>正在准备识别…</value>
+  </data>
+  <data name="Onboarding_SaveFailed" xml:space="preserve">
+    <value>无法保存引导进度，请重试。</value>
+  </data>
+  <data name="Onboarding_PreparationFailed" xml:space="preserve">
+    <value>准备未能完成，请查看上方提示并重试。</value>
+  </data>
+  <data name="Onboarding_RecognitionFailed" xml:space="preserve">
+    <value>未能开始识别，请在识别页面重试。</value>
+  </data>
+  <data name="Install_Downloading" xml:space="preserve">
+    <value>正在下载词典…</value>
+  </data>
+  <data name="Install_Validating" xml:space="preserve">
+    <value>正在校验词典…</value>
+  </data>
+  <data name="Install_Extracting" xml:space="preserve">
+    <value>正在解压词典…</value>
+  </data>
+  <data name="Install_Installing" xml:space="preserve">
+    <value>正在安装词典…</value>
+  </data>
+  <data name="Install_Ready" xml:space="preserve">
+    <value>词典已就绪</value>
+  </data>
+  <data name="Onboarding_Hero1" xml:space="preserve">
+    <value>从每一个词，
+开始。</value>
+  </data>
+  <data name="Onboarding_Hero2" xml:space="preserve">
+    <value>让 AI 帮你，
+读懂言外之意。</value>
+  </data>
+  <data name="Onboarding_Hero3" xml:space="preserve">
+    <value>选一个窗口，
+看见更多。</value>
+  </data>
+  <data name="Onboarding_Hero4" xml:space="preserve">
+    <value>准备好了。
+遇见下一句日语。</value>
+  </data>
+  <data name="Onboarding_DictionaryDefinition" xml:space="preserve">
+    <value>词语；语言。连接人与世界的方式。</value>
+  </data>
+  <data name="Onboarding_DictionarySource" xml:space="preserve">
+    <value>日语形态分析词典</value>
+  </data>
+  <data name="Onboarding_DictionaryHint" xml:space="preserve">
+    <value>只需下载一次，安装后即可在本地分词。</value>
+  </data>
+  <data name="Onboarding_DictionaryReady" xml:space="preserve">
+    <value>词典已安装，可离线使用</value>
+  </data>
+  <data name="Onboarding_Manual" xml:space="preserve">
+    <value>手动配置</value>
+  </data>
+  <data name="Onboarding_Assistant" xml:space="preserve">
+    <value>交给 AI 助手</value>
+  </data>
+  <data name="Onboarding_AssistantSteps" xml:space="preserve">
+    <value>1. 复制 KotobaSenpai 配置提示词
+2. 粘贴到你使用的 AI 编程助手中
+3. 完成配置后，回到这里检测连接</value>
+  </data>
+  <data name="Onboarding_ExplanationHint" xml:space="preserve">
+    <value>用于释义与讲解，可与界面语言不同。</value>
+  </data>
+  <data name="Onboarding_SelectHint" xml:space="preserve">
+    <value>选窗本身不会开始识别。</value>
+  </data>
+  <data name="Onboarding_ReadyHint" xml:space="preserve">
+    <value>识别后，点击词语即可查看读音、词形与结合上下文的解释。</value>
+  </data>
+  <data name="Onboarding_SetupOnce" xml:space="preserve">
+    <value>只需设置一次，以后直接进入主界面。</value>
+  </data>
+  <data name="Onboarding_ConfigurationUsable" xml:space="preserve"><value>配置可用</value></data>
 </root>

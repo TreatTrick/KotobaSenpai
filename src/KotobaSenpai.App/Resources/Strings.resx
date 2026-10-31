@@ -496,4 +496,125 @@ Model discovery, detection and status leave the GUI running. Configure normally 
   <data name="WindowSelectionFailed" xml:space="preserve">
     <value>Could not start window selection. Please try again.</value>
   </data>
+  <data name="Onboarding_Step1" xml:space="preserve">
+    <value>Prepare dictionary</value>
+  </data>
+  <data name="Onboarding_Step2" xml:space="preserve">
+    <value>Configure model</value>
+  </data>
+  <data name="Onboarding_Step3" xml:space="preserve">
+    <value>Select window</value>
+  </data>
+  <data name="Onboarding_Step4" xml:space="preserve">
+    <value>Start recognition</value>
+  </data>
+  <data name="Onboarding_Description1" xml:space="preserve">
+    <value>Let’s get your Japanese dictionary ready. Word segmentation, readings and word forms, available locally after this one-time download.</value>
+  </data>
+  <data name="Onboarding_Description2" xml:space="preserve">
+    <value>Connect your preferred AI model to explore meaning, nuance and context. Check the connection before continuing.</value>
+  </data>
+  <data name="Onboarding_Description3" xml:space="preserve">
+    <value>A game, a video or a reader can be your Japanese classroom. Choose a window with Japanese text.</value>
+  </data>
+  <data name="Onboarding_Description4" xml:space="preserve">
+    <value>Your dictionary, model and window are ready. Start recognizing, and make the next sentence your own.</value>
+  </data>
+  <data name="Onboarding_Progress" xml:space="preserve">
+    <value>Step {0} of {1}</value>
+  </data>
+  <data name="Onboarding_Back" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="Onboarding_Next" xml:space="preserve">
+    <value>Continue</value>
+  </data>
+  <data name="Onboarding_Start" xml:space="preserve">
+    <value>Start recognition</value>
+  </data>
+  <data name="Onboarding_Preparing" xml:space="preserve">
+    <value>Getting ready</value>
+  </data>
+  <data name="Onboarding_PreparingDescription" xml:space="preserve">
+    <value>Preparing the resources needed for recognition. Your setup is already complete.</value>
+  </data>
+  <data name="Onboarding_RuntimePreparing" xml:space="preserve">
+    <value>Preparing recognition tools…</value>
+  </data>
+  <data name="Onboarding_SaveFailed" xml:space="preserve">
+    <value>Could not save setup progress. Please try again.</value>
+  </data>
+  <data name="Onboarding_PreparationFailed" xml:space="preserve">
+    <value>Preparation could not finish. Review any message above and try again.</value>
+  </data>
+  <data name="Onboarding_RecognitionFailed" xml:space="preserve">
+    <value>Recognition could not start. Please try again from the recognition page.</value>
+  </data>
+  <data name="Install_Downloading" xml:space="preserve">
+    <value>Downloading dictionary…</value>
+  </data>
+  <data name="Install_Validating" xml:space="preserve">
+    <value>Checking dictionary…</value>
+  </data>
+  <data name="Install_Extracting" xml:space="preserve">
+    <value>Extracting dictionary…</value>
+  </data>
+  <data name="Install_Installing" xml:space="preserve">
+    <value>Installing dictionary…</value>
+  </data>
+  <data name="Install_Ready" xml:space="preserve">
+    <value>Dictionary ready</value>
+  </data>
+  <data name="Onboarding_Hero1" xml:space="preserve">
+    <value>Every word.
+A new beginning.</value>
+  </data>
+  <data name="Onboarding_Hero2" xml:space="preserve">
+    <value>A little context.
+A lot more meaning.</value>
+  </data>
+  <data name="Onboarding_Hero3" xml:space="preserve">
+    <value>One window.
+A world to discover.</value>
+  </data>
+  <data name="Onboarding_Hero4" xml:space="preserve">
+    <value>You’re all set.
+Meet your next word.</value>
+  </data>
+  <data name="Onboarding_DictionaryDefinition" xml:space="preserve">
+    <value>Words; language. A way to connect with the world.</value>
+  </data>
+  <data name="Onboarding_DictionarySource" xml:space="preserve">
+    <value>Japanese morphology dictionary</value>
+  </data>
+  <data name="Onboarding_DictionaryHint" xml:space="preserve">
+    <value>Downloaded once. Available locally after installation.</value>
+  </data>
+  <data name="Onboarding_DictionaryReady" xml:space="preserve">
+    <value>Dictionary installed, available offline</value>
+  </data>
+  <data name="Onboarding_Manual" xml:space="preserve">
+    <value>Configure manually</value>
+  </data>
+  <data name="Onboarding_Assistant" xml:space="preserve">
+    <value>Use an AI assistant</value>
+  </data>
+  <data name="Onboarding_AssistantSteps" xml:space="preserve">
+    <value>1. Copy the KotobaSenpai setup prompt
+2. Paste it into your AI coding assistant
+3. Return here to check the connection</value>
+  </data>
+  <data name="Onboarding_ExplanationHint" xml:space="preserve">
+    <value>For definitions and explanations. Independent of the interface language.</value>
+  </data>
+  <data name="Onboarding_SelectHint" xml:space="preserve">
+    <value>Selecting a window does not start recognition.</value>
+  </data>
+  <data name="Onboarding_ReadyHint" xml:space="preserve">
+    <value>After recognition, select a word to explore readings, word forms and explanations in context.</value>
+  </data>
+  <data name="Onboarding_SetupOnce" xml:space="preserve">
+    <value>Set up once. Go straight to the app next time.</value>
+  </data>
+  <data name="Onboarding_ConfigurationUsable" xml:space="preserve"><value>Configuration ready</value></data>
 </root>

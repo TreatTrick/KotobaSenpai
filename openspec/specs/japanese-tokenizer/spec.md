@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change add-japanese-tokenizer. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: Tokenize Japanese text
 系统 SHALL 将日语文本分词为 token 序列。每个 token SHALL 暴露 surface、UniDic lemma、书写基本形 `orthBase`、表面形读音 `kana`、基本形读音 `kanaBase`、发音 `pron`、四级词性、活用类型、活用形、原始 UniDic `aType`、可选的规范化音调核以及原始输入中的起始偏移。规范化音调核 SHALL 使用 `0` 表示平板型、`1` 表示头高型、`N` 表示第 N 拍后下降；原始值缺失或无效时 SHALL 为空。
 
@@ -91,7 +92,7 @@ The system SHALL install the Doki-compatible `unidic-py` dictionary build `3.1.0
 
 #### Scenario: Application startup does not wait for installation
 - **WHEN** the application starts without an installed default dictionary
-- **THEN** installation is triggered through an observed background operation without blocking the main window
+- **THEN** the startup window remains responsive while installation runs through the first-run dictionary step, or through a separate preparation/repair surface for a user who has already completed onboarding
 - **AND** installation failure is logged without producing an unobserved task exception
 
 #### Scenario: Already installed
@@ -124,6 +125,11 @@ The system SHALL install the Doki-compatible `unidic-py` dictionary build `3.1.0
 - **THEN** only one process promotes the active dictionary directory at a time
 - **AND** all processes observe either the previous valid installation or the completed new installation, never a partial directory
 
+#### Scenario: Do not construct the recognition runtime before dictionary readiness
+- **WHEN** a new installation is still downloading, validating or extracting the dictionary
+- **THEN** the application keeps the onboarding shell responsive without resolving the tokenizer-dependent recognition object graph
+- **AND** dictionary readiness alone does not bypass the remaining onboarding steps
+
 ### Requirement: Dictionary directory override
 The system SHALL allow overriding the tokenizer dictionary location via the `KOTOBA_UNIDIC_DIR` environment variable for development and testing.
 
@@ -144,3 +150,22 @@ The release process SHALL preserve separate provenance and license evidence for 
 - **WHEN** a release build containing the tokenizer is prepared
 - **THEN** it includes the pinned LibNMeCab version and package hash, dictionary version/source/hash manifest, applicable LibNMeCab GPL/LGPL license texts, and UniDic BSD notice
 - **AND** the release records the selected LGPL compliance path for single-file, trimming, AOT, or embedded-assembly packaging
+
+### Requirement: Report dictionary installation phases accurately
+The installer SHALL expose stable downloading, validating, extracting, installing and ready phases. Percentage progress SHALL describe downloaded bytes only when a valid total length is known. Validation, extraction, installation and unknown-length downloads SHALL use indeterminate progress rather than report installation completion. The ready state SHALL be published only after the pinned asset checks and atomic promotion succeed. Heavy file work SHALL NOT block the UI message loop. Failure and cancellation SHALL preserve the existing cleanup, error-code and retry contracts; retries SHALL NOT claim byte-range resume support.
+
+#### Scenario: Finish downloading an archive
+- **WHEN** all archive bytes have been received but checksum validation or extraction is still pending
+- **THEN** the UI switches to the appropriate preparation phase and does not treat a download fraction of 1 as installation success
+
+#### Scenario: Download without a known length
+- **WHEN** the server does not provide a usable content length
+- **THEN** the UI reports downloading with indeterminate progress rather than a fabricated percentage
+
+#### Scenario: Complete atomic installation
+- **WHEN** validation, extraction and atomic promotion have succeeded
+- **THEN** the installer reports ready and the onboarding coordinator can reassess the dictionary gate
+
+#### Scenario: Fail or close during extraction
+- **WHEN** extraction fails or the application closes while extraction is underway
+- **THEN** the UI is not blocked by synchronous file work; the operation observes cancellation at supported boundaries and cleans up without declaring ready or requiring immediate mid-extraction interruption

@@ -1,0 +1,31 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="KotobaSenpai.App.Views.Onboarding.OnboardingStepLayout"
+             x:Name="LayoutRoot"
+             xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
+             xmlns:views="clr-namespace:KotobaSenpai.App.Views"
+             xmlns:steps="clr-namespace:KotobaSenpai.App.Views.Onboarding"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+  <UserControl.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/KotobaSenpai.App;component/Themes/OnboardingStyles.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </UserControl.Resources>
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="0.95*" />
+      <ColumnDefinition Width="48" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <StackPanel VerticalAlignment="Center" MaxWidth="360" HorizontalAlignment="Left">
+      <TextBlock Text="{Binding Onboarding.ProgressText}" Style="{StaticResource OnboardingCaption}" Margin="0,0,0,16" Visibility="{Binding Onboarding.IsGuideVisible, Converter={StaticResource BoolToVisibility}}" />
+      <TextBlock x:Name="StepHeading" Text="{Binding Onboarding.HeroTitle}" FontSize="34" FontWeight="SemiBold" LineHeight="44" TextWrapping="Wrap" Margin="0,0,0,17" Focusable="True" AutomationProperties.LiveSetting="Polite" />
+      <TextBlock Text="{Binding Onboarding.Description}" FontSize="14" LineHeight="25" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+      <TextBlock Text="{loc:Loc Key=Onboarding_RuntimePreparing}" Style="{StaticResource OnboardingCaption}" Margin="0,15,0,0" Visibility="{Binding Onboarding.IsPreparingRuntime, Converter={StaticResource BoolToVisibility}}" AutomationProperties.LiveSetting="Polite" />
+      <ContentControl Content="{Binding Details, ElementName=LayoutRoot}" HorizontalContentAlignment="Stretch" />
+    </StackPanel>
+    <ContentControl Grid.Column="2" Content="{Binding Visual, ElementName=LayoutRoot}" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" MaxWidth="430" />
+  </Grid>
+</UserControl>

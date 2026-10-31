@@ -1,3 +1,5 @@
+using KotobaSenpai.App.Onboarding;
+using KotobaSenpai.App.Views.Onboarding;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -10,6 +12,7 @@ using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.App.Views;
 using KotobaSenpai.App.Controls;
+using KotobaSenpai.App.Japanese;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using KotobaSenpai.Core.Llm;
@@ -62,6 +65,7 @@ public sealed class PhrasePopupThemeTests
                 Assert.Equal(backgrounds[0], backgrounds[2]);
                 CheckAgentSettingsPresentation(application);
                 CheckWindowSelectionPresentation(application);
+                CheckMainContentStartup(application);
                 completion.SetResult();
             }
             catch (Exception exception)
@@ -80,6 +84,24 @@ public sealed class PhrasePopupThemeTests
         return completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
+    private static void CheckMainContentStartup(Application application)
+    {
+        application.Resources.MergedDictionaries.Add(new ResourceDictionary
+        {
+            Source = new Uri("/KotobaSenpai.App;component/Themes/FluentColorIcons.xaml", UriKind.Relative),
+        });
+        var content = new MainContentView { Width = 1100, Height = 752 };
+        content.Measure(new Size(1100, 752));
+        content.Arrange(new Rect(0, 0, 1100, 752));
+        content.UpdateLayout();
+        var navigation = Assert.IsType<TabControl>(content.FindName("MainNavigation"));
+        Assert.NotNull(navigation.ItemContainerStyle);
+        Assert.Equal(2, navigation.Items.Count);
+        navigation.SelectedIndex = 1;
+        content.UpdateLayout();
+        Assert.IsType<SettingsPage>(navigation.SelectedContent);
+    }
+
     private static void CheckWindowSelectionPresentation(Application application)
     {
         var previousLocalizer = LocalizationHost.Localizer;
@@ -93,7 +115,7 @@ public sealed class PhrasePopupThemeTests
             {
                 localizer.ApplyCulture(CultureInfo.GetCultureInfo(culture));
                 ApplicationThemeManager.Apply(theme, WindowBackdropType.Mica, true);
-                var page = new RecognitionPage
+                var page = new TargetSelectionView
                 {
                     DataContext = new
                     {
@@ -144,6 +166,15 @@ public sealed class PhrasePopupThemeTests
                     var encoder = new PngBitmapEncoder();
                     encoder.Frames.Add(BitmapFrame.Create(bitmap));
                     encoder.Save(file);
+                    page.IsOnboarding = true;
+                    page.Width = 400;
+                    page.HorizontalAlignment = HorizontalAlignment.Center;
+                    host.UpdateLayout();
+                    Assert.Equal(400, preview.ActualWidth);
+                    Assert.InRange(preview.ActualHeight, 244, 246);
+                    Assert.False(select.IsVisible);
+                    Assert.True(image.IsVisible);
+                    Assert.Same(source, image.Source);
                 }
                 finally { host.Close(); }
             }
@@ -181,7 +212,8 @@ public sealed class PhrasePopupThemeTests
                 detector.Fail = failed;
                 llm.CheckConfigurationCommand.ExecuteAsync(null).GetAwaiter().GetResult();
                 var page = new SettingsPage { DataContext = viewModel };
-                var advanced = Assert.IsType<System.Windows.Controls.Expander>(page.FindName("AdvancedLlmSettings"));
+                var model = Assert.IsType<ModelSettingsView>(page.FindName("ModelSettings"));
+                var advanced = Assert.IsType<System.Windows.Controls.Expander>(model.FindName("AdvancedLlmSettings"));
                 Assert.True(advanced.IsExpanded);
                 var frame = new Border { Background = (Brush)application.FindResource("SolidBackgroundFillColorBaseBrush"), Child = page };
                 TextElement.SetForeground(frame, (Brush)application.FindResource("TextFillColorPrimaryBrush"));
@@ -203,14 +235,14 @@ public sealed class PhrasePopupThemeTests
                     var content = Assert.IsAssignableFrom<FrameworkElement>(advanced.Content);
                     Assert.True(content.IsVisible);
                     Assert.True(content.ActualHeight > 0);
-                    var copy = Assert.IsAssignableFrom<System.Windows.Controls.Button>(page.FindName("CopyAgentPromptButton"));
+                    var copy = Assert.IsAssignableFrom<System.Windows.Controls.Button>(model.FindName("CopyAgentPromptButton"));
                     Assert.Equal(localizer.Get("Agent_CopyPrompt"), copy.Content);
                     Assert.True(copy.ActualWidth > 0);
                     llm.ReportPromptCopy(true);
                     frame.UpdateLayout();
-                    var copyStatus = Assert.IsType<System.Windows.Controls.TextBlock>(page.FindName("AgentPromptCopyStatusText"));
-                    var copyStatusIcon = Assert.IsType<SymbolIcon>(page.FindName("AgentPromptCopyStatusIcon"));
-                    var agentCard = Assert.IsType<KotobaSenpai.App.Controls.SettingsCard>(page.FindName("AgentApiConfigurationCard"));
+                    var copyStatus = Assert.IsType<System.Windows.Controls.TextBlock>(model.FindName("AgentPromptCopyStatusText"));
+                    var copyStatusIcon = Assert.IsType<SymbolIcon>(model.FindName("AgentPromptCopyStatusIcon"));
+                    var agentCard = Assert.IsType<KotobaSenpai.App.Controls.SettingsCard>(model.FindName("AgentApiConfigurationCard"));
                     Assert.True(agentCard.IsAncestorOf(copyStatus));
                     Assert.Equal(localizer.Get("Agent_PromptCopied"), copyStatus.Text);
                     Assert.Equal(SymbolRegular.CheckmarkCircle24, copyStatusIcon.Symbol);
@@ -225,21 +257,21 @@ public sealed class PhrasePopupThemeTests
                     Assert.Same(application.FindResource("SystemFillColorCriticalBrush"), copyStatusIcon.Foreground);
                     llm.ReportPromptCopy(true);
                     frame.UpdateLayout();
-                    var check = Assert.IsAssignableFrom<System.Windows.Controls.Button>(page.FindName("CheckConfigurationButton"));
-                    var checkCard = Assert.IsType<Card>(page.FindName("ConfigurationCheckCard"));
+                    var check = Assert.IsAssignableFrom<System.Windows.Controls.Button>(model.FindName("CheckConfigurationButton"));
+                    var checkCard = Assert.IsType<Card>(model.FindName("ConfigurationCheckCard"));
                     Assert.True(checkCard.IsAncestorOf(check));
-                    Assert.True(checkCard.IsAncestorOf(Assert.IsType<System.Windows.Controls.TextBlock>(page.FindName("ConfigurationOperationStatusText"))));
-                    Assert.True(checkCard.IsAncestorOf(Assert.IsType<System.Windows.Controls.TextBlock>(page.FindName("ConfigurationErrorDetailsText"))));
+                    Assert.True(checkCard.IsAncestorOf(Assert.IsType<System.Windows.Controls.TextBlock>(model.FindName("ConfigurationOperationStatusText"))));
+                    Assert.True(checkCard.IsAncestorOf(Assert.IsType<System.Windows.Controls.TextBlock>(model.FindName("ConfigurationErrorDetailsText"))));
                     Assert.Equal(localizer.Get("Agent_CheckConfiguration"),
-                        Assert.IsType<System.Windows.Controls.TextBlock>(page.FindName("CheckConfigurationLabel")).Text);
-                    var label = Assert.IsType<System.Windows.Controls.TextBlock>(page.FindName("ConfigurationValidationText"));
+                        Assert.IsType<System.Windows.Controls.TextBlock>(model.FindName("CheckConfigurationLabel")).Text);
+                    var label = Assert.IsType<System.Windows.Controls.TextBlock>(model.FindName("ConfigurationValidationText"));
                     Assert.Equal(localizer.Get(failed ? "Agent_ConfigurationUnavailable" : "Agent_ConfigurationUsable"), label.Text);
                     Assert.Same(application.FindResource(failed ? "SystemFillColorCriticalBrush" : "SystemFillColorSuccessBrush"), label.Foreground);
-                    var success = Assert.IsType<SymbolIcon>(page.FindName("ConfigurationSuccessIcon"));
-                    var error = Assert.IsType<SymbolIcon>(page.FindName("ConfigurationErrorIcon"));
+                    var success = Assert.IsType<SymbolIcon>(model.FindName("ConfigurationSuccessIcon"));
+                    var error = Assert.IsType<SymbolIcon>(model.FindName("ConfigurationErrorIcon"));
                     Assert.Equal(!failed, success.IsVisible);
                     Assert.Equal(failed, error.IsVisible);
-                    var copyError = Assert.IsAssignableFrom<System.Windows.Controls.Button>(page.FindName("CopyConfigurationErrorButton"));
+                    var copyError = Assert.IsAssignableFrom<System.Windows.Controls.Button>(model.FindName("CopyConfigurationErrorButton"));
                     Assert.Equal(failed, copyError.IsVisible);
                     Assert.True(check.TranslatePoint(new Point(check.ActualWidth, 0), page).X
                         < label.TranslatePoint(new Point(0, 0), page).X);
@@ -264,7 +296,7 @@ public sealed class PhrasePopupThemeTests
                     detector.Pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
                     var checking = llm.CheckConfigurationCommand.ExecuteAsync(null);
                     frame.UpdateLayout();
-                    var ring = Assert.IsType<ProgressRing>(page.FindName("ConfigurationProgressRing"));
+                    var ring = Assert.IsType<ProgressRing>(model.FindName("ConfigurationProgressRing"));
                     Assert.True(ring.IsVisible);
                     Assert.True(ring.IsIndeterminate);
                     Assert.False(check.IsEnabled);
@@ -289,8 +321,184 @@ public sealed class PhrasePopupThemeTests
                 }
                 finally { preview.Close(); }
             }
+            CheckOnboardingLanguageSelection(application, settings, viewModel, language, localizer);
         }
         finally { LocalizationHost.Localizer = previousLocalizer; }
+    }
+
+    private static void CheckOnboardingLanguageSelection(Application application, MemorySettings settings,
+        SettingsPageViewModel settingsViewModel, LanguageService language, ResourceManagerStringLocalizer localizer)
+    {
+        application.Resources.MergedDictionaries.Add(new ResourceDictionary
+            { Source = new Uri("/KotobaSenpai.App;component/Themes/FluentColorIcons.xaml", UriKind.Relative) });
+        using var installer = new UniDicDictionaryInstaller(new System.Net.Http.HttpClient(),
+            Path.Combine(Path.GetTempPath(), "kotoba-onboarding-language-tests"),
+            new("test", "https://example.com/dictionary", "test", "test", []));
+        using var dictionary = new UniDicInstallController(installer, new UserMessageResolver(localizer),
+            (_, _) => Task.CompletedTask, localizer);
+        Assert.True(language.TrySave("French"));
+        var readiness = new OnboardingReadiness(false, false);
+        var preparation = new TaskCompletionSource();
+        var preparations = 0;
+        using var onboarding = new OnboardingViewModel(settings, localizer, () => readiness,
+            _ => { preparations++; return preparation.Task; },
+            () => throw new InvalidOperationException("Recognition must not start when switching languages."));
+        using var shell = new MainWindowViewModel(settingsViewModel, dictionary, onboarding);
+        var initializing = onboarding.InitializeCommand.ExecuteAsync(null);
+        var page = new OnboardingPage { DataContext = shell };
+        var host = new Window
+        {
+            Content = page, Width = 900, Height = 620, Left = -10000, Top = -10000,
+            WindowStyle = WindowStyle.None, ShowActivated = false, ShowInTaskbar = false,
+        };
+        try
+        {
+            host.Show();
+            page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            var selector = Assert.IsType<ComboBox>(page.FindName("OnboardingLanguageSelector"));
+            Assert.Equal(language.AvailableCultures, selector.Items.Cast<CultureInfo>());
+            Assert.Equal("NativeName", selector.DisplayMemberPath);
+            var surface = Assert.IsType<Border>(page.FindName("OnboardingSurface"));
+            var themeSelector = Assert.IsType<ComboBox>(page.FindName("OnboardingThemeSelector"));
+            Assert.Equal(settingsViewModel.ThemeModes, themeSelector.Items.Cast<ThemeModeChoice>());
+
+            void CheckLanguage(OnboardingStep step)
+            {
+                var settled = new DispatcherFrame();
+                var settleTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(260) };
+                settleTimer.Tick += (_, _) => { settleTimer.Stop(); settled.Continue = false; };
+                settleTimer.Start();
+                Dispatcher.PushFrame(settled);
+                var checkpoint = settings.GetValue(OnboardingViewModel.StateKey);
+                var attempts = preparations;
+                var expectedView = "Onboarding" + step + "Step";
+                var currentView = Assert.Single(Descendants(page).OfType<UserControl>(), control => control.GetType().Name == expectedView);
+                foreach (var culture in language.AvailableCultures)
+                {
+                    Assert.True(selector.IsVisible);
+                    Assert.True(selector.IsEnabled);
+                    selector.SelectedItem = culture;
+                    page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+                    page.UpdateLayout();
+                    Assert.Same(currentView, Assert.Single(Descendants(page).OfType<UserControl>(), control => control.GetType().Name == expectedView));
+                    Assert.Equal(culture, language.CurrentCulture);
+                    Assert.Equal(culture.Name, settings.GetValue("Language"));
+                    Assert.Equal("French", language.CustomLanguage);
+                    Assert.Equal(localizer.Get("Label_Language"), System.Windows.Automation.AutomationProperties.GetName(selector));
+                    var layout = Assert.Single(Descendants(page).OfType<OnboardingStepLayout>());
+                    Assert.Equal(localizer.Get("Onboarding_Hero" + ((int)step + 1)),
+                        Assert.IsType<System.Windows.Controls.TextBlock>(layout.FindName("StepHeading")).Text);
+                    if (step == OnboardingStep.Dictionary)
+                    {
+                        Assert.Equal(localizer.Get("Onboarding_DictionaryDefinition"),
+                            Assert.Single(Descendants(page).OfType<System.Windows.Controls.TextBlock>(), text => text.Tag as string == "DictionaryDefinition").Text);
+                        Assert.Equal(localizer.Get("Onboarding_DictionarySource"),
+                            Assert.Single(Descendants(page).OfType<System.Windows.Controls.TextBlock>(), text => text.Tag as string == "DictionarySource").Text);
+                    }
+                    if (step == OnboardingStep.Ready)
+                        Assert.Equal(localizer.Get("Onboarding_ReadyHint"),
+                            Assert.Single(Descendants(page).OfType<System.Windows.Controls.TextBlock>(), text => text.Tag as string == "ReadyHint").Text);
+                    var footer = Assert.IsType<Grid>(page.FindName("OnboardingFooter"));
+                    var scroll = Assert.IsType<ScrollViewer>(page.FindName("StepScroll"));
+                    Assert.False(scroll.IsAncestorOf(footer));
+                    Assert.True(footer.IsVisible);
+                    Assert.True(footer.ActualHeight > 0);
+                    Assert.True(footer.TranslatePoint(new Point(0, footer.ActualHeight), page).Y <= page.ActualHeight);
+                    Assert.True(surface.ActualWidth <= page.ActualWidth);
+                    Assert.True(themeSelector.IsEnabled);
+                    if (step == OnboardingStep.Model)
+                    {
+                        var editor = Assert.Single(Descendants(page).OfType<OnboardingModelView>());
+                        Assert.Same(settingsViewModel, editor.DataContext);
+                        var success = Assert.IsType<Grid>(editor.FindName("ConfigurationSuccess"));
+                        Assert.Equal(settingsViewModel.Llm.IsConfigurationUsable, success.IsVisible);
+                        if (success.IsVisible)
+                        {
+                            var check = Assert.IsAssignableFrom<System.Windows.Controls.Button>(editor.FindName("CheckConfigurationButton"));
+                            var icon = Assert.IsType<SymbolIcon>(editor.FindName("ConfigurationSuccessIcon"));
+                            var text = Assert.IsType<System.Windows.Controls.TextBlock>(editor.FindName("ConfigurationSuccessText"));
+                            Assert.Equal(SymbolRegular.CheckmarkCircle24, icon.Symbol);
+                            Assert.Same(application.FindResource("SystemFillColorSuccessBrush"), icon.Foreground);
+                            Assert.Same(icon.Foreground, text.Foreground);
+                            Assert.Equal(localizer.Get("Onboarding_ConfigurationUsable"), text.Text);
+                            Assert.True(success.TranslatePoint(new Point(), editor).X >= check.TranslatePoint(new Point(check.ActualWidth, 0), editor).X);
+                            Assert.InRange(success.TranslatePoint(new Point(0, success.ActualHeight / 2), editor).Y
+                                - check.TranslatePoint(new Point(0, check.ActualHeight / 2), editor).Y, -1, 1);
+                            Assert.False(Assert.IsType<System.Windows.Controls.TextBlock>(editor.FindName("ValidationText")).IsVisible);
+                        }
+                    }
+                    foreach (var theme in new[] { ApplicationTheme.Light, ApplicationTheme.Dark })
+                    foreach (var width in new[] { 900, 1100 })
+                    {
+                        themeSelector.SelectedValue = theme == ApplicationTheme.Light ? AppThemeMode.Light : AppThemeMode.Dark;
+                        Assert.Equal(themeSelector.SelectedValue, settingsViewModel.SelectedTheme);
+                        ApplicationThemeManager.Apply(theme, WindowBackdropType.Mica, true);
+                        host.Width = width;
+                        host.Height = width == 900 ? 620 : 752;
+                        host.UpdateLayout();
+                        Assert.Same(currentView, Assert.Single(Descendants(page).OfType<UserControl>(), control => control.GetType().Name == expectedView));
+                        Assert.Same(application.FindResource("LayerFillColorDefaultBrush"), surface.Background);
+                        var badge = Assert.Single(Descendants(page).OfType<Border>(),
+                            border => border.Name == "ProgressBadge" && border.Tag is true);
+                        Assert.Same(application.FindResource("AccentFillColorDefaultBrush"), badge.Background);
+                        Assert.True(footer.TranslatePoint(new Point(0, footer.ActualHeight), page).Y <= page.ActualHeight);
+                        Assert.True(selector.TranslatePoint(new Point(selector.ActualWidth, 0), page).X <= page.ActualWidth);
+                        var bitmap = new RenderTargetBitmap(width, (int)host.Height, 96, 96, PixelFormats.Pbgra32);
+                        bitmap.Render(page);
+                        var directory = Path.Combine(AppContext.BaseDirectory, "previews");
+                        Directory.CreateDirectory(directory);
+                        using var file = File.Create(Path.Combine(directory,
+                            $"onboarding-{step}-{culture.Name}-{theme}-{width}-{(onboarding.HasError ? "error" : onboarding.IsBusy ? "busy" : "ready")}.png"));
+                        var encoder = new PngBitmapEncoder();
+                        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                        encoder.Save(file);
+                    }
+                    Assert.Equal(step, onboarding.Step);
+                    Assert.Equal(checkpoint, settings.GetValue(OnboardingViewModel.StateKey));
+                    Assert.Equal(attempts, preparations);
+                }
+            }
+
+            Assert.True(onboarding.IsBusy);
+            CheckLanguage(OnboardingStep.Dictionary);
+            preparation.SetException(new InvalidOperationException("Preparation failed."));
+            page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            initializing.GetAwaiter().GetResult();
+            Assert.True(onboarding.HasError);
+            CheckLanguage(OnboardingStep.Dictionary);
+
+            readiness = new(true, true, true, true);
+            preparation = new TaskCompletionSource();
+            initializing = onboarding.InitializeCommand.ExecuteAsync(null);
+            Assert.True(onboarding.IsPreparingRuntime);
+            CheckLanguage(OnboardingStep.Model);
+            preparation.SetResult();
+            page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            initializing.GetAwaiter().GetResult();
+            settingsViewModel.Llm.IsConfigurationUsable = true;
+            CheckLanguage(OnboardingStep.Model);
+            var modelEditor = Assert.Single(Descendants(page).OfType<OnboardingModelView>());
+            var password = Assert.IsType<System.Windows.Controls.PasswordBox>(modelEditor.FindName("LlmApiKeyPasswordBox"));
+            Assert.Equal(settingsViewModel.Llm.ApiKey, password.Password);
+            settingsViewModel.Llm.ApiKey = "external-test-key";
+            host.UpdateLayout();
+            Assert.False(Assert.IsType<Grid>(modelEditor.FindName("ConfigurationSuccess")).IsVisible);
+            Assert.Equal("external-test-key", password.Password);
+            password.Password = "edited-test-key";
+            Assert.Equal("edited-test-key", settingsViewModel.Llm.ApiKey);
+            var methods = Assert.IsType<TabControl>(modelEditor.FindName("ConfigurationMethods"));
+            methods.SelectedIndex = 1;
+            host.UpdateLayout();
+            Assert.Same(settingsViewModel.Llm, Assert.IsAssignableFrom<FrameworkElement>(methods.SelectedContent).DataContext);
+            onboarding.NextCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            CheckLanguage(OnboardingStep.Window);
+            onboarding.NextCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
+            CheckLanguage(OnboardingStep.Ready);
+            Assert.Equal(2, preparations);
+        }
+        finally { host.Close(); }
     }
 
     private static void CheckOverlayAppearancePresentation(Application application, SettingsPage page, Border frame,

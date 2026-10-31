@@ -10,6 +10,9 @@ using KotobaSenpai.Platform.Windows;
 
 namespace KotobaSenpai.App.Japanese;
 
+public enum DictionaryInstallStage { Downloading, Validating, Extracting, Installing, Ready }
+public sealed record DictionaryInstallProgress(DictionaryInstallStage Stage, double? Fraction = null);
+
 /// <summary>
 /// UniDic dictionary installer (M1 distribution): on first run downloads from a fixed URL and atomically installs into the local cache directory,
 /// and also supports importing from a validated offline archive. After download/extraction it validates the SHA-256, version, <c>unidic22</c> format, and
@@ -63,7 +66,8 @@ public sealed class UniDicDictionaryInstaller : IDisposable
     }
 
     /// <summary>Returns immediately when already installed; otherwise downloads, validates, and atomically installs. Safe to trigger in parallel before installation.</summary>
-    public async Task EnsureInstalledAsync(IProgress<double>? progress = null, CancellationToken ct = default)
+    public async Task EnsureInstalledAsync(IProgress<double>? progress = null, CancellationToken ct = default,
+        IProgress<DictionaryInstallProgress>? stages = null)
     {
         if (IsInstalled)
             return;
@@ -79,9 +83,9 @@ public sealed class UniDicDictionaryInstaller : IDisposable
             var zipPath = Path.Combine(stagingRoot, "unidic-3.1.0.zip");
             try
             {
-                await DownloadAsync(UniDicAssets.SourceUrl, zipPath, progress, ct);
+                await DownloadAsync(UniDicAssets.SourceUrl, zipPath, progress, ct, stages).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
-                await InstallFromArchiveCoreAsync(zipPath, stagingRoot, ct);
+                await InstallFromArchiveCoreAsync(zipPath, stagingRoot, ct, stages).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -110,7 +114,8 @@ public sealed class UniDicDictionaryInstaller : IDisposable
     }
 
     /// <summary>Imports from a local archive, reusing the same hash/version/format/file-set and atomic-replacement validation, without depending on the network.</summary>
-    public async Task InstallFromArchiveAsync(string archivePath, CancellationToken ct = default)
+    public async Task InstallFromArchiveAsync(string archivePath, CancellationToken ct = default,
+        IProgress<DictionaryInstallProgress>? stages = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
         if (!File.Exists(archivePath))
@@ -123,7 +128,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
             Directory.CreateDirectory(stagingRoot);
             try
             {
-                await InstallFromArchiveCoreAsync(archivePath, stagingRoot, ct);
+                await InstallFromArchiveCoreAsync(archivePath, stagingRoot, ct, stages).ConfigureAwait(false);
             }
             finally
             {
@@ -137,15 +142,18 @@ public sealed class UniDicDictionaryInstaller : IDisposable
     }
 
     /// <summary>The install core shared by online and offline paths: SHA-256 → extract → locate → version/format validation → write manifest → atomic replace.</summary>
-    private async Task InstallFromArchiveCoreAsync(string archivePath, string stagingRoot, CancellationToken ct)
+    private async Task InstallFromArchiveCoreAsync(string archivePath, string stagingRoot, CancellationToken ct,
+        IProgress<DictionaryInstallProgress>? stages)
     {
-        var sha = await ComputeSha256Async(archivePath, ct);
+        stages?.Report(new(DictionaryInstallStage.Validating));
+        var sha = await ComputeSha256Async(archivePath, ct).ConfigureAwait(false);
         if (!string.Equals(sha, _manifest.Sha256, StringComparison.OrdinalIgnoreCase))
             throw new WindowsPlatformException(
                 ErrorCodes.UniDicDictionaryInvalid,
                 $"UniDic archive SHA-256 mismatch (got {sha}, expected {_manifest.Sha256}).");
 
-        ZipFile.ExtractToDirectory(archivePath, stagingRoot);
+        stages?.Report(new(DictionaryInstallStage.Extracting));
+        await Task.Run(() => ZipFile.ExtractToDirectory(archivePath, stagingRoot), ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
 
         var dicDir = LocateDicDir(stagingRoot)
@@ -157,6 +165,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
                 ErrorCodes.UniDicDictionaryInvalid,
                 "UniDic archive version/format does not match expected unidic22 asset.");
 
+        stages?.Report(new(DictionaryInstallStage.Installing));
         // Assemble the final content (including the manifest), then take the cross-process lock and atomically replace.
         var finalStaging = Path.Combine(_cacheRoot, "final-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(finalStaging);
@@ -164,6 +173,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         WriteManifest(finalStaging);
 
         await PromoteAsync(finalStaging, ct);
+        stages?.Report(new(DictionaryInstallStage.Ready));
     }
 
     /// <summary>Serializes the dicdir replacement across processes: back up the old directory → atomically rename in the new one → clean up the backup.</summary>
@@ -216,13 +226,15 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         }
     }
 
-    private async Task DownloadAsync(string url, string destination, IProgress<double>? progress, CancellationToken ct)
+    private async Task DownloadAsync(string url, string destination, IProgress<double>? progress, CancellationToken ct,
+        IProgress<DictionaryInstallProgress>? stages)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var total = response.Content.Headers.ContentLength;
+        stages?.Report(new(DictionaryInstallStage.Downloading, total is > 0 ? 0 : null));
         await using var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
         await using var target = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true);
 
@@ -233,6 +245,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         {
             await target.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             received += read;
+            stages?.Report(new(DictionaryInstallStage.Downloading, total is > 0 ? (double)received / total.Value : null));
             if (total.HasValue && progress is not null)
                 progress.Report(total.Value == 0 ? 0 : (double)received / total.Value);
         }
@@ -337,7 +350,8 @@ public sealed class UniDicDictionaryInstaller : IDisposable
     {
         if (_disposed)
             return;
-        _inProcessLock.Dispose();
+        // In-flight operations still release this managed semaphore after cancellation; no wait handle is allocated.
+        _http.Dispose();
         _disposed = true;
     }
 }

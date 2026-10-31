@@ -2,11 +2,23 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using KotobaSenpai.App.Controls;
+using KotobaSenpai.Core.TargetWindow;
 
 namespace KotobaSenpai.App.Tests;
 
 public sealed class WindowPreviewPresentationTests
 {
+    [Fact]
+    public void Shared_preview_pixels_are_small_and_do_not_retain_the_full_frame()
+    {
+        var frame = new CapturedFrame(800, 400, new byte[800 * 400 * 4]);
+        var preview = WindowPreviewFlight.CreateThumbnailFrame(frame);
+        Assert.Equal(640, preview.Width);
+        Assert.Equal(320, preview.Height);
+        Assert.Equal(640 * 320 * 4, preview.Bgra32.Length);
+        Assert.NotEqual(frame.Bgra32, preview.Bgra32);
+    }
+
     [Theory]
     [InlineData(16, 9, 144, 81)]
     [InlineData(9, 16, 81, 144)]

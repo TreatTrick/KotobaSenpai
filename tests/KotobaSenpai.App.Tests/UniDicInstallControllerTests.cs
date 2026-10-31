@@ -32,6 +32,40 @@ public sealed class UniDicInstallControllerTests
         Assert.False(controller.IsBlocking);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Explicit_dictionary_override_is_validated_without_downloading_a_default(bool valid)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "kotoba-override-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            if (valid)
+            {
+                foreach (var name in UniDicAssets.RequiredRuntimeFiles) File.WriteAllText(Path.Combine(root, name), "fixture");
+                File.WriteAllText(Path.Combine(root, UniDicAssets.DicrcFileName), UniDicAssets.Format);
+            }
+            using var installer = new UniDicDictionaryInstaller(new HttpClient(new NoNetworkHandler()),
+                Path.Combine(root, "default"), new UniDicManifest("v", "url", "sha", "fmt", ["char.bin"]));
+            using var controller = new UniDicInstallController(installer, new UserMessageResolver(new FakeLocalizer()),
+                dictionaryOverride: () => root);
+            Assert.Equal(valid, controller.CheckInstalled());
+            await controller.InstallAsync();
+            Assert.Equal(valid, controller.IsInstalled);
+            Assert.Equal(!valid, controller.HasError);
+            if (valid) Assert.Equal(DictionaryInstallStage.Ready, controller.Stage);
+            Assert.False(Directory.Exists(Path.Combine(root, "default")));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    private sealed class NoNetworkHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("An explicit dictionary override must not download the default dictionary.");
+    }
+
     [Fact]
     public async Task Failed_install_shows_error_and_blocks()
     {

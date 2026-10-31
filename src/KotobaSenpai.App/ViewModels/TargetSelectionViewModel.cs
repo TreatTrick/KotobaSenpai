@@ -5,11 +5,123 @@ using KotobaSenpai.App.Resources;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Errors;
 using KotobaSenpai.Core.Logging;
+using KotobaSenpai.Core.Localization;
 
 namespace KotobaSenpai.App.ViewModels;
 
-public sealed partial class RecognitionPageViewModel
+/// <summary>Owns target selection and the small static preview shared by recognition and onboarding.</summary>
+public sealed partial class TargetSelectionViewModel : ObservableObject, IDisposable
 {
+    private readonly IStringLocalizer _localizer;
+    private readonly IUserMessageResolver _messageResolver;
+    private readonly ILogger _logger;
+    private readonly ITargetWindowTracker? _tracker;
+    private readonly IWindowFrameCapture? _capture;
+    private readonly Func<CapturedFrame, CapturedFrame> _createPreview;
+    private bool _disposed;
+    private bool _recognitionActive;
+    private Func<string> _renderStatus = () => string.Empty;
+
+    public TargetSelectionViewModel(IWindowPicker picker, IStringLocalizer localizer,
+        IUserMessageResolver messageResolver, ILogger logger, Func<CapturedFrame, CapturedFrame> createPreview,
+        ITargetWindowTracker? tracker = null,
+        IWindowFrameCapture? capture = null)
+    {
+        _picker = picker;
+        _localizer = localizer;
+        _messageResolver = messageResolver;
+        _logger = logger;
+        _tracker = tracker;
+        _capture = capture;
+        _createPreview = createPreview;
+        if (_tracker is not null) _tracker.Changed += OnTargetStateChanged;
+        _localizer.CultureChanged += OnCultureChanged;
+        SetStatus(ResourceKeys.Status_SelectTarget);
+    }
+
+    public event EventHandler? SelectionCommitted;
+    [ObservableProperty] private WindowTarget? _selectedWindow;
+    [ObservableProperty] private string _status = string.Empty;
+    [ObservableProperty] private CapturedFrame? _previewFrame;
+    public bool IsTargetReady => SelectedWindow is not null && !_targetUnavailable;
+    public bool IsAcquiringPreview => _acquiringPreview;
+    /// <summary>Updates the status prompt after a window is selected.</summary>
+    partial void OnSelectedWindowChanged(WindowTarget? value)
+    {
+        if (!_committingSelection) _selectionCancellation?.Cancel();
+        InvalidatePreview();
+        SelectionCommitted?.Invoke(this, EventArgs.Empty);
+        _awaitingRecognition = value is not null;
+        try
+        {
+            if (value is null)
+                _tracker?.Detach();
+            else
+                _tracker?.Attach(value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to attach the selected target window");
+        }
+
+        if (!Equals(SelectedWindow, value)) return;
+        UpdateSelectionHighlight();
+        NotifySelectionState();
+        SetStatus(value is null ? ResourceKeys.Status_SelectTarget : ResourceKeys.Status_Selected,
+                  value?.Title ?? string.Empty);
+    }
+
+
+    public bool RefreshTarget()
+    {
+        _tracker?.Refresh();
+        return IsTargetReady && !IsSelectingWindow;
+    }
+
+    public void BeginRecognition()
+    {
+        _recognitionActive = true;
+        _awaitingRecognition = false;
+        UpdateSelectionHighlight();
+        NotifySelectionState();
+    }
+
+    public void EndRecognition()
+    {
+        _recognitionActive = false;
+        NotifySelectionState();
+    }
+
+    private void SetStatus(string key, params object[] args)
+    {
+        _renderStatus = () => _localizer.Get(key, args);
+        Status = _renderStatus();
+    }
+
+    private void SetError(Exception exception, string code)
+    {
+        _logger.LogError(exception, "Target selection failed.");
+        _renderStatus = () => _messageResolver.Resolve(exception, code);
+        Status = _renderStatus();
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        Status = _renderStatus();
+        NotifySelectionState();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        UpdateSelectionHighlight();
+        CancelWindowSelection();
+        InvalidatePreview();
+        if (_tracker is not null) _tracker.Changed -= OnTargetStateChanged;
+        _localizer.CultureChanged -= OnCultureChanged;
+    }
+
     private readonly IWindowPicker _picker;
     private readonly SynchronizationContext? _selectionContext = SynchronizationContext.Current;
     private readonly int _selectionThread = Environment.CurrentManagedThreadId;
@@ -44,7 +156,7 @@ public sealed partial class RecognitionPageViewModel
 
     private bool CanOperate() => !_disposed && !IsSelectingWindow;
     private bool CanRetryPreview() => CanOperate() && HasPreviewError && SelectedWindow is not null
-        && !_targetUnavailable && !_recognitionSessionActive && _manualRecognition is null;
+        && !_targetUnavailable && !_recognitionActive;
 
     [RelayCommand(CanExecute = nameof(CanOperate))]
     private async Task SelectWindowAsync()
@@ -121,6 +233,7 @@ public sealed partial class RecognitionPageViewModel
             if (after is not null && (after.Handle != target.Handle || !after.IsCapturable
                 || after.Bounds.Width != frame.Width || after.Bounds.Height != frame.Height))
                 throw new InvalidOperationException("The target layout changed during preview acquisition.");
+            PreviewFrame = _createPreview(frame);
             PreviewReady?.Invoke(this, new WindowPreviewEventArgs(version, after?.Bounds ?? target.Bounds, frame, animate));
             if (_disposed || version != SelectionVersion) return;
             HasPreview = true;
@@ -158,6 +271,7 @@ public sealed partial class RecognitionPageViewModel
     {
         SelectionVersion++;
         HasPreview = false;
+        PreviewFrame = null;
         HasPreviewError = false;
         _previewError = null;
         _targetClosed = false;
@@ -223,9 +337,7 @@ public sealed partial class RecognitionPageViewModel
         OnPropertyChanged(nameof(SelectionButtonText));
         SelectWindowCommand.NotifyCanExecuteChanged();
         RetryPreviewCommand.NotifyCanExecuteChanged();
-        RecognizeCommand.NotifyCanExecuteChanged();
-        SetRecognitionRegionCommand.NotifyCanExecuteChanged();
-        HideCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(IsTargetReady));
     }
 
     partial void OnIsSelectingWindowChanged(bool value) => NotifySelectionState();

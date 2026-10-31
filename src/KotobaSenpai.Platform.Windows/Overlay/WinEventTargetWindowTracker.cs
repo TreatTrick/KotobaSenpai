@@ -70,6 +70,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private nint _reorderHook;
     private nint _foregroundHook;
     private nint _targetHandle;
+    private uint _targetThreadId;
+    private uint _targetProcessId;
+    private volatile bool _targetDestroyed;
     private string? _lastOcclusionDiagnosticState;
     private bool _refreshPosted;
     private bool _disposed;
@@ -109,7 +112,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         return InvokeOnDispatcher(() =>
         {
             ThrowIfDisposed();
-            if (_targetHandle == target.Handle && HooksRegistered())
+            var threadId = NativeMethods.GetWindowThreadProcessId(target.Handle, out var processId);
+            if (_targetHandle == target.Handle && HooksRegistered()
+                && IsSameIdentity(_targetThreadId, _targetProcessId, threadId, processId, _targetDestroyed))
             {
                 _logger?.Log(
                     LogLevel.Debug,
@@ -123,6 +128,8 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
             DetachCore();
             _targetHandle = target.Handle;
+            _targetThreadId = threadId;
+            _targetProcessId = processId;
             try
             {
                 RegisterHooks();
@@ -197,6 +204,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
                     return;
                 if (!IsRelevantEvent(eventType, hwnd, _targetHandle, idObject, idChild, OverlayWindowRegistry.Snapshot()))
                     return;
+                if (eventType == EventObjectDestroy && hwnd == _targetHandle) _targetDestroyed = true;
                 if (_refreshPosted)
                     return;
                 _refreshPosted = true;
@@ -261,7 +269,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
     private TargetWindowSnapshot RefreshCore(string title, ScreenRect fallbackBounds)
     {
-        if (!NativeMethods.IsWindow(_targetHandle))
+        var threadId = NativeMethods.GetWindowThreadProcessId(_targetHandle, out var processId);
+        if (!NativeMethods.IsWindow(_targetHandle)
+            || !IsSameIdentity(_targetThreadId, _targetProcessId, threadId, processId, _targetDestroyed))
             return new TargetWindowSnapshot(_targetHandle, title, fallbackBounds, 1, false, true, false, false, false);
 
         var visible = NativeMethods.IsWindowVisible(_targetHandle);
@@ -283,6 +293,10 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             NativeMethods.GetForegroundWindow() == _targetHandle,
             IsOccluded(bounds, _targetHandle));
     }
+
+    internal static bool IsSameIdentity(uint expectedThread, uint expectedProcess, uint thread, uint process, bool destroyed)
+        => !destroyed && expectedThread != 0 && expectedProcess != 0
+            && thread == expectedThread && process == expectedProcess;
 
     private bool IsOccluded(ScreenRect targetBounds, nint targetHandle)
     {
@@ -519,6 +533,9 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         lock (_gate)
         {
             _targetHandle = nint.Zero;
+            _targetThreadId = 0;
+            _targetProcessId = 0;
+            _targetDestroyed = false;
             _lastOcclusionDiagnosticState = null;
             _current = null;
             _refreshPosted = false;

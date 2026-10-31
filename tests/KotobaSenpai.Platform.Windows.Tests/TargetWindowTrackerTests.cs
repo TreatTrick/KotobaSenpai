@@ -7,6 +7,14 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class TargetWindowTrackerTests
 {
     [Theory]
+    [InlineData(10u, 20u, false, true)]
+    [InlineData(11u, 20u, false, false)]
+    [InlineData(10u, 21u, false, false)]
+    [InlineData(10u, 20u, true, false)]
+    public void Reused_or_destroyed_window_identity_is_not_the_selected_target(uint thread, uint process, bool destroyed, bool expected)
+        => Assert.Equal(expected, WinEventTargetWindowTracker.IsSameIdentity(10, 20, thread, process, destroyed));
+
+    [Theory]
     [InlineData(1, false)]
     [InlineData(29, false)]
     [InlineData(30, false)]

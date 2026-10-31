@@ -13,6 +13,24 @@ namespace KotobaSenpai.App.Tests;
 public sealed class CompositionRootTests
 {
     [Fact]
+    public void Window_shell_can_be_resolved_without_constructing_the_recognition_runtime()
+    {
+        var services = new ServiceCollection();
+        typeof(App).GetMethod("ConfigureServices", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, [services]);
+        var settings = new MemorySettings();
+        services.AddSingleton<ISettingsService>(settings);
+        services.AddSingleton(new OnboardingViewModel(settings, new ResourceManagerStringLocalizer(),
+            () => new(false, false), _ => Task.CompletedTask, () => Task.CompletedTask));
+        services.AddSingleton<RecognitionPageViewModel>(_ => throw new InvalidOperationException("Recognition was initialized too early."));
+        using var provider = services.BuildServiceProvider();
+        var shell = provider.GetRequiredService<MainWindowViewModel>();
+        Assert.Null(shell.Recognition);
+        Assert.Null(shell.Selection);
+        Assert.Same(provider.GetRequiredService<SettingsPageViewModel>(), shell.Settings);
+        shell.Dispose();
+    }
+
+    [Fact]
     public void Settings_page_shares_application_preferences_and_llm_state()
     {
         var services = new ServiceCollection();
@@ -35,6 +53,29 @@ public sealed class CompositionRootTests
         page.SaveExplanationLanguageCommand.Execute(null);
         Assert.Equal("French", provider.GetRequiredService<IExplanationLanguagePreferences>().EffectiveLanguage);
         Assert.Equal("French", settings.GetValue("ExplanationLanguage"));
+    }
+
+    [Fact]
+    public async Task Shutdown_waits_for_cancelled_preparation_to_finish_cleanup()
+    {
+        var services = new ServiceCollection();
+        typeof(App).GetMethod("ConfigureServices", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, [services]);
+        var settings = new MemorySettings();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var cleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        services.AddSingleton<ISettingsService>(settings);
+        services.AddSingleton(new OnboardingViewModel(settings, new ResourceManagerStringLocalizer(), () => new(false, false),
+            async token => { entered.SetResult(); await cleanup.Task; token.ThrowIfCancellationRequested(); }, () => Task.CompletedTask));
+        using var provider = services.BuildServiceProvider();
+        var shell = provider.GetRequiredService<MainWindowViewModel>();
+        var initialization = shell.Onboarding.InitializeCommand.ExecuteAsync(null);
+        await entered.Task;
+        var stopping = shell.StopAsync();
+        var returnedBeforeCleanup = stopping.IsCompleted;
+        cleanup.SetResult();
+        await stopping;
+        await initialization;
+        Assert.False(returnedBeforeCleanup);
     }
 
     [Fact]

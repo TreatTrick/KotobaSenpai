@@ -111,7 +111,7 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
     private MeCabUniDic22Tagger CreateTagger()
     {
         _logger.LogInformation("UniDicTokenizer: loading dictionary from '{0}'", _dictionaryDirectory);
-        ValidateDictionary();
+        ValidateDictionary(_dictionaryDirectory, _requireInstalledManifest);
         try
         {
             var tagger = MeCabUniDic22Tagger.Create(_dictionaryDirectory);
@@ -131,32 +131,32 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
         }
     }
 
-    private void ValidateDictionary()
+    public static void ValidateDictionary(string dictionaryDirectory, bool requireInstalledManifest = true)
     {
         var missing = UniDicAssets.RequiredRuntimeFiles
-            .Where(f => !File.Exists(Path.Combine(_dictionaryDirectory, f)))
+            .Where(f => !File.Exists(Path.Combine(dictionaryDirectory, f)))
             .ToArray();
         if (missing.Length > 0)
             throw new WindowsPlatformException(
                 ErrorCodes.UniDicDictionaryMissing,
-                $"UniDic dictionary missing required runtime files at '{_dictionaryDirectory}': {string.Join(", ", missing)}");
+                $"UniDic dictionary missing required runtime files at '{dictionaryDirectory}': {string.Join(", ", missing)}");
 
         // The archive has no version file (see UniDicDictionaryInstaller); the version is pinned by SHA-256, so only the dicrc format is checked here.
-        var dicrcOk = File.Exists(Path.Combine(_dictionaryDirectory, UniDicAssets.DicrcFileName))
-            && File.ReadAllText(Path.Combine(_dictionaryDirectory, UniDicAssets.DicrcFileName))
+        var dicrcOk = File.Exists(Path.Combine(dictionaryDirectory, UniDicAssets.DicrcFileName))
+            && File.ReadAllText(Path.Combine(dictionaryDirectory, UniDicAssets.DicrcFileName))
                 .Contains(UniDicAssets.Format, StringComparison.Ordinal);
         if (!dicrcOk)
             throw new WindowsPlatformException(
                 ErrorCodes.UniDicDictionaryInvalid,
-                $"UniDic dictionary format mismatch at '{_dictionaryDirectory}'.");
+                $"UniDic dictionary format mismatch at '{dictionaryDirectory}'.");
 
-        if (_requireInstalledManifest)
+        if (requireInstalledManifest)
         {
-            var manifestPath = Path.Combine(_dictionaryDirectory, UniDicAssets.ManifestFileName);
+            var manifestPath = Path.Combine(dictionaryDirectory, UniDicAssets.ManifestFileName);
             if (!File.Exists(manifestPath) || !ManifestMatches(manifestPath))
                 throw new WindowsPlatformException(
                     ErrorCodes.UniDicDictionaryInvalid,
-                    $"UniDic dictionary installed manifest missing or invalid at '{_dictionaryDirectory}'.");
+                    $"UniDic dictionary installed manifest missing or invalid at '{dictionaryDirectory}'.");
         }
     }
 

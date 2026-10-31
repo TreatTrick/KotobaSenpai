@@ -45,7 +45,7 @@ internal static class WindowPickerFixture
         var workflow = new WordOverlayApplicationService(new Recognizer(),
             new WordGroupingService(new Tokenizer(), new SentenceSegmenter(), new SpanResolver()),
             new Renderer(), KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
-        using var vm = new RecognitionPageViewModel(new Win32WindowPicker(localizer, logger), workflow,
+        using var vm = new RecognitionPageViewModel(new TargetSelectionViewModel(new Win32WindowPicker(localizer, logger), localizer, new UserMessageResolver(localizer), logger, KotobaSenpai.App.Controls.WindowPreviewFlight.CreateThumbnailFrame, tracker, capture), workflow,
             new RegionSelectorWindow(new Settings(), localizer, tracker), new Settings(), localizer,
             new UserMessageResolver(localizer), logger, tracker, capture: capture);
         var page = new RecognitionPage { DataContext = vm };
@@ -53,12 +53,12 @@ internal static class WindowPickerFixture
         var previews = 0;
         void Save() => File.WriteAllText(Path.Combine(directory, "host-state.json"), JsonSerializer.Serialize(new
         {
-            selected = vm.SelectedWindow?.Handle.ToInt64(), title = vm.TargetTitle, status = vm.TargetStatus,
-            picking = vm.IsPickingWindow, busy = vm.IsSelectingWindow, preview = vm.HasPreview,
-            failed = vm.HasPreviewError, version = vm.SelectionVersion, previews,
+            selected = vm.Selection.SelectedWindow?.Handle.ToInt64(), title = vm.Selection.TargetTitle, status = vm.Selection.TargetStatus,
+            picking = vm.Selection.IsPickingWindow, busy = vm.Selection.IsSelectingWindow, preview = vm.Selection.HasPreview,
+            failed = vm.Selection.HasPreviewError, version = vm.Selection.SelectionVersion, previews,
         }));
-        vm.PropertyChanged += (_, _) => Save();
-        vm.PreviewReady += (_, _) => { previews++; Save(); };
+        vm.Selection.PropertyChanged += (_, _) => Save();
+        vm.Selection.PreviewReady += (_, _) => { previews++; Save(); };
         host.Loaded += (_, _) => Save();
         return application.Run(host);
     }

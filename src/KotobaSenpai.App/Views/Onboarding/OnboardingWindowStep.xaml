@@ -1,0 +1,27 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:steps="clr-namespace:KotobaSenpai.App.Views.Onboarding"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:views="clr-namespace:KotobaSenpai.App.Views"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="KotobaSenpai.App.Views.Onboarding.OnboardingWindowStep"
+             xmlns:loc="clr-namespace:KotobaSenpai.App.Localization">
+  <UserControl.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="/KotobaSenpai.App;component/Themes/OnboardingStyles.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </UserControl.Resources>
+  <steps:OnboardingStepLayout>
+    <steps:OnboardingStepLayout.Details>
+      <StackPanel Margin="0,25,0,0">
+        <ui:Button Content="{Binding Selection.SelectionButtonText}" Command="{Binding Selection.SelectWindowCommand}" Style="{StaticResource OnboardingButton}" HorizontalAlignment="Left" AutomationProperties.Name="{Binding Selection.SelectionButtonText}" />
+        <TextBlock Text="{loc:Loc Key=Onboarding_SelectHint}" Style="{StaticResource OnboardingCaption}" Margin="0,13,0,0" />
+        <ui:Button Content="{loc:Loc Key=WindowPicker_Retry}" Command="{Binding Selection.RetryPreviewCommand}" Style="{StaticResource OnboardingLinkButton}" HorizontalAlignment="Left" Visibility="{Binding Selection.HasPreviewError, Converter={StaticResource BoolToVisibility}}" />
+      </StackPanel>
+    </steps:OnboardingStepLayout.Details>
+    <steps:OnboardingStepLayout.Visual>
+      <views:TargetSelectionView DataContext="{Binding Selection}" IsOnboarding="True" />
+    </steps:OnboardingStepLayout.Visual>
+  </steps:OnboardingStepLayout>
+</UserControl>

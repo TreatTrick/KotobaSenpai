@@ -22,11 +22,13 @@ public sealed class LocExtension : MarkupExtension
     {
         var value = LocalizationHost.Resolve(Key);
 
-        if (serviceProvider.GetService(typeof(IProvideValueTarget)) is IProvideValueTarget pvt
-            && pvt.TargetObject is DependencyObject target
-            && pvt.TargetProperty is DependencyProperty property)
+        if (serviceProvider.GetService(typeof(IProvideValueTarget)) is IProvideValueTarget pvt)
         {
-            LocalizationHost.Register(target, property, Key);
+            // Defer template placeholders until WPF creates the actual target instance.
+            if (pvt.TargetObject is not DependencyObject)
+                return this;
+            if (pvt.TargetObject is DependencyObject target && pvt.TargetProperty is DependencyProperty property)
+                LocalizationHost.Register(target, property, Key);
         }
 
         return value;

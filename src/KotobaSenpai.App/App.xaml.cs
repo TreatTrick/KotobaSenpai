@@ -1,3 +1,4 @@
+using KotobaSenpai.App.Onboarding;
 using KotobaSenpai.Core.Workflow;
 using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.Core.Diagnostics;
@@ -9,6 +10,7 @@ using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Llm;
 using KotobaSenpai.Core.TargetWindow;
 using System.IO;
+using System.ComponentModel;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Threading;
@@ -48,6 +50,10 @@ public partial class App : Application
     private FileLogger? _logger;
     private MainWindowViewModel? _mainViewModel;
     private ConfigurationProcessLock? _settingsLease;
+    private bool _exiting;
+    private bool _closing;
+    private bool _closeAllowed;
+    private bool _handlingDispatcherError;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -66,6 +72,11 @@ public partial class App : Application
 
         var services = new ServiceCollection();
         ConfigureServices(services);
+        services.AddSingleton(sp => new OnboardingViewModel(sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<IStringLocalizer>(), () => ReadReadiness(sp),
+            ct => PrepareRuntimeAsync(sp, ct),
+            () => _mainViewModel!.Recognition!.StartRecognitionAsync(),
+            () => { _mainViewModel?.Selection?.RefreshTarget(); }));
         _services = services.BuildServiceProvider();
 
         // Before any localization resource is accessed, resolve and set the UI culture from preference/OS.
@@ -82,65 +93,99 @@ public partial class App : Application
 
         ConfigureGlobalErrorHandling();
 
-        var themeService = _services.GetRequiredService<FluentThemeService>();
-        var installController = _services.GetRequiredService<UniDicInstallController>();
-
+        _mainViewModel = _services.GetRequiredService<MainWindowViewModel>();
+        _mainViewModel.Settings.Llm.PropertyChanged += OnReadinessChanged;
+        _mainViewModel.Dictionary.PropertyChanged += OnReadinessChanged;
+        _mainViewModel.Settings.OverlayAppearance.Changed += OnOverlayAppearanceChanged;
         var window = new MainWindow
         {
-            ThemeService = themeService,
-            InstallController = installController
+            ThemeService = _services.GetRequiredService<FluentThemeService>(),
+            DataContext = _mainViewModel,
         };
+        MainWindow = window;
+        window.Closing += OnMainWindowClosing;
         window.Show();
-
-        installController.InstallationCompleted += (_, _) => InitializeRuntime(window);
-        _ = EnsureDictionaryAndInitializeAsync(installController, window);
+        _ = _mainViewModel.Onboarding.InitializeCommand.ExecuteAsync(null);
     }
 
-    private async Task EnsureDictionaryAndInitializeAsync(
-        UniDicInstallController installController,
-        MainWindow window)
+    private OnboardingReadiness ReadReadiness(IServiceProvider services)
+    {
+        var llm = services.GetRequiredService<LlmSettingsViewModel>();
+        var configuration = services.GetRequiredService<LlmConfigurationService>().GetStatus();
+        var target = _mainViewModel?.Selection;
+        return new(services.GetRequiredService<UniDicInstallController>().CheckInstalled(),
+            llm.IsConfigurationUsable && configuration.Verified
+                && !string.IsNullOrWhiteSpace(llm.Endpoint) && !string.IsNullOrWhiteSpace(llm.ApiKey)
+                && !string.IsNullOrWhiteSpace(llm.Model),
+            target?.SelectedWindow is not null, target?.IsTargetReady == true,
+            target?.IsSelectingWindow == true, llm.IsCheckingConfiguration || llm.IsFetchingModels);
+    }
+
+    private async Task PrepareRuntimeAsync(IServiceProvider services, CancellationToken cancellationToken)
     {
         try
         {
-            if (!installController.IsInstalled)
-                await installController.InstallCommand.ExecuteAsync(null);
-            else
-                InitializeRuntime(window);
+            var dictionary = services.GetRequiredService<UniDicInstallController>();
+            await dictionary.InstallAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!dictionary.IsInstalled)
+                throw new InvalidOperationException("Dictionary preparation failed.", dictionary.Failure);
+            if (_mainViewModel?.Recognition is not null) return;
+
+            // Tracking and capture bind their dispatcher during construction, before native model loading moves off-thread.
+            services.GetRequiredService<ITargetWindowTracker>();
+            services.GetRequiredService<IWindowFrameCapture>();
+            // These constructors load large native models; WPF adapters are assembled back on the UI thread.
+            await Task.Run(() =>
+            {
+                services.GetRequiredService<IWindowWordRecognizer>();
+                services.GetRequiredService<ITokenizer>();
+            }, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_exiting || _mainViewModel is null) return;
+            _mainViewModel.Recognition = services.GetRequiredService<RecognitionPageViewModel>();
+            _mainViewModel.Selection!.PropertyChanged += OnReadinessChanged;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to initialize the UniDic tokenizer during startup");
+            _logger?.LogError(ex, "Failed to prepare recognition services.");
+            throw;
         }
     }
 
-    private void InitializeRuntime(MainWindow? window)
+    private void OnReadinessChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (window is null || window.DataContext is not null || _services is null)
-            return;
+        if (!_exiting) _mainViewModel?.Onboarding.Refresh();
+    }
 
-        try
-        {
-            // Resolving these singletons now constructs the OCR model and UniDic tagger during startup.
-            _services.GetRequiredService<IWindowWordRecognizer>();
-            _mainViewModel = _services.GetRequiredService<MainWindowViewModel>();
-            _mainViewModel.Settings.OverlayAppearance.Changed += OnOverlayAppearanceChanged;
-            window.DataContext = _mainViewModel;
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to initialize recognition services during startup");
-        }
+    private async void OnMainWindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (_closeAllowed || _mainViewModel is null) return;
+        e.Cancel = true;
+        if (_closing || sender is not Window window) return;
+        _closing = true;
+        window.IsEnabled = false;
+        try { await _mainViewModel.StopAsync(); }
+        catch (Exception ex) { _logger?.LogError(ex, "Failed to finish cancellation during shutdown."); }
+        _closeAllowed = true;
+        _ = window.Dispatcher.BeginInvoke(() => window.Close());
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         try
         {
+            _exiting = true;
             if (_mainViewModel is not null)
+            {
                 _mainViewModel.Settings.OverlayAppearance.Changed -= OnOverlayAppearanceChanged;
+                _mainViewModel.Settings.Llm.PropertyChanged -= OnReadinessChanged;
+                _mainViewModel.Dictionary.PropertyChanged -= OnReadinessChanged;
+                if (_mainViewModel.Selection is not null)
+                    _mainViewModel.Selection.PropertyChanged -= OnReadinessChanged;
+            }
             _mainViewModel?.Dispose();
-            _services?.GetService<IAutoRecognitionController>()?.Stop();
-            _services?.GetService<IWindowFrameCapture>()?.Stop();
             _services?.Dispose();
         }
         finally
@@ -152,7 +197,10 @@ public partial class App : Application
     }
 
     private void OnOverlayAppearanceChanged(object? sender, EventArgs e)
-        => _services?.GetRequiredService<WpfOverlayRenderer>().RefreshAppearance();
+    {
+        if (_mainViewModel?.Recognition is not null)
+            _services?.GetRequiredService<WpfOverlayRenderer>().RefreshAppearance();
+    }
 
     /// <summary>HttpClient for the dictionary download: a 502MB archive download needs a long timeout to avoid failing mid-way on the default 100s.</summary>
     private static HttpClient CreateDownloadHttpClient()
@@ -245,6 +293,10 @@ public partial class App : Application
         services.AddSingleton<LlmSettingsViewModel>();
         services.AddSingleton<OverlayAppearanceViewModel>();
         services.AddSingleton<SettingsPageViewModel>();
+        services.AddSingleton(sp => new TargetSelectionViewModel(sp.GetRequiredService<IWindowPicker>(),
+            sp.GetRequiredService<IStringLocalizer>(), sp.GetRequiredService<IUserMessageResolver>(),
+            sp.GetRequiredService<ILogger>(), Controls.WindowPreviewFlight.CreateThumbnailFrame,
+            sp.GetRequiredService<ITargetWindowTracker>(), sp.GetRequiredService<IWindowFrameCapture>()));
         services.AddSingleton<RecognitionPageViewModel>();
         services.AddSingleton<MainWindowViewModel>();
     }
@@ -259,11 +311,14 @@ public partial class App : Application
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        e.Handled = true;
+        // A modal notice pumps dispatcher messages; the same layout failure must not open another notice.
+        if (_handlingDispatcherError) return;
+        _handlingDispatcherError = true;
         // Log (FileLogger flushes on each write, so it is on disk before a crash), then prompt the user, then exit in a controlled way.
         Try(() => _logger?.LogError(e.Exception, "Unhandled exception on dispatcher thread"));
-        ShowUnexpectedErrorNotice();
-        e.Handled = true;
-        Shutdown(1);
+        try { ShowUnexpectedErrorNotice(); }
+        finally { Shutdown(1); }
     }
 
     private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)

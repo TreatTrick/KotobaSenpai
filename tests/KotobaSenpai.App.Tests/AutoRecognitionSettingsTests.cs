@@ -45,7 +45,7 @@ public sealed class AutoRecognitionSettingsTests
         var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
         var viewModel = Create(settings, controller, target);
 
-        viewModel.SelectedWindow = target;
+        viewModel.Selection.SelectedWindow = target;
         viewModel.AutoRecognitionEnabled = true;
 
         await viewModel.RecognizeCommand.ExecuteAsync(null);
@@ -79,7 +79,7 @@ public sealed class AutoRecognitionSettingsTests
             new WordGroupingService(new FakeTokenizer(), new SentenceSegmenter(), new FakeSpanResolver()),
             new FakeOverlay(), KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
         return new RecognitionPageViewModel(
-            new FakeWindowPicker(target),
+            new TargetSelectionViewModel(new FakeWindowPicker(target), localizer, new UserMessageResolver(localizer), new FakeLogger(), frame => frame),
             workflow,
             new FakeRegionSelector(),
             settings,

@@ -21,6 +21,61 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
     private readonly List<string> _tempDirs = new();
 
     [Fact]
+    public async Task Offline_install_reports_ready_only_after_validation_extraction_and_promotion()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        using var installer = CreateInstaller(cacheRoot, fixture.Sha);
+        var stages = new List<DictionaryInstallStage>();
+        var progress = new InlineProgress<DictionaryInstallProgress>(value =>
+        {
+            stages.Add(value.Stage);
+            if (value.Stage == DictionaryInstallStage.Ready) Assert.True(installer.IsInstalled);
+        });
+
+        await installer.InstallFromArchiveAsync(fixture.ZipPath, stages: progress);
+
+        Assert.Equal(new[] { DictionaryInstallStage.Validating, DictionaryInstallStage.Extracting,
+            DictionaryInstallStage.Installing, DictionaryInstallStage.Ready }, stages);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Download_progress_distinguishes_known_lengths_from_indeterminate_downloads(bool knownLength)
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        using var http = new HttpClient(new ArchiveHandler(File.ReadAllBytes(fixture.ZipPath), knownLength));
+        using var installer = new UniDicDictionaryInstaller(http, cacheRoot, Manif(cacheRoot, fixture.Sha));
+        var progress = new List<DictionaryInstallProgress>();
+        await installer.EnsureInstalledAsync(stages: new InlineProgress<DictionaryInstallProgress>(progress.Add));
+        Assert.Contains(progress, item => item.Stage == DictionaryInstallStage.Downloading
+            && (knownLength ? item.Fraction == 1 : item.Fraction is null));
+        Assert.Equal(DictionaryInstallStage.Ready, progress[^1].Stage);
+        Assert.True(installer.IsInstalled);
+    }
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
+    }
+
+    private sealed class ArchiveHandler(byte[] bytes, bool knownLength) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = knownLength ? new ByteArrayContent(bytes) : new UnknownLengthContent(bytes),
+            });
+    }
+
+    private sealed class UnknownLengthContent(byte[] bytes) : HttpContent
+    {
+        protected override bool TryComputeLength(out long length) { length = 0; return false; }
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context)
+            => stream.WriteAsync(bytes).AsTask();
+    }
+
+    [Fact]
     public async Task Offline_archive_installs_atomically_and_writes_manifest()
     {
         var (cacheRoot, fixtureSha) = CreateFixture(populate: true);

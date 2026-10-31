@@ -67,6 +67,16 @@ public sealed partial class LocalizationKeyCoverageTests
     [InlineData("src/KotobaSenpai.App/MainWindow.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/RecognitionPage.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/SettingsPage.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/ModelSettingsView.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/OnboardingModelView.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/TargetSelectionView.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/MainContentView.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/OnboardingPage.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingStepLayout.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingDictionaryStep.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingModelStep.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingWindowStep.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingReadyStep.xaml")]
     [InlineData("src/KotobaSenpai.App/Controls/OverlayColorPicker.xaml")]
     public void Every_xaml_loc_key_has_english_and_chinese_resource_entries(string sourcePath)
     {

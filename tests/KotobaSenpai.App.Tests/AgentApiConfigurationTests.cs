@@ -135,6 +135,8 @@ public sealed class AgentApiConfigurationTests : IDisposable
     {
         var settings = new SettingsService(FilePath);
         settings.SetValue("Theme", "Dark");
+        settings.SetValue("OnboardingState", "model");
+        settings.SetValue("ExplanationLanguage", "French");
         var handler = new ProviderHandler(supported);
         var result = await Create(settings, handler).ExecuteAsync("configure", Request);
 
@@ -146,6 +148,8 @@ public sealed class AgentApiConfigurationTests : IDisposable
         Assert.All(handler.Calls, call => Assert.Contains("tenant=demo", call.Uri.Query));
         Assert.Equal("test-secret", new SettingsService(FilePath).GetValue(LlmSettingsKeys.ApiKey));
         Assert.Equal("Dark", settings.GetValue("Theme"));
+        Assert.Equal("model", new SettingsService(FilePath).GetValue("OnboardingState"));
+        Assert.Equal("French", new SettingsService(FilePath).GetValue("ExplanationLanguage"));
         Assert.DoesNotContain(Request.ApiKey!, JsonSerializer.Serialize(result));
     }
 

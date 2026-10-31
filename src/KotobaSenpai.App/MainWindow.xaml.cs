@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Windows;
-using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Themes;
 using KotobaSenpai.App.ViewModels;
 using Wpf.Ui.Controls;
@@ -26,16 +25,6 @@ public partial class MainWindow : FluentWindow
     {
         get => (FluentThemeService?)GetValue(ThemeServiceProperty);
         set => SetValue(ThemeServiceProperty, value);
-    }
-
-    public static readonly DependencyProperty InstallControllerProperty =
-        DependencyProperty.Register(nameof(InstallController), typeof(UniDicInstallController), typeof(MainWindow));
-
-    /// <summary>Drives the startup overlay while recognition services are being initialized.</summary>
-    public UniDicInstallController? InstallController
-    {
-        get => (UniDicInstallController?)GetValue(InstallControllerProperty);
-        set => SetValue(InstallControllerProperty, value);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
