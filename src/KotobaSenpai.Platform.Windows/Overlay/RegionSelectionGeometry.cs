@@ -52,7 +52,8 @@ internal static class RegionSelectionGeometry
             if (dy <= verticalLength + HitPadding && dx <= ArmThickness + HitPadding)
                 return xEdge;
         }
-        return RegionDragMode.Move;
+        var bounds = new Rect(region.X / scale, region.Y / scale, region.Width / scale, region.Height / scale);
+        return bounds.Contains(point) ? RegionDragMode.Move : RegionDragMode.None;
     }
 
     public static ScreenRect Drag(ScreenRect initial, RegionDragMode mode, Vector delta, int windowWidth, int windowHeight)

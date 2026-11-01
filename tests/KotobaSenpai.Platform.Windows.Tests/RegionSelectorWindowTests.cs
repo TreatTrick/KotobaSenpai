@@ -17,6 +17,36 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class RegionSelectorWindowTests
 {
     [Fact]
+    public Task Editor_region_has_a_nearly_transparent_input_surface_around_the_confirm_button() => RunSta(() =>
+    {
+        var (window, target) = CreateTarget();
+        var selector = new RegionSelectorWindow(new RecordingSettings());
+        try
+        {
+            var region = new RecognitionRegion(0.1, 0.2, 0.6, 0.5);
+            selector.Show(target, region);
+            selector.UpdateLayout();
+            var canvas = Assert.IsType<Canvas>(selector.Content);
+            var scale = PresentationSource.FromVisual(selector)!.CompositionTarget!.TransformToDevice.M11;
+            var pixels = region.ToPixelRect(target.Bounds.Width, target.Bounds.Height);
+            var point = new Point((pixels.X + pixels.Width / 4d) / scale,
+                (pixels.Y + pixels.Height / 2d) / scale);
+            var image = new RenderTargetBitmap((int)Math.Ceiling(selector.Width),
+                (int)Math.Ceiling(selector.Height), 96, 96, PixelFormats.Pbgra32);
+            image.Render(canvas);
+
+            Assert.Equal(1, PixelAt(image, (int)point.X, (int)point.Y).Alpha);
+            Assert.IsType<System.Windows.Shapes.Rectangle>(canvas.InputHitTest(point));
+            Assert.Same(Cursors.Arrow, selector.Cursor);
+        }
+        finally
+        {
+            selector.Close();
+            window.Close();
+        }
+    });
+
+    [Fact]
     public Task Confirm_button_remains_clickable_across_redraws_and_stops_animation_when_hidden() => RunSta(() =>
     {
         var (window, target) = CreateTarget();
@@ -31,7 +61,7 @@ public sealed class RegionSelectorWindowTests
             var canvas = Assert.IsType<Canvas>(selector.Content);
             var button = Assert.Single(canvas.Children.OfType<Button>());
             Assert.Same(Cursors.Hand, button.Cursor);
-            Assert.Same(Cursors.SizeAll, selector.Cursor);
+            Assert.Same(Cursors.Arrow, selector.Cursor);
             var border = SystemParameters.HighContrast ? null : Assert.IsType<LinearGradientBrush>(button.BorderBrush);
             var rotation = border is null ? null : Assert.IsType<RotateTransform>(border.RelativeTransform);
             if (rotation is not null)

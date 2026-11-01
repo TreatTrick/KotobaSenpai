@@ -23,7 +23,11 @@ public sealed class RegionSelectionGeometryTests
     [InlineData(120, 78, "Top")]
     [InlineData(300, 180, "Move")]
     [InlineData(300, 80, "Move")]
-    [InlineData(50, 50, "Move")]
+    [InlineData(50, 50, "None")]
+    [InlineData(99, 180, "None")]
+    [InlineData(501, 180, "None")]
+    [InlineData(300, 79, "None")]
+    [InlineData(300, 281, "None")]
     public void Bracket_hit_targets_follow_the_visible_arms_at_every_dpi(double x, double y, string expected)
     {
         foreach (var scale in new[] { 1d, 1.5, 2 })

@@ -23,8 +23,9 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 /// </summary>
 public sealed class RegionSelectorWindow : Window, IRegionSelector
 {
-    private static readonly Brush DimBrush = new SolidColorBrush(Color.FromArgb(0x80, 0x00, 0x00, 0x00));
-    private static readonly Brush HandleBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x00));
+    private static readonly Brush DimBrush = (Brush)new SolidColorBrush(Color.FromArgb(0x80, 0x00, 0x00, 0x00)).GetAsFrozen();
+    private static readonly Brush RegionInputBrush = (Brush)new SolidColorBrush(Color.FromArgb(0x01, 0x00, 0x00, 0x00)).GetAsFrozen();
+    private static readonly Brush HandleBrush = (Brush)new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x00)).GetAsFrozen();
 
     private readonly ISettingsService _settings;
     private readonly IStringLocalizer? _localizer;
@@ -91,7 +92,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         Topmost = false;
         ShowActivated = false;
         ResizeMode = ResizeMode.NoResize;
-        Cursor = Cursors.SizeAll;
+        Cursor = Cursors.Arrow;
         Content = _canvas;
         IsVisibleChanged += (_, _) =>
         {
@@ -386,6 +387,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             return;
         var p = e.GetPosition(_canvas);
         _dragMode = RegionSelectionGeometry.HitTest(_region, _scale, p);
+        if (_dragMode == RegionDragMode.None)
+            return;
         _dragStart = new Point(p.X * _scale, p.Y * _scale);
         _dragRegion = _region;
         if (CaptureMouse())
@@ -440,7 +443,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _dragMode = RegionDragMode.None;
         if (IsMouseCaptured)
             ReleaseMouseCapture();
-        Cursor = Cursors.SizeAll;
+        Cursor = Cursors.Arrow;
     }
 
     private void UpdatePointerCursor(Point point)
@@ -458,7 +461,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             RegionDragMode.Top or RegionDragMode.Bottom => Cursors.SizeNS,
             RegionDragMode.TopLeft or RegionDragMode.BottomRight => Cursors.SizeNWSE,
             RegionDragMode.TopRight or RegionDragMode.BottomLeft => Cursors.SizeNESW,
-            _ => Cursors.SizeAll,
+            RegionDragMode.Move => Cursors.SizeAll,
+            _ => Cursors.Arrow,
         };
     }
 
@@ -520,6 +524,9 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             return;
         }
 
+        // Layered windows pass mouse input through pixels with zero alpha.
+        AddRect(sx, sy, sw, sh, RegionInputBrush);
+
         // Dim the four areas outside the region so the capture range stands out.
         AddRect(0, 0, winW, sy);
         AddRect(0, sy + sh, winW, winH - sy - sh);
@@ -541,11 +548,11 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _canvas.Children.Add(_confirmButton);
     }
 
-    private void AddRect(double x, double y, double w, double h)
+    private void AddRect(double x, double y, double w, double h, Brush? fill = null)
     {
         if (w <= 0 || h <= 0)
             return;
-        var rect = new System.Windows.Shapes.Rectangle { Width = w, Height = h, Fill = DimBrush };
+        var rect = new System.Windows.Shapes.Rectangle { Width = w, Height = h, Fill = fill ?? DimBrush };
         Canvas.SetLeft(rect, x);
         Canvas.SetTop(rect, y);
         _canvas.Children.Add(rect);
