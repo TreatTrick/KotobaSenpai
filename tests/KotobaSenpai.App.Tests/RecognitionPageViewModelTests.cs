@@ -20,6 +20,42 @@ namespace KotobaSenpai.App.Tests;
 public sealed class RecognitionPageViewModelTests
 {
     [Theory]
+    [InlineData("clear")]
+    [InlineData("close")]
+    public void Recognition_and_region_commands_require_a_selected_window(string action)
+    {
+        var tracker = new FakeTargetWindowTracker();
+        var (vm, _, _, _) = CreateVm(new FakeWindowPicker(), tracker);
+        using var lifetime = vm;
+        var recognitionStates = new List<bool>();
+        var regionStates = new List<bool>();
+        vm.RecognizeCommand.CanExecuteChanged += (_, _) => recognitionStates.Add(vm.RecognizeCommand.CanExecute(null));
+        vm.SetRecognitionRegionCommand.CanExecuteChanged += (_, _) => regionStates.Add(vm.SetRecognitionRegionCommand.CanExecute(null));
+
+        Assert.False(vm.RecognizeCommand.CanExecute(null));
+        Assert.False(vm.SetRecognitionRegionCommand.CanExecute(null));
+
+        vm.Selection.SelectedWindow = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+
+        Assert.True(vm.RecognizeCommand.CanExecute(null));
+        Assert.True(vm.SetRecognitionRegionCommand.CanExecute(null));
+        Assert.Contains(true, recognitionStates);
+        Assert.Contains(true, regionStates);
+        recognitionStates.Clear();
+        regionStates.Clear();
+
+        if (action == "close") tracker.Publish(tracker.Current! with { IsValid = false });
+        else vm.Selection.SelectedWindow = null;
+
+        Assert.False(vm.RecognizeCommand.CanExecute(null));
+        Assert.False(vm.SetRecognitionRegionCommand.CanExecute(null));
+        Assert.NotEmpty(recognitionStates);
+        Assert.NotEmpty(regionStates);
+        Assert.False(recognitionStates[^1]);
+        Assert.False(regionStates[^1]);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Manual_and_actual_automatic_completions_each_count_once_even_without_words(bool hasWords)

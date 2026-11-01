@@ -74,6 +74,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 
     public TargetSelectionViewModel Selection { get; }
     private bool CanOperate() => !_disposed && !Selection.IsSelectingWindow;
+    private bool CanOperateOnTarget() => CanOperate() && Selection.SelectedWindow is not null;
 
     private void NotifySelectionState()
     {
@@ -109,7 +110,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private string _status = string.Empty;
 
     /// <summary>Captures and recognizes Japanese words in the current window, drawing underlines.</summary>
-    [RelayCommand(CanExecute = nameof(CanOperate))]
+    [RelayCommand(CanExecute = nameof(CanOperateOnTarget))]
     private async Task RecognizeAsync()
     {
         if (!CanOperate()) return;
@@ -241,7 +242,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Opens the interactive region selector over the selected window to set the recognition sub-region.</summary>
-    [RelayCommand(CanExecute = nameof(CanOperate))]
+    [RelayCommand(CanExecute = nameof(CanOperateOnTarget))]
     private void SetRecognitionRegion()
     {
         if (!CanOperate()) return;

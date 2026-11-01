@@ -5,6 +5,17 @@
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:views="clr-namespace:KotobaSenpai.App.Views"
              xmlns:controls="clr-namespace:KotobaSenpai.App.Controls">
+  <UserControl.Resources>
+    <Style x:Key="TargetRequiredActionButton" TargetType="ui:Button" BasedOn="{StaticResource SettingsActionButton}">
+      <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+      <Setter Property="ToolTipService.IsEnabled" Value="False" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Selection.SelectedWindow}" Value="{x:Null}">
+          <Setter Property="ToolTipService.IsEnabled" Value="True" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </UserControl.Resources>
   <ScrollViewer Style="{StaticResource SettingsPageScrollViewer}">
     <StackPanel>
       <TextBlock Text="{loc:Loc Key=Tab_Recognize}" Style="{StaticResource PageTitle}" />
@@ -16,13 +27,15 @@
       <controls:SettingsCard Header="{loc:Loc Key=Label_RecognizeText}" Description="{loc:Loc Key=Description_RecognizeText}"
                              Icon="{ui:SymbolIcon ScanText24}">
         <ui:Button Content="{loc:Loc Key=Button_Recognize}" Command="{Binding RecognizeCommand}"
-                   Style="{StaticResource SettingsActionButton}" IsDefault="{Binding IsVisible, RelativeSource={RelativeSource Self}}"
+                   Style="{StaticResource TargetRequiredActionButton}" IsDefault="{Binding IsVisible, RelativeSource={RelativeSource Self}}"
+                   ToolTip="{loc:Loc Key=Status_SelectTargetFirst}"
                    Icon="{ui:SymbolIcon Play24}" Appearance="Primary" />
       </controls:SettingsCard>
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_RecognitionRegion}" Description="{loc:Loc Key=Description_RecognitionRegion}"
                              Icon="{ui:SymbolIcon Crop24}">
-        <ui:Button Content="{loc:Loc Key=Button_SetRecognitionRegion}" Command="{Binding SetRecognitionRegionCommand}" Style="{StaticResource SettingsActionButton}" />
+        <ui:Button Content="{loc:Loc Key=Button_SetRecognitionRegion}" Command="{Binding SetRecognitionRegionCommand}"
+                   Style="{StaticResource TargetRequiredActionButton}" ToolTip="{loc:Loc Key=Status_SelectTargetFirst}" />
       </controls:SettingsCard>
       <TextBlock Text="{loc:Loc Key=Label_RecognitionBehavior}" Style="{StaticResource SectionTitle}" />
 
