@@ -1,11 +1,13 @@
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Geometry;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Localization;
@@ -14,24 +16,23 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>
-/// Interactive region-selection overlay: four draggable L-shaped corner brackets bound a recognition sub-region, a
+/// Interactive region-selection overlay: draggable L-shaped corner brackets bound a movable recognition sub-region, a
 /// semi-transparent mask dims everything outside it, and a confirm button in the center finalizes and persists the region
 /// (window-relative, normalized). Unlike the click-through word-overlay window, this one captures mouse input to drag
-/// corners and click the button. Region is clamped to the window and never drops below a minimum size.
+/// bracket arms or junctions, move the region, and click the button. Region is clamped to the window and has a minimum size.
 /// </summary>
 public sealed class RegionSelectorWindow : Window, IRegionSelector
 {
-    private const double HitRadiusPx = 24;
-    private const double ArmLength = 26;
-    private const double ArmThickness = 5;
-
     private static readonly Brush DimBrush = new SolidColorBrush(Color.FromArgb(0x80, 0x00, 0x00, 0x00));
     private static readonly Brush HandleBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x9F, 0x00));
 
     private readonly ISettingsService _settings;
     private readonly IStringLocalizer? _localizer;
     private readonly ITargetWindowTracker? _tracker;
-    private readonly Canvas _canvas = new();
+    private readonly Canvas _canvas = new() { Background = Brushes.Transparent };
+    private readonly Button _confirmButton;
+    private readonly RotateTransform _confirmBorderRotation = new(0, 0.5, 0.5);
+    private readonly LinearGradientBrush _confirmBorderBrush;
     private readonly Grid _flashOutline = CreateWarningOutline();
     private readonly TextBlock _feedbackText = new()
     {
@@ -50,7 +51,9 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private RecognitionRegion _normalizedRegion = RecognitionRegion.Full;
     private ScreenRect _region;   // window-relative pixels
     private double _scale = 1.0;
-    private int _dragCorner = -1; // 0..3 = TL,TR,BL,BR; -1 = none
+    private RegionDragMode _dragMode;
+    private Point _dragStart;
+    private ScreenRect _dragRegion;
     private bool _isFlashing;
     private int _flashesRemaining;
 
@@ -62,6 +65,18 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _localizer = localizer;
         _tracker = tracker;
+        _confirmBorderBrush = new LinearGradientBrush(new GradientStopCollection
+        {
+            new(Color.FromRgb(0xEF, 0x47, 0x6F), 0),
+            new(Color.FromRgb(0xFF, 0x9F, 0x1C), 0.17),
+            new(Color.FromRgb(0xFF, 0xD1, 0x66), 0.33),
+            new(Color.FromRgb(0x06, 0xD6, 0xA0), 0.5),
+            new(Color.FromRgb(0x11, 0x8A, 0xB2), 0.67),
+            new(Color.FromRgb(0xA8, 0x55, 0xF7), 0.83),
+            new(Color.FromRgb(0xEF, 0x47, 0x6F), 1),
+        }, new Point(0, 0), new Point(1, 1)) { RelativeTransform = _confirmBorderRotation };
+        _confirmButton = CreateConfirmButton();
+        _confirmButton.Click += (_, _) => Confirm();
         _feedbackMessage = CreateWarningMessage(_feedbackText);
         _flashTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher)
         {
@@ -76,7 +91,15 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         Topmost = false;
         ShowActivated = false;
         ResizeMode = ResizeMode.NoResize;
+        Cursor = Cursors.SizeAll;
         Content = _canvas;
+        IsVisibleChanged += (_, _) =>
+        {
+            if (!IsVisible)
+                EndDrag();
+            UpdateConfirmAnimation();
+        };
+        SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
         SourceInitialized += (_, _) =>
         {
             SetOwnerHandle();
@@ -93,6 +116,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         Closed += (_, _) =>
         {
             ClearSelection();
+            SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
             if (_tracker is not null)
                 _tracker.Changed -= OnTargetChanged;
             if (_localizer is not null)
@@ -103,6 +127,58 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
     public void Show(WindowTarget target, RecognitionRegion? initial = null)
         => ShowCore(target, initial, flashing: false);
+
+    private static Button CreateConfirmButton()
+    {
+        var frame = new FrameworkElementFactory(typeof(Border));
+        frame.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+        frame.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        frame.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        frame.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+        frame.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+        var content = new FrameworkElementFactory(typeof(ContentPresenter));
+        content.SetValue(ContentPresenter.ContentSourceProperty, "Content");
+        content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        frame.AppendChild(content);
+        var template = new ControlTemplate(typeof(Button)) { VisualTree = frame };
+        var hover = new Trigger { Property = IsMouseOverProperty, Value = true };
+        hover.Setters.Add(new Setter(OpacityProperty, 0.9));
+        template.Triggers.Add(hover);
+        var pressed = new Trigger { Property = Button.IsPressedProperty, Value = true };
+        pressed.Setters.Add(new Setter(OpacityProperty, 0.8));
+        template.Triggers.Add(pressed);
+        return new Button
+        {
+            Padding = new Thickness(14, 6, 14, 6),
+            BorderThickness = new Thickness(2.5),
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Cursor = Cursors.Hand,
+            Template = template,
+        };
+    }
+
+    private void OnSystemParametersChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(SystemParameters.ClientAreaAnimation) or nameof(SystemParameters.HighContrast))
+            _ = Dispatcher.InvokeAsync(UpdateConfirmAnimation);
+    }
+
+    private void UpdateConfirmAnimation()
+    {
+        _confirmBorderRotation.BeginAnimation(RotateTransform.AngleProperty, null);
+        _confirmBorderRotation.Angle = 0;
+        _confirmButton.Background = SystemParameters.HighContrast
+            ? SystemColors.HighlightBrush : new SolidColorBrush(Color.FromRgb(0x2B, 0x6C, 0xB0));
+        _confirmButton.Foreground = SystemParameters.HighContrast ? SystemColors.HighlightTextBrush : Brushes.White;
+        _confirmButton.BorderBrush = SystemParameters.HighContrast ? SystemColors.WindowTextBrush : _confirmBorderBrush;
+        if (!IsVisible || _target is null || _isFlashing
+            || !SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast)
+            return;
+        _confirmBorderRotation.BeginAnimation(RotateTransform.AngleProperty,
+            new DoubleAnimation(0, 360, TimeSpan.FromSeconds(4)) { RepeatBehavior = RepeatBehavior.Forever });
+    }
 
     private static Grid CreateWarningOutline()
     {
@@ -173,7 +249,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             Dispatcher.Invoke(() => OnCultureChanged(sender, e));
             return;
         }
-        if (_isFlashing)
+        if (_target is not null)
             Redraw();
     }
 
@@ -273,14 +349,14 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
                 StopFlashing();
                 return;
             }
-            _dragCorner = -1;
-            if (IsMouseCaptured)
-                ReleaseMouseCapture();
+            EndDrag();
             if (IsVisible)
                 Hide();
             return;
         }
 
+        if (_target.Bounds != snapshot.Bounds)
+            EndDrag();
         _target = snapshot.Target;
         _ownerHandle = snapshot.Handle;
         SetOwnerHandle();
@@ -299,46 +375,101 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _flashOutline.Visibility = Visibility.Visible;
         SetNoActivate();
         _target = null;
-        _dragCorner = -1;
-        if (IsMouseCaptured)
-            ReleaseMouseCapture();
+        EndDrag();
+        UpdateConfirmAnimation();
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
+        if (_target is null || _isFlashing || _confirmButton.IsMouseOver)
+            return;
         var p = e.GetPosition(_canvas);
-        _dragCorner = HitCorner(p.X * _scale, p.Y * _scale);
-        if (_dragCorner >= 0)
+        _dragMode = RegionSelectionGeometry.HitTest(_region, _scale, p);
+        _dragStart = new Point(p.X * _scale, p.Y * _scale);
+        _dragRegion = _region;
+        if (CaptureMouse())
         {
-            CaptureMouse();
+            UpdatePointerCursor(p);
             e.Handled = true;
         }
+        else
+            EndDrag();
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (_dragCorner < 0 || _target is null)
+        if (_target is null || _isFlashing)
             return;
         var p = e.GetPosition(_canvas);
-        UpdateCorner(_dragCorner, p.X * _scale, p.Y * _scale);
-        Redraw();
+        if (_dragMode != RegionDragMode.None)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed)
+                EndDrag();
+            else
+            {
+                var current = new Point(p.X * _scale, p.Y * _scale);
+                _region = RegionSelectionGeometry.Drag(_dragRegion, _dragMode, current - _dragStart,
+                    _target.Bounds.Width, _target.Bounds.Height);
+                _normalizedRegion = RecognitionRegion.FromPixelRect(_region, _target.Bounds.Width, _target.Bounds.Height);
+                Redraw();
+            }
+        }
+        UpdatePointerCursor(p);
     }
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
-        _dragCorner = -1;
+        EndDrag();
+        if (_target is not null && !_isFlashing)
+            UpdatePointerCursor(e.GetPosition(_canvas));
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        base.OnLostMouseCapture(e);
+        _dragMode = RegionDragMode.None;
+        if (_target is not null && !_isFlashing)
+            UpdatePointerCursor(Mouse.GetPosition(_canvas));
+    }
+
+    private void EndDrag()
+    {
+        _dragMode = RegionDragMode.None;
         if (IsMouseCaptured)
             ReleaseMouseCapture();
+        Cursor = Cursors.SizeAll;
+    }
+
+    private void UpdatePointerCursor(Point point)
+    {
+        if (_dragMode == RegionDragMode.None && _confirmButton.IsMouseOver)
+        {
+            Cursor = Cursors.Hand;
+            return;
+        }
+        var mode = _dragMode == RegionDragMode.None
+            ? RegionSelectionGeometry.HitTest(_region, _scale, point) : _dragMode;
+        Cursor = mode switch
+        {
+            RegionDragMode.Left or RegionDragMode.Right => Cursors.SizeWE,
+            RegionDragMode.Top or RegionDragMode.Bottom => Cursors.SizeNS,
+            RegionDragMode.TopLeft or RegionDragMode.BottomRight => Cursors.SizeNWSE,
+            RegionDragMode.TopRight or RegionDragMode.BottomLeft => Cursors.SizeNESW,
+            _ => Cursors.SizeAll,
+        };
     }
 
     private void PositionAndRedraw()
     {
         var handle = new WindowInteropHelper(this).Handle;
         var dpi = NativeMethods.GetDpiForWindow(handle);
-        _scale = (dpi == 0 ? 96 : dpi) / 96d;
+        var scale = (dpi == 0 ? 96 : dpi) / 96d;
+        if (_scale != scale)
+            EndDrag();
+        _scale = scale;
         Width = _target!.Bounds.Width / _scale;
         Height = _target.Bounds.Height / _scale;
         var insertAfter = NativeMethods.GetWindow(_target!.Handle, NativeMethods.GwHwndPrev);
@@ -401,20 +532,13 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         DrawHandle(sx, sy + sh, +1, -1);
         DrawHandle(sx + sw, sy + sh, -1, -1);
 
-        // Confirm button, centered in the region.
-        var button = new Button
-        {
-            Content = _localizer?.Get("Region_Confirm") ?? "OK",
-            Padding = new Thickness(14, 6, 14, 6),
-            Background = new SolidColorBrush(Color.FromRgb(0x2B, 0x6C, 0xB0)),
-            Foreground = Brushes.White,
-            BorderThickness = new Thickness(0),
-        };
-        button.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(button, sx + sw / 2 - button.DesiredSize.Width / 2);
-        Canvas.SetTop(button, sy + sh / 2 - button.DesiredSize.Height / 2);
-        button.Click += (_, _) => Confirm();
-        _canvas.Children.Add(button);
+        // Reuse the button so geometry updates do not restart its rainbow animation.
+        _confirmButton.Content = _localizer?.Get("Region_Confirm") ?? "OK";
+        AutomationProperties.SetName(_confirmButton, (string)_confirmButton.Content);
+        _confirmButton.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Canvas.SetLeft(_confirmButton, sx + sw / 2 - _confirmButton.DesiredSize.Width / 2);
+        Canvas.SetTop(_confirmButton, sy + sh / 2 - _confirmButton.DesiredSize.Height / 2);
+        _canvas.Children.Add(_confirmButton);
     }
 
     private void AddRect(double x, double y, double w, double h)
@@ -429,8 +553,11 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
     private void DrawHandle(double cx, double cy, int dirX, int dirY)
     {
-        AddArm(cx, cy, ArmLength * dirX, ArmThickness);   // horizontal arm
-        AddArm(cx, cy, ArmThickness, ArmLength * dirY);    // vertical arm
+        var horizontalLength = Math.Min(RegionSelectionGeometry.ArmLength, _region.Width / _scale / 2);
+        var verticalLength = Math.Min(RegionSelectionGeometry.ArmLength, _region.Height / _scale / 2);
+        var thickness = RegionSelectionGeometry.ArmThickness;
+        AddArm(cx, dirY < 0 ? cy - thickness : cy, horizontalLength * dirX, thickness);
+        AddArm(dirX < 0 ? cx - thickness : cx, cy, thickness, verticalLength * dirY);
     }
 
     private void AddArm(double x, double y, double w, double h)
@@ -446,43 +573,6 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         Canvas.SetLeft(arm, w < 0 ? x + w : x);
         Canvas.SetTop(arm, h < 0 ? y + h : y);
         _canvas.Children.Add(arm);
-    }
-
-    /// <summary>Returns the corner index (0=TL,1=TR,2=BL,3=BR) within the hit radius of the cursor, or -1.</summary>
-    private int HitCorner(double px, double py)
-    {
-        var corners = new[] { (0, _region.X, _region.Y), (1, _region.Right, _region.Y), (2, _region.X, _region.Bottom), (3, _region.Right, _region.Bottom) };
-        foreach (var (index, x, y) in corners)
-        {
-            if (Math.Abs(px - x) <= HitRadiusPx && Math.Abs(py - y) <= HitRadiusPx)
-                return index;
-        }
-        return -1;
-    }
-
-    private void UpdateCorner(int corner, double px, double py)
-    {
-        var target = _target!;
-        int winW = target.Bounds.Width, winH = target.Bounds.Height;
-        int minW = Math.Max(1, (int)Math.Round(winW * RecognitionRegion.MinFraction));
-        int minH = Math.Max(1, (int)Math.Round(winH * RecognitionRegion.MinFraction));
-        int x = (int)Math.Round(Math.Clamp(px, 0, winW));
-        int y = (int)Math.Round(Math.Clamp(py, 0, winH));
-
-        int left = _region.X, right = _region.Right, top = _region.Y, bottom = _region.Bottom;
-        switch (corner)
-        {
-            case 0: left = Math.Min(x, right - minW); top = Math.Min(y, bottom - minH); break;
-            case 1: right = Math.Max(x, left + minW); top = Math.Min(y, bottom - minH); break;
-            case 2: left = Math.Min(x, right - minW); bottom = Math.Max(y, top + minH); break;
-            default: right = Math.Max(x, left + minW); bottom = Math.Max(y, top + minH); break;
-        }
-        left = Math.Clamp(left, 0, winW);
-        top = Math.Clamp(top, 0, winH);
-        right = Math.Clamp(right, left, winW);
-        bottom = Math.Clamp(bottom, top, winH);
-        _region = new ScreenRect(left, top, right - left, bottom - top);
-        _normalizedRegion = RecognitionRegion.FromPixelRect(_region, winW, winH);
     }
 
     private void Confirm()

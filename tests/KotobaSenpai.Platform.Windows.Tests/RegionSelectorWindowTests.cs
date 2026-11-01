@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -15,6 +16,53 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class RegionSelectorWindowTests
 {
+    [Fact]
+    public Task Confirm_button_remains_clickable_across_redraws_and_stops_animation_when_hidden() => RunSta(() =>
+    {
+        var (window, target) = CreateTarget();
+        var tracker = new FakeTracker();
+        var snapshot = tracker.Attach(target);
+        var settings = new RecordingSettings();
+        var selector = new RegionSelectorWindow(settings, tracker: tracker);
+        try
+        {
+            selector.Show(target, new RecognitionRegion(0.1, 0.2, 0.6, 0.5));
+            selector.UpdateLayout();
+            var canvas = Assert.IsType<Canvas>(selector.Content);
+            var button = Assert.Single(canvas.Children.OfType<Button>());
+            Assert.Same(Cursors.Hand, button.Cursor);
+            Assert.Same(Cursors.SizeAll, selector.Cursor);
+            var border = SystemParameters.HighContrast ? null : Assert.IsType<LinearGradientBrush>(button.BorderBrush);
+            var rotation = border is null ? null : Assert.IsType<RotateTransform>(border.RelativeTransform);
+            if (rotation is not null)
+                Assert.Equal(SystemParameters.ClientAreaAnimation, rotation.HasAnimatedProperties);
+
+            tracker.Publish(snapshot);
+            Assert.Same(button, Assert.Single(canvas.Children.OfType<Button>()));
+            tracker.Publish(snapshot with { IsMinimized = true });
+            Assert.False(selector.IsVisible);
+            if (rotation is not null)
+                Assert.False(rotation.HasAnimatedProperties);
+
+            tracker.Publish(snapshot);
+            Assert.True(selector.IsVisible);
+            Assert.Same(button, Assert.Single(canvas.Children.OfType<Button>()));
+            if (rotation is not null)
+                Assert.Equal(SystemParameters.ClientAreaAnimation, rotation.HasAnimatedProperties);
+
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.False(selector.IsVisible);
+            Assert.Equal(1, settings.WriteCount);
+            if (rotation is not null)
+                Assert.False(rotation.HasAnimatedProperties);
+        }
+        finally
+        {
+            selector.Close();
+            window.Close();
+        }
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
