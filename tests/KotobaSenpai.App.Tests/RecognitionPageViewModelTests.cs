@@ -421,6 +421,54 @@ public sealed class RecognitionPageViewModelTests
         Assert.Equal(1, tracker.RefreshCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Region_selection_temporarily_hides_only_a_pending_selection_highlight(bool alreadyRecognized)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 200, 100));
+        var picker = new FakeWindowPicker(target);
+        var selector = new FakeRegionSelector();
+        var (vm, _, _, _) = CreateVm(picker, regionSelector: selector);
+        using var lifetime = vm;
+        vm.Selection.SelectedWindow = target;
+        if (alreadyRecognized) await vm.RecognizeCommand.ExecuteAsync(null);
+
+        vm.SetRecognitionRegionCommand.Execute(null);
+
+        Assert.True(selector.IsSelecting);
+        Assert.Null(picker.Highlighted);
+
+        selector.CompleteSelection();
+
+        Assert.Equal(alreadyRecognized ? null : target, picker.Highlighted);
+    }
+
+    [Theory]
+    [InlineData("recognize")]
+    [InlineData("clear")]
+    [InlineData("close")]
+    [InlineData("dispose")]
+    public async Task Completing_region_selection_does_not_restore_an_expired_highlight(string action)
+    {
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 200, 100));
+        var picker = new FakeWindowPicker(target);
+        var selector = new FakeRegionSelector();
+        var tracker = new FakeTargetWindowTracker();
+        var (vm, _, _, _) = CreateVm(picker, tracker, regionSelector: selector);
+        using var lifetime = vm;
+        vm.Selection.SelectedWindow = target;
+        vm.SetRecognitionRegionCommand.Execute(null);
+
+        if (action == "recognize") await vm.RecognizeCommand.ExecuteAsync(null);
+        if (action == "clear") vm.Selection.SelectedWindow = null;
+        if (action == "close") tracker.Publish(tracker.Current! with { IsValid = false });
+        if (action == "dispose") vm.Dispose();
+        selector.CompleteSelection();
+
+        Assert.Null(picker.Highlighted);
+    }
+
     [Fact]
     public void Set_recognition_region_without_window_shows_hint()
     {
@@ -776,13 +824,26 @@ public sealed class RecognitionPageViewModelTests
 
     private sealed class FakeRegionSelector : IRegionSelector
     {
+        public bool IsSelecting { get; private set; }
+        public event EventHandler? SelectionStateChanged;
         public static WindowTarget? LastTarget;
         public static int ShowCount;
         public int FlashCount { get; private set; }
         public int StopFlashingCount { get; private set; }
         public WindowTarget? LastFlashTarget { get; private set; }
         public RecognitionRegion? LastFlashRegion { get; private set; }
-        public void Show(WindowTarget target, RecognitionRegion? initial = null) { LastTarget = target; ShowCount++; }
+        public void Show(WindowTarget target, RecognitionRegion? initial = null)
+        {
+            LastTarget = target;
+            ShowCount++;
+            IsSelecting = true;
+            SelectionStateChanged?.Invoke(this, EventArgs.Empty);
+        }
+        public void CompleteSelection()
+        {
+            IsSelecting = false;
+            SelectionStateChanged?.Invoke(this, EventArgs.Empty);
+        }
         public void Flash(WindowTarget target, RecognitionRegion? region = null)
         {
             FlashCount++;

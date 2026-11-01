@@ -97,6 +97,8 @@ public sealed class AutoRecognitionSettingsTests
 
     private sealed class FakeRegionSelector : IRegionSelector
     {
+        public bool IsSelecting => false;
+        public event EventHandler? SelectionStateChanged { add { } remove { } }
         public void Show(WindowTarget target, RecognitionRegion? initial = null) { }
         public void Flash(WindowTarget target, RecognitionRegion? region = null) { }
         public void StopFlashing() { }

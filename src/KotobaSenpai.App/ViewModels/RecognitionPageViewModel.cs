@@ -56,6 +56,8 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         Selection.PropertyChanged += OnSelectionPropertyChanged;
         _workflow = workflow;
         _regionSelector = regionSelector;
+        _regionSelector.SelectionStateChanged += OnRegionSelectionStateChanged;
+        Selection.SetRegionSelectionActive(_regionSelector.IsSelecting);
         _settings = settings;
         _localizer = localizer;
         _messageResolver = messageResolver;
@@ -81,6 +83,9 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     }
 
     private void OnSelectionCommitted(object? sender, EventArgs e) => EndRecognitionSession();
+
+    private void OnRegionSelectionStateChanged(object? sender, EventArgs e)
+        => Selection.SetRegionSelectionActive(_regionSelector.IsSelecting);
 
     private void OnSelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -184,6 +189,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         _disposed = true;
         Selection.SelectionCommitted -= OnSelectionCommitted;
         Selection.PropertyChanged -= OnSelectionPropertyChanged;
+        _regionSelector.SelectionStateChanged -= OnRegionSelectionStateChanged;
         Selection.Dispose();
         _localizer.CultureChanged -= OnCultureChanged;
         EndRecognitionSession();

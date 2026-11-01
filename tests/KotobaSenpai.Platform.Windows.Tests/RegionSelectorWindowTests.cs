@@ -16,6 +16,81 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class RegionSelectorWindowTests
 {
+    [Theory]
+    [InlineData("confirm")]
+    [InlineData("close")]
+    [InlineData("target-close")]
+    [InlineData("target-switch")]
+    public Task Interactive_selection_reports_its_lifetime_and_survives_temporary_target_hiding(string action) => RunSta(() =>
+    {
+        var (window, target) = CreateTarget();
+        var tracker = new FakeTracker();
+        var snapshot = tracker.Attach(target);
+        var selector = new RegionSelectorWindow(new RecordingSettings(), tracker: tracker);
+        var states = new List<bool>();
+        selector.SelectionStateChanged += (_, _) => states.Add(selector.IsSelecting);
+        try
+        {
+            Assert.False(selector.IsSelecting);
+            selector.Show(target);
+            Assert.True(selector.IsSelecting);
+            Assert.Equal(new[] { true }, states);
+
+            tracker.Publish(snapshot with { IsMinimized = true });
+            Assert.False(selector.IsVisible);
+            Assert.True(selector.IsSelecting);
+            tracker.Publish(snapshot);
+            Assert.True(selector.IsVisible);
+            Assert.Equal(new[] { true }, states);
+
+            if (action == "confirm")
+            {
+                var canvas = Assert.IsType<Canvas>(selector.Content);
+                Assert.Single(canvas.Children.OfType<Button>()).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+            if (action == "close") selector.Close();
+            if (action == "target-close") tracker.Publish(snapshot with { IsValid = false });
+            if (action == "target-switch") tracker.Publish(snapshot with { Handle = (nint)999 });
+
+            Assert.False(selector.IsVisible);
+            Assert.False(selector.IsSelecting);
+            Assert.Equal(new[] { true, false }, states);
+        }
+        finally
+        {
+            if (action != "close") selector.Close();
+            window.Close();
+        }
+    });
+
+    [Fact]
+    public Task Passive_feedback_and_unavailable_targets_do_not_start_interactive_selection() => RunSta(() =>
+    {
+        var (window, target) = CreateTarget();
+        var tracker = new FakeTracker();
+        var snapshot = tracker.Attach(target);
+        var selector = new RegionSelectorWindow(new RecordingSettings(), tracker: tracker);
+        var changes = 0;
+        selector.SelectionStateChanged += (_, _) => changes++;
+        try
+        {
+            selector.Flash(target);
+            Assert.False(selector.IsSelecting);
+            selector.StopFlashing();
+            tracker.Publish(snapshot with { IsMinimized = true });
+            selector.Show(target);
+
+            Assert.False(selector.IsSelecting);
+            Assert.False(selector.IsVisible);
+            Assert.Equal(0, changes);
+        }
+        finally
+        {
+            selector.Close();
+            window.Close();
+        }
+    });
+
     [Fact]
     public Task Editor_region_has_a_nearly_transparent_input_surface_around_the_confirm_button() => RunSta(() =>
     {

@@ -20,6 +20,7 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
     private readonly Func<CapturedFrame, CapturedFrame> _createPreview;
     private bool _disposed;
     private bool _recognitionActive;
+    private bool _isSelectingRegion;
     private Func<string> _renderStatus = () => string.Empty;
 
     public TargetSelectionViewModel(IWindowPicker picker, IStringLocalizer localizer,
@@ -90,6 +91,13 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
     {
         _recognitionActive = false;
         NotifySelectionState();
+    }
+
+    /// <summary>Temporarily suspends the pending selection outline during an interactive region edit.</summary>
+    public void SetRegionSelectionActive(bool isActive)
+    {
+        _isSelectingRegion = isActive;
+        UpdateSelectionHighlight();
     }
 
     private void SetStatus(string key, params object[] args)
@@ -320,7 +328,7 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
     {
         try
         {
-            _picker.Highlight(_awaitingRecognition && !_disposed && !IsPickingWindow
+            _picker.Highlight(_awaitingRecognition && !_disposed && !IsPickingWindow && !_isSelectingRegion
                 ? SelectedWindow : null);
         }
         catch (Exception exception)

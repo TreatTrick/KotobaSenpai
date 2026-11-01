@@ -126,8 +126,25 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         // NOTE: intentionally NOT click-through — this window must capture mouse for dragging and the confirm button.
     }
 
+    public bool IsSelecting => _target is not null && !_isFlashing;
+
+    public event EventHandler? SelectionStateChanged;
+
     public void Show(WindowTarget target, RecognitionRegion? initial = null)
-        => ShowCore(target, initial, flashing: false);
+    {
+        try
+        {
+            ShowCore(target, initial, flashing: false);
+        }
+        catch
+        {
+            ClearSelection();
+            Hide();
+            throw;
+        }
+        if (IsSelecting)
+            SelectionStateChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     private static Button CreateConfirmButton()
     {
@@ -369,6 +386,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
     private void ClearSelection()
     {
+        var wasSelecting = IsSelecting;
         _flashTimer.Stop();
         _isFlashing = false;
         _canvas.Children.Clear();
@@ -378,6 +396,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _target = null;
         EndDrag();
         UpdateConfirmAnimation();
+        if (wasSelecting)
+            SelectionStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
