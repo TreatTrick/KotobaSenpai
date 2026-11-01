@@ -663,4 +663,11 @@ Meet your next word.</value>
   <data name="PhrasePopup_BackgroundTransparencyDescription" xml:space="preserve">
     <value>Adjust the word and phrase popup background. 0% is opaque, 100% is transparent. Text stays clear.</value>
   </data>
+  <data name="Guide_SelectWindow" xml:space="preserve"><value>Click Select window, then use your mouse to choose the window you want to recognize.</value></data>
+  <data name="Guide_Recognize" xml:space="preserve"><value>Click to recognize Japanese in the selected window. By default, recognition runs once.</value></data>
+  <data name="Guide_RecognitionRegion" xml:space="preserve"><value>Click to select the area of the window to recognize. A smaller area makes recognition faster.</value></data>
+  <data name="Guide_AutoRecognition" xml:space="preserve"><value>When enabled, recognition runs automatically when the text changes.</value></data>
+  <data name="Guide_RegionTopLeft" xml:space="preserve"><value>Drag the yellow edges to select the recognition area. Only text inside this area is recognized. A smaller area makes recognition faster.</value></data>
+  <data name="Guide_RegionConfirm" xml:space="preserve"><value>Click the confirmation button to save the selected area.</value></data>
+  <data name="Guide_Understood" xml:space="preserve"><value>I understand</value></data>
 </root>

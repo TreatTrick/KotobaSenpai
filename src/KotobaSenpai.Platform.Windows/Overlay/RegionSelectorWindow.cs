@@ -12,6 +12,8 @@ using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Core.Overlay;
+using KotobaSenpai.Platform.Windows.Guidance;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
@@ -30,6 +32,8 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private readonly ISettingsService _settings;
     private readonly IStringLocalizer? _localizer;
     private readonly ITargetWindowTracker? _tracker;
+    private readonly ITourPresentation? _guidance;
+    private readonly GuidanceOverlay _guideOverlay;
     private readonly Canvas _canvas = new() { Background = Brushes.Transparent };
     private readonly Button _confirmButton;
     private readonly RotateTransform _confirmBorderRotation = new(0, 0.5, 0.5);
@@ -61,11 +65,17 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     public RegionSelectorWindow(
         ISettingsService settings,
         IStringLocalizer? localizer = null,
-        ITargetWindowTracker? tracker = null)
+        ITargetWindowTracker? tracker = null,
+        ITourPresentation? guidance = null,
+        Func<Border, Button, FrameworkElement>? decorateBubble = null)
     {
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _localizer = localizer;
         _tracker = tracker;
+        _guidance = guidance;
+        _guideOverlay = new GuidanceOverlay(decorateBubble);
+        _guideOverlay.Acknowledged += (_, _) => _guidance?.Advance();
+        if (_guidance is not null) _guidance.Changed += OnGuidanceChanged;
         _confirmBorderBrush = new LinearGradientBrush(new GradientStopCollection
         {
             new(Color.FromRgb(0xEF, 0x47, 0x6F), 0),
@@ -122,6 +132,11 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
                 _tracker.Changed -= OnTargetChanged;
             if (_localizer is not null)
                 _localizer.CultureChanged -= OnCultureChanged;
+            if (_guidance is not null)
+            {
+                _guidance.Changed -= OnGuidanceChanged;
+                _guidance.Dispose();
+            }
         };
         // NOTE: intentionally NOT click-through — this window must capture mouse for dragging and the confirm button.
     }
@@ -300,6 +315,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             Show();
         SetNoActivate();
         PositionAndRedraw();
+        if (!flashing) _guidance?.Start();
         if (flashing)
             _flashTimer.Start();
     }
@@ -394,6 +410,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         _flashOutline.Visibility = Visibility.Visible;
         SetNoActivate();
         _target = null;
+        _guidance?.Stop();
         EndDrag();
         UpdateConfirmAnimation();
         if (wasSelecting)
@@ -403,7 +420,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
-        if (_target is null || _isFlashing || _confirmButton.IsMouseOver)
+        if (_target is null || _isFlashing || _guidance?.Target is not null || _confirmButton.IsMouseOver)
             return;
         var p = e.GetPosition(_canvas);
         _dragMode = RegionSelectionGeometry.HitTest(_region, _scale, p);
@@ -423,7 +440,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (_target is null || _isFlashing)
+        if (_target is null || _isFlashing || _guidance?.Target is not null)
             return;
         var p = e.GetPosition(_canvas);
         if (_dragMode != RegionDragMode.None)
@@ -468,6 +485,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
     private void UpdatePointerCursor(Point point)
     {
+        if (_guidance?.Target is not null) { Cursor = Cursors.Arrow; return; }
         if (_dragMode == RegionDragMode.None && _confirmButton.IsMouseOver)
         {
             Cursor = Cursors.Hand;
@@ -566,6 +584,33 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
         Canvas.SetLeft(_confirmButton, sx + sw / 2 - _confirmButton.DesiredSize.Width / 2);
         Canvas.SetTop(_confirmButton, sy + sh / 2 - _confirmButton.DesiredSize.Height / 2);
         _canvas.Children.Add(_confirmButton);
+        DrawGuidance();
+    }
+
+    private void OnGuidanceChanged(object? sender, EventArgs e)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => OnGuidanceChanged(sender, e));
+            return;
+        }
+        if (_target is not null && !_isFlashing) DrawGuidance();
+    }
+
+    private void DrawGuidance()
+    {
+        _canvas.Children.Remove(_guideOverlay);
+        if (_guidance?.Target is not { } anchor || _target is null || _isFlashing) return;
+        var area = new Size(_target.Bounds.Width / _scale, _target.Bounds.Height / _scale);
+        _guideOverlay.Width = area.Width;
+        _guideOverlay.Height = area.Height;
+        var target = anchor == GuidanceTarget.RegionTopLeft
+            ? new Rect(_region.X / _scale, _region.Y / _scale, 20, 20)
+            : new Rect(Canvas.GetLeft(_confirmButton), Canvas.GetTop(_confirmButton),
+                _confirmButton.DesiredSize.Width, _confirmButton.DesiredSize.Height);
+        _guideOverlay.SetText(_guidance.Text, _guidance.AcknowledgeText);
+        _guideOverlay.Place(target, area);
+        _canvas.Children.Add(_guideOverlay);
     }
 
     private void AddRect(double x, double y, double w, double h, Brush? fill = null)
@@ -604,7 +649,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
 
     private void Confirm()
     {
-        if (_target is null)
+        if (_target is null || _guidance?.Target is not null)
             return;
         var normalized = RecognitionRegion.FromPixelRect(
             _region, _target.Bounds.Width, _target.Bounds.Height);

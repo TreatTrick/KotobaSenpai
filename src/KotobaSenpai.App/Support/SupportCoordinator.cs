@@ -41,7 +41,8 @@ internal sealed class SupportCoordinator : IDisposable
             await Task.Delay(TimeSpan.FromSeconds(3), _lifetime.Token);
             if (_disposed) return;
             var canShow = _main.Onboarding.IsMain && _owner.IsVisible && _owner.WindowState != WindowState.Minimized
-                && _window is null && _main.Selection?.IsSelectingWindow != true && !SupportWindows.ForegroundIsFullScreen();
+                && _window is null && _main.Guidance?.IsActive != true
+                && _main.Selection?.IsSelectingWindow != true && !SupportWindows.ForegroundIsFullScreen();
             if (_support.TryMarkStartupPrompt(DateTime.Now, canShow)) Show(false);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }

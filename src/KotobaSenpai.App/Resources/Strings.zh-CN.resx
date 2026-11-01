@@ -663,4 +663,11 @@ API Key：YOUR_API_KEY
   <data name="PhrasePopup_BackgroundTransparencyDescription" xml:space="preserve">
     <value>调整单词和词组弹出框的背景。0% 为不透明，100% 为完全透明，文字保持清晰。</value>
   </data>
+  <data name="Guide_SelectWindow" xml:space="preserve"><value>点击选择窗口按钮后用鼠标选择想要识别的窗口</value></data>
+  <data name="Guide_Recognize" xml:space="preserve"><value>点击之后将开始识别窗口内的日语，默认识别一次</value></data>
+  <data name="Guide_RecognitionRegion" xml:space="preserve"><value>点击之后可以在窗口上面选择需要识别的区域，区域越小，识别速度越快。</value></data>
+  <data name="Guide_AutoRecognition" xml:space="preserve"><value>打开后文字变化时会自动识别</value></data>
+  <data name="Guide_RegionTopLeft" xml:space="preserve"><value>拖动黄色边缘选择识别区域，只会识别区域内的文字，区域越小识别速度越快</value></data>
+  <data name="Guide_RegionConfirm" xml:space="preserve"><value>点击确认后确定选区范围</value></data>
+  <data name="Guide_Understood" xml:space="preserve"><value>我知道了</value></data>
 </root>

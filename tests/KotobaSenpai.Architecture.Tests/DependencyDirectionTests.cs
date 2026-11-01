@@ -37,6 +37,17 @@ public sealed class DependencyDirectionTests
     private const string ViewModelsNamespace = @"KotobaSenpai\.App\.ViewModels(\..*)?$";
 
     [Fact]
+    public void Guidance_flow_has_no_presentation_platform_or_container_dependencies()
+    {
+        var result = Types.InAssembly(typeof(KotobaSenpai.App.Guidance.ContextualGuidance).Assembly)
+            .That().ResideInNamespaceMatching(@"^KotobaSenpai\.App\.Guidance$")
+            .ShouldNot().HaveDependencyOnAny("System.Windows", "KotobaSenpai.Platform.Windows",
+                "KotobaSenpai.App.Views", "KotobaSenpai.App.ViewModels", "Microsoft.Extensions.DependencyInjection")
+            .GetResult();
+        Assert.True(result.IsSuccessful, FormatFailure("Guidance flow must remain independent of presentation and the container", result));
+    }
+
+    [Fact]
     public void Onboarding_state_machine_has_no_presentation_platform_or_container_dependencies()
     {
         var result = Types.InAssembly(typeof(KotobaSenpai.App.Onboarding.OnboardingStateMachine).Assembly)

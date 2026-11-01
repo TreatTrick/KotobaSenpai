@@ -1,4 +1,6 @@
 using KotobaSenpai.App.Onboarding;
+using KotobaSenpai.App.Guidance;
+using KotobaSenpai.App.Guidance.Presentation;
 using KotobaSenpai.App.Support;
 using KotobaSenpai.Core.Workflow;
 using KotobaSenpai.Core.Overlay;
@@ -226,7 +228,11 @@ public partial class App : Application
         services.AddSingleton<IAutoRecognitionController, AutoRecognitionController>();
         services.AddSingleton<WpfOverlayRenderer>();
         services.AddSingleton<IOverlayRenderer>(sp => sp.GetRequiredService<WpfOverlayRenderer>());
-        services.AddSingleton<IRegionSelector, RegionSelectorWindow>();
+        services.AddSingleton<ContextualGuidance>();
+        services.AddSingleton<IRegionSelector>(sp => new RegionSelectorWindow(sp.GetRequiredService<ISettingsService>(),
+            sp.GetRequiredService<IStringLocalizer>(), sp.GetRequiredService<ITargetWindowTracker>(),
+            new TourPresentation(sp.GetRequiredService<ContextualGuidance>().Region, sp.GetRequiredService<IStringLocalizer>()),
+            (bubble, button) => GuidanceLight.DecorateBubble(bubble, button, reactToPointerWhenInactive: true)));
 
         // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
         // Cloud analysis is required; incomplete provider configuration returns NoKey with a retryable warning.

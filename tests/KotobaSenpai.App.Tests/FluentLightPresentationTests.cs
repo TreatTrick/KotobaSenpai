@@ -222,7 +222,7 @@ public sealed class FluentLightPresentationTests
     {
         var window = new Window
         {
-            Content = host, Width = 380, Height = 140, WindowStyle = WindowStyle.None,
+            Content = host, Width = 380, Height = 140, WindowStyle = WindowStyle.None, Style = null,
             Left = -10000, Top = -10000, ShowActivated = false,
         };
         window.Show();

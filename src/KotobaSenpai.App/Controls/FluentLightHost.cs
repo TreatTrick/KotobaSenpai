@@ -10,6 +10,10 @@ namespace KotobaSenpai.App.Controls;
 /// <summary>Shares one pointer and an idle-aware rendering loop across a page or popup.</summary>
 public sealed class FluentLightHost : AdornerDecorator
 {
+    public static readonly DependencyProperty ReactToPointerWhenInactiveProperty = DependencyProperty.Register(
+        nameof(ReactToPointerWhenInactive), typeof(bool), typeof(FluentLightHost), new PropertyMetadata(false,
+            (sender, _) => ((FluentLightHost)sender).RefreshActivity()));
+
     private static readonly DependencyProperty ThemeBrushProperty = DependencyProperty.Register(
         "ThemeBrush", typeof(Brush), typeof(FluentLightHost), new PropertyMetadata(Brushes.White,
             (sender, _) => ((FluentLightHost)sender).Wake()));
@@ -24,6 +28,17 @@ public sealed class FluentLightHost : AdornerDecorator
     private bool _geometryDirty = true;
 
     internal bool IsRendering { get; private set; }
+
+    /// <summary>Allows non-activating interactive overlays to illuminate while the pointer is present or fading out.</summary>
+    public bool ReactToPointerWhenInactive
+    {
+        get => (bool)GetValue(ReactToPointerWhenInactiveProperty);
+        set => SetValue(ReactToPointerWhenInactiveProperty, value);
+    }
+
+    private bool CanRenderInWindow => _window is not { WindowState: WindowState.Minimized }
+        && (_window is not { IsActive: false } || ReactToPointerWhenInactive
+            && (_pointer is not null || _motion.Presence > 0 || _surfaces.Values.Any(surface => surface.Hover > 0)));
 
     public FluentLightHost()
     {
@@ -131,7 +146,7 @@ public sealed class FluentLightHost : AdornerDecorator
     private void Wake()
     {
         if (!IsLoaded || !IsVisible || _adorner is null || SystemParameters.HighContrast) return;
-        if (_window is { IsActive: false } or { WindowState: WindowState.Minimized }) return;
+        if (!CanRenderInWindow) return;
         if (IsRendering) return;
         IsRendering = true;
         _lastFrame = null;
@@ -148,7 +163,7 @@ public sealed class FluentLightHost : AdornerDecorator
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        if (_window is { IsActive: false } or { WindowState: WindowState.Minimized }) { Reset(); return; }
+        if (!CanRenderInWindow) { Reset(); return; }
         if (e is not RenderingEventArgs rendering) return;
         var seconds = _lastFrame is { } previous ? (rendering.RenderingTime - previous).TotalSeconds : 1d / 60;
         _lastFrame = rendering.RenderingTime;
@@ -216,7 +231,13 @@ public sealed class FluentLightHost : AdornerDecorator
         if (!IsVisible) Reset();
     }
 
-    private void OnDeactivated(object? sender, EventArgs e) => Reset();
+    private void RefreshActivity()
+    {
+        if (CanRenderInWindow) Wake();
+        else Reset();
+    }
+
+    private void OnDeactivated(object? sender, EventArgs e) => RefreshActivity();
     private void OnActivated(object? sender, EventArgs e)
     {
         UpdatePointer(IsMouseOver ? Mouse.GetPosition(this) : null);

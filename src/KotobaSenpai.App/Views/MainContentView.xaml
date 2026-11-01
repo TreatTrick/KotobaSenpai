@@ -46,7 +46,7 @@
       </Setter>
     </Style>
   </UserControl.Resources>
-  <Grid Background="Transparent">
+  <Grid x:Name="ContentRoot" Background="Transparent">
     <TabControl x:Name="MainNavigation" SelectedIndex="0" TabStripPlacement="Left"
                 Background="Transparent" BorderThickness="0" Padding="0"
                 ItemContainerStyle="{StaticResource NavigationTab}">
@@ -102,7 +102,7 @@
             <TextBlock Text="{loc:Loc Key=Tab_Recognize}" VerticalAlignment="Center" />
           </StackPanel>
         </TabItem.Header>
-        <views:RecognitionPage DataContext="{Binding Recognition}" />
+        <views:RecognitionPage x:Name="RecognitionView" DataContext="{Binding Recognition}" />
       </TabItem>
 
       <TabItem AutomationProperties.Name="{loc:Loc Key=Tab_Settings}">

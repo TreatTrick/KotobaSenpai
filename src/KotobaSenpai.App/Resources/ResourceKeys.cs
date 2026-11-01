@@ -160,4 +160,11 @@ public static class ResourceKeys
     public const string Onboarding_ReadyHint = nameof(Onboarding_ReadyHint);
     public const string Onboarding_SetupOnce = nameof(Onboarding_SetupOnce);
     public const string Onboarding_ConfigurationUsable = nameof(Onboarding_ConfigurationUsable);
+    public const string Guide_SelectWindow = nameof(Guide_SelectWindow);
+    public const string Guide_Recognize = nameof(Guide_Recognize);
+    public const string Guide_RecognitionRegion = nameof(Guide_RecognitionRegion);
+    public const string Guide_AutoRecognition = nameof(Guide_AutoRecognition);
+    public const string Guide_RegionTopLeft = nameof(Guide_RegionTopLeft);
+    public const string Guide_RegionConfirm = nameof(Guide_RegionConfirm);
+    public const string Guide_Understood = nameof(Guide_Understood);
 }

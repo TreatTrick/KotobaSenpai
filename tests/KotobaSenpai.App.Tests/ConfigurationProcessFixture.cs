@@ -10,6 +10,8 @@ public static class ConfigurationProcessFixture
     [STAThread]
     public static int Main()
     {
+        var guidanceDirectory = Environment.GetEnvironmentVariable(GuidanceDesktopFixture.DirectoryEnvironmentVariable);
+        if (guidanceDirectory is not null) return GuidanceDesktopFixture.Run(guidanceDirectory);
         var pickerDirectory = Environment.GetEnvironmentVariable("KOTOBA_PICKER_FIXTURE_DIRECTORY");
         if (pickerDirectory is not null)
             return WindowPickerFixture.Run(pickerDirectory, Environment.GetEnvironmentVariable("KOTOBA_PICKER_FIXTURE_MODE") ?? "host");
