@@ -17,9 +17,9 @@ public static class LlmProtocolIds
     public static string Normalize(string? value)
         => value switch
         {
-            OpenAiResponses or "responses" => OpenAiResponses,
+            OpenAiResponses or "responses" or null or "" => OpenAiResponses,
             Anthropic => Anthropic,
-            OpenAiChat or null or "" => OpenAiChat,
+            OpenAiChat => OpenAiChat,
             _ => OpenAiChat,
         };
 }

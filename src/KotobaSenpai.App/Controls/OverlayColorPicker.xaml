@@ -18,7 +18,8 @@
     </ui:Button>
     <Popup x:Name="PickerPopup" Placement="Bottom" PlacementTarget="{Binding ElementName=ChooseColorButton}"
            AllowsTransparency="True" StaysOpen="False" Opened="Picker_Opened">
-      <Border Width="312" Padding="16" Margin="0,4" CornerRadius="8"
+      <controls:FluentLightHost Margin="0,4">
+      <Border Width="312" Padding="16" CornerRadius="8"
               Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
               BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1"
               TextElement.Foreground="{DynamicResource TextFillColorPrimaryBrush}">
@@ -97,6 +98,7 @@
           </Grid>
         </StackPanel>
       </Border>
+      </controls:FluentLightHost>
     </Popup>
   </Grid>
 </UserControl>

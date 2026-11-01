@@ -32,7 +32,10 @@
           <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <ComboBox x:Name="ModelInput" IsEditable="True" ItemsSource="{Binding Models}" DisplayMemberPath="Id" Style="{StaticResource OnboardingComboInput}" Text="{Binding Model, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Key=Label_LlmModel}" />
-            <ui:Button Grid.Column="1" Content="{loc:Loc Key=Button_LlmFetchModels}" Command="{Binding FetchModelsCommand}" VerticalAlignment="Center" Margin="12,0,0,0" Style="{StaticResource OnboardingLinkButton}" />
+            <ui:Button Grid.Column="1" Content="{loc:Loc Key=Button_LlmFetchModels}" Command="{Binding FetchModelsCommand}"
+                       VerticalAlignment="Center" Margin="12,0,0,0" Style="{StaticResource OnboardingButton}"
+                       Background="{DynamicResource AccentFillColorDefaultBrush}" Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}"
+                       BorderBrush="{DynamicResource AccentFillColorDefaultBrush}" />
           </Grid>
           <ProgressBar Height="3" Margin="0,8,0,0" IsIndeterminate="{Binding IsFetchingModels}" Visibility="{Binding IsFetchingModels, Converter={StaticResource BoolToVisibility}}" />
           <TextBlock Text="{Binding ModelStatus}" Style="{StaticResource ModelStatus}" AutomationProperties.LiveSetting="Polite" />

@@ -7,6 +7,32 @@ namespace KotobaSenpai.App.Tests;
 
 public sealed class LlmSettingsViewModelTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Unconfigured_protocol_defaults_to_responses_in_the_ui_and_runtime(string? saved)
+    {
+        var settings = new FakeSettings(new Dictionary<string, string?> { [LlmSettingsKeys.Protocol] = saved });
+        using var viewModel = new LlmSettingsViewModel(settings, new FakeCatalog(), new FakeLocalizer());
+
+        Assert.Equal(LlmProtocolIds.OpenAiResponses, viewModel.Protocol);
+        Assert.Equal(viewModel.Protocol, LlmConfiguration.Read(settings).Protocol);
+        Assert.Equal(saved, settings.GetValue(LlmSettingsKeys.Protocol));
+    }
+
+    [Theory]
+    [InlineData(LlmProtocolIds.OpenAiChat)]
+    [InlineData(LlmProtocolIds.Anthropic)]
+    [InlineData(LlmProtocolIds.OpenAiResponses)]
+    public void An_explicitly_saved_protocol_keeps_its_selection(string saved)
+    {
+        var settings = new FakeSettings(new Dictionary<string, string?> { [LlmSettingsKeys.Protocol] = saved });
+        using var viewModel = new LlmSettingsViewModel(settings, new FakeCatalog(), new FakeLocalizer());
+
+        Assert.Equal(saved, viewModel.Protocol);
+        Assert.Equal(saved, LlmConfiguration.Read(settings).Protocol);
+    }
+
     [Fact]
     public void Culture_changes_translate_protocol_choices_without_replacing_the_selected_item()
     {

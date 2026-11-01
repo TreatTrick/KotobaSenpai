@@ -1,6 +1,7 @@
 <UserControl x:Class="KotobaSenpai.App.Views.Support.SupportCompanion"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:KotobaSenpai.App.Controls"
              xmlns:support="clr-namespace:KotobaSenpai.App.Views.Support">
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
@@ -9,6 +10,7 @@
                              TargetElement="{Binding ElementName=CoffeeButton}" />
     </Viewbox>
     <Button x:Name="CoffeeButton" Grid.Row="1" Command="{Binding OpenCommand}" Content="{Binding EntryText}"
+            controls:FluentLight.Kind="Button" controls:FluentLight.CornerRadius="20"
             ToolTip="{Binding EntryHelp}" HorizontalAlignment="Center" Padding="12,7" FontSize="13"
             AutomationProperties.Name="{Binding EntryText}">
       <Button.Style>

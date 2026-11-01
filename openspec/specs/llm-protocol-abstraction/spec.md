@@ -19,10 +19,18 @@ The system SHALL expose a protocol port that, given a canonical phrase-analysis 
 - **THEN** the request uses an OpenAI `input` envelope with a strict `text.format` JSON schema, sends Bearer authentication, and reads the group array from the `output` array's text content; endpoint fallback uses `/v1/responses` and `/responses`
 
 ### Requirement: Select the protocol by configuration
-The system SHALL select the active wire protocol from the current BYOK settings key for each new phrase-analysis or model-discovery request, defaulting to OpenAI Chat Completions when unset or unknown. Changing the key SHALL change the protocol implementation and authentication strategy used by subsequent requests without changing the phrase-analysis port contract.
+The system SHALL select the active wire protocol from the current BYOK settings key for each new phrase-analysis or model-discovery request, defaulting to OpenAI Responses when unset or empty. Unknown stored values SHALL retain the legacy OpenAI Chat Completions fallback. Changing the key SHALL change the protocol implementation and authentication strategy used by subsequent requests without changing the phrase-analysis port contract.
 
-#### Scenario: Default to OpenAI Chat Completions
-- **WHEN** no protocol is configured or the stored value is unknown
+#### Scenario: Default to OpenAI Responses
+- **WHEN** no protocol is configured or the stored value is empty
+- **THEN** the settings selector and subsequent requests use OpenAI Responses, with Bearer authentication for requests
+
+#### Scenario: Preserve an explicitly selected protocol
+- **WHEN** a supported protocol has already been saved
+- **THEN** the selector and requests continue to use that protocol
+
+#### Scenario: Preserve the legacy fallback for unknown values
+- **WHEN** the stored protocol value is unknown
 - **THEN** the next request uses the OpenAI Chat Completions protocol and Bearer authentication
 
 #### Scenario: Switch protocol by configuration

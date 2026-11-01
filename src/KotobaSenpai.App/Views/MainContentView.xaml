@@ -3,10 +3,12 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:controls="clr-namespace:KotobaSenpai.App.Controls"
              xmlns:support="clr-namespace:KotobaSenpai.App.Views.Support"
              xmlns:views="clr-namespace:KotobaSenpai.App.Views">
   <UserControl.Resources>
     <Style x:Key="NavigationTab" TargetType="TabItem">
+      <Setter Property="controls:FluentLight.Kind" Value="Surface" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -44,7 +46,7 @@
       </Setter>
     </Style>
   </UserControl.Resources>
-  <Grid>
+  <Grid Background="Transparent">
     <TabControl x:Name="MainNavigation" SelectedIndex="0" TabStripPlacement="Left"
                 Background="Transparent" BorderThickness="0" Padding="0"
                 ItemContainerStyle="{StaticResource NavigationTab}">

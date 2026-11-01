@@ -11,6 +11,7 @@
           <Style TargetType="controls:SettingsCard" BasedOn="{StaticResource {x:Type controls:SettingsCard}}">
             <Style.Triggers><DataTrigger Binding="{Binding IsOnboarding, RelativeSource={RelativeSource AncestorType=views:TargetSelectionView}}" Value="True">
               <Setter Property="Margin" Value="0" /><Setter Property="MinHeight" Value="0" />
+              <Setter Property="controls:FluentLight.Kind" Value="None" />
               <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="controls:SettingsCard"><ContentPresenter Content="{TemplateBinding DescriptionContent}" /></ControlTemplate></Setter.Value></Setter>
             </DataTrigger></Style.Triggers>
           </Style>
@@ -21,6 +22,7 @@
               <Style.Triggers><DataTrigger Binding="{Binding IsOnboarding, RelativeSource={RelativeSource AncestorType=views:TargetSelectionView}}" Value="True"><Setter Property="Orientation" Value="Vertical" /><Setter Property="Margin" Value="0" /></DataTrigger></Style.Triggers>
             </Style></WrapPanel.Style>
             <Border CornerRadius="8" BorderThickness="1"
+                    controls:FluentLight.Kind="Surface" controls:FluentLight.CornerRadius="8"
                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                     Background="{DynamicResource LayerFillColorDefaultBrush}"
                     AutomationProperties.Name="{Binding TargetTitle}" AutomationProperties.HelpText="{Binding TargetStatus}">

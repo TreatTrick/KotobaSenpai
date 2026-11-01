@@ -22,7 +22,7 @@ public sealed class AgentSettingsViewModelTests
 
         await viewModel.CheckConfigurationCommand.ExecuteAsync(null);
 
-        Assert.Equal(LlmProtocolIds.OpenAiChat, viewModel.Protocol);
+        Assert.Equal(LlmProtocolIds.OpenAiResponses, viewModel.Protocol);
         Assert.Equal(before.OrderBy(entry => entry.Key), settings.GetSnapshot(LlmConfiguration.Keys).OrderBy(entry => entry.Key));
         Assert.Equal(0, settings.SingleWrites);
         Assert.Equal(1, settings.BatchWrites);

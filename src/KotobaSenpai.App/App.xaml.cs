@@ -230,7 +230,7 @@ public partial class App : Application
 
         // Phrase analysis: a protocol-agnostic adapter + pluggable protocol. Local words/spans complete first, and a failure only produces a retryable warning,
         // Cloud analysis is required; incomplete provider configuration returns NoKey with a retryable warning.
-        // The protocol is selected by LlmProtocol for each request (anthropic/openai-responses/default OpenAI Chat Completions).
+        // LlmProtocol selects the wire format for each request; unconfigured settings default to OpenAI Responses.
         services.AddSingleton<PhrasePromptBuilder>();
         services.AddSingleton<PhraseResponseParser>();
         services.AddSingleton(_ => LlmHttpClient.Create());

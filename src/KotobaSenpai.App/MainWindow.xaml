@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:controls="clr-namespace:KotobaSenpai.App.Controls"
         xmlns:views="clr-namespace:KotobaSenpai.App.Views"
         x:Name="RootWindow"
         Title="{loc:Loc Key=MainWindow_Title}"
@@ -24,7 +25,8 @@
       </ui:TitleBar.Icon>
     </ui:TitleBar>
 
-    <ContentControl Grid.Row="1" Content="{Binding}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+    <controls:FluentLightHost Grid.Row="1">
+    <ContentControl Content="{Binding}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
       <ContentControl.Resources>
         <DataTemplate x:Key="GuideContent"><views:OnboardingPage /></DataTemplate>
         <DataTemplate x:Key="MainContent"><views:MainContentView /></DataTemplate>
@@ -40,5 +42,6 @@
         </Style>
       </ContentControl.Style>
     </ContentControl>
+    </controls:FluentLightHost>
   </Grid>
 </ui:FluentWindow>

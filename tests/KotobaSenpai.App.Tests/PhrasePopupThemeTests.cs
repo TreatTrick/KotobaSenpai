@@ -620,7 +620,8 @@ public sealed partial class PhrasePopupThemeTests
         hue.Value = 240;
         spectrum.SelectAt(new Point(spectrum.ActualWidth, 0));
         Assert.Equal("#0000FF", hex.Text);
-        var pickerFrame = Assert.IsType<Border>(popup.Child);
+        var pickerLightHost = Assert.IsType<FluentLightHost>(popup.Child);
+        var pickerFrame = Assert.IsType<Border>(pickerLightHost.Child);
         pickerFrame.UpdateLayout();
         var pickerImage = new RenderTargetBitmap((int)Math.Ceiling(pickerFrame.ActualWidth), (int)Math.Ceiling(pickerFrame.ActualHeight), 96, 96, PixelFormats.Pbgra32);
         pickerImage.Render(pickerFrame);

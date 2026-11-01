@@ -7,7 +7,10 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class LlmModelCatalogTests
 {
     [Theory]
-    [InlineData(null, LlmProtocolIds.OpenAiChat)]
+    [InlineData(null, LlmProtocolIds.OpenAiResponses)]
+    [InlineData("", LlmProtocolIds.OpenAiResponses)]
+    [InlineData(LlmProtocolIds.OpenAiChat, LlmProtocolIds.OpenAiChat)]
+    [InlineData(LlmProtocolIds.Anthropic, LlmProtocolIds.Anthropic)]
     [InlineData("unknown", LlmProtocolIds.OpenAiChat)]
     [InlineData("responses", LlmProtocolIds.OpenAiResponses)]
     public void Registry_defaults_and_normalizes_protocol_ids(string? value, string expected)

@@ -53,7 +53,7 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
     public ObservableCollection<LlmProtocolChoice> Protocols { get; } = [];
 
     [ObservableProperty]
-    private string _protocol = LlmProtocolIds.OpenAiChat;
+    private string _protocol = LlmProtocolIds.OpenAiResponses;
 
     [ObservableProperty]
     private string _endpoint = string.Empty;
