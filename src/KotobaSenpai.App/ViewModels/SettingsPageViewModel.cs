@@ -27,18 +27,22 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private readonly IThemePreferenceStore _themePreferences;
     private readonly IStringLocalizer _localizer;
     private readonly IExplanationLanguagePreferences _explanationPreferences;
+    private readonly CaptureBorderPreferences _captureBorder;
+    private string? _captureBorderErrorKey;
     private string? _explanationStatusKey;
     private double _furiganaFontScale;
     private bool _disposed;
 
     public SettingsPageViewModel(ISettingsService settings, IThemePreferenceStore themePreferences,
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
-        IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance)
+        IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance,
+        CaptureBorderPreferences? captureBorder = null)
     {
         _settings = settings;
         _themePreferences = themePreferences;
         _localizer = localizer;
         _explanationPreferences = explanationLanguage;
+        _captureBorder = captureBorder ?? new CaptureBorderPreferences(settings);
         _explanationLanguage = explanationLanguage.CustomLanguage ?? string.Empty;
         Language = language;
         Llm = llm;
@@ -106,6 +110,28 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         }
     }
 
+    public bool ShowCaptureBorder
+    {
+        get => _captureBorder.ShowBorder;
+        set
+        {
+            if (value == ShowCaptureBorder) return;
+            try
+            {
+                _captureBorder.ShowBorder = value;
+                _captureBorderErrorKey = null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _captureBorderErrorKey = ResourceKeys.CaptureBorder_SaveFailed;
+            }
+            OnPropertyChanged(nameof(ShowCaptureBorder));
+            OnPropertyChanged(nameof(CaptureBorderError));
+        }
+    }
+
+    public string CaptureBorderError => _captureBorderErrorKey is null ? string.Empty : _localizer.Get(_captureBorderErrorKey);
+
     partial void OnSelectedThemeChanged(AppThemeMode value) => _themePreferences.Save(value);
 
     private static double NormalizeFontScale(double value)
@@ -129,6 +155,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         OverlayAppearance.RefreshLanguage();
         OnPropertyChanged(nameof(EffectiveExplanationLanguage));
         OnPropertyChanged(nameof(ExplanationLanguageStatus));
+        OnPropertyChanged(nameof(CaptureBorderError));
     }
 
     public void Dispose()

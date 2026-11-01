@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using KotobaSenpai.Core.Errors;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.TargetWindow;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
@@ -17,15 +18,18 @@ public sealed class WgcWindowFrameCapture : IWindowFrameCapture, IDisposable
 {
     private readonly object _gate = new();
     private readonly ITargetWindowTracker? _tracker;
+    private readonly CaptureBorderPreferences? _borderPreferences;
     private Session? _session;
     private Task _cleanup = Task.CompletedTask;
     private long _stopVersion;
     private bool _disposed;
 
-    public WgcWindowFrameCapture(ITargetWindowTracker? tracker = null)
+    public WgcWindowFrameCapture(ITargetWindowTracker? tracker = null, CaptureBorderPreferences? borderPreferences = null)
     {
         _tracker = tracker;
+        _borderPreferences = borderPreferences;
         if (_tracker is not null) _tracker.Changed += OnTargetChanged;
+        if (_borderPreferences is not null) _borderPreferences.Changed += OnBorderPreferenceChanged;
     }
 
     public Task<CapturedFrame> CaptureAsync(WindowTarget target, CancellationToken cancellationToken = default, ScreenRect? region = null)
@@ -45,7 +49,7 @@ public sealed class WgcWindowFrameCapture : IWindowFrameCapture, IDisposable
                     if (version != _stopVersion) throw new OperationCanceledException("Capture was stopped before initialization.");
                     if (_session is not null && (_session.Handle != target.Handle || _session.IsStopped))
                         ReleaseSession();
-                    session = _session ??= new Session(target.Handle);
+                    session = _session ??= new Session(target.Handle, _borderPreferences?.ShowBorder ?? false);
                 }
                 try { return await session.CaptureAsync(target, region, TimeSpan.FromSeconds(2) - clock.Elapsed, cancellationToken).ConfigureAwait(false); }
                 catch (LayoutChangedException) when (attempt == 0)
@@ -89,6 +93,7 @@ public sealed class WgcWindowFrameCapture : IWindowFrameCapture, IDisposable
             cleanup = _cleanup;
         }
         if (_tracker is not null) _tracker.Changed -= OnTargetChanged;
+        if (_borderPreferences is not null) _borderPreferences.Changed -= OnBorderPreferenceChanged;
         cleanup.GetAwaiter().GetResult();
     }
 
@@ -110,9 +115,17 @@ public sealed class WgcWindowFrameCapture : IWindowFrameCapture, IDisposable
         }
     }
 
+    private void OnBorderPreferenceChanged(object? sender, EventArgs e)
+    {
+        lock (_gate)
+        {
+            if (!_disposed) _session?.SetBorderRequired(_borderPreferences!.ShowBorder);
+        }
+    }
+
     private sealed class LayoutChangedException() : Exception("The target window layout changed during capture.");
 
-    private sealed class Session(nint handle)
+    private sealed class Session(nint handle, bool showBorder)
     {
         private static long _nextGeneration;
         private readonly object _nativeGate = new();
@@ -135,9 +148,20 @@ public sealed class WgcWindowFrameCapture : IWindowFrameCapture, IDisposable
         private uint _threadId;
         private WgcInterop.WindowLayout _layout;
         private long _generation = Interlocked.Increment(ref _nextGeneration);
+        private bool _showBorder = showBorder;
 
         internal nint Handle => handle;
         internal bool IsStopped => Volatile.Read(ref _stopped) != 0;
+
+        internal void SetBorderRequired(bool value)
+        {
+            lock (_nativeGate)
+            {
+                _showBorder = value;
+                if (!IsStopped && _capture is not null)
+                    WgcInterop.SetCaptureBorder(_capture, value);
+            }
+        }
 
         internal async Task<CapturedFrame> CaptureAsync(WindowTarget target, ScreenRect? region, TimeSpan timeout, CancellationToken cancellationToken)
         {
@@ -194,6 +218,8 @@ public sealed class WgcWindowFrameCapture : IWindowFrameCapture, IDisposable
         {
             if (!GraphicsCaptureSession.IsSupported())
                 throw new WindowsPlatformException(ErrorCodes.WindowCaptureNotSupported, "Windows Graphics Capture is not supported in this Windows session.");
+            // Request once before capture so the border can also be toggled during this session.
+            WgcInterop.RequestBorderlessAccessAsync().GetAwaiter().GetResult();
             _device = D3D11.D3D11CreateDevice(DriverType.Hardware, DeviceCreationFlags.BgraSupport);
             _context = _device.ImmediateContext;
             _winrtDevice = WgcInterop.CreateWinrtDevice(_device);
@@ -205,6 +231,7 @@ public sealed class WgcWindowFrameCapture : IWindowFrameCapture, IDisposable
             _pool = Direct3D11CaptureFramePool.CreateFreeThreaded(_winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _bufferSize);
             _capture = _pool.CreateCaptureSession(_item);
             _capture.IsCursorCaptureEnabled = false;
+            WgcInterop.SetCaptureBorder(_capture, _showBorder);
             _pool.FrameArrived += OnFrameArrived;
             _item.Closed += OnClosed;
             _capture.StartCapture();

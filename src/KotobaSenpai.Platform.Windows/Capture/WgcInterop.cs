@@ -3,8 +3,10 @@ using KotobaSenpai.Core.Errors;
 using KotobaSenpai.Core.Geometry;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
+using Windows.Foundation;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX.Direct3D11;
+using Windows.Security.Authorization.AppCapabilityAccess;
 
 namespace KotobaSenpai.Platform.Windows.Capture;
 
@@ -68,6 +70,47 @@ internal static class WgcInterop
         finally { Marshal.Release(pointer); }
     }
 
+    internal static Task RequestBorderlessAccessAsync()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348)) return Task.CompletedTask;
+        const string name = "Windows.Graphics.Capture.GraphicsCaptureAccess";
+        Marshal.ThrowExceptionForHR(WindowsCreateString(name, name.Length, out var hstring));
+        try
+        {
+            var iid = new Guid("743ED370-06EC-5040-A58A-901F0F757095");
+            Marshal.ThrowExceptionForHR(RoGetActivationFactory(hstring, in iid, out var factory));
+            try
+            {
+                // IInspectable has six slots; GraphicsCaptureAccessKind.Borderless is zero.
+                var method = Marshal.GetDelegateForFunctionPointer<RequestCaptureAccess>(Method(factory, 6));
+                Marshal.ThrowExceptionForHR(method(factory, 0, out var operation));
+                try { return WinRT.MarshalInterface<IAsyncOperation<AppCapabilityAccessStatus>>.FromAbi(operation).AsTask(); }
+                finally { Marshal.Release(operation); }
+            }
+            finally { Marshal.Release(factory); }
+        }
+        finally { WindowsDeleteString(hstring); }
+    }
+
+    internal static void SetCaptureBorder(GraphicsCaptureSession session, bool required)
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 20348)) return;
+        var pointer = WinRT.MarshalInspectable<GraphicsCaptureSession>.FromManaged(session);
+        try
+        {
+            var iid = new Guid("F2CDD966-22AE-5EA1-9596-3A289344C3BE");
+            Marshal.ThrowExceptionForHR(Marshal.QueryInterface(pointer, in iid, out var border));
+            try
+            {
+                // IGraphicsCaptureSession3 exposes the getter and setter after IInspectable's six slots.
+                var method = Marshal.GetDelegateForFunctionPointer<SetBorderRequired>(Method(border, 7));
+                Marshal.ThrowExceptionForHR(method(border, required ? (byte)1 : (byte)0));
+            }
+            finally { Marshal.Release(border); }
+        }
+        finally { Marshal.Release(pointer); }
+    }
+
     internal static ID3D11Texture2D GetTexture(IDirect3DSurface surface)
     {
         var surfacePointer = WinRT.MarshalInterface<IDirect3DSurface>.FromManaged(surface);
@@ -87,8 +130,8 @@ internal static class WgcInterop
         finally { Marshal.Release(surfacePointer); }
     }
 
-    // Both interop interfaces expose their first method directly after IUnknown's three slots.
-    private static nint Method(nint instance) => Marshal.ReadIntPtr(Marshal.ReadIntPtr(instance), 3 * IntPtr.Size);
+    // Interface methods follow IUnknown's three slots or IInspectable's six slots.
+    private static nint Method(nint instance, int slot = 3) => Marshal.ReadIntPtr(Marshal.ReadIntPtr(instance), slot * IntPtr.Size);
     private static nint GetWindowStyle(nint hwnd, int index)
         => IntPtr.Size == 8 ? GetWindowLongPtrW(hwnd, index) : GetWindowLongW(hwnd, index);
 
@@ -96,6 +139,10 @@ internal static class WgcInterop
     private delegate int CreateForWindow(nint factory, nint hwnd, in Guid iid, out nint result);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int GetInterface(nint access, in Guid iid, out nint result);
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate int RequestCaptureAccess(nint factory, int request, out nint operation);
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate int SetBorderRequired(nint session, byte required);
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
     {

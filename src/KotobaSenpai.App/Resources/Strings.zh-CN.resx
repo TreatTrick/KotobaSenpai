@@ -41,6 +41,15 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="Label_CaptureBorder" xml:space="preserve">
+    <value>显示窗口捕获边框</value>
+  </data>
+  <data name="Description_CaptureBorder" xml:space="preserve">
+    <value>在捕获的窗口周围显示黄色边框，默认关闭。旧版 Windows 或未获准无边框捕获时，系统仍可能显示边框。</value>
+  </data>
+  <data name="CaptureBorder_SaveFailed" xml:space="preserve">
+    <value>无法保存捕获边框设置，请重试。</value>
+  </data>
   <!-- Error code messages (one per ErrorCodes key) -->
   <data name="OcrModelMissing" xml:space="preserve">
     <value>缺少日语 OCR 模型。请将 meikiocr 模型文件放入 Models 目录（或设置 KOTOBA_MEIKIOCR_MODEL_DIR）后重试。</value>

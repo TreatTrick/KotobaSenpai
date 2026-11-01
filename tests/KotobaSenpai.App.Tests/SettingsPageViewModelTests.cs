@@ -11,6 +11,56 @@ namespace KotobaSenpai.App.Tests;
 public sealed class SettingsPageViewModelTests
 {
     [Theory]
+    [InlineData(null, false)]
+    [InlineData("invalid", false)]
+    [InlineData("false", false)]
+    [InlineData("true", true)]
+    public void Capture_border_restores_saved_values_and_defaults_to_off(string? raw, bool expected)
+    {
+        var settings = new RecordingSettings();
+        settings.Values["ShowCaptureBorder"] = raw;
+        using var viewModel = Create(settings, new RecordingThemeStore());
+
+        Assert.Equal(expected, viewModel.ShowCaptureBorder);
+        Assert.Equal(0, settings.WriteCount);
+    }
+
+    [Fact]
+    public void Capture_border_changes_persist_and_notify_only_once_per_change()
+    {
+        var settings = new RecordingSettings();
+        using var viewModel = Create(settings, new RecordingThemeStore());
+        var changes = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        foreach (var enabled in new[] { true, false })
+        {
+            changes.Clear();
+            viewModel.ShowCaptureBorder = enabled;
+            viewModel.ShowCaptureBorder = enabled;
+
+            Assert.Equal(enabled ? "true" : "false", settings.GetValue("ShowCaptureBorder"));
+            Assert.Equal(1, changes.Count(name => name == nameof(SettingsPageViewModel.ShowCaptureBorder)));
+            using var restored = Create(settings, new RecordingThemeStore());
+            Assert.Equal(enabled, restored.ShowCaptureBorder);
+        }
+        Assert.Equal(2, settings.WriteCount);
+    }
+
+    [Fact]
+    public void Failed_capture_border_save_keeps_the_committed_value()
+    {
+        var settings = new RecordingSettings { FailWrites = true };
+        using var viewModel = Create(settings, new RecordingThemeStore());
+
+        viewModel.ShowCaptureBorder = true;
+
+        Assert.False(viewModel.ShowCaptureBorder);
+        Assert.Null(settings.GetValue("ShowCaptureBorder"));
+        Assert.NotEmpty(viewModel.CaptureBorderError);
+    }
+
+    [Theory]
     [InlineData(0, "0")]
     [InlineData(1, "1")]
     [InlineData(0.75, "0.75")]
@@ -311,7 +361,13 @@ public sealed class SettingsPageViewModelTests
             return base.TryUpdate(expected, changes);
         }
         public override string? GetValue(string key) => Values.GetValueOrDefault(key);
-        public override void SetValue(string key, string? value) { Values[key] = value; WriteCount++; }
+        public override void SetValue(string key, string? value)
+        {
+            if (FailWrites)
+                throw new System.IO.IOException("Simulated storage failure.");
+            Values[key] = value;
+            WriteCount++;
+        }
     }
 
     private sealed class RecordingThemeStore : IThemePreferenceStore

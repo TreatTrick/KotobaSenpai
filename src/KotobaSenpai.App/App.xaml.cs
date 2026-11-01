@@ -271,6 +271,7 @@ public partial class App : Application
 
         // Settings: unified settings.json read/write, the single owner for preference storage and log-level configuration (singleton, holds the in-memory view).
         services.AddSingleton<ISettingsService>(_ => new SettingsService());
+        services.AddSingleton<CaptureBorderPreferences>();
 
         // Localization: the concrete implementation and the Core port point at the same singleton, so LanguageService and the ViewModel share culture state.
         services.AddSingleton<ResourceManagerStringLocalizer>();

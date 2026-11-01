@@ -48,6 +48,15 @@
                      Style="{StaticResource Description}" Margin="0" />
         </Grid>
       </controls:SettingsCard>
+      <controls:SettingsCard Header="{loc:Loc Key=Label_CaptureBorder}" Description="{loc:Loc Key=Description_CaptureBorder}"
+                             Icon="{ui:SymbolIcon Window24}">
+        <controls:SettingsCard.DescriptionContent>
+          <TextBlock Text="{Binding CaptureBorderError}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+        </controls:SettingsCard.DescriptionContent>
+        <ui:ToggleSwitch x:Name="CaptureBorderSwitch" IsChecked="{Binding ShowCaptureBorder, Mode=TwoWay}"
+                         Style="{StaticResource SettingsToggle}" AutomationProperties.Name="{loc:Loc Key=Label_CaptureBorder}" />
+      </controls:SettingsCard>
       <TextBlock Text="{loc:Loc Key=OverlayAppearance_Title}" Style="{StaticResource SectionTitle}" />
       <controls:SettingsCard x:Name="PopupTransparencyCard" Header="{loc:Loc Key=PhrasePopup_BackgroundTransparency}"
                              Description="{loc:Loc Key=PhrasePopup_BackgroundTransparencyDescription}" Icon="{ui:SymbolIcon PaintBrush24}">

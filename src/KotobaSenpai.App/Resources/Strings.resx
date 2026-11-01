@@ -41,6 +41,15 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="Label_CaptureBorder" xml:space="preserve">
+    <value>Show window capture border</value>
+  </data>
+  <data name="Description_CaptureBorder" xml:space="preserve">
+    <value>Show a yellow border around the captured window. Off by default. Windows may require the border on older systems or when borderless capture is not allowed.</value>
+  </data>
+  <data name="CaptureBorder_SaveFailed" xml:space="preserve">
+    <value>Could not save the capture border preference. Try again.</value>
+  </data>
   <!-- Error code messages (one per ErrorCodes key) -->
   <data name="OcrModelMissing" xml:space="preserve">
     <value>Japanese OCR models are missing. Place the meikiocr model files in the Models folder (or set KOTOBA_MEIKIOCR_MODEL_DIR) and try again.</value>
