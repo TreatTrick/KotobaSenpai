@@ -60,6 +60,10 @@ public static class ResourceKeys
     public const string Label_TargetWindow = nameof(Label_TargetWindow);
     public const string Label_Actions = nameof(Label_Actions);
     public const string Label_Language = nameof(Label_Language);
+    public const string Label_Logging = nameof(Label_Logging);
+    public const string Label_LogLevel = nameof(Label_LogLevel);
+    public const string Description_LogLevel = nameof(Description_LogLevel);
+    public const string LogLevel_SaveFailed = nameof(LogLevel_SaveFailed);
     public const string Label_CaptureBorder = nameof(Label_CaptureBorder);
     public const string Description_CaptureBorder = nameof(Description_CaptureBorder);
     public const string CaptureBorder_SaveFailed = nameof(CaptureBorder_SaveFailed);

@@ -1,8 +1,11 @@
 using System.Globalization;
+using System.IO;
 using KotobaSenpai.App.Localization;
+using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Llm;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Settings;
 
@@ -10,6 +13,104 @@ namespace KotobaSenpai.App.Tests;
 
 public sealed class SettingsPageViewModelTests
 {
+    [Theory]
+    [InlineData(null, LogLevel.Error)]
+    [InlineData("invalid", LogLevel.Error)]
+    [InlineData("999", LogLevel.Error)]
+    [InlineData("trace", LogLevel.Trace)]
+    [InlineData("Debug", LogLevel.Debug)]
+    [InlineData("Information", LogLevel.Information)]
+    [InlineData("Warning", LogLevel.Warning)]
+    [InlineData("Error", LogLevel.Error)]
+    [InlineData("Critical", LogLevel.Critical)]
+    public void Log_level_restores_saved_values_without_writing(string? raw, LogLevel expected)
+    {
+        var settings = new RecordingSettings();
+        settings.Values["MinimumLogLevel"] = raw;
+        using var viewModel = Create(settings, new RecordingThemeStore());
+
+        Assert.Equal(expected, viewModel.SelectedLogLevel);
+        Assert.Equal(Enum.GetValues<LogLevel>(), viewModel.LogLevels);
+        Assert.Equal(0, settings.WriteCount);
+    }
+
+    [Theory]
+    [InlineData(LogLevel.Trace)]
+    [InlineData(LogLevel.Debug)]
+    [InlineData(LogLevel.Information)]
+    [InlineData(LogLevel.Warning)]
+    [InlineData(LogLevel.Critical)]
+    public void Log_level_changes_persist_once_and_restore(LogLevel level)
+    {
+        var settings = new RecordingSettings();
+        settings.Values["Theme"] = "Dark";
+        using var viewModel = Create(settings, new RecordingThemeStore());
+        var changes = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        viewModel.SelectedLogLevel = level;
+        viewModel.SelectedLogLevel = level;
+
+        Assert.Equal(level.ToString(), settings.GetValue("MinimumLogLevel"));
+        Assert.Equal("Dark", settings.GetValue("Theme"));
+        Assert.Equal(1, settings.WriteCount);
+        Assert.Equal(1, changes.Count(name => name == nameof(SettingsPageViewModel.SelectedLogLevel)));
+        using var restored = Create(settings, new RecordingThemeStore());
+        Assert.Equal(level, restored.SelectedLogLevel);
+    }
+
+    [Fact]
+    public void Failed_log_level_save_preserves_the_committed_level_and_can_be_retried()
+    {
+        var settings = new RecordingSettings { FailWrites = true };
+        using var viewModel = Create(settings, new RecordingThemeStore());
+
+        viewModel.SelectedLogLevel = LogLevel.Trace;
+
+        Assert.Equal(LogLevel.Error, viewModel.SelectedLogLevel);
+        Assert.Null(settings.GetValue("MinimumLogLevel"));
+        Assert.NotEmpty(viewModel.LogLevelError);
+
+        settings.FailWrites = false;
+        viewModel.SelectedLogLevel = LogLevel.Trace;
+
+        Assert.Equal(LogLevel.Trace, viewModel.SelectedLogLevel);
+        Assert.Empty(viewModel.LogLevelError);
+    }
+
+    [Fact]
+    public void Log_level_changes_immediately_update_the_running_logger()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "kslog_settings_" + Guid.NewGuid().ToString("N"));
+        var settings = new RecordingSettings();
+        using var viewModel = Create(settings, new RecordingThemeStore());
+        try
+        {
+            using (var logger = new FileLogger(directory, () => LogConfiguration.LoadMinimumLevel(settings)))
+            {
+                logger.Log(LogLevel.Debug, null, "DEBUG_BEFORE");
+                viewModel.SelectedLogLevel = LogLevel.Debug;
+                logger.Log(LogLevel.Trace, null, "TRACE_BELOW_MINIMUM");
+                logger.Log(LogLevel.Debug, null, "DEBUG_ENABLED");
+                viewModel.SelectedLogLevel = LogLevel.Critical;
+                logger.Log(LogLevel.Error, null, "ERROR_BELOW_MINIMUM");
+                logger.Log(LogLevel.Critical, null, "CRITICAL_ENABLED");
+            }
+
+            var content = File.ReadAllText(Directory.GetFiles(directory).Single());
+            Assert.Contains("DEBUG_ENABLED", content);
+            Assert.Contains("CRITICAL_ENABLED", content);
+            Assert.DoesNotContain("DEBUG_BEFORE", content);
+            Assert.DoesNotContain("TRACE_BELOW_MINIMUM", content);
+            Assert.DoesNotContain("ERROR_BELOW_MINIMUM", content);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("invalid", false)]

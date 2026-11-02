@@ -16,7 +16,7 @@ namespace KotobaSenpai.App.Logging;
 public sealed class FileLogger : ILogger, IDisposable
 {
     private readonly string _logsDirectory;
-    private readonly LogLevel _minimumLevel;
+    private readonly Func<LogLevel> _minimumLevel;
     private readonly LogRetentionPolicy _retention;
     private readonly Func<DateTime> _now;
     private readonly object _gate = new();
@@ -26,6 +26,16 @@ public sealed class FileLogger : ILogger, IDisposable
     public FileLogger(
         string logsDirectory,
         LogLevel minimumLevel,
+        LogRetentionPolicy? retention = null,
+        Func<DateTime>? now = null)
+        : this(logsDirectory, () => minimumLevel, retention, now)
+    {
+    }
+
+    /// <summary>Uses the current minimum level for each entry so preference changes apply immediately.</summary>
+    public FileLogger(
+        string logsDirectory,
+        Func<LogLevel> minimumLevel,
         LogRetentionPolicy? retention = null,
         Func<DateTime>? now = null)
     {
@@ -38,7 +48,7 @@ public sealed class FileLogger : ILogger, IDisposable
     /// <inheritdoc />
     public void Log(LogLevel level, Exception? exception, string message, params object[] args)
     {
-        if (level < _minimumLevel)
+        if (level < _minimumLevel())
             return;
 
         try

@@ -147,6 +147,18 @@
         </StackPanel>
       </ui:Card>
 
+      <TextBlock Text="{loc:Loc Key=Label_Logging}" Style="{StaticResource SectionTitle}" />
+      <controls:SettingsCard Header="{loc:Loc Key=Label_LogLevel}" Description="{loc:Loc Key=Description_LogLevel}"
+                             Icon="{ui:SymbolIcon Settings24}">
+        <controls:SettingsCard.DescriptionContent>
+          <TextBlock Text="{Binding LogLevelError}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+        </controls:SettingsCard.DescriptionContent>
+        <ComboBox x:Name="LogLevelComboBox" Style="{StaticResource SettingInput}"
+                  ItemsSource="{Binding LogLevels}" SelectedItem="{Binding SelectedLogLevel, Mode=TwoWay}"
+                  AutomationProperties.Name="{loc:Loc Key=Label_LogLevel}" />
+      </controls:SettingsCard>
+
     </StackPanel>
   </ScrollViewer>
 </UserControl>

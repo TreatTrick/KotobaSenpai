@@ -28,6 +28,15 @@ public sealed class LogConfigurationTests
         Assert.Equal(LogLevel.Error, LogConfiguration.LoadMinimumLevel(new FakeSettings("Verbose")));
     }
 
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("6")]
+    [InlineData("999")]
+    public void Undefined_numeric_levels_fall_back_to_error(string raw)
+    {
+        Assert.Equal(LogLevel.Error, LogConfiguration.LoadMinimumLevel(new FakeSettings(raw)));
+    }
+
     private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub
     {
         private readonly string? _value;

@@ -293,10 +293,12 @@ public partial class App : Application
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "KotobaSenpai", "logs");
         services.AddSingleton(_ => new LogRetentionPolicy(logsDirectory));
-        services.AddSingleton(sp => new FileLogger(
-            logsDirectory,
-            LogConfiguration.LoadMinimumLevel(sp.GetRequiredService<ISettingsService>()),
-            sp.GetRequiredService<LogRetentionPolicy>()));
+        services.AddSingleton(sp =>
+        {
+            var settings = sp.GetRequiredService<ISettingsService>();
+            return new FileLogger(logsDirectory, () => LogConfiguration.LoadMinimumLevel(settings),
+                sp.GetRequiredService<LogRetentionPolicy>());
+        });
         services.AddSingleton<ILogger>(sp => sp.GetRequiredService<FileLogger>());
 
         // Theme: the preference-store port and the view-layer FluentThemeService singleton (holds the window OS-follow subscription; must be shared).

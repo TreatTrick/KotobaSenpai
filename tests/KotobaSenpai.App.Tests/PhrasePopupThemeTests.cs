@@ -16,6 +16,7 @@ using KotobaSenpai.App.Japanese;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using KotobaSenpai.Core.Llm;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.PhraseAnalysis;
@@ -244,6 +245,17 @@ public sealed partial class PhrasePopupThemeTests
                     timer.Start();
                     Dispatcher.PushFrame(loaded);
                     frame.UpdateLayout();
+                    var logLevel = Assert.IsType<ComboBox>(page.FindName("LogLevelComboBox"));
+                    Assert.Equal(localizer.Get("Label_LogLevel"), System.Windows.Automation.AutomationProperties.GetName(logLevel));
+                    Assert.Equal(viewModel.SelectedLogLevel, logLevel.SelectedItem);
+                    foreach (var level in Enum.GetValues<LogLevel>())
+                    {
+                        logLevel.SelectedItem = level;
+                        Assert.Equal(level, viewModel.SelectedLogLevel);
+                        Assert.Equal(level.ToString(), settings.GetValue("MinimumLogLevel"));
+                    }
+                    viewModel.SelectedLogLevel = LogLevel.Error;
+                    Assert.Equal(LogLevel.Error, logLevel.SelectedItem);
                     CheckOverlayAppearancePresentation(application, page, frame, viewModel, culture, theme);
                     var content = Assert.IsAssignableFrom<FrameworkElement>(advanced.Content);
                     Assert.True(content.IsVisible);

@@ -670,4 +670,8 @@ Meet your next word.</value>
   <data name="Guide_RegionTopLeft" xml:space="preserve"><value>Drag the yellow edges to select the recognition area. Only text inside this area is recognized. A smaller area makes recognition faster.</value></data>
   <data name="Guide_RegionConfirm" xml:space="preserve"><value>Click the confirmation button to save the selected area.</value></data>
   <data name="Guide_Understood" xml:space="preserve"><value>I understand</value></data>
+  <data name="Label_Logging" xml:space="preserve"><value>Logging</value></data>
+  <data name="Label_LogLevel" xml:space="preserve"><value>Log level</value></data>
+  <data name="Description_LogLevel" xml:space="preserve"><value>Record messages at this level and above. Changes are saved and applied immediately.</value></data>
+  <data name="LogLevel_SaveFailed" xml:space="preserve"><value>Could not save the log level. The previous level is still active.</value></data>
 </root>

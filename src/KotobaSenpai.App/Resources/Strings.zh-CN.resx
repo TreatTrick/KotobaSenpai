@@ -670,4 +670,8 @@ API Key：YOUR_API_KEY
   <data name="Guide_RegionTopLeft" xml:space="preserve"><value>拖动黄色边缘选择识别区域，只会识别区域内的文字，区域越小识别速度越快</value></data>
   <data name="Guide_RegionConfirm" xml:space="preserve"><value>点击确认后确定选区范围</value></data>
   <data name="Guide_Understood" xml:space="preserve"><value>我知道了</value></data>
+  <data name="Label_Logging" xml:space="preserve"><value>日志</value></data>
+  <data name="Label_LogLevel" xml:space="preserve"><value>日志级别</value></data>
+  <data name="Description_LogLevel" xml:space="preserve"><value>记录所选级别及以上的日志，修改后自动保存并立即生效。</value></data>
+  <data name="LogLevel_SaveFailed" xml:space="preserve"><value>无法保存日志级别，仍使用之前的级别。</value></data>
 </root>

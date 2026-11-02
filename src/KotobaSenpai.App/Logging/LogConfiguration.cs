@@ -10,11 +10,13 @@ namespace KotobaSenpai.App.Logging;
 /// </summary>
 public static class LogConfiguration
 {
+    public const string MinimumLogLevelKey = "MinimumLogLevel";
+
     /// <summary>Reads the minimum log level; <paramref name="settings"/> is injected to make it testable.</summary>
     public static LogLevel LoadMinimumLevel(ISettingsService settings)
     {
-        var raw = settings.GetValue("MinimumLogLevel");
-        if (raw is not null && Enum.TryParse(raw, ignoreCase: true, out LogLevel level))
+        var raw = settings.GetValue(MinimumLogLevelKey);
+        if (raw is not null && Enum.TryParse(raw, ignoreCase: true, out LogLevel level) && Enum.IsDefined(level))
             return level;
 
         return LogLevel.Error;

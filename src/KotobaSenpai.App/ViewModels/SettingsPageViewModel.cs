@@ -2,8 +2,10 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.IO;
+using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.Core.Localization;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.PhraseAnalysis;
 
@@ -29,8 +31,10 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private readonly IExplanationLanguagePreferences _explanationPreferences;
     private readonly CaptureBorderPreferences _captureBorder;
     private string? _captureBorderErrorKey;
+    private string? _logLevelErrorKey;
     private string? _explanationStatusKey;
     private double _furiganaFontScale;
+    private LogLevel _selectedLogLevel;
     private bool _disposed;
 
     public SettingsPageViewModel(ISettingsService settings, IThemePreferenceStore themePreferences,
@@ -48,6 +52,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         Llm = llm;
         OverlayAppearance = overlayAppearance;
         _selectedTheme = themePreferences.Load() ?? AppThemeMode.Auto;
+        _selectedLogLevel = LogConfiguration.LoadMinimumLevel(settings);
         _furiganaFontScale = NormalizeFontScale(FuriganaFontSettings.ResolveFontScale(settings.GetValue(FuriganaFontSettings.FontScaleKey)));
         ThemeModes = [new(AppThemeMode.Auto, string.Empty), new(AppThemeMode.Light, string.Empty), new(AppThemeMode.Dark, string.Empty)];
         RefreshThemeNames();
@@ -59,6 +64,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     public LlmSettingsViewModel Llm { get; }
     public OverlayAppearanceViewModel OverlayAppearance { get; }
     public IReadOnlyList<ThemeModeChoice> ThemeModes { get; }
+    public IReadOnlyList<LogLevel> LogLevels { get; } = Enum.GetValues<LogLevel>();
 
     [ObservableProperty]
     private AppThemeMode _selectedTheme;
@@ -132,6 +138,29 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
 
     public string CaptureBorderError => _captureBorderErrorKey is null ? string.Empty : _localizer.Get(_captureBorderErrorKey);
 
+    public LogLevel SelectedLogLevel
+    {
+        get => _selectedLogLevel;
+        set
+        {
+            if (value == _selectedLogLevel || !Enum.IsDefined(value)) return;
+            try
+            {
+                _settings.SetValue(LogConfiguration.MinimumLogLevelKey, value.ToString());
+                _selectedLogLevel = value;
+                _logLevelErrorKey = null;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logLevelErrorKey = ResourceKeys.LogLevel_SaveFailed;
+            }
+            OnPropertyChanged(nameof(SelectedLogLevel));
+            OnPropertyChanged(nameof(LogLevelError));
+        }
+    }
+
+    public string LogLevelError => _logLevelErrorKey is null ? string.Empty : _localizer.Get(_logLevelErrorKey);
+
     partial void OnSelectedThemeChanged(AppThemeMode value) => _themePreferences.Save(value);
 
     private static double NormalizeFontScale(double value)
@@ -156,6 +185,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         OnPropertyChanged(nameof(EffectiveExplanationLanguage));
         OnPropertyChanged(nameof(ExplanationLanguageStatus));
         OnPropertyChanged(nameof(CaptureBorderError));
+        OnPropertyChanged(nameof(LogLevelError));
     }
 
     public void Dispose()
