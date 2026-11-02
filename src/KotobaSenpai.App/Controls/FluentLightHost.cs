@@ -113,18 +113,6 @@ public sealed class FluentLightHost : AdornerDecorator
         UpdatePointer(null);
     }
 
-    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
-    {
-        base.OnGotKeyboardFocus(e);
-        Wake();
-    }
-
-    protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
-    {
-        base.OnLostKeyboardFocus(e);
-        Wake();
-    }
-
     internal void UpdatePointer(Point? position)
     {
         _pointer = position;
@@ -184,7 +172,7 @@ public sealed class FluentLightHost : AdornerDecorator
         foreach (var surface in _surfaces.Values)
         {
             var hovered = surface.Element.IsEnabled && surface.Element.IsVisible
-                && (ReferenceEquals(surface.Element, _hovered) || surface.Element.IsKeyboardFocusWithin);
+                && ReferenceEquals(surface.Element, _hovered);
             var target = surface.Kind == FluentLightKind.Button && hovered ? 1d : 0d;
             surface.Hover = FluentLightMotion.Fade(surface.Hover, target, seconds, animate);
             settled &= surface.Hover == target;

@@ -85,6 +85,41 @@ public sealed class FluentLightPresentationTests
     });
 
     [Fact]
+    public Task Keyboard_focus_does_not_keep_a_button_halo_visible_without_pointer_hover() => RunSta(() =>
+    {
+        var canvas = new Canvas { Background = new SolidColorBrush(Color.FromRgb(32, 33, 39)) };
+        var button = AddButton(canvas, 20, 40);
+        var host = new FluentLightHost { Child = canvas };
+        var window = Show(host);
+        try
+        {
+            host.UpdatePointer(null);
+            host.Advance(1, animate: false);
+            var baseline = Render(host);
+
+            Assert.True(button.Focus());
+            Assert.True(button.IsKeyboardFocusWithin);
+            host.Advance(1, animate: false);
+            Assert.Equal(0, Difference(baseline, Render(host), 18, 58));
+
+            host.UpdatePointer(new Point(60, 58));
+            host.Advance(1, animate: false);
+            Assert.True(Difference(baseline, Render(host), 18, 58) > 2);
+
+            host.UpdatePointer(new Point(170, 58));
+            host.Advance(1, animate: false);
+            Assert.True(button.IsKeyboardFocusWithin);
+            Assert.Equal(0, Difference(baseline, Render(host), 18, 58));
+
+            host.UpdatePointer(null);
+            host.Advance(1, animate: false);
+            Assert.Equal(0, Difference(baseline, Render(host), 18, 58));
+            Assert.False(host.IsRendering);
+        }
+        finally { window.Close(); }
+    });
+
+    [Fact]
     public Task Switching_pages_reuses_the_host_and_releases_the_previous_pages_light_surfaces() => RunSta(() =>
     {
         var first = new Canvas { Background = new SolidColorBrush(Color.FromRgb(32, 33, 39)) };
