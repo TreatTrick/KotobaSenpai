@@ -168,6 +168,25 @@ public sealed class WordMeaningValidatorTests
 
 public sealed class PhraseSessionTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(25)]
+    [InlineData(40)]
+    public void Group_membership_excludes_the_empty_area_inside_a_wrapped_words_union_bounds(int y)
+    {
+        var target = new WindowTarget((nint)1, "Target", new ScreenRect(0, 0, 300, 100));
+        var wrapped = new GroupedWord(TokenOf("気がかり", "きがかり"),
+            [new ScreenRect(200, 0, 10, 20), new ScreenRect(0, 40, 30, 20)]);
+        var neighbor = new GroupedWord(TokenOf("彼女", "かのじょ"), new ScreenRect(100, y, 20, 10));
+        var meaning = new WordMeaningView(neighbor.Surface, neighbor.Reading, "Pronoun", "She", "");
+        var session = WordOverlaySession.Start(target, [wrapped, neighbor], wordMeanings: [meaning]);
+        var group = new PhraseGroupView(Guid.NewGuid(), neighbor.Surface, "word", "She", "", 0, 1,
+            [new PhrasePartView(neighbor.Rects)]);
+
+        Assert.Equal([1], session.GetCoveredWordIndices(group));
+        Assert.Equal([meaning], session.GetCoveredWordMeanings(group));
+    }
+
     [Fact]
     public void Session_carries_phrase_groups_and_warning()
     {

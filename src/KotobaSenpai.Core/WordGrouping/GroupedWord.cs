@@ -71,7 +71,7 @@ public sealed record GroupedWord
     /// <summary>The sentence segment that produced this word, when available.</summary>
     public string? SegmentId { get; }
 
-    /// <summary>The union of <see cref="Rects"/>, for consumers that need a single box (hover hit-test, covered-word detection).</summary>
+    /// <summary>The union of <see cref="Rects"/> for coarse bounds; precise hit testing must use the per-line rects.</summary>
     public ScreenRect Bounds { get; }
 
     public string Surface => Token.Surface;

@@ -127,7 +127,7 @@ public sealed class WordOverlaySession
             .Select(GetMeaningOrDefault)
             .ToArray();
 
-    /// <summary>Returns the indices of the local merged words whose bounds overlap a phrase group's part rects (group membership signal).</summary>
+    /// <summary>Returns the local merged words whose per-line rects overlap a phrase group's part rects.</summary>
     public IReadOnlyList<int> GetCoveredWordIndices(PhraseGroupView group)
     {
         ArgumentNullException.ThrowIfNull(group);
@@ -135,7 +135,7 @@ public sealed class WordOverlaySession
         foreach (var part in group.Parts)
             foreach (var rect in part.Rects)
                 for (int i = 0; i < _words.Count; i++)
-                    if (Intersects(_words[i].Bounds, rect))
+                    if (_words[i].Rects.Any(wordRect => Intersects(wordRect, rect)))
                         indices.Add(i);
         return indices.ToArray();
     }

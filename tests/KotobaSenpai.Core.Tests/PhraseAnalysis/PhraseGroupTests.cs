@@ -4,6 +4,7 @@ using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.Overlay;
 
 namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 
@@ -118,6 +119,33 @@ public sealed class SentenceTokenBuilderTests
 
 public sealed class PhraseGeometryTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Maps_a_wrapped_token_to_its_actual_line_fragments(bool includeFollowingToken)
+    {
+        const string firstLine = "完璧主義者である彼女にとって、それは痛くはないけど気";
+        const string secondLine = "がかりなトゲのようなもので、";
+        OcrLine Line(string text, int x, int y) => new(text.Select((c, i) =>
+            new OcrWord(c.ToString(), new ScreenRect(x + i * 10, y, 10, 20))).ToArray());
+        var builder = new SentenceTokenBuilder(new StubTokenizer(
+            new TokenSpec("気がかり", firstLine.Length - 1),
+            new TokenSpec("な", firstLine.Length + 3)));
+        var built = builder.Build([Line(firstLine, 100, 40), Line(secondLine, 60, 70)], new SentenceSegment([0, 1]));
+        var part = new PhraseGroupPart(built.References.Take(includeFollowingToken ? 2 : 1).ToArray());
+        var group = PhraseGeometryMapper.MapGroup(new PhraseGroup("wrapped", "word", [part],
+            part.Surface, "Concerning", "Modifier", Guid.NewGuid()));
+
+        var firstFragment = new ScreenRect(100 + (firstLine.Length - 1) * 10, 40, 10, 20);
+        var secondFragment = new ScreenRect(60, 70, includeFollowingToken ? 40 : 30, 20);
+        Assert.Equal([firstFragment, secondFragment], Assert.Single(group.Parts).Rects);
+        Assert.Equal(0, PhraseHoverResolver.Resolve([group], firstFragment.X + 5, 50));
+        Assert.Equal(0, PhraseHoverResolver.Resolve([group], 65, 80));
+        Assert.Equal(-1, PhraseHoverResolver.Resolve([group], 150, 50));
+        Assert.Equal(-1, PhraseHoverResolver.Resolve([group], 150, 80));
+        Assert.Equal(-1, PhraseHoverResolver.Resolve([group], 150, 65));
+    }
+
     [Fact]
     public void Maps_same_line_part_to_single_union_rect()
     {

@@ -18,7 +18,8 @@ public sealed record SentenceTokenReference
         int lineTokenIndex,
         int lineOffset,
         Token token,
-        IReadOnlyList<ScreenRect> boxes)
+        IReadOnlyList<ScreenRect> boxes,
+        IReadOnlyList<LineBlockTokenizer.LineSegment>? lineSegments = null)
     {
         if (sentenceIndex < 0)
             throw new ArgumentOutOfRangeException(nameof(sentenceIndex), "Sentence index must be non-negative.");
@@ -36,6 +37,7 @@ public sealed record SentenceTokenReference
         LineOffset = lineOffset;
         Token = token;
         Boxes = (boxes ?? throw new ArgumentNullException(nameof(boxes))).ToArray();
+        LineSegments = lineSegments?.ToArray() ?? [new LineBlockTokenizer.LineSegment(lineId, Boxes)];
     }
 
     /// <summary>The token's global ordinal within the whole sentence's reading order.</summary>
@@ -53,8 +55,11 @@ public sealed record SentenceTokenReference
     /// <summary>UniDic tokenization metadata.</summary>
     public Token Token { get; }
 
-    /// <summary>The source character boxes covered by this token (in-line physical coordinates).</summary>
+    /// <summary>The source character boxes covered by this token, including every line it spans.</summary>
     public IReadOnlyList<ScreenRect> Boxes { get; }
+
+    /// <summary>Character boxes grouped by their actual source lines, including wrapped token fragments.</summary>
+    public IReadOnlyList<LineBlockTokenizer.LineSegment> LineSegments { get; }
 
     /// <summary>Request-scoped stable reference id (a strongly typed value object, wire format <c>l0:t3</c>).</summary>
     public SentenceTokenId Id => new(LineId, LineTokenIndex);

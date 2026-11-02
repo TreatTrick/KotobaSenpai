@@ -75,12 +75,22 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             var hovered = new ScreenRect(targetBounds.Left + 300, targetBounds.Top + 200, 100, 40);
             var word = new GroupedWord(new Token("Word", "Word", "Word", "", "", "",
                 new PartsOfSpeech("Noun", "", "", ""), "", "", "", 0), [first, hovered]);
+            GroupedWord Neighbor(string surface, ScreenRect rect) => new(new Token(surface, surface, surface, "", "", "",
+                new PartsOfSpeech("Noun", "", "", ""), "", "", "", 0), rect);
+            var neighbors = new[]
+            {
+                Neighbor("First neighbor", new ScreenRect(hovered.X, first.Y, 100, 40)),
+                Neighbor("Second neighbor", new ScreenRect(first.X, hovered.Y, 100, 40)),
+            };
+            var reference = new SentenceTokenReference(0, 0, 0, 0, word.Token, [first, hovered],
+                [new(0, [first]), new(1, [hovered])]);
             var groups = phrase
-                ? new[] { new PhraseGroupView(Guid.NewGuid(), "Phrase", "Type", "Meaning", "", 0, 1, [new([first, hovered])]) }
+                ? new[] { PhraseGeometryMapper.MapGroup(new PhraseGroup("wrapped", "Type",
+                    [new PhraseGroupPart([reference])], "Phrase", "Meaning", "Grammar", Guid.NewGuid())) }
                 : Array.Empty<PhraseGroupView>();
             overlay.Render(WordOverlaySession.Start(new WindowTarget(handle, "Target",
                 new ScreenRect(targetBounds.Left, targetBounds.Top, targetBounds.Right - targetBounds.Left, targetBounds.Bottom - targetBounds.Top)),
-                [word], groups), 1d / 3);
+                [word, .. neighbors], groups), 1d / 3);
 
             overlay.PollHover(hovered.X + 20, hovered.Y + 10);
 
@@ -89,6 +99,25 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             Assert.True(Native.GetWindowRect(new WindowInteropHelper(popup).Handle, out var bounds));
             Assert.Equal(hovered.Y, bounds.Top);
             Assert.True(bounds.Left > hovered.Right || bounds.Right < hovered.X);
+            var underlines = Assert.IsType<Canvas>(overlay.Content).Children.OfType<OverlayAnnotation>().ToArray();
+            Assert.Equal([OverlayColorRole.Hover, OverlayColorRole.Hover,
+                OverlayColorRole.Underline, OverlayColorRole.Underline], underlines.Select(line => line.Role));
+
+            for (var index = 0; index < neighbors.Length; index++)
+            {
+                overlay.StopHover();
+                var rect = neighbors[index].Rects[0];
+                overlay.PollHover(rect.X + 20, rect.Y + 10);
+                Assert.True(popup.IsVisible);
+                Assert.Equal(neighbors[index].Surface, Assert.IsType<TextBlock>(popup.FindName("Heading")).Text);
+                for (var line = 0; line < underlines.Length; line++)
+                    Assert.Equal(line == index + 2 ? OverlayColorRole.Hover : OverlayColorRole.Underline, underlines[line].Role);
+            }
+
+            overlay.StopHover();
+            overlay.PollHover(first.X + 150, first.Y + 100);
+            Assert.False(popup.IsVisible);
+            Assert.All(underlines, line => Assert.Equal(OverlayColorRole.Underline, line.Role));
         }
         finally { overlay.Close(); target.Close(); }
     });

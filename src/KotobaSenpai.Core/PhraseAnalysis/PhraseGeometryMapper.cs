@@ -13,9 +13,10 @@ public static class PhraseGeometryMapper
     public static PhrasePartView MapPart(PhraseGroupPart part)
     {
         var rects = part.Tokens
-            .SelectMany(token => token.Boxes.Select(box => (LineId: token.LineId, Box: box)))
-            .GroupBy(item => item.LineId)
-            .Select(group => Union(group.Select(item => item.Box)))
+            .SelectMany(token => token.LineSegments)
+            .Where(segment => segment.Boxes.Count > 0)
+            .GroupBy(segment => segment.LineIndex)
+            .Select(group => Union(group.SelectMany(segment => segment.Boxes)))
             .ToArray();
         var offset = 0;
         var pitchAccents = new List<PitchAccentSummary>(part.Tokens.Count);

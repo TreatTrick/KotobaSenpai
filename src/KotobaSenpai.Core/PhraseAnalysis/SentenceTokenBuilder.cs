@@ -49,7 +49,8 @@ public sealed class SentenceTokenBuilder
                 i,
                 st.Token.StartOffset,
                 st.Token,
-                boxes);
+                boxes,
+                st.Segments);
             references.Add(reference);
             idByToken[st.Token] = reference.Id;
             sentenceIndex++;
