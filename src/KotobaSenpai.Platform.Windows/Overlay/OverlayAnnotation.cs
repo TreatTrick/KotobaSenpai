@@ -18,7 +18,7 @@ public sealed class OverlayAnnotationStyle
     {
         Appearance = appearance;
         string[] colors = [appearance.FuriganaColor, appearance.PitchHighColor, appearance.PitchLowColor,
-            appearance.UnderlineColor, "#FF4500", "#88FF88"];
+            appearance.UnderlineColor, "#FF4500", appearance.PitchHeibanColor];
         _fills = colors.Select(CreateBrush).ToArray();
         _outlines = colors.Select(color =>
         {

@@ -9,6 +9,20 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class OverlayAnnotationTests
 {
+    [Fact]
+    public Task Heiban_marker_recolors_when_the_saved_appearance_changes() => RunSta(() =>
+    {
+        var appearance = new OverlayAppearance(OutlineEnabled: false);
+        var marker = OverlayAnnotation.CreatePill(5, 2, OverlayColorRole.Heiban, new OverlayAnnotationStyle(appearance));
+        Assert.Contains(Render(marker, 1), color => color.ToString() == "#FF88FF88");
+
+        marker.ApplyStyle(new OverlayAnnotationStyle(appearance with { PitchHeibanColor = "#ABCDEF" }));
+
+        var recolored = Render(marker, 1);
+        Assert.Contains(recolored, color => color.ToString() == "#FFABCDEF");
+        Assert.DoesNotContain(recolored, color => color.ToString() == "#FF88FF88");
+    });
+
     [Theory]
     [InlineData(OverlayOutlineColorMode.Black, "#FF000000")]
     [InlineData(OverlayOutlineColorMode.White, "#FFFFFFFF")]

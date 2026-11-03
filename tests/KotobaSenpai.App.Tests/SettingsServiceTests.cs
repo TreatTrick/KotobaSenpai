@@ -18,17 +18,22 @@ public sealed class SettingsServiceTests : IDisposable
         var viewModel = new ViewModels.OverlayAppearanceViewModel(settings,
             LocalizerFactory.Create(new System.Globalization.CultureInfo("en")));
         Assert.True(viewModel.TrySaveColor(viewModel.Colors[1], "#abcdef"));
+        var heiban = Assert.Single(viewModel.Colors, color => color.Key == "OverlayPitchHeibanColor");
+        Assert.True(viewModel.TrySaveColor(heiban, "#fedcba"));
         viewModel.OutlineEnabled = false;
         viewModel.OutlineColorMode = Core.Settings.OverlayOutlineColorMode.White;
         viewModel.OutlineThickness = 2.25;
         var committed = viewModel.Appearance;
-        Assert.Equal(committed, Core.Settings.OverlayAppearanceSettings.Load(new SettingsService(path)));
+        var restored = Core.Settings.OverlayAppearanceSettings.Load(new SettingsService(path));
+        Assert.Equal(committed, restored);
+        Assert.Equal("#FEDCBA", restored.PitchHeibanColor);
 
         using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
         {
             viewModel.ResetColorsCommand.Execute(null);
             Assert.Equal(committed, viewModel.Appearance);
             Assert.Equal("#ABCDEF", settings.GetValue("OverlayPitchHighColor"));
+            Assert.Equal("#FEDCBA", settings.GetValue("OverlayPitchHeibanColor"));
             Assert.NotEmpty(viewModel.ResetStatus);
         }
         Assert.Equal(committed, Core.Settings.OverlayAppearanceSettings.Load(new SettingsService(path)));
@@ -37,6 +42,7 @@ public sealed class SettingsServiceTests : IDisposable
                 OutlineColorMode: Core.Settings.OverlayOutlineColorMode.White, OutlineThickness: 2.25),
             Core.Settings.OverlayAppearanceSettings.Load(new SettingsService(path)));
         Assert.Equal("preserved", settings.GetValue("UnrelatedSetting"));
+        Assert.Equal("#88FF88", settings.GetValue("OverlayPitchHeibanColor"));
     }
 
     private readonly List<string> _tempPaths = new();

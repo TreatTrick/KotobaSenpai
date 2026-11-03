@@ -13,13 +13,15 @@ public sealed record OverlayAppearance(
     bool OutlineEnabled = true,
     OverlayOutlineColorMode OutlineColorMode = OverlayOutlineColorMode.Auto,
     double OutlineThickness = 1,
-    double PopupBackgroundTransparency = 0.5);
+    double PopupBackgroundTransparency = 0.5,
+    string PitchHeibanColor = "#88FF88");
 
 public static class OverlayAppearanceSettings
 {
     public const string FuriganaColorKey = "OverlayFuriganaColor";
     public const string PitchHighColorKey = "OverlayPitchHighColor";
     public const string PitchLowColorKey = "OverlayPitchLowColor";
+    public const string PitchHeibanColorKey = "OverlayPitchHeibanColor";
     public const string UnderlineColorKey = "OverlayUnderlineColor";
     public const string OutlineEnabledKey = "OverlayOutlineEnabled";
     public const string OutlineColorModeKey = "OverlayOutlineColorMode";
@@ -29,7 +31,7 @@ public static class OverlayAppearanceSettings
     public const double MaximumOutlineThickness = 3;
     public static OverlayAppearance Default { get; } = new();
     public static IReadOnlyList<string> ColorKeys { get; } =
-        [FuriganaColorKey, PitchHighColorKey, PitchLowColorKey, UnderlineColorKey];
+        [FuriganaColorKey, PitchHighColorKey, PitchLowColorKey, PitchHeibanColorKey, UnderlineColorKey];
     public static IReadOnlyList<string> Keys { get; } =
         [.. ColorKeys, OutlineEnabledKey, OutlineColorModeKey, OutlineThicknessKey, PopupBackgroundTransparencyKey];
 
@@ -53,7 +55,8 @@ public static class OverlayAppearanceSettings
                 ? thickness : Default.OutlineThickness,
             double.TryParse(values[PopupBackgroundTransparencyKey], NumberStyles.Float, CultureInfo.InvariantCulture, out var transparency)
                 && double.IsFinite(transparency) && transparency >= 0 && transparency <= 1
-                ? transparency : Default.PopupBackgroundTransparency);
+                ? transparency : Default.PopupBackgroundTransparency,
+            Resolve(values[PitchHeibanColorKey], Default.PitchHeibanColor));
     }
 
     public static IReadOnlyDictionary<string, string?> Colors(OverlayAppearance appearance) => new Dictionary<string, string?>
@@ -61,6 +64,7 @@ public static class OverlayAppearanceSettings
         [FuriganaColorKey] = appearance.FuriganaColor,
         [PitchHighColorKey] = appearance.PitchHighColor,
         [PitchLowColorKey] = appearance.PitchLowColor,
+        [PitchHeibanColorKey] = appearance.PitchHeibanColor,
         [UnderlineColorKey] = appearance.UnderlineColor,
     };
 

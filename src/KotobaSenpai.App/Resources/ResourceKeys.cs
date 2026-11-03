@@ -39,6 +39,8 @@ public static class ResourceKeys
     public const string OverlayPitchHighColor_Description = nameof(OverlayPitchHighColor_Description);
     public const string OverlayPitchLowColor = nameof(OverlayPitchLowColor);
     public const string OverlayPitchLowColor_Description = nameof(OverlayPitchLowColor_Description);
+    public const string OverlayPitchHeibanColor = nameof(OverlayPitchHeibanColor);
+    public const string OverlayPitchHeibanColor_Description = nameof(OverlayPitchHeibanColor_Description);
     public const string OverlayUnderlineColor = nameof(OverlayUnderlineColor);
     public const string OverlayUnderlineColor_Description = nameof(OverlayUnderlineColor_Description);
     public const string OverlayAppearance_Outline = nameof(OverlayAppearance_Outline);

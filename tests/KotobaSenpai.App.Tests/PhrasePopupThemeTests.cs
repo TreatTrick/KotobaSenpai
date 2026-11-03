@@ -601,8 +601,11 @@ public sealed partial class PhrasePopupThemeTests
         Assert.Equal(0.75, viewModel.OverlayAppearance.PopupBackgroundTransparency);
         transparency.Value = 0.5;
         var items = Assert.IsType<ItemsControl>(page.FindName("OverlayColorSettings"));
-        Assert.Equal(4, items.Items.Count);
-        var container = Assert.IsType<ContentPresenter>(items.ItemContainerGenerator.ContainerFromIndex(1));
+        Assert.Equal(5, items.Items.Count);
+        var heiban = Assert.Single(viewModel.OverlayAppearance.Colors, color => color.Key == "OverlayPitchHeibanColor");
+        Assert.NotEqual(heiban.Key, heiban.Label);
+        Assert.NotEqual(heiban.Key + "_Description", heiban.Description);
+        var container = Assert.IsType<ContentPresenter>(items.ItemContainerGenerator.ContainerFromItem(heiban));
         var picker = Assert.Single(Descendants(container).OfType<OverlayColorPicker>());
         Assert.Same(viewModel.OverlayAppearance, picker.Settings);
         var choice = Assert.IsType<OverlayColorChoice>(picker.DataContext);
@@ -675,6 +678,7 @@ public sealed partial class PhrasePopupThemeTests
         Assert.Equal("#ABCDEF", choice.Value);
         var preview = Assert.IsType<OverlayAppearancePreview>(page.FindName("OverlayPreview"));
         Assert.Equal(viewModel.OverlayAppearance.Appearance, preview.Appearance);
+        Assert.Equal("#ABCDEF", preview.Appearance.PitchHeibanColor);
         Assert.NotEmpty(preview.Children.OfType<OverlayAnnotation>());
         var outline = Assert.IsType<ToggleSwitch>(page.FindName("OverlayOutlineSwitch"));
         var outlineMode = Assert.IsType<ComboBox>(page.FindName("OverlayOutlineColorModeComboBox"));
@@ -693,7 +697,7 @@ public sealed partial class PhrasePopupThemeTests
         Assert.False(viewModel.OverlayAppearance.OutlineEnabled);
         Assert.Equal(OverlayOutlineColorMode.White, viewModel.OverlayAppearance.OutlineColorMode);
         Assert.Equal(2.25, viewModel.OverlayAppearance.OutlineThickness);
-        Assert.Equal("#FF4444", choice.Value);
+        Assert.Equal("#88FF88", choice.Value);
         outline.IsChecked = true;
         outlineMode.SelectedValue = OverlayOutlineColorMode.Auto;
         outlineThickness.Value = 1;

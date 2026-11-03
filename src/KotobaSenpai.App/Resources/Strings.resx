@@ -394,6 +394,12 @@ Model discovery, detection and status leave the GUI running. Configure normally 
   <data name="OverlayPitchLowColor_Description" xml:space="preserve">
     <value>Color of low-pitch readings and dots.</value>
   </data>
+  <data name="OverlayPitchHeibanColor" xml:space="preserve">
+    <value>Heiban marker color</value>
+  </data>
+  <data name="OverlayPitchHeibanColor_Description" xml:space="preserve">
+    <value>Color of the short bar marking a heiban (flat) pitch pattern.</value>
+  </data>
   <data name="OverlayUnderlineColor" xml:space="preserve">
     <value>Underlines</value>
   </data>

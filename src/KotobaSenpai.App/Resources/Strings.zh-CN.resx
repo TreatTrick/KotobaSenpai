@@ -394,6 +394,12 @@ API Key：YOUR_API_KEY
   <data name="OverlayPitchLowColor_Description" xml:space="preserve">
     <value>低音振假名和音调圆点的颜色。</value>
   </data>
+  <data name="OverlayPitchHeibanColor" xml:space="preserve">
+    <value>平板型标记颜色</value>
+  </data>
+  <data name="OverlayPitchHeibanColor_Description" xml:space="preserve">
+    <value>平板型声调短横线的颜色。</value>
+  </data>
   <data name="OverlayUnderlineColor" xml:space="preserve">
     <value>下划线</value>
   </data>

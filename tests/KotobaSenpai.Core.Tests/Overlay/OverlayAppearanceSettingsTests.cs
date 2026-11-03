@@ -5,6 +5,21 @@ namespace KotobaSenpai.Core.Tests.Overlay;
 public sealed class OverlayAppearanceSettingsTests
 {
     [Theory]
+    [InlineData(null, "#88FF88")]
+    [InlineData(" #abcdef ", "#ABCDEF")]
+    [InlineData("invalid", "#88FF88")]
+    [InlineData("#80123456", "#88FF88")]
+    public void Heiban_color_restores_valid_values_and_defaults_invalid_ones(string? raw, string expected)
+    {
+        var settings = new MemorySettings();
+        settings.SetValue("OverlayPitchHeibanColor", raw);
+
+        var colors = OverlayAppearanceSettings.Colors(OverlayAppearanceSettings.Load(settings));
+
+        Assert.Equal(expected, colors["OverlayPitchHeibanColor"]);
+    }
+
+    [Theory]
     [InlineData(null, 0.5)]
     [InlineData("0", 0)]
     [InlineData("1", 1)]
