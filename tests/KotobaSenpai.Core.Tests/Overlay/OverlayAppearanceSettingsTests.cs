@@ -20,16 +20,16 @@ public sealed class OverlayAppearanceSettingsTests
     }
 
     [Theory]
-    [InlineData(null, 0.5)]
+    [InlineData(null, 0.3)]
     [InlineData("0", 0)]
     [InlineData("1", 1)]
     [InlineData("0.75", 0.75)]
-    [InlineData("invalid", 0.5)]
-    [InlineData("NaN", 0.5)]
-    [InlineData("Infinity", 0.5)]
-    [InlineData("-0.1", 0.5)]
-    [InlineData("1.1", 0.5)]
-    [InlineData("0,75", 0.5)]
+    [InlineData("invalid", 0.3)]
+    [InlineData("NaN", 0.3)]
+    [InlineData("Infinity", 0.3)]
+    [InlineData("-0.1", 0.3)]
+    [InlineData("1.1", 0.3)]
+    [InlineData("0,75", 0.3)]
     public void Popup_transparency_restores_valid_values_and_defaults_invalid_ones(string? raw, double expected)
     {
         var settings = new MemorySettings();

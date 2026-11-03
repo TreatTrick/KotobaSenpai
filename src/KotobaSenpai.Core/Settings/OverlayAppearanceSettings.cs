@@ -13,7 +13,7 @@ public sealed record OverlayAppearance(
     bool OutlineEnabled = true,
     OverlayOutlineColorMode OutlineColorMode = OverlayOutlineColorMode.Auto,
     double OutlineThickness = 1,
-    double PopupBackgroundTransparency = 0.5,
+    double PopupBackgroundTransparency = 0.3,
     string PitchHeibanColor = "#88FF88");
 
 public static class OverlayAppearanceSettings

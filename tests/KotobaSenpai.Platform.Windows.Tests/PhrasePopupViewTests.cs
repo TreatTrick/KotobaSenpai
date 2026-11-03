@@ -21,7 +21,7 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 {
     [Fact]
-    public Task Background_defaults_to_half_transparency_without_fading_content() => RunSta(() =>
+    public Task Background_defaults_to_thirty_percent_transparency_without_fading_content() => RunSta(() =>
     {
         var popup = new PhrasePopup();
         try
@@ -29,7 +29,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
             popup.ShowResult("Phrase", "Meaning", "", new ScreenRect(100, 100, 100, 30));
             var background = Assert.IsType<Border>(popup.FindName("PopupFrame"));
             var viewer = Assert.IsType<ScrollViewer>(popup.FindName("PopupScrollViewer"));
-            Assert.Equal(0.5, background.Opacity);
+            Assert.Equal(0.7, background.Opacity);
             Assert.Equal(1, popup.Opacity);
             Assert.Equal(1, viewer.Opacity);
             Assert.False(background.IsAncestorOf(viewer), "Text must render outside the translucent background layer.");

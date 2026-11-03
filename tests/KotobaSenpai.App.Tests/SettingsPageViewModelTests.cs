@@ -171,7 +171,7 @@ public sealed class SettingsPageViewModelTests
     {
         var settings = new RecordingSettings();
         using var page = Create(settings, new RecordingThemeStore());
-        Assert.Equal(0.5, page.OverlayAppearance.PopupBackgroundTransparency);
+        Assert.Equal(0.3, page.OverlayAppearance.PopupBackgroundTransparency);
         var notifications = 0;
         page.OverlayAppearance.Changed += (_, _) => notifications++;
         var previousCulture = CultureInfo.CurrentCulture;
@@ -198,7 +198,7 @@ public sealed class SettingsPageViewModelTests
 
         page.OverlayAppearance.PopupBackgroundTransparency = 0.75;
 
-        Assert.Equal(0.5, page.OverlayAppearance.PopupBackgroundTransparency);
+        Assert.Equal(0.3, page.OverlayAppearance.PopupBackgroundTransparency);
         Assert.Null(settings.GetValue("PhrasePopupBackgroundTransparency"));
         Assert.NotEmpty(page.OverlayAppearance.PopupBackgroundTransparencyError);
         Assert.Equal(0, notifications);
