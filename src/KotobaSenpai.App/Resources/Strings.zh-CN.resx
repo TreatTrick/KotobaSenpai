@@ -239,6 +239,24 @@
   <data name="Page_RecognizeDescription" xml:space="preserve">
     <value>识别窗口中的日语，轻松查词与阅读。</value>
   </data>
+  <data name="AnnotationLegend_Title" xml:space="preserve">
+    <value>标注怎么看</value>
+  </data>
+  <data name="AnnotationLegend_Heiban" xml:space="preserve">
+    <value>⓪ 平板型</value>
+  </data>
+  <data name="AnnotationLegend_Sample" xml:space="preserve">
+    <value>读音与音调示例：普通注音、第 3 拍后下降的「日本語」、无音高下降的「かな」。</value>
+  </data>
+  <data name="AnnotationLegend_Reading" xml:space="preserve">
+    <value>单色振假名：读音（暂无音调数据）。双色振假名或圆点：每拍的高低音。</value>
+  </data>
+  <data name="AnnotationLegend_PitchNumbers" xml:space="preserve">
+    <value>③：第 3 拍后音高下降。⓪：平板型，无音高下降，末尾用短横线标记。</value>
+  </data>
+  <data name="AnnotationLegend_ColorMeaning" xml:space="preserve">
+    <value>高低指音高，不是音量大小。图例颜色与「设置 → 标注外观」一致。</value>
+  </data>
   <data name="Page_SettingsDescription" xml:space="preserve">
     <value>调整阅读体验，配置你的 AI 服务。</value>
   </data>

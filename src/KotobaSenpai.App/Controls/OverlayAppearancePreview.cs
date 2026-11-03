@@ -6,7 +6,7 @@ using KotobaSenpai.Platform.Windows.Overlay;
 
 namespace KotobaSenpai.App.Controls;
 
-/// <summary>Uses the real annotation primitives for the settings preview.</summary>
+/// <summary>Uses the real annotation primitives for appearance previews and the recognition legend.</summary>
 public sealed class OverlayAppearancePreview : Canvas
 {
     public static readonly DependencyProperty AppearanceProperty = DependencyProperty.Register(nameof(Appearance),
@@ -16,6 +16,15 @@ public sealed class OverlayAppearancePreview : Canvas
     {
         get => (OverlayAppearance)GetValue(AppearanceProperty);
         set => SetValue(AppearanceProperty, value);
+    }
+
+    public static readonly DependencyProperty ShowPitchNumbersProperty = DependencyProperty.Register(nameof(ShowPitchNumbers),
+        typeof(bool), typeof(OverlayAppearancePreview),
+        new PropertyMetadata(false, (sender, _) => ((OverlayAppearancePreview)sender).Build()));
+    public bool ShowPitchNumbers
+    {
+        get => (bool)GetValue(ShowPitchNumbersProperty);
+        set => SetValue(ShowPitchNumbersProperty, value);
     }
 
     public OverlayAppearancePreview()
@@ -46,6 +55,15 @@ public sealed class OverlayAppearancePreview : Canvas
         Add(OverlayAnnotation.CreatePill(6, 6, OverlayColorRole.Low, style), 280, 17);
         Add(OverlayAnnotation.CreatePill(6, 6, OverlayColorRole.High, style), 310, 17);
         Add(OverlayAnnotation.CreatePill(5, 2, OverlayColorRole.Heiban, style), 325, 19);
+        if (ShowPitchNumbers)
+        {
+            foreach (var (number, left) in new[] { ("③", 232d), ("⓪", 332d) })
+            {
+                var text = new TextBlock { Text = number, FontSize = 16 };
+                text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+                Add(text, left, 31);
+            }
+        }
     }
 
     private void Add(FrameworkElement element, double x, double y)

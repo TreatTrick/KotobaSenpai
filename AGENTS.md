@@ -26,3 +26,27 @@ readable and reusable by everyone:
 > Rule of thumb: if it's a *message* (comment, test name, assertion, log,
 > exception) → English. If it's *data* (language sample, dictionary content,
 > localized UI text) → keep as-is.
+
+## UI: FluentLight integration is required
+
+All newly added UI MUST integrate with FluentLight by default. Include this work
+when implementing any new page, card, panel, control, window, or popup.
+
+- **Automatic adaptation through shared styles** — reuse the existing FluentLight
+  styles and controls. When introducing reusable controls or styles, include the
+  appropriate FluentLight defaults so every new instance inherits them.
+- **One-off surfaces** — explicitly set `controls:FluentLight.Kind="Surface"`
+  on standalone cards and panels, including raw `ui:Card` instances. Follow the
+  existing styles for the appropriate light kind on interactive controls.
+- **Matching geometry** — set `controls:FluentLight.CornerRadius` to match the
+  control's actual rendered corners and the project's design tokens.
+- **Host coverage** — reuse the nearest existing `FluentLightHost`. Separate
+  windows and popup visual trees MUST provide their own host when they cannot
+  inherit one. Keep ordinary page content under the shared shell host.
+- **Content elements** — text, icons, and illustrations participate through their
+  containing FluentLight surface; configure the enclosing surface rather than
+  decorating every child separately.
+- **Verification** — before completing UI work, check every added surface and
+  interactive control for shared-style or explicit FluentLight configuration,
+  matching corners, and host coverage. Build the application and run the relevant
+  existing FluentLight tests.

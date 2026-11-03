@@ -239,6 +239,24 @@
   <data name="Page_RecognizeDescription" xml:space="preserve">
     <value>Read Japanese in any window, with word annotations and dictionary lookups.</value>
   </data>
+  <data name="AnnotationLegend_Title" xml:space="preserve">
+    <value>Annotation guide</value>
+  </data>
+  <data name="AnnotationLegend_Heiban" xml:space="preserve">
+    <value>⓪ Heiban</value>
+  </data>
+  <data name="AnnotationLegend_Sample" xml:space="preserve">
+    <value>Reading and pitch examples: a plain reading, 日本語 with a drop after beat 3, and かな with no pitch drop.</value>
+  </data>
+  <data name="AnnotationLegend_Reading" xml:space="preserve">
+    <value>Plain furigana: reading only, with no pitch data. Two-color furigana or dots: high/low pitch for each beat.</value>
+  </data>
+  <data name="AnnotationLegend_PitchNumbers" xml:space="preserve">
+    <value>③: pitch drops after beat 3. ⓪: no pitch drop (heiban), marked with a short dash.</value>
+  </data>
+  <data name="AnnotationLegend_ColorMeaning" xml:space="preserve">
+    <value>High and low refer to pitch, not volume. Colors follow Settings → Annotation appearance.</value>
+  </data>
   <data name="Page_SettingsDescription" xml:space="preserve">
     <value>Make KotobaSenpai work the way you read.</value>
   </data>

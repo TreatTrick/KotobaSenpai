@@ -1,4 +1,5 @@
 <UserControl x:Class="KotobaSenpai.App.Views.RecognitionPage"
+             x:Name="Root"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:KotobaSenpai.App.Localization"
@@ -31,6 +32,51 @@
                    ToolTip="{loc:Loc Key=Status_SelectTargetFirst}"
                    Icon="{ui:SymbolIcon Play24}" Appearance="Primary" />
       </controls:SettingsCard>
+
+      <ui:Card x:Name="AnnotationLegendCard" Padding="{StaticResource FluentCardPadding}" Margin="{StaticResource FluentCardGap}"
+               controls:FluentLight.Kind="Surface" controls:FluentLight.CornerRadius="8"
+               Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+               BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1" HorizontalContentAlignment="Stretch">
+        <StackPanel>
+          <WrapPanel>
+            <TextBlock Text="{loc:Loc Key=AnnotationLegend_Title}" FontWeight="SemiBold" Margin="0,0,24,8" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,20,8">
+              <Ellipse x:Name="PitchHighSwatch" Width="10" Height="10" Margin="0,0,8,0"
+                       Fill="{Binding Appearance.PitchHighColor, ElementName=Root}"
+                       Stroke="{DynamicResource TextFillColorSecondaryBrush}" StrokeThickness="0.5" />
+              <TextBlock Text="{loc:Loc Key=OverlayPitchHighColor}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,20,8">
+              <Ellipse x:Name="PitchLowSwatch" Width="10" Height="10" Margin="0,0,8,0"
+                       Fill="{Binding Appearance.PitchLowColor, ElementName=Root}"
+                       Stroke="{DynamicResource TextFillColorSecondaryBrush}" StrokeThickness="0.5" />
+              <TextBlock Text="{loc:Loc Key=OverlayPitchLowColor}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+              <Border x:Name="PitchHeibanSwatch" Width="12" Height="5" Margin="0,0,8,0" CornerRadius="2"
+                      Background="{Binding Appearance.PitchHeibanColor, ElementName=Root}"
+                      BorderBrush="{DynamicResource TextFillColorSecondaryBrush}" BorderThickness="0.5" />
+              <TextBlock Text="{loc:Loc Key=AnnotationLegend_Heiban}" />
+            </StackPanel>
+          </WrapPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="1.2*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left" VerticalAlignment="Center">
+              <controls:OverlayAppearancePreview x:Name="AnnotationLegendPreview" ShowPitchNumbers="True"
+                                                 Appearance="{Binding Appearance, ElementName=Root}"
+                                                 AutomationProperties.Name="{loc:Loc Key=AnnotationLegend_Sample}" />
+            </Viewbox>
+            <StackPanel Grid.Column="1" Margin="12,0,0,8" VerticalAlignment="Center">
+              <TextBlock Text="{loc:Loc Key=AnnotationLegend_Reading}" Style="{StaticResource Description}" Margin="0,0,0,8" />
+              <TextBlock Text="{loc:Loc Key=AnnotationLegend_PitchNumbers}" Style="{StaticResource Description}" Margin="0" />
+            </StackPanel>
+          </Grid>
+          <TextBlock Text="{loc:Loc Key=AnnotationLegend_ColorMeaning}" Style="{StaticResource Description}" />
+        </StackPanel>
+      </ui:Card>
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_RecognitionRegion}" Description="{loc:Loc Key=Description_RecognitionRegion}"
                              Icon="{ui:SymbolIcon Crop24}">
