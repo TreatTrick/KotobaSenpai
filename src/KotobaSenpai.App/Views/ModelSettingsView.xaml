@@ -92,6 +92,8 @@
           <StackPanel>
             <ui:Card x:Name="ConfigurationCheckCard" Padding="{StaticResource FluentCardPadding}"
                      Margin="{StaticResource FluentCardGap}" MinHeight="80" HorizontalContentAlignment="Stretch"
+                     controls:FluentLight.Kind="Surface"
+                     controls:FluentLight.CornerRadius="{Binding CornerRadius.TopLeft, RelativeSource={RelativeSource Self}}"
                      Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                      BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
             <Grid>
