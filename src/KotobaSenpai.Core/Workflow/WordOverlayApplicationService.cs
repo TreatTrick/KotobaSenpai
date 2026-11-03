@@ -78,12 +78,12 @@ public sealed class WordOverlayApplicationService : IDisposable
             return result;
 
         _lastRecognizedText = GetRecognizedText(result.Lines);
-        await PublishAsync(recognitionId, generation, activeTarget, result, incremental: false, cancellationToken)
+        await PublishAsync(recognitionId, generation, activeTarget, result, cancellationToken)
             .ConfigureAwait(false);
         return result;
     }
 
-    /// <summary>Recognizes a changed frame and chooses incremental or full replacement from the OCR text relationship.</summary>
+    /// <summary>Recognizes a changed frame and reuses successful analysis independently for each unchanged segment.</summary>
     public async Task<WordRecognitionResult?> RecognizeChangedAndShowAsync(
         WindowTarget target,
         CancellationToken cancellationToken = default)
@@ -100,17 +100,10 @@ public sealed class WordOverlayApplicationService : IDisposable
         if (string.Equals(_lastRecognizedText, newText, StringComparison.Ordinal))
             return result;
 
-        var incremental = !string.IsNullOrEmpty(_lastRecognizedText)
-            && newText.Contains(_lastRecognizedText, StringComparison.Ordinal);
         var generation = Interlocked.Increment(ref _recognitionGeneration);
-        if (!incremental)
-        {
-            _phraseOrchestrator.ClearCache();
-            _overlay.Hide();
-        }
 
         _lastRecognizedText = newText;
-        await PublishAsync(recognitionId, generation, activeTarget, result, incremental, cancellationToken)
+        await PublishAsync(recognitionId, generation, activeTarget, result, cancellationToken)
             .ConfigureAwait(false);
         return result;
     }
@@ -130,7 +123,6 @@ public sealed class WordOverlayApplicationService : IDisposable
         int generation,
         WindowTarget activeTarget,
         WordRecognitionResult result,
-        bool incremental,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -153,14 +145,17 @@ public sealed class WordOverlayApplicationService : IDisposable
 
         _diagnostics?.RecordTokens(recognitionId, activeTarget, screenWords);
 
-        // Publish local furigana while the required cloud analysis runs; only successful segments receive underlines.
+        // Reproject cached annotations immediately; an OCR correction in one segment must not erase the others.
         if (!IsCurrent(generation))
             return;
-        if (!incremental)
-            _overlay.Show(WordOverlaySession.Start(
-                activeTarget,
-                screenWords,
-                underlineSegmentIds: Array.Empty<string>()), CanRender);
+        var cachedRun = _phraseOrchestrator.GetCachedAnalysis(recognitionId, result.Lines);
+        _overlay.Show(WordOverlaySession.Start(
+            activeTarget,
+            screenWords,
+            cachedRun.Groups.Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds)).ToArray(),
+            cachedRun.Warning,
+            cachedRun.Words,
+            cachedRun.SuccessfulSegmentIds), CanRender);
 
         var phraseRun = await _phraseOrchestrator
             .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)

@@ -1,5 +1,6 @@
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Ocr;
+using KotobaSenpai.Core.Logging;
 
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
@@ -21,8 +22,9 @@ public sealed class PhraseAnalysisOrchestrator
     private readonly SentenceSegmenter _segmenter;
     private readonly SentenceTokenBuilder _tokenBuilder;
     private readonly IExplanationLanguagePreferences? _explanationLanguage;
+    private readonly ILogger? _logger;
     private readonly object _cacheGate = new();
-    private readonly Dictionary<(string SegmentText, string Language), PhraseAnalysisResult> _cache = new();
+    private readonly Dictionary<(string SegmentText, string Language), CachedAnalysis> _cache = new();
     private readonly LinkedList<(string SegmentText, string Language)> _cacheOrder = new();
     private readonly Dictionary<(string SegmentText, string Language, string ModelGroupId), Guid> _sessionGroupIds = new();
 
@@ -30,12 +32,24 @@ public sealed class PhraseAnalysisOrchestrator
         ILlmPhraseAnalyzer analyzer,
         SentenceSegmenter? segmenter = null,
         SentenceTokenBuilder? tokenBuilder = null,
-        IExplanationLanguagePreferences? explanationLanguage = null)
+        IExplanationLanguagePreferences? explanationLanguage = null,
+        ILogger? logger = null)
     {
         _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
         _segmenter = segmenter ?? new SentenceSegmenter();
         _tokenBuilder = tokenBuilder ?? throw new ArgumentNullException(nameof(tokenBuilder));
         _explanationLanguage = explanationLanguage;
+        _logger = logger;
+    }
+
+    /// <summary>Rebuilds successful cached annotations against the current OCR geometry without calling the provider.</summary>
+    public PhraseAnalysisRun GetCachedAnalysis(Guid recognitionId, IReadOnlyList<OcrLine> lines)
+    {
+        var requests = BuildRequests(recognitionId, lines);
+        var (cached, _) = SplitByCache(requests);
+        var indices = cached.Keys.Order().ToArray();
+        return BuildRun(indices.Select(index => requests[index]).ToArray(),
+            indices.Select(index => cached[index]).ToArray());
     }
 
     public async Task<PhraseAnalysisRun> AnalyzeAsync(
@@ -43,10 +57,6 @@ public sealed class PhraseAnalysisOrchestrator
         IReadOnlyList<OcrLine> lines,
         CancellationToken cancellationToken = default)
     {
-        if (recognitionId == Guid.Empty)
-            throw new ArgumentException("Recognition id must not be empty.", nameof(recognitionId));
-        ArgumentNullException.ThrowIfNull(lines);
-
         // First build the requests purely locally (fast, zero I/O), preserving segment order; Task.WhenAll returns results in input order, so no re-sorting is needed.
         var requests = BuildRequests(recognitionId, lines);
         if (requests.Count == 0)
@@ -56,6 +66,8 @@ public sealed class PhraseAnalysisOrchestrator
         try
         {
             var (cached, uncached) = SplitByCache(requests);
+            _logger?.LogInformation("[PHRASE] Recognition {0:N}: segments={1}, cacheHits={2}, providerRequests={3}.",
+                recognitionId, requests.Count, cached.Count, uncached.Count);
             var freshResults = uncached.Count > 0
                 ? await RunThrottledAsync(uncached, cancellationToken).ConfigureAwait(false)
                 : Array.Empty<PhraseAnalysisResult>();
@@ -63,7 +75,7 @@ public sealed class PhraseAnalysisOrchestrator
             for (int i = 0; i < uncached.Count; i++)
             {
                 if (freshResults[i].Succeeded)
-                    CacheResult(uncached[i].Key, freshResults[i]);
+                    CacheResult(uncached[i].Request, freshResults[i]);
             }
             // Merge: build a lookup for fresh results by request index in the uncached list
             var freshByIndex = new Dictionary<int, PhraseAnalysisResult>();
@@ -84,6 +96,11 @@ public sealed class PhraseAnalysisOrchestrator
             return Failed(PhraseAnalysisOutcome.Cancelled, "Phrase analysis cancelled.", []);
         }
 
+        return BuildRun(requests, results);
+    }
+
+    private PhraseAnalysisRun BuildRun(IReadOnlyList<PhraseAnalysisRequest> requests, IReadOnlyList<PhraseAnalysisResult> results)
+    {
         // Evaluate each sentence independently: failed sentences are recorded as warnings and skipped, the rest proceed as usual, matching the "partially usable" positioning.
         var groups = new List<PhraseGroup>();
         var wordMeanings = new List<WordMeaningView>();
@@ -91,7 +108,7 @@ public sealed class PhraseAnalysisOrchestrator
         var successfulSegmentIds = new HashSet<string>(StringComparer.Ordinal);
         PhraseAnalysisOutcome? firstFailure = null;
 
-        for (int i = 0; i < results.Length; i++)
+        for (int i = 0; i < results.Count; i++)
         {
             var result = results[i];
             if (!result.Succeeded)
@@ -133,6 +150,10 @@ public sealed class PhraseAnalysisOrchestrator
 
     private IReadOnlyList<PhraseAnalysisRequest> BuildRequests(Guid recognitionId, IReadOnlyList<OcrLine> lines)
     {
+        if (recognitionId == Guid.Empty)
+            throw new ArgumentException("Recognition id must not be empty.", nameof(recognitionId));
+        ArgumentNullException.ThrowIfNull(lines);
+
         var requests = new List<PhraseAnalysisRequest>();
         foreach (var segment in _segmenter.Segment(lines))
         {
@@ -200,7 +221,7 @@ public sealed class PhraseAnalysisOrchestrator
         var uncached = new List<CacheableRequest>();
         for (int i = 0; i < requests.Count; i++)
         {
-            if (TryGetCached((requests[i].SegmentText, requests[i].ExplanationLanguage), out var result))
+            if (TryGetCached(requests[i], out var result))
                 cached[i] = result;
             else
                 uncached.Add(new CacheableRequest(requests[i], i));
@@ -208,13 +229,15 @@ public sealed class PhraseAnalysisOrchestrator
         return (cached, uncached);
     }
 
-    private void CacheResult((string SegmentText, string Language) key, PhraseAnalysisResult result)
+    private void CacheResult(PhraseAnalysisRequest request, PhraseAnalysisResult result)
     {
+        var key = (request.SegmentText, request.ExplanationLanguage);
+        var cached = new CachedAnalysis(request.Tokens, result);
         lock (_cacheGate)
         {
             if (_cache.ContainsKey(key))
             {
-                _cache[key] = result;
+                _cache[key] = cached;
                 return;
             }
 
@@ -228,7 +251,7 @@ public sealed class PhraseAnalysisOrchestrator
                     .ToArray())
                     _sessionGroupIds.Remove(groupKey);
             }
-            _cache[key] = result;
+            _cache[key] = cached;
             _cacheOrder.AddLast(key);
         }
     }
@@ -243,10 +266,37 @@ public sealed class PhraseAnalysisOrchestrator
         }
     }
 
-    private bool TryGetCached((string SegmentText, string Language) key, out PhraseAnalysisResult result)
+    private bool TryGetCached(PhraseAnalysisRequest request, out PhraseAnalysisResult result)
     {
+        CachedAnalysis? cached;
         lock (_cacheGate)
-            return _cache.TryGetValue(key, out result!);
+            _cache.TryGetValue((request.SegmentText, request.ExplanationLanguage), out cached);
+
+        result = null!;
+        if (cached is null || !cached.Tokens.Select(token => token.Token).SequenceEqual(request.Tokens.Select(token => token.Token)))
+            return false;
+
+        result = cached.Result;
+        if (cached.Tokens.Select(token => token.Id).SequenceEqual(request.Tokens.Select(token => token.Id)))
+            return true;
+
+        // Token order is stable for identical text, but line ids change when OCR wraps the same sentence differently.
+        var ids = cached.Tokens.Select((token, index) => (token.Id, CurrentId: request.Tokens[index].Id))
+            .ToDictionary(pair => pair.Id, pair => pair.CurrentId);
+        var groups = cached.Result.Groups
+            // An unknown provider reference must not accidentally become valid in the new layout.
+            .Where(group => group.PartTokenIds.SelectMany(part => part).All(ids.ContainsKey))
+            .Select(group => new ParsedPhraseGroup(group.ModelGroupId, group.Type,
+                group.PartTokenIds.Select(part => (IReadOnlyList<SentenceTokenId>)part.Select(id => ids[id]).ToArray()).ToArray(),
+                group.Label, group.Meaning, group.Grammar))
+            .ToArray();
+        result = new PhraseAnalysisResult(cached.Result.Outcome, groups, cached.Result.Warning)
+        {
+            Words = cached.Result.Words,
+            Endpoint = cached.Result.Endpoint,
+            ProviderStatusCode = cached.Result.ProviderStatusCode,
+        };
+        return true;
     }
 
     private Guid GetSessionGroupId(PhraseAnalysisRequest request, string modelGroupId)
@@ -262,8 +312,7 @@ public sealed class PhraseAnalysisOrchestrator
         }
     }
 
-    private sealed record CacheableRequest(PhraseAnalysisRequest Request, int OriginalIndex)
-    {
-        public (string SegmentText, string Language) Key => (Request.SegmentText, Request.ExplanationLanguage);
-    };
+    private sealed record CacheableRequest(PhraseAnalysisRequest Request, int OriginalIndex);
+
+    private sealed record CachedAnalysis(IReadOnlyList<SentenceTokenReference> Tokens, PhraseAnalysisResult Result);
 }

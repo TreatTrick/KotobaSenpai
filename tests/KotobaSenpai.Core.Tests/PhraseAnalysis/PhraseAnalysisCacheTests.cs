@@ -2,11 +2,27 @@ using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.Logging;
+using System.Globalization;
 
 namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 
 public sealed class PhraseAnalysisCacheTests
 {
+    [Fact]
+    public async Task Logs_cache_hits_and_new_provider_requests_with_the_recognition_id()
+    {
+        var logger = new RecordingLogger();
+        var orchestrator = new PhraseAnalysisOrchestrator(new CountingAnalyzer(), new SentenceSegmenter(),
+            new SentenceTokenBuilder(new CharTokenizer()), logger: logger);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("旧句。")]);
+        var recognitionId = Guid.NewGuid();
+
+        await orchestrator.AnalyzeAsync(recognitionId, [Line("旧句。"), Line("新句。", 60)]);
+
+        Assert.Contains($"[PHRASE] Recognition {recognitionId:N}: segments=2, cacheHits=1, providerRequests=1.", logger.Messages);
+    }
+
     [Fact]
     public async Task Same_text_uses_separate_results_for_each_language()
     {
@@ -103,11 +119,50 @@ public sealed class PhraseAnalysisCacheTests
         Assert.Equal(Assert.Single(first.Groups).SessionGroupId, Assert.Single(second.Groups).SessionGroupId);
     }
 
+    [Fact]
+    public async Task Rewrapped_text_reuses_analysis_and_maps_cached_group_ids_to_current_tokens()
+    {
+        var analyzer = new LastTokenAnalyzer();
+        var orchestrator = Create(analyzer);
+        var first = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ句。")]);
+
+        var second = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ"), Line("句。", 30)]);
+
+        Assert.Equal(1, analyzer.CallCount);
+        var firstGroup = Assert.Single(first.Groups);
+        var secondGroup = Assert.Single(second.Groups);
+        Assert.Equal(firstGroup.SessionGroupId, secondGroup.SessionGroupId);
+        var part = Assert.Single(secondGroup.Parts);
+        Assert.Equal("。", part.Surface);
+        Assert.Equal(new ScreenRect(10, 30, 10, 20), Assert.Single(part.Rects));
+        Assert.Null(second.Warning);
+    }
+
     private static PhraseAnalysisOrchestrator Create(ILlmPhraseAnalyzer analyzer)
         => new(analyzer, new SentenceSegmenter(), new SentenceTokenBuilder(new CharTokenizer()));
 
-    private static OcrLine Line(string text)
-        => new(text.Select((character, index) => new OcrWord(character.ToString(), new ScreenRect(index * 10, 0, 10, 20))).ToArray());
+    private static OcrLine Line(string text, int y = 0)
+        => new(text.Select((character, index) => new OcrWord(character.ToString(), new ScreenRect(index * 10, y, 10, 20))).ToArray());
+
+    private sealed class LastTokenAnalyzer : ILlmPhraseAnalyzer
+    {
+        public int CallCount { get; private set; }
+
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
+                [new ParsedPhraseGroup("last", "grammar", [[request.Tokens[^1].Id]], "label", "meaning", "grammar")]));
+        }
+    }
+
+    private sealed class RecordingLogger : ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public void Log(LogLevel level, Exception? exception, string message, params object[] args)
+            => Messages.Add(string.Format(CultureInfo.InvariantCulture, message, args));
+    }
 
     private sealed class CountingAnalyzer : ILlmPhraseAnalyzer
     {
