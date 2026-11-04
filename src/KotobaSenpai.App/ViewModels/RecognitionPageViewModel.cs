@@ -1,93 +1,116 @@
-using KotobaSenpai.Core.Workflow;
-using KotobaSenpai.Core.TargetWindow;
-using KotobaSenpai.Core.Errors;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using KotobaSenpai.App.Reading;
 using KotobaSenpai.App.Resources;
+using KotobaSenpai.App.Support;
+using KotobaSenpai.Core.Errors;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
-using KotobaSenpai.App.Support;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Workflow;
 
 namespace KotobaSenpai.App.ViewModels;
 
-/// <summary>
-/// Recognition page view model: orchestrates the window selection, recognition, and hide use cases.
-/// Depends only on Core ports and application services (including the localization ports <see cref="IStringLocalizer"/>
-/// and <see cref="IUserMessageResolver"/>), and references no WPF or platform implementation, so it can be tested headlessly.
-/// All user-visible text is resolved through <see cref="IStringLocalizer"/>; on culture switch <see cref="Status"/> is recomputed from the current state.
-/// </summary>
+/// <summary>Projects a reading session into localized page state and shared reading commands.</summary>
 public sealed partial class RecognitionPageViewModel : ObservableObject, IDisposable
 {
-    private readonly WordOverlayApplicationService _workflow;
-    private readonly IRegionSelector _regionSelector;
+    private readonly RecognitionSessionController _session;
+    private readonly IRegionSelector _region;
+    private readonly IWindowFrameCapture? _capture;
     private readonly ISettingsService _settings;
     private readonly IStringLocalizer _localizer;
-    private readonly IUserMessageResolver _messageResolver;
+    private readonly IUserMessageResolver _messages;
     private readonly ILogger _logger;
-    private readonly ITargetWindowTracker? _tracker;
-    private readonly IAutoRecognitionController? _autoRecognitionController;
-    private readonly IWindowFrameCapture? _capture;
     private readonly SupportService? _support;
-    private bool _recognitionSessionActive;
-    private CancellationTokenSource? _manualRecognition;
-    private int _sessionVersion;
+    private Func<string> _renderStatus = () => string.Empty;
+    private RecognitionPhase _previousPhase;
+    private Exception? _shownError;
     private bool _disposed;
 
-    /// <summary>A delegate that renders the localized Status from the current state; re-invoked on culture switch to refresh in place.</summary>
-    private Func<string> _renderStatus = () => string.Empty;
-
-    public RecognitionPageViewModel(
-        TargetSelectionViewModel selection,
-        WordOverlayApplicationService workflow,
-        IRegionSelector regionSelector,
-        ISettingsService settings,
-        IStringLocalizer localizer,
-        IUserMessageResolver messageResolver,
-        ILogger logger,
-        ITargetWindowTracker? tracker = null,
-        IAutoRecognitionController? autoRecognitionController = null,
-        IWindowFrameCapture? capture = null,
-        SupportService? support = null)
+    public RecognitionPageViewModel(TargetSelectionViewModel selection, WordOverlayApplicationService workflow,
+        IRegionSelector regionSelector, ISettingsService settings, IStringLocalizer localizer,
+        IUserMessageResolver messageResolver, ILogger logger, ITargetWindowTracker? tracker = null,
+        IAutoRecognitionController? autoRecognitionController = null, IWindowFrameCapture? capture = null,
+        SupportService? support = null, RecognitionSessionController? session = null, ReadingActions? actions = null,
+        ShortcutSettingsViewModel? shortcuts = null)
     {
         Selection = selection;
-        Selection.SelectionCommitted += OnSelectionCommitted;
-        Selection.PropertyChanged += OnSelectionPropertyChanged;
-        _workflow = workflow;
-        _regionSelector = regionSelector;
-        _regionSelector.SelectionStateChanged += OnRegionSelectionStateChanged;
-        Selection.SetRegionSelectionActive(_regionSelector.IsSelecting);
+        Shortcuts = shortcuts;
+        _session = session ?? new RecognitionSessionController(workflow, settings, autoRecognitionController, logger);
+        Actions = actions ?? new ReadingActions(selection, _session, regionSelector, settings, tracker, support);
+        _region = regionSelector;
+        _capture = capture;
         _settings = settings;
         _localizer = localizer;
-        _messageResolver = messageResolver;
+        _messages = messageResolver;
         _logger = logger;
-        _tracker = tracker;
-        _autoRecognitionController = autoRecognitionController;
-        _capture = capture;
         _support = support;
-        _autoRecognitionEnabled = IsEnabled(_settings.GetValue(AutoRecognitionSettings.EnabledKey));
-
+        Selection.SelectionCommitted += OnSelectionCommitted;
+        Selection.PropertyChanged += OnSelectionPropertyChanged;
+        _region.SelectionStateChanged += OnRegionChanged;
+        Selection.SetRegionSelectionActive(_region.IsSelecting);
+        _session.Changed += OnSessionChanged;
+        _session.Completed += OnCompleted;
+        Actions.Notice += OnNotice;
+        Actions.Failed += OnActionFailed;
         _localizer.CultureChanged += OnCultureChanged;
         SetStatus(ResourceKeys.Status_SelectTarget);
     }
 
     public TargetSelectionViewModel Selection { get; }
-    private bool CanOperate() => !_disposed && !Selection.IsSelectingWindow;
-    private bool CanOperateOnTarget() => CanOperate() && Selection.SelectedWindow is not null;
-
-    private void NotifySelectionState()
+    public ReadingActions Actions { get; }
+    public ShortcutSettingsViewModel? Shortcuts { get; }
+    public bool IsHidden => _session.State.Phase == RecognitionPhase.Hidden;
+    public string VisibilityButtonText => _localizer.Get(IsHidden ? "Reading_Resume" : "Reading_HidePause");
+    public string RunState => _localizer.Get(IsHidden ? "Reading_HiddenPaused"
+        : _session.State.IsAutomaticRunning ? "Reading_AutoRunning" : "Reading_AutoOff");
+    public bool AutoRecognitionEnabled
     {
-        RecognizeCommand.NotifyCanExecuteChanged();
-        SetRecognitionRegionCommand.NotifyCanExecuteChanged();
-        HideCommand.NotifyCanExecuteChanged();
+        get => _session.State.AutoRecognitionEnabled;
+        set { if (value != AutoRecognitionEnabled) _ = SetAutomaticAsync(value); }
     }
 
-    private void OnSelectionCommitted(object? sender, EventArgs e) => EndRecognitionSession();
+    [ObservableProperty] private string _status = string.Empty;
+    public Task StartRecognitionAsync() => ExecuteAsync(ReadingAction.Recognize);
+    public Task StopAsync() => _session.StopAsync();
+    public void RefreshInteraction() => NotifyCommands();
+    private bool CanRecognize() => !_disposed && Actions.CanExecute(ReadingAction.Recognize) && Selection.SelectedWindow is not null;
+    private bool CanRegion() => !_disposed && Actions.CanExecute(ReadingAction.SelectRegion) && Selection.SelectedWindow is not null;
+    private bool CanStop() => !_disposed && Actions.CanExecute(ReadingAction.Stop);
+    private bool CanVisibility() => !_disposed && Actions.CanExecute(ReadingAction.ToggleVisibility);
 
-    private void OnRegionSelectionStateChanged(object? sender, EventArgs e)
-        => Selection.SetRegionSelectionActive(_regionSelector.IsSelecting);
+    [RelayCommand(CanExecute = nameof(CanRecognize))]
+    private Task RecognizeAsync() => ExecuteAsync(ReadingAction.Recognize);
+    [RelayCommand(CanExecute = nameof(CanStop))]
+    private void Hide() => _ = ExecuteAsync(ReadingAction.Stop);
+    [RelayCommand(CanExecute = nameof(CanVisibility))]
+    private Task ToggleVisibilityAsync() => ExecuteAsync(ReadingAction.ToggleVisibility);
+    [RelayCommand(CanExecute = nameof(CanRegion))]
+    private void SetRecognitionRegion() => _ = ExecuteAsync(ReadingAction.SelectRegion);
 
+    private async Task ExecuteAsync(ReadingAction action)
+    {
+        if (_disposed) return;
+        _support?.CancelStartupReminder();
+        try { await Actions.ExecuteAsync(action); }
+        catch (Exception exception) { SetError(exception, action == ReadingAction.SelectRegion ? ErrorCodes.TargetWindowUnavailable : ErrorCodes.RecognitionFailed); }
+    }
+
+    private async Task SetAutomaticAsync(bool enabled)
+    {
+        try
+        {
+            if (!Actions.CanExecute(ReadingAction.ToggleAutomatic)) return;
+            _support?.CancelStartupReminder();
+            await Actions.SetAutomaticAsync(enabled);
+        }
+        catch (Exception exception) { SetError(exception, ErrorCodes.RecognitionFailed); }
+        finally { OnPropertyChanged(nameof(AutoRecognitionEnabled)); }
+    }
+
+    private void OnSelectionCommitted(object? sender, EventArgs e) => _session.Stop();
     private void OnSelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (Selection.IsSelectingWindow) _support?.CancelStartupReminder();
@@ -96,199 +119,113 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
             _renderStatus = () => Selection.Status;
             Status = _renderStatus();
         }
-        NotifySelectionState();
+        NotifyCommands();
     }
 
-    public Task StartRecognitionAsync() => RecognizeAsync();
-
-    /// <summary>Whether polling recognition is enabled for the current recognition session.</summary>
-    [ObservableProperty]
-    private bool _autoRecognitionEnabled;
-
-    /// <summary>User-visible status text.</summary>
-    [ObservableProperty]
-    private string _status = string.Empty;
-
-    /// <summary>Captures and recognizes Japanese words in the current window, drawing underlines.</summary>
-    [RelayCommand(CanExecute = nameof(CanOperateOnTarget))]
-    private async Task RecognizeAsync()
+    private void OnRegionChanged(object? sender, EventArgs e)
     {
-        if (!CanOperate()) return;
-        if (Selection.SelectedWindow is null)
-        {
-            SetStatus(ResourceKeys.Status_SelectTargetFirst);
-            return;
-        }
-
-        Selection.BeginRecognition();
-        _support?.CancelStartupReminder();
-        var target = Selection.SelectedWindow;
-        var version = ++_sessionVersion;
-        using var cancellation = new CancellationTokenSource();
-        _manualRecognition = cancellation;
-        NotifySelectionState();
-        try
-        {
-            _autoRecognitionController?.Stop();
-            _recognitionSessionActive = false;
-            _regionSelector.StopFlashing();
-            SetStatus(ResourceKeys.Status_Recognizing);
-            var result = await _workflow.RecognizeAndShowAsync(target, cancellation.Token);
-            if (cancellation.IsCancellationRequested || version != _sessionVersion) return;
-            _support?.RecordRecognition(DateTime.Now);
-            _recognitionSessionActive = true;
-            var wordCount = result.Lines.Sum(line => line.Words.Count);
-            if (wordCount == 0)
-                _regionSelector.Flash(target, ReadSavedRegion());
-            SetStatus(wordCount == 0
-                ? ResourceKeys.Status_NoWords
-                : ResourceKeys.Status_WordsRecognized,
-                wordCount);
-            StartAutoRecognitionIfEnabled();
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || version != _sessionVersion)
-        {
-        }
-        catch (Exception ex)
-        {
-            if (version != _sessionVersion) return;
-            EndRecognitionSession();
-            SetError(ex, ErrorCodes.RecognitionFailed);
-        }
-        finally
-        {
-            if (ReferenceEquals(_manualRecognition, cancellation)) _manualRecognition = null;
-            NotifySelectionState();
-        }
+        Selection.SetRegionSelectionActive(_region.IsSelecting);
+        NotifyCommands();
     }
 
-    /// <summary>Hides the underline overlay.</summary>
-    [RelayCommand(CanExecute = nameof(CanOperate))]
-    private void Hide()
+    private void OnNotice(object? sender, string key) => SetStatus(key);
+    private void OnActionFailed(object? sender, ReadingFailure failure)
+        => SetError(failure.Exception, failure.Action == ReadingAction.SelectRegion ? ErrorCodes.TargetWindowUnavailable : ErrorCodes.RecognitionFailed);
+    private void OnSessionChanged(object? sender, EventArgs e)
     {
-        if (!CanOperate()) return;
-        EndRecognitionSession();
-        SetStatus(ResourceKeys.Status_Hidden);
+        if (_disposed) return;
+        var state = _session.State;
+        if (state.Phase != _previousPhase)
+        {
+            if (state.Phase is RecognitionPhase.Recognizing or RecognitionPhase.Restoring)
+            {
+                Selection.BeginRecognition();
+                _region.StopFlashing();
+            }
+            if (state.Phase is RecognitionPhase.Hidden or RecognitionPhase.Stopped or RecognitionPhase.Failed)
+            {
+                _region.StopFlashing();
+                if (!Selection.IsAcquiringPreview) _capture?.Stop();
+                if (state.Phase != RecognitionPhase.Hidden) Selection.EndRecognition();
+            }
+        }
+        _previousPhase = state.Phase;
+        if (state.Error is not null)
+        {
+            if (!ReferenceEquals(_shownError, state.Error)) SetError(state.Error, ErrorCodes.RecognitionFailed);
+        }
+        else switch (state.Phase)
+            {
+                case RecognitionPhase.Recognizing:
+                case RecognitionPhase.Restoring: SetStatus(ResourceKeys.Status_Recognizing); break;
+                case RecognitionPhase.Ready: SetStatus(state.WordCount == 0 ? ResourceKeys.Status_NoWords : ResourceKeys.Status_WordsRecognized, state.WordCount); break;
+                case RecognitionPhase.Hidden: SetStatus("Reading_HiddenPaused"); break;
+                case RecognitionPhase.Stopped: SetStatus(ResourceKeys.Status_Hidden); break;
+            }
+        OnPropertyChanged(nameof(AutoRecognitionEnabled));
+        OnPropertyChanged(nameof(IsHidden));
+        OnPropertyChanged(nameof(VisibilityButtonText));
+        OnPropertyChanged(nameof(RunState));
+        NotifyCommands();
     }
 
-    private void EndRecognitionSession()
+    private void OnCompleted(object? sender, RecognitionCompleted completion)
     {
-        _sessionVersion++;
-        _manualRecognition?.Cancel();
-        _autoRecognitionController?.Stop();
-        _recognitionSessionActive = false;
-        _regionSelector.StopFlashing();
-        if (!Selection.IsAcquiringPreview) _capture?.Stop();
-        Selection.EndRecognition();
-        _workflow.Hide();
-        NotifySelectionState();
+        if (_disposed) return;
+        _support?.RecordRecognition(DateTime.Now);
+        if (!completion.IsAutomatic && !completion.Result.Lines.Any(line => line.Words.Count > 0))
+        {
+            var saved = RecognitionRegion.TryParse(_settings.GetValue(RecognitionRegion.SettingsKey), out var parsed) ? parsed : null;
+            if (Selection.SelectedWindow is { } target) _region.Flash(target, saved);
+        }
+        else if (completion.Result.Lines.Any(line => line.Words.Count > 0)) _region.StopFlashing();
+    }
+
+    private void NotifyCommands()
+    {
+        RecognizeCommand.NotifyCanExecuteChanged();
+        SetRecognitionRegionCommand.NotifyCanExecuteChanged();
+        HideCommand.NotifyCanExecuteChanged();
+        ToggleVisibilityCommand.NotifyCanExecuteChanged();
+    }
+
+    private void SetStatus(string key, params object[] args)
+    {
+        _shownError = null;
+        _renderStatus = () => _localizer.Get(key, args);
+        Status = _renderStatus();
+    }
+
+    private void SetError(Exception exception, string fallback)
+    {
+        _shownError = exception;
+        _logger.LogError(exception, "Error reported to user");
+        _renderStatus = () => _messages.Resolve(exception, fallback);
+        Status = _renderStatus();
+    }
+
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        Status = _renderStatus();
+        OnPropertyChanged(nameof(VisibilityButtonText));
+        OnPropertyChanged(nameof(RunState));
+        NotifyCommands();
     }
 
     public void Dispose()
     {
         if (_disposed) return;
+        _session.Stop();
         _disposed = true;
+        _session.Changed -= OnSessionChanged;
+        _session.Completed -= OnCompleted;
+        Actions.Notice -= OnNotice;
+        Actions.Failed -= OnActionFailed;
         Selection.SelectionCommitted -= OnSelectionCommitted;
         Selection.PropertyChanged -= OnSelectionPropertyChanged;
-        _regionSelector.SelectionStateChanged -= OnRegionSelectionStateChanged;
-        Selection.Dispose();
+        _region.SelectionStateChanged -= OnRegionChanged;
         _localizer.CultureChanged -= OnCultureChanged;
-        EndRecognitionSession();
-    }
-
-    partial void OnAutoRecognitionEnabledChanged(bool value)
-    {
-        if (value) _support?.CancelStartupReminder();
-        _settings.SetValue(AutoRecognitionSettings.EnabledKey, value ? "true" : "false");
-        if (value)
-            StartAutoRecognitionIfEnabled();
-        else
-            _autoRecognitionController?.Stop();
-    }
-
-    private void StartAutoRecognitionIfEnabled()
-    {
-        if (!_recognitionSessionActive || !AutoRecognitionEnabled || Selection.SelectedWindow is null || _autoRecognitionController is null)
-            return;
-
-        var target = Selection.SelectedWindow;
-        _autoRecognitionController.Start(target, cancellationToken => RecognizeChangedAsync(target, cancellationToken));
-    }
-
-    private async Task RecognizeChangedAsync(WindowTarget target, CancellationToken cancellationToken)
-    {
-        var version = _sessionVersion;
-        try
-        {
-            var result = await _workflow.RecognizeChangedAndShowAsync(target, cancellationToken).ConfigureAwait(true);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (result is not null && version == _sessionVersion && _recognitionSessionActive)
-            {
-                _support?.RecordRecognition(DateTime.Now);
-                if (result.Lines.Any(line => line.Words.Count > 0)) _regionSelector.StopFlashing();
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (Exception ex)
-        {
-            if (!cancellationToken.IsCancellationRequested)
-                _logger.LogError(ex, "Automatic recognition failed.");
-        }
-    }
-
-    private static bool IsEnabled(string? value)
-        => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>Opens the interactive region selector over the selected window to set the recognition sub-region.</summary>
-    [RelayCommand(CanExecute = nameof(CanOperateOnTarget))]
-    private void SetRecognitionRegion()
-    {
-        if (!CanOperate()) return;
-        _support?.CancelStartupReminder();
-        if (Selection.SelectedWindow is null)
-        {
-            SetStatus(ResourceKeys.Status_SelectTargetFirst);
-            return;
-        }
-        try
-        {
-            _tracker?.Refresh();
-            _regionSelector.Show(Selection.SelectedWindow, ReadSavedRegion());
-            SetStatus(ResourceKeys.Status_RegionSelecting);
-        }
-        catch (Exception ex)
-        {
-            SetError(ex, ErrorCodes.TargetWindowUnavailable);
-        }
-    }
-
-    private RecognitionRegion? ReadSavedRegion()
-    {
-        var raw = _settings.GetValue(RecognitionRegion.SettingsKey);
-        return RecognitionRegion.TryParse(raw, out var region) ? region : null;
-    }
-
-    /// <summary>Records a normal status (key + format arguments) and renders it.</summary>
-    private void SetStatus(string key, params object[] args)
-    {
-        _renderStatus = () => _localizer.Get(key, args);
-        Status = _renderStatus();
-    }
-
-    /// <summary>Records an error status (exception + fallback code) and renders it through the resolver; re-translated by code on culture switch.</summary>
-    private void SetError(Exception exception, string fallbackErrorCode)
-    {
-        _logger.LogError(exception, "Error reported to user");
-        _renderStatus = () => _messageResolver.Resolve(exception, fallbackErrorCode);
-        Status = _renderStatus();
-    }
-
-    /// <summary>On culture switch, re-derives <see cref="Status"/> from the current state and notifies the view.</summary>
-    private void OnCultureChanged(object? sender, EventArgs e)
-    {
-        Status = _renderStatus();
-        NotifySelectionState();
+        Selection.Dispose();
+        _session.Dispose();
     }
 }

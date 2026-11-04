@@ -36,6 +36,10 @@ using KotobaSenpai.Platform.Windows.Ocr;
 using KotobaSenpai.Platform.Windows.Overlay;
 using KotobaSenpai.Platform.Windows.AutoRecognition;
 using Microsoft.Extensions.DependencyInjection;
+using KotobaSenpai.Core.Shortcuts;
+using KotobaSenpai.Platform.Windows.Shortcuts;
+using KotobaSenpai.App.Shortcuts;
+using KotobaSenpai.App.Reading;
 
 namespace KotobaSenpai.App;
 
@@ -53,6 +57,7 @@ public partial class App : Application
     private FileLogger? _logger;
     private MainWindowViewModel? _mainViewModel;
     private SupportCoordinator? _support;
+    private ReadingShortcutCoordinator? _shortcuts;
     private ConfigurationProcessLock? _settingsLease;
     private bool _exiting;
     private bool _closing;
@@ -98,6 +103,10 @@ public partial class App : Application
         ConfigureGlobalErrorHandling();
 
         _mainViewModel = _services.GetRequiredService<MainWindowViewModel>();
+        _shortcuts = _services.GetRequiredService<ReadingShortcutCoordinator>();
+        _shortcuts.Changed += OnShortcutStateChanged;
+        _shortcuts.Start();
+        _mainViewModel.Onboarding.PropertyChanged += OnReadinessChanged;
         _mainViewModel.Settings.Llm.PropertyChanged += OnReadinessChanged;
         _mainViewModel.Dictionary.PropertyChanged += OnReadinessChanged;
         _mainViewModel.Settings.OverlayAppearance.Changed += OnOverlayAppearanceChanged;
@@ -150,6 +159,10 @@ public partial class App : Application
             cancellationToken.ThrowIfCancellationRequested();
             if (_exiting || _mainViewModel is null) return;
             _mainViewModel.Recognition = services.GetRequiredService<RecognitionPageViewModel>();
+            var actions = services.GetRequiredService<ReadingActions>();
+            actions.IsInteractionEnabled = () => !_closing && !_exiting
+                && _mainViewModel?.Onboarding.IsMain == true && _shortcuts?.IsRecording != true;
+            _shortcuts?.Attach(actions);
             _mainViewModel.Selection!.PropertyChanged += OnReadinessChanged;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -162,8 +175,13 @@ public partial class App : Application
 
     private void OnReadinessChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (!_exiting) _mainViewModel?.Onboarding.Refresh();
+        if (_exiting) return;
+        if (!ReferenceEquals(sender, _mainViewModel?.Onboarding)) _mainViewModel?.Onboarding.Refresh();
+        _mainViewModel?.Recognition?.RefreshInteraction();
     }
+
+    private void OnShortcutStateChanged(object? sender, EventArgs e)
+        => _mainViewModel?.Recognition?.RefreshInteraction();
 
     private async void OnMainWindowClosing(object? sender, CancelEventArgs e)
     {
@@ -171,6 +189,7 @@ public partial class App : Application
         e.Cancel = true;
         if (_closing || sender is not Window window) return;
         _closing = true;
+        _shortcuts?.Detach();
         _support?.Dispose();
         window.IsEnabled = false;
         try { await _mainViewModel.StopAsync(); }
@@ -184,9 +203,12 @@ public partial class App : Application
         try
         {
             _exiting = true;
+            if (_shortcuts is not null) _shortcuts.Changed -= OnShortcutStateChanged;
+            _shortcuts?.Dispose();
             _support?.Dispose();
             if (_mainViewModel is not null)
             {
+                _mainViewModel.Onboarding.PropertyChanged -= OnReadinessChanged;
                 _mainViewModel.Settings.OverlayAppearance.Changed -= OnOverlayAppearanceChanged;
                 _mainViewModel.Settings.Llm.PropertyChanged -= OnReadinessChanged;
                 _mainViewModel.Dictionary.PropertyChanged -= OnReadinessChanged;
@@ -251,6 +273,9 @@ public partial class App : Application
         services.AddSingleton<PhraseAnalysisOrchestrator>();
 
         services.AddSingleton<WordOverlayApplicationService>();
+        services.AddSingleton<RecognitionSessionController>();
+        services.AddSingleton<ReadingActions>();
+        services.AddSingleton<IReadingActions>(sp => sp.GetRequiredService<ReadingActions>());
         // Diagnostics: when DiagEnabled=true, write the tokenization results to disk for offline analysis.
         services.AddSingleton<IDiagnosticReporter, FileDiagnosticReporter>();
 
@@ -277,6 +302,9 @@ public partial class App : Application
 
         // Settings: unified settings.json read/write, the single owner for preference storage and log-level configuration (singleton, holds the in-memory view).
         services.AddSingleton<ISettingsService>(_ => new SettingsService());
+        services.AddSingleton<IGlobalShortcutRegistrar, Win32GlobalShortcutRegistrar>();
+        services.AddSingleton<ReadingShortcutCoordinator>();
+        services.AddSingleton<ShortcutSettingsViewModel>();
         services.AddSingleton<CaptureBorderPreferences>();
 
         // Localization: the concrete implementation and the Core port point at the same singleton, so LanguageService and the ViewModel share culture state.

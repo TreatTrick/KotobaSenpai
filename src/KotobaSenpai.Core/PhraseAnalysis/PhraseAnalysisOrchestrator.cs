@@ -71,12 +71,7 @@ public sealed class PhraseAnalysisOrchestrator
             var freshResults = uncached.Count > 0
                 ? await RunThrottledAsync(uncached, cancellationToken).ConfigureAwait(false)
                 : Array.Empty<PhraseAnalysisResult>();
-            // Write successful fresh results to cache
-            for (int i = 0; i < uncached.Count; i++)
-            {
-                if (freshResults[i].Succeeded)
-                    CacheResult(uncached[i].Request, freshResults[i]);
-            }
+            cancellationToken.ThrowIfCancellationRequested();
             // Merge: build a lookup for fresh results by request index in the uncached list
             var freshByIndex = new Dictionary<int, PhraseAnalysisResult>();
             for (int i = 0; i < uncached.Count; i++)
@@ -183,7 +178,12 @@ public sealed class PhraseAnalysisOrchestrator
             await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await _analyzer.AnalyzeAsync(cacheableRequest.Request, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                var result = await _analyzer.AnalyzeAsync(cacheableRequest.Request, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                // Keep completed sentences even if another sentence is cancelled later in the same batch.
+                if (result.Succeeded) CacheResult(cacheableRequest.Request, result);
+                return result;
             }
             finally
             {

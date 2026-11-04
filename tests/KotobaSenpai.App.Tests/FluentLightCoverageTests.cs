@@ -11,6 +11,33 @@ namespace KotobaSenpai.App.Tests;
 
 public sealed class FluentLightCoverageTests
 {
+    [Fact]
+    public Task Shortcut_capture_and_readonly_hints_inherit_the_shared_presentation() => RunSta(() =>
+    {
+        var resources = LoadResources("Light");
+        var button = new ShortcutCaptureButton { Style = (Style)resources[typeof(ShortcutCaptureButton)] };
+        Assert.Equal(FluentLightKind.Button, FluentLight.GetKind(button));
+        Assert.Equal(4, FluentLight.GetCornerRadius(button));
+        Assert.Equal(new CornerRadius(4), button.CornerRadius);
+        var hint = new TextBlock { Style = (Style)resources["ShortcutHint"], Text = "Ctrl+Alt+Shift+F11" };
+        Assert.False(hint.Focusable);
+        Assert.Equal(Visibility.Visible, hint.Visibility);
+        hint.Text = "";
+        Assert.Equal(Visibility.Collapsed, hint.Visibility);
+    });
+
+    [Fact]
+    public void All_five_actions_show_the_live_binding_beside_their_control()
+    {
+        var page = Source("Views/RecognitionPage.xaml");
+        foreach (var action in new[] { "Recognize", "Automatic", "Stop", "Visibility", "Region" })
+        {
+            var expression = "{Binding Shortcuts." + action + ".Hint}";
+            Assert.Single(page.Descendants(Presentation + "TextBlock"), element => (string?)element.Attribute("Text") == expression);
+            Assert.Single(page.Descendants(), element => (string?)element.Attribute("AutomationProperties.AcceleratorKey") == expression);
+        }
+    }
+
     private static readonly XNamespace Presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
     private static readonly XNamespace Controls = "clr-namespace:KotobaSenpai.App.Controls";
     private static readonly XNamespace Views = "clr-namespace:KotobaSenpai.App.Views";

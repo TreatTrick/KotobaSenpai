@@ -153,6 +153,7 @@ public sealed class TargetWindowGeometryTests
 
     private sealed class NullOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         public void Show(WordOverlaySession session, Func<bool>? canRender = null) { }
 
         public void Hide() { }

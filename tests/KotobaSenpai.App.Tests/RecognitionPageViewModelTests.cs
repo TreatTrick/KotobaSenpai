@@ -20,6 +20,76 @@ namespace KotobaSenpai.App.Tests;
 public sealed class RecognitionPageViewModelTests
 {
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Unavailable_targets_do_not_start_recognition_or_open_the_region_editor(bool minimized)
+    {
+        var tracker = new FakeTargetWindowTracker();
+        var selector = new FakeRegionSelector();
+        var target = new WindowTarget((nint)2, "Reading target", new ScreenRect(0, 0, 200, 100));
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowPicker(target), tracker, regionSelector: selector);
+        using (vm)
+        {
+            vm.Selection.SelectedWindow = target;
+            tracker.Publish(tracker.Current! with { IsMinimized = minimized, IsOccluded = !minimized });
+            if (minimized)
+            {
+                await vm.Actions.ExecuteAsync(KotobaSenpai.App.Reading.ReadingAction.Recognize);
+                Assert.Equal("WindowPicker_Unavailable", vm.Status);
+                Assert.Equal(0, overlay.ShowCount);
+            }
+            await vm.Actions.ExecuteAsync(KotobaSenpai.App.Reading.ReadingAction.SelectRegion);
+            Assert.Equal("WindowPicker_Unavailable", vm.Status);
+            Assert.False(selector.IsSelecting);
+        }
+    }
+
+    [Fact]
+    public async Task Buttons_and_keyboard_actions_share_pause_preferences_and_stop_during_region_selection()
+    {
+        var target = new WindowTarget((nint)2, "Reading target", new ScreenRect(0, 0, 200, 100));
+        var selector = new FakeRegionSelector();
+        var automatic = new RecordingAutoController();
+        var (vm, overlay, _, _) = CreateVm(new FakeWindowPicker(target), controller: automatic, regionSelector: selector);
+        using (vm)
+        {
+            vm.Selection.SelectedWindow = target;
+            await vm.RecognizeCommand.ExecuteAsync(null);
+            await vm.Actions.ExecuteAsync(KotobaSenpai.App.Reading.ReadingAction.ToggleAutomatic);
+            Assert.True(automatic.IsRunning);
+            var saved = overlay.LastSession;
+            await vm.Actions.ExecuteAsync(KotobaSenpai.App.Reading.ReadingAction.ToggleAutomatic);
+            Assert.False(automatic.IsRunning);
+            Assert.Same(saved, overlay.LastSession);
+            var shown = overlay.ShowCount;
+            await vm.ToggleVisibilityCommand.ExecuteAsync(null);
+            Assert.True(vm.IsHidden);
+            Assert.Equal("Reading_Resume", vm.VisibilityButtonText);
+            await vm.Actions.ExecuteAsync(KotobaSenpai.App.Reading.ReadingAction.Recognize);
+            Assert.Equal("Reading_ResumeFirst", vm.Status);
+            vm.AutoRecognitionEnabled = true;
+            Assert.True(vm.AutoRecognitionEnabled);
+            Assert.False(automatic.IsRunning);
+            Assert.Equal(shown, overlay.ShowCount);
+            vm.SetRecognitionRegionCommand.Execute(null);
+            Assert.True(selector.IsSelecting);
+            Assert.False(vm.ToggleVisibilityCommand.CanExecute(null));
+            Assert.False(vm.RecognizeCommand.CanExecute(null));
+            Assert.True(vm.HideCommand.CanExecute(null));
+            vm.HideCommand.Execute(null);
+            Assert.False(selector.IsSelecting);
+            Assert.False(vm.IsHidden);
+            Assert.Equal("Reading_HidePause", vm.VisibilityButtonText);
+            Assert.Equal(target, vm.Selection.SelectedWindow);
+            Assert.True(vm.AutoRecognitionEnabled);
+            Assert.False(automatic.IsRunning);
+            await vm.ToggleVisibilityCommand.ExecuteAsync(null);
+            Assert.Equal("Reading_StartFirst", vm.Status);
+            Assert.Equal(shown, overlay.ShowCount);
+        }
+    }
+
+    [Theory]
     [InlineData("clear")]
     [InlineData("close")]
     public void Recognition_and_region_commands_require_a_selected_window(string action)
@@ -70,8 +140,8 @@ public sealed class RecognitionPageViewModelTests
         var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: new SequenceRecognizer(result, result),
             controller: controller, support: support);
         using var lifetime = vm;
-        vm.Selection.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
+        vm.Selection.SelectedWindow = target;
         await vm.StartRecognitionAsync();
         Assert.Equal(1, support.State.RecognitionCount);
         await controller.ChangeAsync();
@@ -114,8 +184,8 @@ public sealed class RecognitionPageViewModelTests
         var controller = new RecordingAutoController();
         var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer, controller: controller, support: support);
         using var lifetime = vm;
-        vm.Selection.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
+        vm.Selection.SelectedWindow = target;
         await vm.StartRecognitionAsync();
         var automatic = controller.ChangeAsync();
         if (cancelSession)
@@ -244,8 +314,8 @@ public sealed class RecognitionPageViewModelTests
         var controller = new RecordingAutoController();
         var selector = new FakeRegionSelector();
         var (vm, overlay, _, logger) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer, capture: capture, controller: controller, regionSelector: selector);
-        vm.Selection.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
+        vm.Selection.SelectedWindow = target;
         var stoppedBefore = capture.StopCount;
         var pending = vm.RecognizeCommand.ExecuteAsync(null);
         if (action == "hide") vm.HideCommand.Execute(null);
@@ -303,8 +373,8 @@ public sealed class RecognitionPageViewModelTests
         var controller = new RecordingAutoController();
         var (vm, _, _, _) = CreateVm(new FakeWindowPicker(target), recognizer: recognizer,
             controller: controller, regionSelector: selector);
-        vm.Selection.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
+        vm.Selection.SelectedWindow = target;
 
         await vm.RecognizeCommand.ExecuteAsync(null);
         var expectedWarnings = manualStartsEmpty ? 1 : 0;
@@ -496,7 +566,7 @@ public sealed class RecognitionPageViewModelTests
         vm.Selection.SelectedWindow = target;
         vm.SetRecognitionRegionCommand.Execute(null);
 
-        if (action == "recognize") await vm.RecognizeCommand.ExecuteAsync(null);
+        if (action == "recognize") { selector.CompleteSelection(); await vm.RecognizeCommand.ExecuteAsync(null); }
         if (action == "clear") vm.Selection.SelectedWindow = null;
         if (action == "close") tracker.Publish(tracker.Current! with { IsValid = false });
         if (action == "dispose") vm.Dispose();
@@ -553,8 +623,8 @@ public sealed class RecognitionPageViewModelTests
         var controller = new RecordingAutoController();
         var (vm, _, _, _) = CreateVm(picker, controller: controller);
         var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
-        vm.Selection.SelectedWindow = target;
         vm.AutoRecognitionEnabled = true;
+        vm.Selection.SelectedWindow = target;
         await vm.RecognizeCommand.ExecuteAsync(null);
 
         var picking = vm.Selection.SelectWindowCommand.ExecuteAsync(null);
@@ -887,6 +957,7 @@ public sealed class RecognitionPageViewModelTests
             LastFlashRegion = region;
         }
         public void StopFlashing() => StopFlashingCount++;
+        public void Cancel() => CompleteSelection();
     }
 
     private sealed class FakeSettings(string? region = null) : KotobaSenpai.TestSupport.SettingsStub
@@ -916,6 +987,7 @@ public sealed class RecognitionPageViewModelTests
 
     private sealed class FakeOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         public int ShowCount { get; private set; }
         public int HideCount { get; private set; }
         public WordOverlaySession? LastSession { get; private set; }

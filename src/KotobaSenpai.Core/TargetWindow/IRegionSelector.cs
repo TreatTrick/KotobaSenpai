@@ -18,4 +18,7 @@ public interface IRegionSelector
 
     /// <summary>Stops passive feedback without interrupting an active region edit.</summary>
     void StopFlashing();
+
+    /// <summary>Closes an edit without saving its unconfirmed region.</summary>
+    void Cancel();
 }

@@ -108,6 +108,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         });
     }
 
+    public void Suspend()
+        => Application.Current.Dispatcher.Invoke(() => _window?.SuspendPresentation());
+
     internal sealed class OverlayWindow : Window
     {
         private OverlayAnnotationStyle _annotationStyle = new(OverlayAppearanceSettings.Default);
@@ -122,6 +125,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private readonly ITargetWindowTracker? _tracker;
         private readonly ILogger? _logger;
         private WordOverlaySession? _session;
+        private bool _presentationSuspended;
         private TargetWindowSnapshot? _renderedSnapshot;
         private int _renderDiagnosticGeneration;
         private nint _ownerHandle;
@@ -184,6 +188,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
         public void Render(WordOverlaySession session, double fontScale)
         {
+            _presentationSuspended = false;
             _fontScale = fontScale;
             _session = session;
             _ownerHandle = session.Target.Handle;
@@ -317,7 +322,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 Hide();
                 return;
             }
-            if (!snapshot.IsRenderable)
+            if (!snapshot.IsRenderable || _presentationSuspended)
             {
                 _logger?.Log(
                     IsVisible ? LogLevel.Debug : LogLevel.Trace,
@@ -510,6 +515,13 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _canvas.Children.Clear();
             _lineElements.Clear();
             _lineOwner.Clear();
+        }
+
+        internal void SuspendPresentation()
+        {
+            _presentationSuspended = true;
+            StopHover();
+            Hide();
         }
 
         private void SetOwnerHandle()

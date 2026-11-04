@@ -17,6 +17,7 @@ public sealed class CoreSliceArchitectureTests
         ["Localization", 0],
         ["Logging", 0],
         ["Settings", 0],
+        ["Shortcuts", 0],
         ["Llm", 1],
         ["TargetWindow", 1],
         ["Ocr", 2],
@@ -79,6 +80,19 @@ public sealed class CoreSliceArchitectureTests
         Assert.True(
             offenders.Length == 0,
             $"Core contains a forbidden namespace or a namespace/folder mismatch: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void Shortcut_adapters_do_not_depend_on_reading_or_UI_application_types()
+    {
+        var native = Types.InAssembly(typeof(KotobaSenpai.Platform.Windows.Shortcuts.Win32GlobalShortcutRegistrar).Assembly)
+            .That().ResideInNamespace("KotobaSenpai.Platform.Windows.Shortcuts")
+            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.App", "KotobaSenpai.Core.Workflow", "KotobaSenpai.Core.PhraseAnalysis")
+            .GetResult();
+        Assert.True(native.IsSuccessful);
+        var core = Types.InAssembly(CoreAssembly).ShouldNot()
+            .HaveDependencyOnAny("System.Windows", "KotobaSenpai.App", "KotobaSenpai.Platform.Windows").GetResult();
+        Assert.True(core.IsSuccessful);
     }
 
     private static IEnumerable<string> FindNamespaceFolderOffenders()

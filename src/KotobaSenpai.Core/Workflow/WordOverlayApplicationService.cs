@@ -118,6 +118,29 @@ public sealed class WordOverlayApplicationService : IDisposable
             .ConfigureAwait(false);
     }
 
+    /// <summary>Checks the current frame and reuses successful analysis without clearing its cache.</summary>
+    public async Task<WordRecognitionResult> ResumeAndShowAsync(WindowTarget target, CancellationToken cancellationToken = default)
+    {
+        var activeTarget = ValidateTarget(target);
+        if (_tracker is not null && !_tracker.Refresh().IsRenderable)
+            throw new BusinessRuleValidationException(ErrorCodes.TargetWindowUnavailable,
+                "The target window must be renderable before resuming reading.");
+        var generation = Interlocked.Increment(ref _recognitionGeneration);
+        var recognitionId = Guid.NewGuid();
+        var result = await RecognizeCoreAsync(recognitionId, activeTarget, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!IsCurrent(generation)) return result;
+        _lastRecognizedText = GetRecognizedText(result.Lines);
+        await PublishAsync(recognitionId, generation, activeTarget, result, cancellationToken).ConfigureAwait(false);
+        return result;
+    }
+
+    public void Suspend()
+    {
+        Interlocked.Increment(ref _recognitionGeneration);
+        _overlay.Suspend();
+    }
+
     private async Task PublishAsync(
         Guid recognitionId,
         int generation,
@@ -157,6 +180,7 @@ public sealed class WordOverlayApplicationService : IDisposable
             cachedRun.Words,
             cachedRun.SuccessfulSegmentIds), CanRender);
 
+        cancellationToken.ThrowIfCancellationRequested();
         var phraseRun = await _phraseOrchestrator
             .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
             .ConfigureAwait(false);

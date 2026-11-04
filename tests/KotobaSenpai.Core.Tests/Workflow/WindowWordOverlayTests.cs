@@ -149,6 +149,7 @@ public sealed class WindowWordOverlayTests
 
     private sealed class FakeOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         public WordOverlaySession? Session { get; private set; }
         public void Show(WordOverlaySession session, Func<bool>? canRender = null) => Session = session;
         public void Hide() => Session = null;
@@ -156,6 +157,7 @@ public sealed class WindowWordOverlayTests
 
     private sealed class DeferredOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         private Action? _pending;
         public WordOverlaySession? Session { get; private set; }
         public void Show(WordOverlaySession session, Func<bool>? canRender = null)
@@ -180,6 +182,7 @@ public sealed class WindowWordOverlayTests
 
     private sealed class RecordingOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         private readonly IList<string> _events;
 
         public RecordingOverlay(IList<string> events) => _events = events;

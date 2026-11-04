@@ -17,6 +17,20 @@ namespace KotobaSenpai.App.Tests;
 public sealed class AutoRecognitionSettingsTests
 {
     [Fact]
+    public void Explicitly_enabling_auto_recognition_starts_a_selected_target()
+    {
+        var controller = new FakeAutoRecognitionController();
+        var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
+        using var viewModel = Create(new RecordingSettings(), controller, target);
+        viewModel.Selection.SelectedWindow = target;
+
+        viewModel.AutoRecognitionEnabled = true;
+
+        Assert.True(controller.IsRunning);
+        Assert.Equal(1, controller.StartCount);
+    }
+
+    [Fact]
     public void Auto_recognition_defaults_to_disabled_when_the_setting_is_missing()
     {
         var settings = new RecordingSettings();
@@ -45,8 +59,8 @@ public sealed class AutoRecognitionSettingsTests
         var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
         var viewModel = Create(settings, controller, target);
 
-        viewModel.Selection.SelectedWindow = target;
         viewModel.AutoRecognitionEnabled = true;
+        viewModel.Selection.SelectedWindow = target;
 
         await viewModel.RecognizeCommand.ExecuteAsync(null);
 
@@ -102,6 +116,7 @@ public sealed class AutoRecognitionSettingsTests
         public void Show(WindowTarget target, RecognitionRegion? initial = null) { }
         public void Flash(WindowTarget target, RecognitionRegion? region = null) { }
         public void StopFlashing() { }
+        public void Cancel() { }
     }
 
     private sealed class FakeRecognizer : IWindowWordRecognizer
@@ -116,6 +131,7 @@ public sealed class AutoRecognitionSettingsTests
 
     private sealed class FakeOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         public void Show(WordOverlaySession session, Func<bool>? canRender = null) { }
 
         public void Hide() { }

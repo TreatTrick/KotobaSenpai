@@ -122,7 +122,7 @@
     <value>Start recognition</value>
   </data>
   <data name="Button_Hide" xml:space="preserve">
-    <value>Hide annotations</value>
+    <value>Stop and clear</value>
   </data>
   <data name="Button_SetRecognitionRegion" xml:space="preserve">
     <value>Select region</value>
@@ -153,7 +153,7 @@
     <value>Recognized {0} words and drew underlines.</value>
   </data>
   <data name="Status_Hidden" xml:space="preserve">
-    <value>Underline hidden.</value>
+    <value>Recognition stopped and annotations cleared.</value>
   </data>
   <data name="Status_RegionSelecting" xml:space="preserve">
     <value>Drag the corners to set the recognition region, then confirm.</value>
@@ -288,7 +288,7 @@
     <value>After starting recognition, update annotations when the text changes.</value>
   </data>
   <data name="Description_Overlay" xml:space="preserve">
-    <value>Hide annotations and stop automatic recognition.</value>
+    <value>End this recognition session and clear all annotations.</value>
   </data>
   <data name="Description_Theme" xml:space="preserve">
     <value>Choose light, dark, or follow Windows.</value>
@@ -698,4 +698,31 @@ Meet your next word.</value>
   <data name="Label_LogLevel" xml:space="preserve"><value>Log level</value></data>
   <data name="Description_LogLevel" xml:space="preserve"><value>Record messages at this level and above. Changes are saved and applied immediately.</value></data>
   <data name="LogLevel_SaveFailed" xml:space="preserve"><value>Could not save the log level. The previous level is still active.</value></data>
+  <data name="Shortcut_Title" xml:space="preserve"><value>Keyboard shortcuts</value></data>
+  <data name="Shortcut_Description" xml:space="preserve"><value>Click a key to change it. Changes take effect immediately.</value></data>
+  <data name="Shortcut_Action_Recognize" xml:space="preserve"><value>Recognize current screen</value></data>
+  <data name="Shortcut_Action_ToggleAutomatic" xml:space="preserve"><value>Toggle automatic recognition</value></data>
+  <data name="Shortcut_Action_Stop" xml:space="preserve"><value>Stop and clear annotations</value></data>
+  <data name="Shortcut_Action_ToggleVisibility" xml:space="preserve"><value>Hide and pause / Resume reading</value></data>
+  <data name="Shortcut_Action_SelectRegion" xml:space="preserve"><value>Set recognition region</value></data>
+  <data name="Shortcut_PressKey" xml:space="preserve"><value>Press a key…</value></data>
+  <data name="Shortcut_RecordingHelp" xml:space="preserve"><value>Use a function key or key combination. Esc cancels.</value></data>
+  <data name="Shortcut_Unbound" xml:space="preserve"><value>Not assigned</value></data>
+  <data name="Shortcut_Inactive" xml:space="preserve"><value>Inactive</value></data>
+  <data name="Shortcut_Active" xml:space="preserve"><value>Shortcut active</value></data>
+  <data name="Shortcut_Clear" xml:space="preserve"><value>Remove</value></data>
+  <data name="Shortcut_Reset" xml:space="preserve"><value>Default</value></data>
+  <data name="Shortcut_Error_Invalid" xml:space="preserve"><value>Use F1–F11 or a key with Ctrl, Alt or Shift. F12 is reserved.</value></data>
+  <data name="Shortcut_Error_Duplicate" xml:space="preserve"><value>Already assigned to: {0}.</value></data>
+  <data name="Shortcut_Error_Unavailable" xml:space="preserve"><value>Shortcut unavailable (Windows error {1}). Choose another key.</value></data>
+  <data name="Shortcut_Error_SaveFailed" xml:space="preserve"><value>Could not save. The previous binding is still active.</value></data>
+  <data name="Reading_Resume" xml:space="preserve"><value>Resume reading</value></data>
+  <data name="Reading_HidePause" xml:space="preserve"><value>Hide and pause</value></data>
+  <data name="Reading_VisibilityTitle" xml:space="preserve"><value>Reading assistance</value></data>
+  <data name="Reading_VisibilityDescription" xml:space="preserve"><value>Hide annotations and pause recognition. Existing results are kept for resuming.</value></data>
+  <data name="Reading_HiddenPaused" xml:space="preserve"><value>Annotations hidden. Recognition is paused.</value></data>
+  <data name="Reading_AutoRunning" xml:space="preserve"><value>Automatic recognition is running.</value></data>
+  <data name="Reading_AutoOff" xml:space="preserve"><value>Automatic recognition is not running. Start a scan when needed.</value></data>
+  <data name="Reading_ResumeFirst" xml:space="preserve"><value>Resume reading before starting another scan.</value></data>
+  <data name="Reading_StartFirst" xml:space="preserve"><value>Start recognition first.</value></data>
 </root>

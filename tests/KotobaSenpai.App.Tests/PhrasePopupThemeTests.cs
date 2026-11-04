@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using System.Windows.Documents;
 using System.Windows.Media.Imaging;
 using System.Globalization;
+using System.Diagnostics;
 using System.IO;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.ViewModels;
@@ -29,7 +30,22 @@ namespace KotobaSenpai.App.Tests;
 public sealed partial class PhrasePopupThemeTests
 {
     [Fact]
-    public Task Open_popup_follows_application_theme_changes_without_replacing_content()
+    public async Task Open_popup_follows_application_theme_changes_without_replacing_content()
+    {
+        var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "KotobaSenpai.App.Tests.exe"))
+        {
+            UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardError = true,
+        };
+        start.Environment["KOTOBA_POPUP_THEME_FIXTURE"] = "1";
+        using var process = Process.Start(start)!;
+        var errors = process.StandardError.ReadToEndAsync();
+        try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60)); }
+        finally { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+        Assert.True(process.ExitCode == 0, await errors);
+    }
+
+    internal static Task CheckDesktopPresentationAsync()
     {
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
@@ -66,7 +82,8 @@ public sealed partial class PhrasePopupThemeTests
                     bitmap.Render(popup);
                     var pixel = new byte[4];
                     bitmap.CopyPixels(new Int32Rect(10, 10, 1, 1), pixel, 4, 0);
-                    Assert.InRange(pixel[3], (byte)127, (byte)128);
+                    var alpha = 255 * (1 - OverlayAppearanceSettings.Default.PopupBackgroundTransparency);
+                    Assert.InRange(pixel[3], (byte)Math.Floor(alpha), (byte)Math.Ceiling(alpha));
                     var directory = Path.Combine(AppContext.BaseDirectory, "previews");
                     Directory.CreateDirectory(directory);
                     using var file = File.Create(Path.Combine(directory, $"phrase-popup-{theme}.png"));
@@ -80,6 +97,8 @@ public sealed partial class PhrasePopupThemeTests
                 CheckWindowSelectionPresentation(application);
                 CheckMainContentStartup(application);
                 CheckSupportPresentation(application);
+                CheckSuspendedOverlay();
+                CheckNativeShortcuts();
                 completion.SetResult();
             }
             catch (Exception exception)
@@ -95,7 +114,7 @@ public sealed partial class PhrasePopupThemeTests
         }) { IsBackground = true };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        return completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        return completion.Task.WaitAsync(TimeSpan.FromSeconds(45));
     }
 
     private static void CheckMainContentStartup(Application application)
@@ -213,8 +232,11 @@ public sealed partial class PhrasePopupThemeTests
         var detector = new PreviewDetector();
         var catalog = new EmptyCatalog();
         using var llm = new LlmSettingsViewModel(settings, catalog, localizer, new LlmConfigurationService(settings, detector, catalog));
+        using var shortcuts = new KotobaSenpai.App.Shortcuts.ReadingShortcutCoordinator(settings, new PreviewShortcutRegistrar());
+        shortcuts.Start();
+        using var shortcutSettings = new ShortcutSettingsViewModel(shortcuts, localizer);
         using var viewModel = new SettingsPageViewModel(settings, new LocalAppDataThemePreferenceStore(settings), language, llm, localizer, language,
-            new OverlayAppearanceViewModel(settings, localizer));
+            new OverlayAppearanceViewModel(settings, localizer), shortcuts: shortcutSettings);
         try
         {
             foreach (var culture in new[] { "en", "zh-CN" })
@@ -256,6 +278,7 @@ public sealed partial class PhrasePopupThemeTests
                     }
                     viewModel.SelectedLogLevel = LogLevel.Error;
                     Assert.Equal(LogLevel.Error, logLevel.SelectedItem);
+                    CheckShortcutSettingsPresentation(page, frame, shortcuts, culture, theme);
                     CheckOverlayAppearancePresentation(application, page, frame, viewModel, culture, theme);
                     var content = Assert.IsAssignableFrom<FrameworkElement>(advanced.Content);
                     Assert.True(content.IsVisible);

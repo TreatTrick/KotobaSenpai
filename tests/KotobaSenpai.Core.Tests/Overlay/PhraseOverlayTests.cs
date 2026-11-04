@@ -661,6 +661,7 @@ public sealed class PhraseOrchestratorConcurrencyTests
 
     private sealed class FakeOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         public WordOverlaySession? Session { get; private set; }
         public List<WordOverlaySession> Sessions { get; } = new();
         public TaskCompletionSource<bool> FirstShown { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

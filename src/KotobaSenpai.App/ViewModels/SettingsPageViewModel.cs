@@ -40,9 +40,10 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     public SettingsPageViewModel(ISettingsService settings, IThemePreferenceStore themePreferences,
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
         IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance,
-        CaptureBorderPreferences? captureBorder = null)
+        CaptureBorderPreferences? captureBorder = null, ShortcutSettingsViewModel? shortcuts = null)
     {
         _settings = settings;
+        Shortcuts = shortcuts;
         _themePreferences = themePreferences;
         _localizer = localizer;
         _explanationPreferences = explanationLanguage;
@@ -63,6 +64,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     public ILanguagePreferences Language { get; }
     public LlmSettingsViewModel Llm { get; }
     public OverlayAppearanceViewModel OverlayAppearance { get; }
+    public ShortcutSettingsViewModel? Shortcuts { get; }
     public IReadOnlyList<ThemeModeChoice> ThemeModes { get; }
     public IReadOnlyList<LogLevel> LogLevels { get; } = Enum.GetValues<LogLevel>();
 

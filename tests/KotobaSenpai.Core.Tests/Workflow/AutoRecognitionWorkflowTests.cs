@@ -222,6 +222,7 @@ public sealed class AutoRecognitionWorkflowTests
 
     private sealed class RecordingOverlay : IOverlayRenderer
     {
+        public void Suspend() { }
         public int ShowCount { get; private set; }
         public int HideCount { get; private set; }
         public WordOverlaySession? LastSession { get; private set; }

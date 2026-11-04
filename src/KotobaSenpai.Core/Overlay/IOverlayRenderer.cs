@@ -8,4 +8,7 @@ public interface IOverlayRenderer
     void Show(WordOverlaySession session, Func<bool>? canRender = null);
 
     void Hide();
+
+    /// <summary>Hides presentation while retaining the last session until a fresh result is published.</summary>
+    void Suspend();
 }

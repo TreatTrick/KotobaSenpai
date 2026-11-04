@@ -13,6 +13,26 @@
       <TextBlock Text="{loc:Loc Key=Page_SettingsDescription}" Style="{StaticResource PageDescription}" />
       <TextBlock Text="{loc:Loc Key=Label_LlmSettings}" Style="{StaticResource SectionTitle}" />
       <views:ModelSettingsView x:Name="ModelSettings" />
+      <TextBlock Text="{loc:Loc Key=Shortcut_Title}" Style="{StaticResource SectionTitle}" />
+      <TextBlock Text="{loc:Loc Key=Shortcut_Description}" Style="{StaticResource Description}" />
+      <ItemsControl x:Name="KeyboardShortcutsList" ItemsSource="{Binding Shortcuts.Items}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <controls:SettingsCard Header="{Binding Name}" Description="{Binding Status}" Icon="{ui:SymbolIcon Keyboard24}">
+              <StackPanel>
+                <controls:ShortcutCaptureButton Entry="{Binding}" Content="{Binding CaptureText}"
+                    AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding HelpText}" />
+                <WrapPanel Margin="0,6,0,0" HorizontalAlignment="Right">
+                  <ui:Button Content="{loc:Loc Key=Shortcut_Clear}" Command="{Binding ClearCommand}"
+                             Style="{StaticResource SettingsButton}" Margin="0,0,6,0" />
+                  <ui:Button Content="{loc:Loc Key=Shortcut_Reset}" Command="{Binding ResetCommand}"
+                             Style="{StaticResource SettingsButton}" />
+                </WrapPanel>
+              </StackPanel>
+            </controls:SettingsCard>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
       <TextBlock Text="{loc:Loc Key=Label_Appearance}" Style="{StaticResource SectionTitle}" />
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_Theme}" Description="{loc:Loc Key=Description_Theme}"

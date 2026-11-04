@@ -122,7 +122,7 @@
     <value>开始识别</value>
   </data>
   <data name="Button_Hide" xml:space="preserve">
-    <value>隐藏标注</value>
+    <value>停止并清除</value>
   </data>
   <data name="Button_SetRecognitionRegion" xml:space="preserve">
     <value>选择区域</value>
@@ -153,7 +153,7 @@
     <value>已识别 {0} 个词，并绘制下划线。</value>
   </data>
   <data name="Status_Hidden" xml:space="preserve">
-    <value>下划线已隐藏。</value>
+    <value>识别已停止，标注已清除。</value>
   </data>
   <data name="Status_RegionSelecting" xml:space="preserve">
     <value>拖拽四角设置识别区域，然后点击确定。</value>
@@ -288,7 +288,7 @@
     <value>开始识别后，在文字变化时自动更新标注。</value>
   </data>
   <data name="Description_Overlay" xml:space="preserve">
-    <value>隐藏下划线，并停止自动识别。</value>
+    <value>结束本次识别并清除所有标注。</value>
   </data>
   <data name="Description_Theme" xml:space="preserve">
     <value>选择浅色、深色，或跟随 Windows。</value>
@@ -698,4 +698,31 @@ API Key：YOUR_API_KEY
   <data name="Label_LogLevel" xml:space="preserve"><value>日志级别</value></data>
   <data name="Description_LogLevel" xml:space="preserve"><value>记录所选级别及以上的日志，修改后自动保存并立即生效。</value></data>
   <data name="LogLevel_SaveFailed" xml:space="preserve"><value>无法保存日志级别，仍使用之前的级别。</value></data>
+  <data name="Shortcut_Title" xml:space="preserve"><value>键盘快捷键</value></data>
+  <data name="Shortcut_Description" xml:space="preserve"><value>点击键位即可修改，保存后立即生效。</value></data>
+  <data name="Shortcut_Action_Recognize" xml:space="preserve"><value>识别当前画面</value></data>
+  <data name="Shortcut_Action_ToggleAutomatic" xml:space="preserve"><value>开启／暂停自动识别</value></data>
+  <data name="Shortcut_Action_Stop" xml:space="preserve"><value>停止识别并清除标注</value></data>
+  <data name="Shortcut_Action_ToggleVisibility" xml:space="preserve"><value>隐藏并暂停／恢复阅读</value></data>
+  <data name="Shortcut_Action_SelectRegion" xml:space="preserve"><value>设置识别区域</value></data>
+  <data name="Shortcut_PressKey" xml:space="preserve"><value>请按下快捷键…</value></data>
+  <data name="Shortcut_RecordingHelp" xml:space="preserve"><value>按下功能键或组合键，Esc 取消。</value></data>
+  <data name="Shortcut_Unbound" xml:space="preserve"><value>未绑定</value></data>
+  <data name="Shortcut_Inactive" xml:space="preserve"><value>未生效</value></data>
+  <data name="Shortcut_Active" xml:space="preserve"><value>快捷键已生效</value></data>
+  <data name="Shortcut_Clear" xml:space="preserve"><value>取消绑定</value></data>
+  <data name="Shortcut_Reset" xml:space="preserve"><value>恢复默认</value></data>
+  <data name="Shortcut_Error_Invalid" xml:space="preserve"><value>请使用 F1～F11，或搭配 Ctrl、Alt、Shift 的组合键；F12 为系统保留键。</value></data>
+  <data name="Shortcut_Error_Duplicate" xml:space="preserve"><value>此快捷键已用于“{0}”，请选择其他键位。</value></data>
+  <data name="Shortcut_Error_Unavailable" xml:space="preserve"><value>快捷键无法注册（Windows 错误 {1}），请更换键位。</value></data>
+  <data name="Shortcut_Error_SaveFailed" xml:space="preserve"><value>保存失败，原来的快捷键仍然有效。</value></data>
+  <data name="Reading_Resume" xml:space="preserve"><value>恢复阅读</value></data>
+  <data name="Reading_HidePause" xml:space="preserve"><value>隐藏并暂停</value></data>
+  <data name="Reading_VisibilityTitle" xml:space="preserve"><value>阅读辅助</value></data>
+  <data name="Reading_VisibilityDescription" xml:space="preserve"><value>隐藏标注并暂停识别，保留已有结果，恢复时优先复用缓存。</value></data>
+  <data name="Reading_HiddenPaused" xml:space="preserve"><value>标注已隐藏，识别已暂停。</value></data>
+  <data name="Reading_AutoRunning" xml:space="preserve"><value>自动识别正在运行。</value></data>
+  <data name="Reading_AutoOff" xml:space="preserve"><value>自动识别未运行，可按需开始一次识别。</value></data>
+  <data name="Reading_ResumeFirst" xml:space="preserve"><value>请先恢复阅读，再进行识别。</value></data>
+  <data name="Reading_StartFirst" xml:space="preserve"><value>请先开始识别。</value></data>
 </root>

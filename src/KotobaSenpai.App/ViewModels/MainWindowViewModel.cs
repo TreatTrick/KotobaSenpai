@@ -26,6 +26,7 @@ public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, 
             Onboarding.InitializeCommand.ExecutionTask, Onboarding.NextCommand.ExecutionTask,
             Selection?.SelectWindowCommand.ExecutionTask, Selection?.RetryPreviewCommand.ExecutionTask,
             Recognition?.RecognizeCommand.ExecutionTask, Settings.Llm.CheckConfigurationCommand.ExecutionTask,
+            Recognition?.StopAsync(),
             Settings.Llm.FetchModelsCommand.ExecutionTask,
         }.OfType<Task>().Where(task => !task.IsCompleted).ToArray();
         Dispose();

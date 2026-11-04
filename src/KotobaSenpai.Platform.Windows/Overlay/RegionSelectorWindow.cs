@@ -417,6 +417,12 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             SelectionStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    public void Cancel()
+    {
+        ClearSelection();
+        Hide();
+    }
+
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);

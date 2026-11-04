@@ -10,6 +10,21 @@ public static class ConfigurationProcessFixture
     [STAThread]
     public static int Main()
     {
+        if (Environment.GetEnvironmentVariable("KOTOBA_SHORTCUT_CONFLICT_FIXTURE") == "1")
+        {
+            using var registrar = new KotobaSenpai.Platform.Windows.Shortcuts.Win32GlobalShortcutRegistrar();
+            if (!KotobaSenpai.Core.Shortcuts.ShortcutGesture.TryParse("Ctrl+Alt+Shift+F11", out var gesture)
+                || !registrar.TryRegister(1, gesture, out _)) return 1;
+            Console.WriteLine("ready");
+            Console.Out.Flush();
+            Console.ReadLine();
+            return 0;
+        }
+        if (Environment.GetEnvironmentVariable("KOTOBA_POPUP_THEME_FIXTURE") == "1")
+        {
+            try { PhrasePopupThemeTests.CheckDesktopPresentationAsync().GetAwaiter().GetResult(); return 0; }
+            catch (Exception exception) { Console.Error.WriteLine(exception); return 1; }
+        }
         var guidanceDirectory = Environment.GetEnvironmentVariable(GuidanceDesktopFixture.DirectoryEnvironmentVariable);
         if (guidanceDirectory is not null) return GuidanceDesktopFixture.Run(guidanceDirectory);
         var pickerDirectory = Environment.GetEnvironmentVariable("KOTOBA_PICKER_FIXTURE_DIRECTORY");

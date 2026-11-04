@@ -104,6 +104,7 @@ internal static class WindowPickerFixture
     private sealed class SpanResolver : ITokenSpanResolver { public IReadOnlyList<LookupSpan> Resolve(IReadOnlyList<Token> tokens) => []; }
     private sealed class Renderer : IOverlayRenderer
     {
+        public void Suspend() { }
         public void Show(WordOverlaySession session, Func<bool>? canRender = null) { }
         public void Hide() { }
     }

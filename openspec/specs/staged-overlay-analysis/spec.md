@@ -42,23 +42,39 @@ After all sentence requests in an analysis batch complete, the application SHALL
 - **THEN** the replacement overlay SHALL contain underlines/groups from both fresh and cached segments, SHALL NOT clear the cached segments
 
 ### Requirement: Superseded recognition cannot publish
-A recognition run SHALL NOT publish either its staged or post-analysis overlay after a newer recognition run, target switch, or explicit user request to end or hide the recognition session supersedes it. Temporary visibility hiding due to target invisibility, minimization, or occlusion SHALL NOT supersede pending analysis; a still-current run SHALL save its latest completed result without reopening a hidden overlay.
+系统 SHALL 在较新的识别、目标切换、用户明确停止或主动隐藏并暂停后，拒绝旧任务返回的本地或云端结果。停止操作 SHALL 清除可恢复结果，主动隐藏并暂停 SHALL 保留已完成结果及有效缓存；两者都 SHALL 取消未完成任务并阻止后续模型请求和重试。只有目标因原有隐藏、最小化、遮挡规则暂时不能显示、且用户没有主动隐藏时，系统才 SHALL 允许当前有效任务更新保存结果。用户主动恢复阅读时 SHALL 检查当前画面，优先使用有效缓存，仅对缺少分析的句段请求模型；窗口自身恢复显示仍沿用原有不主动发起识别的规则。
 
-#### Scenario: Older provider response arrives late
-- **WHEN** a second recognition starts before the first provider batch completes
-- **THEN** the first run's late result does not replace the second run's overlay
+#### Scenario: 旧分析晚于新识别返回
+- **WHEN** 第二次识别已经开始，第一次云端分析才返回
+- **THEN** 第一次返回的结果不能替换第二次识别的结果
 
-#### Scenario: Explicit hide supersedes pending analysis
-- **WHEN** the user explicitly hides or ends the recognition session while provider analysis is pending
-- **THEN** the pending run does not publish a saved result or show an overlay after completion
+#### Scenario: 原隐藏入口停止识别后旧分析返回
+- **WHEN** 用户通过原隐藏入口对应的“停止识别并清除标注”操作结束会话，但云端分析尚未完成
+- **THEN** 晚到结果不更新保存内容，不重新显示标注，也不重启自动识别
 
-#### Scenario: Temporary visibility hide retains pending analysis
-- **WHEN** the target becomes invisible, minimized, or occluded beyond 30% of its full client area while the current provider analysis is pending
-- **THEN** completed analysis updates the saved session without showing the hidden overlay; restoration uses the latest completed result when the target is visible, restored, and at most 30% occluded, without starting OCR or LLM itself
+#### Scenario: 窗口暂时不能显示时保留当前分析
+- **WHEN** 当前分析尚未完成，目标变为不可见、最小化或被遮挡的合并面积超过客户区的 30%
+- **THEN** 完成结果只更新保存会话，不显示标注；窗口恢复且用户没有主动隐藏后才可展示，恢复本身不调用识别或模型
 
-#### Scenario: Incremental cycle superseded by a full-change cycle
-- **WHEN** an incremental recognition cycle is in progress and a full-change detection triggers a new full recognition
-- **THEN** the incremental cycle's result SHALL NOT publish; only the full recognition's result SHALL be rendered
+#### Scenario: 新的完整识别替代旧增量识别
+- **WHEN** 增量识别尚未结束，新的完整识别已经开始
+- **THEN** 系统不再接收旧增量任务的结果，只保留当前完整识别的有效结果
+
+#### Scenario: 用户主动隐藏时分析晚到
+- **WHEN** 用户隐藏并暂停后，隐藏前的分析任务仍返回了结果
+- **THEN** 系统忽略该结果，保留隐藏前已完成的内容，不显示标注、不发起后续分析，也不启动自动检测
+
+#### Scenario: 隐藏时仍有排队的句段或重试
+- **WHEN** 一轮分析已有请求正在执行，还有其他句段尚未发送或准备重试，用户隐藏并暂停
+- **THEN** 系统取消未完成任务，隐藏后不再发送排队句段或重试请求
+
+#### Scenario: 恢复后旧分析才返回
+- **WHEN** 用户隐藏并暂停，又恢复并开始了新的本地检查，隐藏前的旧分析才返回
+- **THEN** 旧结果仍被忽略，不能覆盖恢复后的结果，也不能补发后续请求
+
+#### Scenario: 恢复时优先使用有效缓存
+- **WHEN** 当前画面检查完成，部分句段在隐藏前已有成功缓存，另一些句段没有完整分析
+- **THEN** 系统复用有效缓存并只请求缺少分析的句段，不因恢复动作清空缓存，不因整段原文相同就跳过缺失分析
 
 ### Requirement: 保存语言不立即替换已有显示
 

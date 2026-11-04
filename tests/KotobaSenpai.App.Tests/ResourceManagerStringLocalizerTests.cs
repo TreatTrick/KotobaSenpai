@@ -38,7 +38,7 @@ public sealed class ResourceManagerStringLocalizerTests
         var localizer = LocalizerFactory.Create(new CultureInfo("en"));
         localizer.ApplyCulture(new CultureInfo("zh-CN"));
 
-        Assert.Equal("下划线已隐藏。", localizer.Get(ResourceKeys.Status_Hidden));
+        Assert.Equal("识别已停止，标注已清除。", localizer.Get(ResourceKeys.Status_Hidden));
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public sealed class ResourceManagerStringLocalizerTests
         var localizer = LocalizerFactory.Create(new CultureInfo("zh-CN"));
         localizer.ApplyCulture(new CultureInfo("en"));
 
-        Assert.Equal("Underline hidden.", localizer.Get(ResourceKeys.Status_Hidden));
+        Assert.Equal("Recognition stopped and annotations cleared.", localizer.Get(ResourceKeys.Status_Hidden));
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class ResourceManagerStringLocalizerTests
         var localizer = LocalizerFactory.Create(new CultureInfo("zh-CN"));
         localizer.ApplyCulture(new CultureInfo("fr-FR"));
 
-        Assert.Equal("Underline hidden.", localizer.Get(ResourceKeys.Status_Hidden));
+        Assert.Equal("Recognition stopped and annotations cleared.", localizer.Get(ResourceKeys.Status_Hidden));
     }
 
     [Fact]

@@ -106,7 +106,7 @@ public sealed class LanguageServiceTests
         svc.Initialize();
 
         Assert.Equal("en", localizer.CurrentCulture.Name);
-        Assert.Equal("Underline hidden.", localizer.Get(ResourceKeys.Status_Hidden));
+        Assert.Equal("Recognition stopped and annotations cleared.", localizer.Get(ResourceKeys.Status_Hidden));
     }
 
     [Fact]
