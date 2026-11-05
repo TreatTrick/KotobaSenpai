@@ -19,15 +19,20 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate>
             <controls:SettingsCard Header="{Binding Name}" Description="{Binding Status}" Icon="{ui:SymbolIcon Keyboard24}">
-              <StackPanel>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <controls:ShortcutCaptureButton Entry="{Binding}" Content="{Binding CaptureText}"
                     AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding HelpText}" />
-                <WrapPanel Margin="0,6,0,0" HorizontalAlignment="Right">
-                  <ui:Button Content="{loc:Loc Key=Shortcut_Clear}" Command="{Binding ClearCommand}"
-                             Style="{StaticResource SettingsButton}" Margin="0,0,6,0" />
-                  <ui:Button Content="{loc:Loc Key=Shortcut_Reset}" Command="{Binding ResetCommand}"
-                             Style="{StaticResource SettingsButton}" />
-                </WrapPanel>
+                <ui:Button Command="{Binding ClearCommand}" Style="{StaticResource SettingsIconButton}"
+                           ToolTip="{loc:Loc Key=Shortcut_Clear}" AutomationProperties.Name="{loc:Loc Key=Shortcut_Clear}"
+                           CornerRadius="4" controls:FluentLight.CornerRadius="4">
+                  <ui:Button.Icon>
+                    <ui:SymbolIcon Symbol="Delete24" Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+                  </ui:Button.Icon>
+                </ui:Button>
+                <ui:Button Icon="{ui:SymbolIcon ArrowCounterclockwise24}" Command="{Binding ResetCommand}"
+                           Style="{StaticResource SettingsIconButton}" ToolTip="{loc:Loc Key=Shortcut_Reset}"
+                           AutomationProperties.Name="{loc:Loc Key=Shortcut_Reset}"
+                           CornerRadius="4" controls:FluentLight.CornerRadius="4" />
               </StackPanel>
             </controls:SettingsCard>
           </DataTemplate>
