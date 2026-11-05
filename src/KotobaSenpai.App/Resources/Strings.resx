@@ -699,6 +699,7 @@ Meet your next word.</value>
   <data name="Description_LogLevel" xml:space="preserve"><value>Record messages at this level and above. Changes are saved and applied immediately.</value></data>
   <data name="LogLevel_SaveFailed" xml:space="preserve"><value>Could not save the log level. The previous level is still active.</value></data>
   <data name="Shortcut_Title" xml:space="preserve"><value>Keyboard shortcuts</value></data>
+  <data name="Shortcut_Label" xml:space="preserve"><value>Shortcut</value></data>
   <data name="Shortcut_Description" xml:space="preserve"><value>Click a key to change it. Changes take effect immediately.</value></data>
   <data name="Shortcut_Action_Recognize" xml:space="preserve"><value>Recognize current screen</value></data>
   <data name="Shortcut_Action_ToggleAutomatic" xml:space="preserve"><value>Toggle automatic recognition</value></data>

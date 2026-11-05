@@ -27,14 +27,14 @@
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_RecognizeText}" Description="{loc:Loc Key=Description_RecognizeText}"
                              Icon="{ui:SymbolIcon ScanText24}">
-        <StackPanel Orientation="Horizontal">
+        <WrapPanel MaxWidth="300">
         <ui:Button x:Name="RecognizeButton" Content="{loc:Loc Key=Button_Recognize}" Command="{Binding RecognizeCommand}"
                    Style="{StaticResource TargetRequiredActionButton}" IsDefault="{Binding IsVisible, RelativeSource={RelativeSource Self}}"
                    ToolTip="{loc:Loc Key=Status_SelectTargetFirst}"
                    AutomationProperties.AcceleratorKey="{Binding Shortcuts.Recognize.Hint}"
                    Icon="{ui:SymbolIcon Play24}" Appearance="Primary" />
-        <TextBlock Text="{Binding Shortcuts.Recognize.Hint}" Style="{StaticResource ShortcutHint}" />
-        </StackPanel>
+        <ContentControl Content="{Binding Shortcuts.Recognize}" Style="{StaticResource ShortcutHint}" />
+        </WrapPanel>
       </controls:SettingsCard>
 
       <ui:Card x:Name="AnnotationLegendCard" Padding="{StaticResource FluentCardPadding}" Margin="{StaticResource FluentCardGap}"
@@ -84,44 +84,44 @@
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_RecognitionRegion}" Description="{loc:Loc Key=Description_RecognitionRegion}"
                              Icon="{ui:SymbolIcon Crop24}">
-        <StackPanel Orientation="Horizontal">
+        <WrapPanel MaxWidth="300">
           <ui:Button x:Name="RegionButton" Content="{loc:Loc Key=Button_SetRecognitionRegion}" Command="{Binding SetRecognitionRegionCommand}"
                      Style="{StaticResource TargetRequiredActionButton}" ToolTip="{loc:Loc Key=Status_SelectTargetFirst}"
                      AutomationProperties.AcceleratorKey="{Binding Shortcuts.Region.Hint}" />
-          <TextBlock Text="{Binding Shortcuts.Region.Hint}" Style="{StaticResource ShortcutHint}" />
-        </StackPanel>
+          <ContentControl Content="{Binding Shortcuts.Region}" Style="{StaticResource ShortcutHint}" />
+        </WrapPanel>
       </controls:SettingsCard>
       <TextBlock Text="{loc:Loc Key=Label_RecognitionBehavior}" Style="{StaticResource SectionTitle}" />
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_AutoRecognition}" Description="{loc:Loc Key=Description_AutoRecognition}"
                              Icon="{ui:SymbolIcon ArrowSync24}">
-        <StackPanel Orientation="Horizontal">
+        <WrapPanel MaxWidth="300">
         <ui:ToggleSwitch x:Name="AutoRecognitionToggle" IsChecked="{Binding AutoRecognitionEnabled, Mode=TwoWay}" Style="{StaticResource SettingsToggle}"
                          OnContent="{loc:Loc Key=Toggle_On}" OffContent="{loc:Loc Key=Toggle_Off}"
                          AutomationProperties.AcceleratorKey="{Binding Shortcuts.Automatic.Hint}"
                          AutomationProperties.Name="{loc:Loc Key=Label_AutoRecognition}" />
-        <TextBlock Text="{Binding Shortcuts.Automatic.Hint}" Style="{StaticResource ShortcutHint}" />
-        </StackPanel>
+        <ContentControl Content="{Binding Shortcuts.Automatic}" Style="{StaticResource ShortcutHint}" />
+        </WrapPanel>
       </controls:SettingsCard>
       <TextBlock Text="{Binding RunState}" Style="{StaticResource Description}" AutomationProperties.LiveSetting="Polite" />
 
       <controls:SettingsCard Header="{loc:Loc Key=Reading_VisibilityTitle}" Description="{loc:Loc Key=Reading_VisibilityDescription}"
                              Icon="{ui:SymbolIcon EyeOff24}">
-        <StackPanel Orientation="Horizontal">
+        <WrapPanel MaxWidth="300">
           <ui:Button Content="{Binding VisibilityButtonText}" Command="{Binding ToggleVisibilityCommand}"
                      Style="{StaticResource SettingsActionButton}"
                      AutomationProperties.AcceleratorKey="{Binding Shortcuts.Visibility.Hint}" />
-          <TextBlock Text="{Binding Shortcuts.Visibility.Hint}" Style="{StaticResource ShortcutHint}" />
-        </StackPanel>
+          <ContentControl Content="{Binding Shortcuts.Visibility}" Style="{StaticResource ShortcutHint}" />
+        </WrapPanel>
       </controls:SettingsCard>
 
       <controls:SettingsCard Header="{loc:Loc Key=Label_Overlay}" Description="{loc:Loc Key=Description_Overlay}"
                              Icon="{ui:SymbolIcon EyeOff24}">
-        <StackPanel Orientation="Horizontal">
+        <WrapPanel MaxWidth="300">
           <ui:Button Content="{loc:Loc Key=Button_Hide}" Command="{Binding HideCommand}" Style="{StaticResource SettingsActionButton}"
                      AutomationProperties.AcceleratorKey="{Binding Shortcuts.Stop.Hint}" />
-          <TextBlock Text="{Binding Shortcuts.Stop.Hint}" Style="{StaticResource ShortcutHint}" />
-        </StackPanel>
+          <ContentControl Content="{Binding Shortcuts.Stop}" Style="{StaticResource ShortcutHint}" />
+        </WrapPanel>
       </controls:SettingsCard>
       <TextBlock Text="{Binding Status}" Style="{StaticResource Description}" AutomationProperties.LiveSetting="Polite" />
     </StackPanel>

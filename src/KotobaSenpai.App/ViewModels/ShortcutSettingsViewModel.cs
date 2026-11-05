@@ -40,6 +40,8 @@ public sealed class ShortcutSettingsViewModel : IDisposable
     }
 }
 
+public sealed record ShortcutKey(string Text, bool HasSeparator);
+
 public sealed partial class ShortcutEntryViewModel(ReadingShortcutCoordinator coordinator,
     IStringLocalizer localizer, ReadingAction action) : ObservableObject
 {
@@ -47,6 +49,11 @@ public sealed partial class ShortcutEntryViewModel(ReadingShortcutCoordinator co
     public ReadingAction Action { get; } = action;
     public string Name => localizer.Get("Shortcut_Action_" + Action);
     public string GestureText => coordinator.GetBinding(Action).Gesture?.ToString() ?? "";
+    public string ShortcutLabel => localizer.Get("Shortcut_Label");
+    public IReadOnlyList<ShortcutKey> Keys => GestureText.Split('+', StringSplitOptions.RemoveEmptyEntries)
+        .Select((key, index) => new ShortcutKey(key, index > 0)).ToArray();
+    public string InactiveText => GestureText.Length > 0 && coordinator.GetBinding(Action).Error != ShortcutBindingError.None
+        ? localizer.Get("Shortcut_Inactive") : "";
     public bool IsRecording => coordinator.RecordingAction == Action;
     public string CaptureText => IsRecording ? localizer.Get("Shortcut_PressKey")
         : GestureText.Length > 0 ? GestureText : localizer.Get("Shortcut_Unbound");
@@ -97,7 +104,7 @@ public sealed partial class ShortcutEntryViewModel(ReadingShortcutCoordinator co
 
     public void Refresh()
     {
-        foreach (var property in new[] { nameof(Name), nameof(GestureText), nameof(IsRecording), nameof(CaptureText), nameof(Hint), nameof(HelpText), nameof(Status) })
+        foreach (var property in new[] { nameof(Name), nameof(GestureText), nameof(ShortcutLabel), nameof(Keys), nameof(InactiveText), nameof(IsRecording), nameof(CaptureText), nameof(Hint), nameof(HelpText), nameof(Status) })
             OnPropertyChanged(property);
     }
 }

@@ -699,6 +699,7 @@ API Key：YOUR_API_KEY
   <data name="Description_LogLevel" xml:space="preserve"><value>记录所选级别及以上的日志，修改后自动保存并立即生效。</value></data>
   <data name="LogLevel_SaveFailed" xml:space="preserve"><value>无法保存日志级别，仍使用之前的级别。</value></data>
   <data name="Shortcut_Title" xml:space="preserve"><value>键盘快捷键</value></data>
+  <data name="Shortcut_Label" xml:space="preserve"><value>快捷键</value></data>
   <data name="Shortcut_Description" xml:space="preserve"><value>点击键位即可修改，保存后立即生效。</value></data>
   <data name="Shortcut_Action_Recognize" xml:space="preserve"><value>识别当前画面</value></data>
   <data name="Shortcut_Action_ToggleAutomatic" xml:space="preserve"><value>开启／暂停自动识别</value></data>

@@ -130,13 +130,56 @@
     <Setter Property="controls:FluentLight.Kind" Value="Button" />
     <Setter Property="controls:FluentLight.CornerRadius" Value="4" />
   </Style>
-  <Style x:Key="ShortcutHint" TargetType="TextBlock" BasedOn="{StaticResource Description}">
-    <Setter Property="Margin" Value="12,0,0,0" />
-    <Setter Property="MaxWidth" Value="160" />
+  <Style x:Key="ShortcutKeycap" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="controls:FluentLight.Kind" Value="Surface" />
+    <Setter Property="controls:FluentLight.CornerRadius" Value="4" />
+  </Style>
+  <DataTemplate x:Key="ShortcutHintTemplate">
+    <WrapPanel VerticalAlignment="Center">
+      <TextBlock Text="{Binding ShortcutLabel}" Style="{StaticResource Description}"
+                 Margin="0,0,6,0" VerticalAlignment="Center" />
+      <ItemsControl ItemsSource="{Binding Keys}" MaxWidth="200" VerticalAlignment="Center">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <TextBlock x:Name="Separator" Text="+" Style="{StaticResource Description}"
+                         Margin="3,0" VerticalAlignment="Center" />
+              <Border Style="{StaticResource ShortcutKeycap}">
+                <TextBlock Text="{Binding Text}" Style="{StaticResource Description}" Margin="0" />
+              </Border>
+            </StackPanel>
+            <DataTemplate.Triggers>
+              <DataTrigger Binding="{Binding HasSeparator}" Value="False">
+                <Setter TargetName="Separator" Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
+            </DataTemplate.Triggers>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="{Binding InactiveText}" Style="{StaticResource Description}"
+                 Margin="6,0,0,0" VerticalAlignment="Center" />
+    </WrapPanel>
+  </DataTemplate>
+  <Style x:Key="ShortcutHint" TargetType="ContentControl">
+    <Setter Property="ContentTemplate" Value="{StaticResource ShortcutHintTemplate}" />
+    <Setter Property="Margin" Value="12,2,0,2" />
+    <Setter Property="MaxWidth" Value="270" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="Focusable" Value="False" />
+    <Setter Property="IsHitTestVisible" Value="False" />
     <Style.Triggers>
-      <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger>
+      <DataTrigger Binding="{Binding Content.GestureText, RelativeSource={RelativeSource Self}}" Value="">
+        <Setter Property="Visibility" Value="Collapsed" />
+      </DataTrigger>
+      <DataTrigger Binding="{Binding Content.GestureText, RelativeSource={RelativeSource Self}}" Value="{x:Null}">
+        <Setter Property="Visibility" Value="Collapsed" />
+      </DataTrigger>
     </Style.Triggers>
   </Style>
   <Style x:Key="SettingsIconButton" TargetType="ui:Button" BasedOn="{StaticResource SettingsButton}">

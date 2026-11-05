@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Xml.Linq;
 using KotobaSenpai.App.Controls;
@@ -19,10 +20,11 @@ public sealed class FluentLightCoverageTests
         Assert.Equal(FluentLightKind.Button, FluentLight.GetKind(button));
         Assert.Equal(4, FluentLight.GetCornerRadius(button));
         Assert.Equal(new CornerRadius(4), button.CornerRadius);
-        var hint = new TextBlock { Style = (Style)resources["ShortcutHint"], Text = "Ctrl+Alt+Shift+F11" };
+        var hint = new ContentControl { Style = (Style)resources["ShortcutHint"], Content = new { GestureText = "Ctrl+Alt+Shift+F11" } };
         Assert.False(hint.Focusable);
+        Assert.False(hint.IsHitTestVisible);
         Assert.Equal(Visibility.Visible, hint.Visibility);
-        hint.Text = "";
+        hint.Content = new { GestureText = "" };
         Assert.Equal(Visibility.Collapsed, hint.Visibility);
     });
 
@@ -33,8 +35,81 @@ public sealed class FluentLightCoverageTests
         foreach (var action in new[] { "Recognize", "Automatic", "Stop", "Visibility", "Region" })
         {
             var expression = "{Binding Shortcuts." + action + ".Hint}";
-            Assert.Single(page.Descendants(Presentation + "TextBlock"), element => (string?)element.Attribute("Text") == expression);
+            Assert.Single(page.Descendants(Presentation + "ContentControl"), element =>
+                (string?)element.Attribute("Content") == "{Binding Shortcuts." + action + "}");
             Assert.Single(page.Descendants(), element => (string?)element.Attribute("AutomationProperties.AcceleratorKey") == expression);
+        }
+    }
+
+    [Theory]
+    [InlineData("Light")]
+    [InlineData("Dark")]
+    public Task Shortcut_keycaps_show_modifiers_and_the_inactive_state(string theme) => RunSta(() =>
+    {
+        var resources = LoadResources(theme);
+        var hint = new ContentControl
+        {
+            Style = (Style)resources["ShortcutHint"],
+            Content = new { GestureText = "Ctrl+Alt+Shift+F11", ShortcutLabel = "Shortcut",
+                Keys = new[] { new { Text = "Ctrl", HasSeparator = false }, new { Text = "Alt", HasSeparator = true },
+                    new { Text = "Shift", HasSeparator = true }, new { Text = "F11", HasSeparator = true } }, InactiveText = "Inactive" },
+        };
+        var frame = new Border { Background = (Brush)resources["SolidBackgroundFillColorBaseBrush"], Child = hint };
+        var window = new Window
+        {
+            Resources = resources, Content = frame, Width = 300, Height = 120,
+            WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false,
+            Left = -10000, Top = -10000,
+        };
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+            var settled = new DispatcherFrame();
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            timer.Tick += (_, _) => { timer.Stop(); settled.Continue = false; };
+            timer.Start();
+            Dispatcher.PushFrame(settled);
+            var visuals = VisualDescendants(hint).ToArray();
+            var caps = visuals.OfType<Border>().Where(element => FluentLight.GetKind(element) == FluentLightKind.Surface).ToArray();
+            Assert.Equal(4, caps.Length);
+            Assert.All(caps, cap =>
+            {
+                Assert.Equal(new CornerRadius(4), cap.CornerRadius);
+                Assert.Equal(4, FluentLight.GetCornerRadius(cap));
+                Assert.True(cap.ActualWidth > 0);
+                Assert.False(cap.IsHitTestVisible);
+                Assert.True(cap.TranslatePoint(new Point(cap.ActualWidth, cap.ActualHeight), hint).X <= hint.ActualWidth + 0.5);
+                Assert.True(cap.TranslatePoint(new Point(cap.ActualWidth, cap.ActualHeight), hint).Y <= hint.ActualHeight + 0.5);
+            });
+            Assert.Equal(3, visuals.OfType<TextBlock>().Count(text => text.Text == "+" && text.Visibility == Visibility.Visible));
+            Assert.Contains(visuals.OfType<TextBlock>(), text => text.Text == "Shortcut" && text.IsVisible);
+            Assert.Contains(visuals.OfType<TextBlock>(), text => text.Text == "Inactive" && text.IsVisible);
+            var width = (int)Math.Ceiling(frame.ActualWidth);
+            var height = (int)Math.Ceiling(frame.ActualHeight);
+            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(frame);
+            var pixels = new byte[width * height * 4];
+            bitmap.CopyPixels(pixels, width * 4, 0);
+            var colors = Enumerable.Range(0, width * height).Select(index => BitConverter.ToUInt32(pixels, index * 4)).Distinct().Count();
+            Assert.True(colors > 1, $"No visible keycaps: hint={hint.RenderSize}, position={hint.TransformToAncestor(frame).Transform(new Point())}, frame={frame.RenderSize}.");
+            var directory = Path.Combine(AppContext.BaseDirectory, "previews");
+            Directory.CreateDirectory(directory);
+            using var file = File.Create(Path.Combine(directory, $"keycap-{theme}.png"));
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            encoder.Save(file);
+        }
+        finally { window.Close(); }
+    });
+
+    private static IEnumerable<DependencyObject> VisualDescendants(DependencyObject parent)
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            yield return child;
+            foreach (var descendant in VisualDescendants(child)) yield return descendant;
         }
     }
 

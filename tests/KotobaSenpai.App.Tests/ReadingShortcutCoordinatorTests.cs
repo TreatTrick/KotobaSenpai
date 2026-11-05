@@ -46,15 +46,22 @@ public sealed class ReadingShortcutCoordinatorTests
         var localizer = LocalizerFactory.Create(CultureInfo.GetCultureInfo("en"));
         using var model = new ShortcutSettingsViewModel(shortcuts, localizer);
         Assert.Equal("F1", model.Recognize.Hint);
+        Assert.Equal(["F1"], model.Recognize.Keys.Select(key => key.Text));
+        Assert.Equal("Shortcut", model.Recognize.ShortcutLabel);
         Assert.True(ShortcutGesture.TryParse("Ctrl+H", out var gesture));
         Assert.True(shortcuts.ChangeBinding(ReadingAction.Recognize, gesture).Succeeded);
         Assert.Equal("Ctrl+H", model.Recognize.Hint);
+        Assert.Equal(["Ctrl", "H"], model.Recognize.Keys.Select(key => key.Text));
+        Assert.Equal([false, true], model.Recognize.Keys.Select(key => key.HasSeparator));
         var previousName = model.Recognize.Name;
         localizer.ApplyCulture(CultureInfo.GetCultureInfo("zh-CN"));
         Assert.NotEqual(previousName, model.Recognize.Name);
         Assert.Equal("Ctrl+H", model.Recognize.Hint);
+        Assert.NotEqual("Shortcut", model.Recognize.ShortcutLabel);
+        Assert.Equal(localizer.Get("Shortcut_Label"), model.Recognize.ShortcutLabel);
         model.Recognize.ClearCommand.Execute(null);
         Assert.Empty(model.Recognize.Hint);
+        Assert.Empty(model.Recognize.Keys);
         model.Recognize.ResetCommand.Execute(null);
         Assert.Equal("F1", model.Recognize.Hint);
     }
@@ -66,6 +73,7 @@ public sealed class ReadingShortcutCoordinatorTests
         using var model = new ShortcutSettingsViewModel(shortcuts, LocalizerFactory.Create(CultureInfo.GetCultureInfo("en")));
         Assert.Contains("F3", model.Stop.Hint);
         Assert.Contains("Inactive", model.Stop.Hint);
+        Assert.Equal("Inactive", model.Stop.InactiveText);
         Assert.Contains("1409", model.Stop.Status);
     }
 

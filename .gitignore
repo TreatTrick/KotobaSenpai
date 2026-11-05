@@ -5,6 +5,7 @@ obj/
 # Local verification and publish output
 .codex/tmp/
 artifacts/
+.artifacts/
 
 # IDE / tools
 .vs/
