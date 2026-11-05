@@ -1,6 +1,7 @@
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Logging;
+using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
@@ -23,23 +24,26 @@ public sealed class PhraseAnalysisOrchestrator
     private readonly SentenceTokenBuilder _tokenBuilder;
     private readonly IExplanationLanguagePreferences? _explanationLanguage;
     private readonly ILogger? _logger;
+    private readonly SentenceTranslationPreferences? _sentenceTranslation;
     private readonly object _cacheGate = new();
-    private readonly Dictionary<(string SegmentText, string Language), CachedAnalysis> _cache = new();
-    private readonly LinkedList<(string SegmentText, string Language)> _cacheOrder = new();
-    private readonly Dictionary<(string SegmentText, string Language, string ModelGroupId), Guid> _sessionGroupIds = new();
+    private readonly Dictionary<(string SegmentText, string Language, bool Translation), CachedAnalysis> _cache = new();
+    private readonly LinkedList<(string SegmentText, string Language, bool Translation)> _cacheOrder = new();
+    private readonly Dictionary<(string SegmentText, string Language, bool Translation, string ModelGroupId), Guid> _sessionGroupIds = new();
 
     public PhraseAnalysisOrchestrator(
         ILlmPhraseAnalyzer analyzer,
         SentenceSegmenter? segmenter = null,
         SentenceTokenBuilder? tokenBuilder = null,
         IExplanationLanguagePreferences? explanationLanguage = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        SentenceTranslationPreferences? sentenceTranslation = null)
     {
         _analyzer = analyzer ?? throw new ArgumentNullException(nameof(analyzer));
         _segmenter = segmenter ?? new SentenceSegmenter();
         _tokenBuilder = tokenBuilder ?? throw new ArgumentNullException(nameof(tokenBuilder));
         _explanationLanguage = explanationLanguage;
         _logger = logger;
+        _sentenceTranslation = sentenceTranslation;
     }
 
     /// <summary>Rebuilds successful cached annotations against the current OCR geometry without calling the provider.</summary>
@@ -97,8 +101,9 @@ public sealed class PhraseAnalysisOrchestrator
     private PhraseAnalysisRun BuildRun(IReadOnlyList<PhraseAnalysisRequest> requests, IReadOnlyList<PhraseAnalysisResult> results)
     {
         // Evaluate each sentence independently: failed sentences are recorded as warnings and skipped, the rest proceed as usual, matching the "partially usable" positioning.
-        var groups = new List<PhraseGroup>();
+        var groups = new List<PhraseGroupView>();
         var wordMeanings = new List<WordMeaningView>();
+        var sentences = new List<SentenceTranslation>();
         var warnings = new List<string>();
         var successfulSegmentIds = new HashSet<string>(StringComparer.Ordinal);
         PhraseAnalysisOutcome? firstFailure = null;
@@ -116,12 +121,15 @@ public sealed class PhraseAnalysisOrchestrator
             }
 
             successfulSegmentIds.Add(requests[i].SegmentId);
+            var request = requests[i];
+            sentences.Add(new SentenceTranslation(request.SegmentId, request.SegmentText, request.ExplanationLanguage,
+                request.IncludeSentenceTranslation, request.IncludeSentenceTranslation ? SentenceTranslation.Validate(result.Translation) : null));
 
             var tokenById = requests[i].Tokens.ToDictionary(reference => reference.Id);
             var validation = PhraseGroupValidator.ValidateAndBuild(result.Groups, tokenById);
             warnings.AddRange(validation.Warnings);
-            groups.AddRange(validation.ValidGroups.Select(group => group.WithSessionId(
-                GetSessionGroupId(requests[i], group.ModelGroupId))));
+            groups.AddRange(validation.ValidGroups.Select(group => PhraseGeometryMapper.MapGroup(group.WithSessionId(
+                GetSessionGroupId(request, group.ModelGroupId))) with { SegmentId = request.SegmentId }));
 
             var wordValidation = WordMeaningValidator.ValidateAndBuild(result.Words, requests[i].LocalSpans);
             warnings.AddRange(wordValidation.Warnings);
@@ -135,11 +143,12 @@ public sealed class PhraseAnalysisOrchestrator
 
         return new PhraseAnalysisRun(
             outcome,
-            groups.Select(PhraseGeometryMapper.MapGroup).ToArray(),
+            groups.ToArray(),
             warnings.Count > 0 ? string.Join("; ", warnings) : null)
         {
             Words = wordMeanings.ToArray(),
             SuccessfulSegmentIds = successfulSegmentIds,
+            Sentences = sentences.ToArray(),
         };
     }
 
@@ -162,7 +171,8 @@ public sealed class PhraseAnalysisOrchestrator
                 string.Concat(segment.LineIndices.Select(i => lines[i].Text)),
                 segmentTokens.References,
                 segmentTokens.LocalSpans,
-                _explanationLanguage?.EffectiveLanguage ?? "English"));
+                _explanationLanguage?.EffectiveLanguage ?? "English",
+                _sentenceTranslation?.Enabled ?? true));
         }
         return requests;
     }
@@ -231,7 +241,7 @@ public sealed class PhraseAnalysisOrchestrator
 
     private void CacheResult(PhraseAnalysisRequest request, PhraseAnalysisResult result)
     {
-        var key = (request.SegmentText, request.ExplanationLanguage);
+        var key = (request.SegmentText, request.ExplanationLanguage, request.IncludeSentenceTranslation);
         var cached = new CachedAnalysis(request.Tokens, result);
         lock (_cacheGate)
         {
@@ -247,7 +257,7 @@ public sealed class PhraseAnalysisOrchestrator
                 _cache.Remove(oldest.Value);
                 _cacheOrder.RemoveFirst();
                 foreach (var groupKey in _sessionGroupIds.Keys
-                    .Where(groupKey => (groupKey.SegmentText, groupKey.Language) == oldest.Value)
+                    .Where(groupKey => (groupKey.SegmentText, groupKey.Language, groupKey.Translation) == oldest.Value)
                     .ToArray())
                     _sessionGroupIds.Remove(groupKey);
             }
@@ -270,7 +280,7 @@ public sealed class PhraseAnalysisOrchestrator
     {
         CachedAnalysis? cached;
         lock (_cacheGate)
-            _cache.TryGetValue((request.SegmentText, request.ExplanationLanguage), out cached);
+            _cache.TryGetValue((request.SegmentText, request.ExplanationLanguage, request.IncludeSentenceTranslation), out cached);
 
         result = null!;
         if (cached is null || !cached.Tokens.Select(token => token.Token).SequenceEqual(request.Tokens.Select(token => token.Token)))
@@ -293,6 +303,7 @@ public sealed class PhraseAnalysisOrchestrator
         result = new PhraseAnalysisResult(cached.Result.Outcome, groups, cached.Result.Warning)
         {
             Words = cached.Result.Words,
+            Translation = cached.Result.Translation,
             Endpoint = cached.Result.Endpoint,
             ProviderStatusCode = cached.Result.ProviderStatusCode,
         };
@@ -303,7 +314,7 @@ public sealed class PhraseAnalysisOrchestrator
     {
         lock (_cacheGate)
         {
-            var key = (request.SegmentText, request.ExplanationLanguage, modelGroupId);
+            var key = (request.SegmentText, request.ExplanationLanguage, request.IncludeSentenceTranslation, modelGroupId);
             if (_sessionGroupIds.TryGetValue(key, out var id))
                 return id;
             id = Guid.NewGuid();

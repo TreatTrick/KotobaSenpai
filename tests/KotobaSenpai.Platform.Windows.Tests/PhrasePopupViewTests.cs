@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Interop;
 using System.Windows.Input;
@@ -20,6 +21,175 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 
 public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 {
+    [Fact]
+    public Task Translation_mouse_gesture_is_consumed_and_toggles_once_without_activation() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            var activeBefore = Native.GetActiveWindow();
+            popup.ShowResult("Phrase", "Meaning", "", new ScreenRect(100, 100, 100, 30));
+            var toggle = Assert.IsType<ToggleButton>(popup.FindName("TranslationButton"));
+            var content = Assert.IsType<StackPanel>(popup.FindName("SentenceTranslationContent"));
+
+            Assert.False(popup.HandleMouseInput(0x0201, false, false));
+            Assert.False(popup.HandleMouseInput(0x0202, true, true));
+            Assert.True(popup.HandleMouseInput(0x0201, true, true));
+            Assert.False(toggle.IsChecked);
+            Assert.True(popup.HandleMouseInput(0x0202, true, true));
+            Pump();
+            Assert.True(toggle.IsChecked);
+            Assert.Equal(Visibility.Visible, content.Visibility);
+            Assert.False(popup.HandleMouseInput(0x0202, true, true));
+
+            Assert.True(popup.HandleMouseInput(0x0201, true, true));
+            Assert.True(popup.HandleMouseInput(0x0202, true, true));
+            Pump();
+            Assert.False(toggle.IsChecked);
+            Assert.Equal(activeBefore, Native.GetActiveWindow());
+
+            Assert.True(popup.HandleMouseInput(0x0201, true, true));
+            Assert.True(popup.HandleMouseInput(0x0202, false, false));
+            Pump();
+            Assert.False(toggle.IsChecked);
+        }
+        finally { popup.Close(); }
+    });
+
+    [Fact]
+    public Task Hiding_or_replacing_a_pressed_translation_consumes_release_without_toggling() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            var anchor = new ScreenRect(100, 100, 100, 30);
+            popup.ShowResult("First", "Meaning", "", anchor);
+            var toggle = Assert.IsType<ToggleButton>(popup.FindName("TranslationButton"));
+            Assert.True(popup.HandleMouseInput(0x0201, true, true));
+            popup.HidePopup();
+            Assert.True(popup.HandleMouseInput(0x0202, false, false));
+            Pump();
+            popup.ShowResult("Second", "Meaning", "", anchor);
+            Assert.False(toggle.IsChecked);
+
+            Assert.True(popup.HandleMouseInput(0x0201, true, true));
+            popup.ShowResult("Third", "Meaning", "", anchor);
+            Assert.True(popup.HandleMouseInput(0x0202, true, true));
+            Pump();
+            Assert.False(toggle.IsChecked);
+            Assert.True(popup.HandleMouseInput(0x0201, true, true));
+            popup.SetSentenceTranslationEnabled(false);
+            Assert.True(popup.HandleMouseInput(0x0202, true, true));
+            Pump();
+            Assert.False(toggle.IsChecked);
+
+            popup.SetSentenceTranslationEnabled(true);
+            Assert.True(popup.HandleMouseInput(0x0201, true, true));
+            Assert.True(popup.HandleMouseInput(0x0202, true, true));
+            popup.SetSentenceTranslationEnabled(false);
+            popup.SetSentenceTranslationEnabled(true);
+            Pump();
+            Assert.False(toggle.IsChecked);
+            toggle.IsEnabled = false;
+            Assert.False(popup.HandleMouseInput(0x0201, true, true));
+        }
+        finally { popup.Close(); }
+    });
+
+    [Fact]
+    public Task Intercepted_wheel_scrolls_only_the_visible_popup() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            var activeBefore = Native.GetActiveWindow();
+            popup.ShowResult("Long phrase", string.Join(" ", Enumerable.Repeat("Long explanation.", 1000)), "",
+                new ScreenRect(100, 100, 100, 30));
+            var viewer = Assert.IsType<ScrollViewer>(popup.FindName("PopupScrollViewer"));
+            Assert.True(popup.HandleMouseInput(0x020A, true, false, -120));
+            Pump();
+            Assert.True(viewer.VerticalOffset > 0);
+            Assert.False(popup.HandleMouseInput(0x020A, false, false, -120));
+            Assert.False(popup.HandleMouseInput(0x0201, true, false));
+            popup.HidePopup();
+            Assert.False(popup.HandleMouseInput(0x020A, true, false, -120));
+            Assert.Equal(activeBefore, Native.GetActiveWindow());
+        }
+        finally { popup.Close(); }
+    });
+
+    [Fact]
+    public Task Collapsing_a_translation_above_its_source_does_not_dismiss_at_the_old_button_position() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        Native.GetCursorPos(out var originalCursor);
+        try
+        {
+            var area = SystemParameters.WorkArea;
+            var anchor = new ScreenRect((int)area.Left + 20, (int)area.Bottom - 60, (int)area.Width - 40, 30);
+            popup.ShowWordMeaning(new WordMeaningView("学校", "がっこう", "Noun", "School", "Grammar"), anchor,
+                new SentenceTranslation("s0", "学校に行く。", "English", true, string.Concat(Enumerable.Repeat("An extended reference translation. ", 16))));
+            var toggle = Assert.IsType<ToggleButton>(popup.FindName("TranslationButton"));
+            toggle.IsChecked = true;
+            toggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            popup.UpdateLayout();
+            var pointer = toggle.PointToScreen(new Point(20, toggle.ActualHeight / 2));
+            Native.SetCursorPos((int)pointer.X, (int)pointer.Y);
+            Assert.True(popup.ShouldRemainOpen((int)pointer.X, (int)pointer.Y, isOverSource: false));
+            toggle.IsChecked = false;
+            toggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            popup.UpdateLayout();
+            Assert.True(popup.PointToScreen(new Point()).Y > pointer.Y + 10);
+            Assert.True(popup.ShouldRemainOpen((int)pointer.X, (int)pointer.Y, isOverSource: false));
+            Assert.True(popup.ShouldRemainOpen((int)pointer.X, (int)pointer.Y + 5, isOverSource: false));
+            Assert.False(popup.ShouldRemainOpen((int)pointer.X, (int)pointer.Y - 5, isOverSource: false));
+        }
+        finally { popup.Close(); Native.SetCursorPos(originalCursor.X, originalCursor.Y); }
+    });
+
+    [Fact]
+    public Task Translation_opens_above_word_details_and_setting_changes_preserve_the_bound_result() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            var word = new WordMeaningView("学校", "がっこう", "Noun", "School", "Word grammar");
+            var sentence = new SentenceTranslation("s0", "学校に行く。", "English", true, "Go to school.");
+            var anchor = new ScreenRect(100, 100, 100, 30);
+            popup.ShowWordMeaning(word, anchor, sentence);
+            var model = popup.DataContext;
+            var toggle = Assert.IsType<ToggleButton>(popup.FindName("TranslationButton"));
+            var translation = Assert.IsType<StackPanel>(popup.FindName("SentenceTranslationContent"));
+            var section = Assert.IsType<StackPanel>(popup.FindName("SentenceTranslationSection"));
+            Assert.Equal(Visibility.Collapsed, translation.Visibility);
+            toggle.IsChecked = true;
+            toggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            popup.UpdateLayout();
+            Assert.Same(model, popup.DataContext);
+            Assert.Equal(Visibility.Visible, translation.Visibility);
+            Assert.Contains("Go to school.", VisibleText(popup));
+            var heading = Assert.IsType<TextBlock>(popup.FindName("Heading"));
+            Assert.True(toggle.TranslatePoint(new Point(), popup).Y < heading.TranslatePoint(new Point(), popup).Y);
+            popup.SetSentenceTranslationEnabled(false);
+            Assert.Equal(Visibility.Collapsed, section.Visibility);
+            Assert.Same(model, popup.DataContext);
+            Assert.Contains("School", VisibleText(popup));
+            popup.ShowWordMeaning(word, anchor, sentence);
+            Assert.Equal(Visibility.Collapsed, section.Visibility);
+            popup.SetSentenceTranslationEnabled(true);
+            Assert.False(toggle.IsChecked);
+            Assert.Equal(Visibility.Collapsed, translation.Visibility);
+            popup.ShowWordMeaning(word, anchor, sentence with { Requested = false, Translation = null });
+            Assert.Contains("next recognition", Assert.IsType<PhrasePopupViewModel>(popup.DataContext).TranslationText);
+            toggle.IsChecked = true;
+            toggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            popup.HidePopup();
+            popup.ShowWordMeaning(word, anchor, sentence);
+            Assert.False(toggle.IsChecked);
+        }
+        finally { popup.Close(); }
+    });
+
     [Fact]
     public Task Background_defaults_to_thirty_percent_transparency_without_fading_content() => RunSta(() =>
     {
@@ -211,7 +381,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 
             popup.ShowResult("Empty phrase", "", "", anchor);
             popup.UpdateLayout();
-            Assert.Equal(["Empty phrase"], VisibleText(popup));
+            Assert.Equal([Assert.IsType<PhrasePopupViewModel>(popup.DataContext).TranslationShowLabel, "Empty phrase"], VisibleText(popup));
         }
         finally
         {
@@ -604,6 +774,14 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 
     private static class Native
     {
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool GetCursorPos(out Point point);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetCursorPos(int x, int y);
+
         [StructLayout(LayoutKind.Sequential)]
         public struct Point { public int X, Y; }
 

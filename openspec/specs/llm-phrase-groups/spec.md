@@ -5,11 +5,11 @@ TBD - created by archiving change add-llm-phrase-groups. Update Purpose after ar
 ## Requirements
 ### Requirement: 按当前语言分析有本地依据的句段
 
-系统 SHALL 通过与提供方无关的分析接口按句段提交 OCR 原文、稳定词元引用、UniDic 元数据及本地连续 JMdict 词块摘要，并携带该次分析开始时读取的当前语言名称。语义请求内容 SHALL 不包含截图、坐标、窗口标题或 API Key。相同语义内容 SHALL 可以按配置通过三种现有协议发送。调用模型前 SHALL 检查句子原文和语言名称是否匹配现有缓存；只有两者都匹配时才直接复用。
+系统 SHALL 通过与提供方无关的分析接口按句段提交 OCR 原文、稳定词元引用、UniDic 元数据及本地连续 JMdict 词块摘要，并携带该次分析开始时读取的语言名称和整句翻译开关值。语义请求内容 SHALL 不包含截图、坐标、窗口标题或 API Key。相同语义内容 SHALL 可以按配置通过三种现有协议发送。调用模型前 SHALL 检查原文、语言及是否要求译文三项是否匹配现有缓存，只有三者都匹配时才复用。已开始的请求 SHALL 沿用开始时的开关值。
 
 #### Scenario: 请求具有完整本地依据
 - **WHEN** 句段具有 UniDic 词元和本地连续词块
-- **THEN** 请求包含原文、唯一词元标识、表面形式、词典形、读音、词性、活用信息、本地词块摘要和语言名称
+- **THEN** 请求包含原文、唯一词元标识、表面形式、词典形、读音、词性、活用信息、本地词块摘要、语言名称和是否要求译文
 
 #### Scenario: 不发送截图等无关数据
 - **WHEN** 应用请求模型分析 OCR 结果
@@ -17,15 +17,15 @@ TBD - created by archiving change add-llm-phrase-groups. Update Purpose after ar
 
 #### Scenario: 三种协议均能传递相同语义
 - **WHEN** 配置为 OpenAI Chat Completions、Anthropic Messages 或 OpenAI Responses
-- **THEN** 同一份语义请求被包装为对应协议的请求格式，并发送到对应接口
+- **THEN** 同一份语义请求被包装为对应协议的请求格式，并使用同一份语言和开关值
 
 #### Scenario: 相同句子和语言命中缓存
-- **WHEN** 句子原文与有效语言都匹配当前有效缓存
+- **WHEN** 原文、有效语言和是否要求译文都匹配当前有效缓存
 - **THEN** 系统直接复用缓存结果，不调用模型
 
 #### Scenario: 文本或语言不匹配时重新分析
-- **WHEN** 缓存不存在，或句子原文、有效语言任一不匹配
-- **THEN** 系统按该次分析读取的语言调用模型，并按该请求使用的语言缓存成功结果
+- **WHEN** 缓存不存在，或原文、有效语言、是否要求译文任一不匹配
+- **THEN** 系统使用本次读取的语言和开关调用模型，并按本次请求的三项条件缓存成功结果
 
 ### Requirement: 只返回有解释价值的组合组
 
@@ -124,3 +124,43 @@ The provider SHALL return only a request-local model group ID. After validation,
 #### Scenario: Each request carries only its segment's tokens
 - **WHEN** 一个句段发起 LLM 请求
 - **THEN** 该请求的 token 表只含本句段的 token,不含其他句段
+
+### Requirement: 同一次分析返回整句译文
+
+系统 SHALL 按本次请求的 `IncludeSentenceTranslation` 值决定是否要求译文。开启时，在 `groups` 和 `words` 之外要求模型返回 `translation` 字符串；关闭时只要求词义和语法，不要求整句译文，也不增加单独的翻译请求。开启时的译文 SHALL 自然、忠实，使用请求的释义语言，保留否定和条件等关系，不凭空添加人物姓名或剧情；无法翻译时要求空字符串。指令 SHALL 继续使用统一英文模板。
+
+#### Scenario: 词义语法和译文一起返回
+- **WHEN** 开关开启的句段请求完成正常分析
+- **THEN** 同一次响应提供 `groups`、`words` 和 `translation`，不要求模型回传原文、句段编号或屏幕位置
+
+#### Scenario: 目标语言用于整句翻译
+- **WHEN** 请求使用“法语”作为释义语言
+- **THEN** 固定指令要求整句译文和词义语法都使用法语，不按“法语”二字的书写文字选择中文
+
+#### Scenario: 关闭时不生成译文
+- **WHEN** 本次请求的整句翻译开关为关闭
+- **THEN** 提示词只要求词义和语法，不声明 `translation`；供应商额外返回的译文也被忽略，正常分析继续
+
+### Requirement: 单独检查译文字段
+
+本次要求译文时，系统 SHALL 对译文去掉两端空白。字段缺失、不是字符串、去空白后为空或超过 4000 字符时，系统 SHALL 将它视为无译文，保留其他合法分析内容，不单独自动重试，不截断后当作完整译文。关闭的请求 SHALL 不检查或发布额外译文字段，也不因没有译文报错。整个响应无法解析成有效 JSON 时 SHALL 继续遵守现有失败处理。
+
+#### Scenario: 译文字段类型错误
+- **WHEN** `translation` 是数组或对象，但词义和语法数据合法
+- **THEN** 丢弃译文，保留合法内容，并允许弹窗显示无译文提示
+
+#### Scenario: 返回的译文过长
+- **WHEN** 译文去掉两端空白后有 4001 个字符
+- **THEN** 不展示该译文，不影响合法的词义和语法
+
+#### Scenario: 接受长度边界内的译文
+- **WHEN** 译文是非空字符串，去掉两端空白后不超过 4000 个字符
+- **THEN** 保存完整的去空白后译文
+
+### Requirement: 本地建立句段与译文的关联
+
+系统 SHALL 在汇总分析时，把可用译文与本次请求的原文、语言和句段标识关联，再传给覆盖层。单词和短语的译文入口 SHALL 依赖这个关联。系统 SHALL 不信任模型生成的原文或位置来决定显示对象。
+
+#### Scenario: 汇总多个句段
+- **WHEN** 同一轮识别中的多个句段分别返回译文
+- **THEN** 每份译文关联到各自的本地请求，不因模型返回顺序或重复词语而混用

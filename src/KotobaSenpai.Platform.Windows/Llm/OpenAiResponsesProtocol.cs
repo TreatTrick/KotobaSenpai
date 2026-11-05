@@ -17,7 +17,7 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
     public void ApplyAuthentication(HttpRequestMessage request, string apiKey)
         => request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
 
-    public string BuildBody(string systemPrompt, string userContent, string model)
+    public string BuildBody(string systemPrompt, string userContent, string model, bool includeSentenceTranslation = true)
     {
         var payload = new JsonObject
         {
@@ -33,7 +33,7 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
                 {
                     ["type"] = "json_schema",
                     ["name"] = "return_groups",
-                    ["schema"] = PhraseGroupSchema.Root.DeepClone(),
+                    ["schema"] = PhraseGroupSchema.ForRequest(includeSentenceTranslation),
                     ["strict"] = true,
                 },
             },
@@ -46,6 +46,9 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
 
     public JsonElement ExtractWordsJson(string envelopeJson)
         => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+
+    public string? ExtractTranslation(string envelopeJson)
+        => PhraseResponseParser.ParseTranslation(ExtractContentRoot(envelopeJson));
 
     private static JsonElement ExtractContentRoot(string envelopeJson)
     {

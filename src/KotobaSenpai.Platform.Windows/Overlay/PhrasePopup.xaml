@@ -21,6 +21,26 @@
         <Setter Property="LineHeight" Value="{StaticResource FluentBodyLineHeight}" />
         <Setter Property="TextWrapping" Value="Wrap" />
       </Style>
+      <Style x:Key="TranslationToggle" TargetType="ToggleButton">
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="ToggleButton">
+              <Border x:Name="ButtonFrame" Background="{TemplateBinding Background}"
+                      BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}" BorderThickness="1"
+                      CornerRadius="{StaticResource FluentCardRadius}" Padding="{TemplateBinding Padding}">
+                <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center" />
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonFrame" Property="Opacity" Value="0.8" /></Trigger>
+                <Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonFrame" Property="Opacity" Value="0.6" /></Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
       <Style x:Key="SecondaryText" TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
         <Setter Property="FontSize" Value="{StaticResource FluentCaptionFontSize}" />
@@ -187,6 +207,16 @@
     <ScrollViewer x:Name="PopupScrollViewer" VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled" Padding="0" Margin="1">
       <StackPanel x:Name="ContentPanel" Margin="{StaticResource FluentPopupPadding}">
+        <StackPanel x:Name="SentenceTranslationSection" Margin="0,0,0,20">
+          <ToggleButton x:Name="TranslationButton" Content="{Binding TranslationShowLabel, Mode=OneTime}"
+                        Style="{StaticResource TranslationToggle}" Click="OnTranslationToggled" />
+          <StackPanel x:Name="SentenceTranslationContent" Visibility="Collapsed" Margin="0,12,0,0">
+            <ContentControl Content="{Binding OriginalText, Mode=OneTime}" Tag="{Binding OriginalLabel, Mode=OneTime}"
+                            Style="{StaticResource Section}" />
+            <ContentControl Content="{Binding TranslationText, Mode=OneTime}" Tag="{Binding TranslationLabel, Mode=OneTime}"
+                            Style="{StaticResource Section}" />
+          </StackPanel>
+        </StackPanel>
         <StackPanel Margin="0,0,0,24">
           <TextBlock x:Name="Heading"
                      Style="{StaticResource BodyText}" FontSize="{StaticResource FluentTitleFontSize}"

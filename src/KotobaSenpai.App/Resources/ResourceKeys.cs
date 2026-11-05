@@ -9,6 +9,10 @@ namespace KotobaSenpai.App.Resources;
 /// </summary>
 public static class ResourceKeys
 {
+    public const string SentenceTranslation_Title = nameof(SentenceTranslation_Title);
+    public const string SentenceTranslation_Description = nameof(SentenceTranslation_Description);
+    public const string SentenceTranslation_Saved = nameof(SentenceTranslation_Saved);
+    public const string SentenceTranslation_SaveFailed = nameof(SentenceTranslation_SaveFailed);
     public const string WindowPicker_Select = nameof(WindowPicker_Select);
     public const string WindowPicker_Reselect = nameof(WindowPicker_Reselect);
     public const string WindowPicker_Retry = nameof(WindowPicker_Retry);

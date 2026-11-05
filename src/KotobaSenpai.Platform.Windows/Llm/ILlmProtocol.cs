@@ -33,7 +33,7 @@ public interface ILlmProtocol
     /// Anthropic uses a forced <c>return_groups</c> tool; the root object is in the response's
     /// <c>content[].tool_use.input</c> block.
     /// </example>
-    string BuildBody(string systemPrompt, string userContent, string model);
+    string BuildBody(string systemPrompt, string userContent, string model, bool includeSentenceTranslation = true);
 
     /// <summary>Extracts the root element of the structured group array from the response envelope. Throws <see cref="PhraseResponseException"/> on structural mismatch.</summary>
     /// <example>
@@ -47,6 +47,8 @@ public interface ILlmProtocol
 
     /// <summary>Extracts the <c>words</c> array from the same content root as <see cref="ExtractGroupsJson"/>. Returns an empty array when the provider omits it (tolerated for backward compatibility).</summary>
     JsonElement ExtractWordsJson(string envelopeJson);
+
+    string? ExtractTranslation(string envelopeJson);
 }
 
 /// <summary>Prompt variants whose tool/structured-output instructions match each protocol.</summary>

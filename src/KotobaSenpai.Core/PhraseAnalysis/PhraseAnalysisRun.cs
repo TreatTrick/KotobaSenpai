@@ -16,6 +16,8 @@ public sealed record PhraseAnalysisRun(PhraseAnalysisOutcome Outcome, IReadOnlyL
 
     /// <summary>Validated per-word meanings (referencing local merged spans by surface+reading); empty when none or analysis failed.</summary>
     public IReadOnlyList<WordMeaningView> Words { get; init; } = Array.Empty<WordMeaningView>();
+
+    public IReadOnlyList<SentenceTranslation> Sentences { get; init; } = Array.Empty<SentenceTranslation>();
 }
 
 /// <summary>Overlay-visible phrase group view: a shared session id, display fields, provider order, and per-part geometry.</summary>
@@ -27,7 +29,10 @@ public sealed record PhraseGroupView(
     string Grammar,
     int ProviderOrder,
     int DistinctTokenCount,
-    IReadOnlyList<PhrasePartView> Parts);
+    IReadOnlyList<PhrasePartView> Parts)
+{
+    public string? SegmentId { get; init; }
+}
 
 /// <summary>A part's drawable geometry: split into multiple rectangles by line, never spanning blank regions.</summary>
 public sealed record PhrasePartView(IReadOnlyList<ScreenRect> Rects)

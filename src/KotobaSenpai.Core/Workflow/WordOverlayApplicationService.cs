@@ -25,6 +25,7 @@ public sealed class WordOverlayApplicationService : IDisposable
     private readonly ISettingsService? _settings;
     private readonly ITargetWindowTracker? _tracker;
     private readonly IExplanationLanguagePreferences? _explanationLanguage;
+    private readonly SentenceTranslationPreferences? _sentenceTranslation;
     private int _recognitionGeneration;
     private string? _lastRecognizedText;
 
@@ -36,7 +37,8 @@ public sealed class WordOverlayApplicationService : IDisposable
         IDiagnosticReporter? diagnostics = null,
         ISettingsService? settings = null,
         ITargetWindowTracker? tracker = null,
-        IExplanationLanguagePreferences? explanationLanguage = null)
+        IExplanationLanguagePreferences? explanationLanguage = null,
+        SentenceTranslationPreferences? sentenceTranslation = null)
     {
         _recognizer = recognizer;
         _grouping = grouping;
@@ -46,9 +48,14 @@ public sealed class WordOverlayApplicationService : IDisposable
         _settings = settings;
         _tracker = tracker;
         _explanationLanguage = explanationLanguage;
+        _sentenceTranslation = sentenceTranslation;
+        if (_sentenceTranslation is not null)
+            _sentenceTranslation.Changed += OnSentenceTranslationChanged;
         if (_explanationLanguage is not null)
             _explanationLanguage.EffectiveLanguageChanged += OnExplanationLanguageChanged;
     }
+
+    private void OnSentenceTranslationChanged(object? sender, EventArgs e) => _lastRecognizedText = null;
 
     private void OnExplanationLanguageChanged(object? sender, EventArgs e)
     {
@@ -59,6 +66,8 @@ public sealed class WordOverlayApplicationService : IDisposable
 
     public void Dispose()
     {
+        if (_sentenceTranslation is not null)
+            _sentenceTranslation.Changed -= OnSentenceTranslationChanged;
         if (_explanationLanguage is not null)
             _explanationLanguage.EffectiveLanguageChanged -= OnExplanationLanguageChanged;
     }
@@ -178,7 +187,8 @@ public sealed class WordOverlayApplicationService : IDisposable
             cachedRun.Groups.Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds)).ToArray(),
             cachedRun.Warning,
             cachedRun.Words,
-            cachedRun.SuccessfulSegmentIds), CanRender);
+            cachedRun.SuccessfulSegmentIds,
+            cachedRun.Sentences), CanRender);
 
         cancellationToken.ThrowIfCancellationRequested();
         var phraseRun = await _phraseOrchestrator
@@ -199,7 +209,8 @@ public sealed class WordOverlayApplicationService : IDisposable
             phraseGroups,
             phraseRun.Warning,
             phraseRun.Words,
-            phraseRun.SuccessfulSegmentIds), CanRender);
+            phraseRun.SuccessfulSegmentIds,
+            phraseRun.Sentences), CanRender);
     }
 
     public void Hide()
@@ -263,5 +274,5 @@ public sealed class WordOverlayApplicationService : IDisposable
                     Reading = part.Reading,
                     PitchAccents = part.PitchAccents,
                 })
-                .ToArray());
+                .ToArray()) { SegmentId = group.SegmentId };
 }

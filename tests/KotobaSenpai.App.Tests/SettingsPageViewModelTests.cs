@@ -14,6 +14,43 @@ namespace KotobaSenpai.App.Tests;
 public sealed class SettingsPageViewModelTests
 {
     [Theory]
+    [InlineData(null, true)]
+    [InlineData("invalid", true)]
+    [InlineData("false", false)]
+    [InlineData("true", true)]
+    public void Sentence_translation_restores_or_defaults_to_enabled(string? stored, bool enabled)
+    {
+        var settings = new RecordingSettings();
+        settings.Values[SentenceTranslationPreferences.EnabledKey] = stored;
+        using var model = Create(settings, new RecordingThemeStore());
+        Assert.Equal(enabled, model.SentenceTranslationEnabled);
+        Assert.Equal(0, settings.WriteCount);
+    }
+
+    [Fact]
+    public void Sentence_translation_saves_without_changing_model_configuration_and_restores_after_recreation()
+    {
+        var settings = new RecordingSettings();
+        settings.Values["LlmModel"] = "existing-model";
+        using (var model = Create(settings, new RecordingThemeStore())) model.SentenceTranslationEnabled = false;
+        using var restored = Create(settings, new RecordingThemeStore());
+        Assert.False(restored.SentenceTranslationEnabled);
+        Assert.Equal("existing-model", settings.Values["LlmModel"]);
+        Assert.Equal(1, settings.WriteCount);
+    }
+
+    [Fact]
+    public void Sentence_translation_failed_save_preserves_the_effective_setting()
+    {
+        var settings = new RecordingSettings { FailWrites = true };
+        using var model = Create(settings, new RecordingThemeStore());
+        model.SentenceTranslationEnabled = false;
+        Assert.True(model.SentenceTranslationEnabled);
+        Assert.Contains("previous setting remains active", model.SentenceTranslationStatus);
+        Assert.Equal(0, settings.WriteCount);
+    }
+
+    [Theory]
     [InlineData(null, LogLevel.Error)]
     [InlineData("invalid", LogLevel.Error)]
     [InlineData("999", LogLevel.Error)]

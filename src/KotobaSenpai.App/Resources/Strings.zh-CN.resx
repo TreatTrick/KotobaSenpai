@@ -725,4 +725,14 @@ API Key：YOUR_API_KEY
   <data name="Reading_AutoOff" xml:space="preserve"><value>自动识别未运行，可按需开始一次识别。</value></data>
   <data name="Reading_ResumeFirst" xml:space="preserve"><value>请先恢复阅读，再进行识别。</value></data>
   <data name="Reading_StartFirst" xml:space="preserve"><value>请先开始识别。</value></data>
+  <data name="SentenceTranslation_Title" xml:space="preserve"><value>整句翻译</value></data>
+  <data name="SentenceTranslation_Description" xml:space="preserve"><value>分析时同时生成整句译文，点击词语或短语详情顶部的按钮查看。关闭后隐藏入口，之后的请求不再生成译文。</value></data>
+  <data name="SentenceTranslation_Saved" xml:space="preserve"><value>已保存。入口显示立即更新，译文生成方式在下次识别时生效。</value></data>
+  <data name="SentenceTranslation_SaveFailed" xml:space="preserve"><value>无法保存整句翻译设置，仍使用之前的设置。</value></data>
+  <data name="SentenceTranslation_Show" xml:space="preserve"><value>查看整句译文</value></data>
+  <data name="SentenceTranslation_Hide" xml:space="preserve"><value>收起整句译文</value></data>
+  <data name="SentenceTranslation_Original" xml:space="preserve"><value>原文</value></data>
+  <data name="SentenceTranslation_Reference" xml:space="preserve"><value>AI 参考译文</value></data>
+  <data name="SentenceTranslation_Unavailable" xml:space="preserve"><value>暂无整句译文，可重新识别后再试。</value></data>
+  <data name="SentenceTranslation_NextRecognition" xml:space="preserve"><value>下次识别时生成整句译文。</value></data>
 </root>

@@ -8,6 +8,17 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 internal sealed class PhrasePopupViewModel
 {
     private PhrasePopupViewModel() { }
+    private IStringLocalizer? Localizer { get; init; }
+
+    public SentenceTranslation? Sentence { get; private init; }
+    public string OriginalText => Sentence?.SourceText ?? "";
+    public string TranslationText => Sentence?.Translation ?? (Sentence is { Requested: false }
+        ? Localizer?.Get("SentenceTranslation_NextRecognition") ?? "A sentence translation will be generated on the next recognition."
+        : Localizer?.Get("SentenceTranslation_Unavailable") ?? "No sentence translation is available. Run recognition again to retry.");
+    public string TranslationShowLabel => Localizer?.Get("SentenceTranslation_Show") ?? "Show sentence translation";
+    public string TranslationHideLabel => Localizer?.Get("SentenceTranslation_Hide") ?? "Hide sentence translation";
+    public string OriginalLabel => Localizer?.Get("SentenceTranslation_Original") ?? "Original";
+    public string TranslationLabel => Localizer?.Get("SentenceTranslation_Reference") ?? "AI reference translation";
 
     public string Heading { get; private init; } = "";
     public string Reading { get; private init; } = "";
@@ -26,12 +37,15 @@ internal sealed class PhrasePopupViewModel
 
     public static PhrasePopupViewModel ForPhrase(
         string label, string meaning, string grammar,
-        IReadOnlyList<WordMeaningView>? memberMeanings = null, IStringLocalizer? localizer = null, string reading = "")
+        IReadOnlyList<WordMeaningView>? memberMeanings = null, IStringLocalizer? localizer = null, string reading = "",
+        SentenceTranslation? sentence = null)
     {
         var hiragana = Kana.ToHiragana(reading);
         return new()
         {
             Heading = label,
+            Sentence = sentence,
+            Localizer = localizer,
             Reading = hiragana,
             Romanization = Kana.ToRomaji(hiragana),
             Meaning = meaning,
@@ -45,12 +59,14 @@ internal sealed class PhrasePopupViewModel
     }
 
     public static PhrasePopupViewModel ForWord(
-        WordMeaningView word, IStringLocalizer? localizer = null, bool showMeaning = true)
+        WordMeaningView word, IStringLocalizer? localizer = null, bool showMeaning = true, SentenceTranslation? sentence = null)
     {
         var entry = CreateWord(word, localizer);
         return new()
         {
             Heading = entry.Headword,
+            Sentence = sentence,
+            Localizer = localizer,
             Reading = entry.Reading,
             Romanization = entry.Romanization,
             PitchMarker = entry.PitchMarker,

@@ -14,7 +14,8 @@ public sealed record PhraseAnalysisRequest
         string segmentText,
         IReadOnlyList<SentenceTokenReference> tokens,
         IReadOnlyList<LocalSpanSummary> localSpans,
-        string explanationLanguage = "English")
+        string explanationLanguage = "English",
+        bool includeSentenceTranslation = true)
     {
         if (recognitionId == Guid.Empty)
             throw new ArgumentException("Recognition id must not be empty.", nameof(recognitionId));
@@ -31,6 +32,7 @@ public sealed record PhraseAnalysisRequest
         Tokens = tokens.ToArray();
         LocalSpans = localSpans.ToArray();
         ExplanationLanguage = explanationLanguage;
+        IncludeSentenceTranslation = includeSentenceTranslation;
     }
 
     /// <summary>Application-owned recognition id used only for local diagnostic correlation.</summary>
@@ -50,4 +52,6 @@ public sealed record PhraseAnalysisRequest
 
     /// <summary>The language name used for this request's explanations and cache entry.</summary>
     public string ExplanationLanguage { get; }
+
+    public bool IncludeSentenceTranslation { get; }
 }

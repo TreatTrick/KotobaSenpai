@@ -19,6 +19,7 @@ public sealed class WordOverlaySession
     private readonly IReadOnlySet<string>? _underlineSegmentIds;
     private readonly IReadOnlyList<NormalizedWordGeometry> _wordGeometry;
     private readonly IReadOnlyList<NormalizedPhraseGroupGeometry> _phraseGeometry;
+    private readonly IReadOnlyDictionary<string, SentenceTranslation> _sentences;
 
     private WordOverlaySession(
         Guid id,
@@ -29,7 +30,8 @@ public sealed class WordOverlaySession
         IReadOnlyList<WordMeaningView> wordMeanings,
         IReadOnlySet<string>? underlineSegmentIds,
         IReadOnlyList<NormalizedWordGeometry> wordGeometry,
-        IReadOnlyList<NormalizedPhraseGroupGeometry> phraseGeometry)
+        IReadOnlyList<NormalizedPhraseGroupGeometry> phraseGeometry,
+        IEnumerable<SentenceTranslation> sentences)
     {
         Id = id;
         Target = target;
@@ -39,6 +41,7 @@ public sealed class WordOverlaySession
         _underlineSegmentIds = underlineSegmentIds;
         _wordGeometry = wordGeometry;
         _phraseGeometry = phraseGeometry;
+        _sentences = sentences.ToDictionary(sentence => sentence.SegmentId, StringComparer.Ordinal);
         // ponytail: keyed by merged surface+reading — both come from the same span resolver, so this matches reliably. A word can appear multiple times (same surface+reading); keep the first rather than throwing on a duplicate.
         var meaningByWord = new Dictionary<(string Surface, string Reading), WordMeaningView>();
         foreach (var meaning in wordMeanings)
@@ -63,6 +66,9 @@ public sealed class WordOverlaySession
 
     /// <summary>All validated word meanings, for diagnostics and group-detail rendering.</summary>
     public IReadOnlyList<WordMeaningView> WordMeanings => _meaningByWord.Values.ToArray();
+
+    public SentenceTranslation? GetSentenceTranslation(string? segmentId)
+        => segmentId is not null && _sentences.TryGetValue(segmentId, out var sentence) ? sentence : null;
 
     /// <summary>Reprojects the stable recognition geometry into a current target client rectangle.</summary>
     public WordOverlaySession Reproject(WindowTarget target)
@@ -111,7 +117,8 @@ public sealed class WordOverlaySession
             _meaningByWord.Values.ToArray(),
             _underlineSegmentIds,
             _wordGeometry,
-            _phraseGeometry);
+            _phraseGeometry,
+            _sentences.Values);
     }
 
     /// <summary>Looks up the LLM meaning for a local merged word (by its merged surface+reading), or null when none was returned.</summary>
@@ -159,7 +166,8 @@ public sealed class WordOverlaySession
         IEnumerable<PhraseGroupView>? phraseGroups = null,
         string? phraseWarning = null,
         IEnumerable<WordMeaningView>? wordMeanings = null,
-        IEnumerable<string>? underlineSegmentIds = null)
+        IEnumerable<string>? underlineSegmentIds = null,
+        IEnumerable<SentenceTranslation>? sentences = null)
     {
         ArgumentNullException.ThrowIfNull(words);
 
@@ -199,7 +207,8 @@ public sealed class WordOverlaySession
                 ? null
                 : new HashSet<string>(underlineSegmentIds, StringComparer.Ordinal),
             wordGeometry,
-            phraseGeometry);
+            phraseGeometry,
+            sentences ?? Array.Empty<SentenceTranslation>());
     }
 
     /// <summary>Returns whether a word's underline should be included in this session.</summary>

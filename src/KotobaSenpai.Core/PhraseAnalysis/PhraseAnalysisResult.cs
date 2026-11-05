@@ -24,6 +24,8 @@ public sealed record PhraseAnalysisResult
 
     public bool Succeeded => Outcome == PhraseAnalysisOutcome.Success;
 
+    public string? Translation { get; init; }
+
     /// <summary>Transport metadata used by connection verification without parsing diagnostic text.</summary>
     public int? ProviderStatusCode { get; init; }
     public string? Endpoint { get; init; }

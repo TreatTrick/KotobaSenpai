@@ -16,8 +16,9 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
     public void ApplyAuthentication(HttpRequestMessage request, string apiKey)
         => request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
 
-    public string BuildBody(string systemPrompt, string userContent, string model)
+    public string BuildBody(string systemPrompt, string userContent, string model, bool includeSentenceTranslation = true)
     {
+        var example = includeSentenceTranslation ? OutputExample[..^1] + ",\"translation\":\"example\"}" : OutputExample;
         var payload = new JsonObject
         {
             ["model"] = model,
@@ -27,7 +28,7 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
             ["thinking"] = new JsonObject { ["type"] = "disabled" },
             ["temperature"] = 0.0,
             ["messages"] = new JsonArray(
-                new JsonObject { ["role"] = "system", ["content"] = systemPrompt + "\nJSON output structure example (replace all example values with the actual analysis):\n" + OutputExample },
+                new JsonObject { ["role"] = "system", ["content"] = systemPrompt + "\nJSON output structure example (replace all example values with the actual analysis):\n" + example },
                 new JsonObject { ["role"] = "user", ["content"] = userContent }),
             ["response_format"] = new JsonObject
             {
@@ -42,6 +43,9 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
 
     public JsonElement ExtractWordsJson(string envelopeJson)
         => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+
+    public string? ExtractTranslation(string envelopeJson)
+        => PhraseResponseParser.ParseTranslation(ExtractContentRoot(envelopeJson));
 
     private static JsonElement ExtractContentRoot(string envelopeJson)
     {

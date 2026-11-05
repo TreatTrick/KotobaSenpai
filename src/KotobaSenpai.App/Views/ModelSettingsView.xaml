@@ -35,6 +35,17 @@
         </StackPanel>
       </controls:SettingsCard>
 
+      <controls:SettingsCard x:Name="SentenceTranslationCard" Header="{loc:Loc Key=SentenceTranslation_Title}"
+                             Description="{loc:Loc Key=SentenceTranslation_Description}"
+                             Icon="{ui:SymbolIcon LocalLanguage24}">
+        <StackPanel>
+          <ui:ToggleSwitch x:Name="SentenceTranslationSwitch" IsChecked="{Binding SentenceTranslationEnabled, Mode=TwoWay}"
+                           AutomationProperties.Name="{loc:Loc Key=SentenceTranslation_Title}" />
+          <TextBlock Text="{Binding SentenceTranslationStatus}" Style="{StaticResource ModelStatus}"
+                     AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+      </controls:SettingsCard>
+
       <StackPanel DataContext="{Binding Llm}">
         <controls:SettingsCard x:Name="AgentApiConfigurationCard" Header="{loc:Loc Key=Agent_Title}" Description="{loc:Loc Key=Agent_Description}"
                                Icon="{ui:SymbolIcon Sparkle24}">

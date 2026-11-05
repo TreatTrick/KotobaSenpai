@@ -14,6 +14,29 @@ namespace KotobaSenpai.Core.Tests.Workflow;
 public sealed class AutoRecognitionWorkflowTests
 {
     [Fact]
+    public async Task Translation_setting_keeps_the_overlay_and_reanalyzes_unchanged_text_on_the_next_scan()
+    {
+        var preferences = new SentenceTranslationPreferences(new TranslationSettings());
+        var overlay = new RecordingOverlay();
+        var recognizer = new SequencedRecognizer([Line("同じ。")], [Line("同じ。")]);
+        var analyzer = new CountingAnalyzer();
+        using var service = CreateService(recognizer, overlay, analyzer, translation: preferences);
+        await service.RecognizeAndShowAsync(Target());
+        var previous = overlay.LastSession;
+        preferences.Enabled = false;
+        Assert.Same(previous, overlay.LastSession);
+        Assert.Equal(1, analyzer.CallCount);
+        await service.RecognizeChangedAndShowAsync(Target());
+        Assert.Equal(2, analyzer.CallCount);
+    }
+
+    private sealed class TranslationSettings : KotobaSenpai.TestSupport.SettingsStub
+    {
+        public override string? GetValue(string key) => null;
+        public override void SetValue(string key, string? value) { }
+    }
+
+    [Fact]
     public async Task Changing_language_keeps_the_overlay_and_reanalyzes_unchanged_text_next_time()
     {
         var overlay = new RecordingOverlay();
@@ -188,14 +211,15 @@ public sealed class AutoRecognitionWorkflowTests
         IWindowWordRecognizer recognizer,
         IOverlayRenderer overlay,
         ILlmPhraseAnalyzer analyzer,
-        IExplanationLanguagePreferences? language = null)
+        IExplanationLanguagePreferences? language = null,
+        SentenceTranslationPreferences? translation = null)
         => new(
             recognizer,
             new WordGroupingService(new CharTokenizer(), new SentenceSegmenter(), new IdentitySpanResolver()),
             overlay,
             phraseOrchestrator: new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(),
-                new SentenceTokenBuilder(new CharTokenizer(), new IdentitySpanResolver()), language),
-            explanationLanguage: language);
+                new SentenceTokenBuilder(new CharTokenizer(), new IdentitySpanResolver()), language, sentenceTranslation: translation),
+            explanationLanguage: language, sentenceTranslation: translation);
 
     private static WindowTarget Target() => new((nint)42, "VN", new ScreenRect(0, 0, 1000, 500));
 

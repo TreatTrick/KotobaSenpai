@@ -1,5 +1,6 @@
 using System.Text;
 using KotobaSenpai.Core.Llm;
+using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Llm;
 using KotobaSenpai.Platform.Windows.Settings;
 
@@ -63,7 +64,7 @@ public static class Program
         var registry = new LlmProtocolRegistry();
         var analyzer = new LlmPhraseAnalyzer(settings, http, protocolRegistry: registry);
         var service = new LlmConfigurationService(settings,
-            new LlmConnectionDetector(analyzer, registry), new HttpLlmModelCatalog(http, registry));
+            new LlmConnectionDetector(analyzer, registry, new SentenceTranslationPreferences(settings)), new HttpLlmModelCatalog(http, registry));
         return await service.ExecuteAsync(command, request, cancellationToken);
     }
 

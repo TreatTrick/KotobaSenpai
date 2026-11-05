@@ -16,6 +16,10 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// </summary>
 public sealed class PhraseResponseParser
 {
+    public static string? ParseTranslation(JsonElement root)
+        => root.TryGetProperty("translation", out var value) && value.ValueKind == JsonValueKind.String
+            ? SentenceTranslation.Validate(value.GetString()) : null;
+
     private readonly ILogger? _logger;
 
     public PhraseResponseParser(ILogger? logger = null) => _logger = logger;

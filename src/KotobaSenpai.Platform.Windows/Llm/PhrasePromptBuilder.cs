@@ -23,7 +23,6 @@ public sealed class PhrasePromptBuilder
     };
 
     private const string GroupInstructions = """
-        The result must contain exactly two top-level arrays, `groups` and `words`, and no other top-level fields.
         groups contains only meaningful multi-token combinations that are not ordinary words or contiguous chunks already recognized locally.
         Every group must contain exactly `modelGroupId`, `type`, `parts`, `label`, `meaning`, and `grammar`.
         Copy every token ID in `parts` exactly from the token table in l<line>:t<token> form.
@@ -62,7 +61,14 @@ public sealed class PhrasePromptBuilder
 
         var (outputInstruction, userInstruction) = OutputInstructions(profile);
         var systemPrompt = string.Join('\n', "You analyze Japanese visual-novel text for teaching value.",
-            outputInstruction, GroupInstructions, LanguageInstructions,
+            outputInstruction,
+            request.IncludeSentenceTranslation
+                ? "The result must contain exactly the top-level arrays `groups` and `words` and the string `translation`, with no other top-level fields."
+                : "The result must contain exactly two top-level arrays, `groups` and `words`, and no other top-level fields.",
+            GroupInstructions, LanguageInstructions,
+            request.IncludeSentenceTranslation
+                ? "Write `translation` exclusively in the target explanation language. Translate the complete segment naturally and faithfully, preserving negation and conditions. Do not invent character names or plot details. Return an empty string if no translation is available."
+                : string.Empty,
             "Target explanation language: " + JsonSerializer.Serialize(request.ExplanationLanguage, LanguageJsonOptions));
 
         var userContent = new StringBuilder(userInstruction).Append('\n');

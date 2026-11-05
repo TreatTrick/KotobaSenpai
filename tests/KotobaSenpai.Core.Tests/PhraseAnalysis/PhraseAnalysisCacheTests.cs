@@ -4,11 +4,130 @@ using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Logging;
 using System.Globalization;
+using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Core.Overlay;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.WordGrouping;
 
 namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 
 public sealed class PhraseAnalysisCacheTests
 {
+    [Fact]
+    public async Task An_in_flight_result_is_cached_under_its_request_mode_after_the_setting_changes()
+    {
+        var preferences = new SentenceTranslationPreferences(new TranslationSettings());
+        var analyzer = new PendingTranslationAnalyzer();
+        var orchestrator = new PhraseAnalysisOrchestrator(analyzer, tokenBuilder: new SentenceTokenBuilder(new CharTokenizer()),
+            sentenceTranslation: preferences);
+        var pending = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        preferences.Enabled = false;
+        analyzer.Release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []) { Translation = "Translation" });
+        Assert.True(Assert.Single((await pending).Sentences).Requested);
+        var disabled = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        Assert.Null(Assert.Single(disabled.Sentences).Translation);
+        preferences.Enabled = true;
+        var enabled = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        Assert.Equal("Translation", Assert.Single(enabled.Sentences).Translation);
+        Assert.Equal(2, analyzer.Calls);
+    }
+
+    private sealed class PendingTranslationAnalyzer : ILlmPhraseAnalyzer
+    {
+        public TaskCompletionSource<PhraseAnalysisResult> Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Calls { get; private set; }
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Release.Task;
+        }
+    }
+
+    [Fact]
+    public void Repeated_words_use_their_own_sentences_and_reprojection_preserves_translation()
+    {
+        var token = new Token("彼", "彼", "彼", "かれ", "かれ", "かれ", new PartsOfSpeech("pronoun", "", "", ""), "", "", "", 0);
+        var first = new GroupedWord(token, new ScreenRect(10, 10, 20, 20)).WithSegmentId("first");
+        var second = new GroupedWord(token, new ScreenRect(10, 60, 20, 20)).WithSegmentId("second");
+        var sentences = new[] {
+            new SentenceTranslation("first", "彼は来ない。", "English", true, "He will not come."),
+            new SentenceTranslation("second", "彼は来た。", "English", true, "He came.")
+        };
+        var target = new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 500, 300));
+        var session = WordOverlaySession.Start(target, [first, second], sentences: sentences);
+        Assert.Equal("He will not come.", session.GetSentenceTranslation(first.SegmentId)?.Translation);
+        Assert.Equal("He came.", session.GetSentenceTranslation(second.SegmentId)?.Translation);
+        Assert.Null(session.GetSentenceTranslation(null));
+        Assert.Null(session.GetSentenceTranslation("unknown"));
+        var moved = session.Reproject(new WindowTarget((nint)42, "Target", new ScreenRect(100, 100, 1000, 600)));
+        Assert.Same(sentences[1], moved.GetSentenceTranslation(second.SegmentId));
+    }
+
+    [Fact]
+    public async Task Translation_mode_has_separate_cached_results_and_never_leaks_disabled_output()
+    {
+        var preferences = new SentenceTranslationPreferences(new TranslationSettings());
+        var analyzer = new TranslationAnalyzer();
+        var orchestrator = new PhraseAnalysisOrchestrator(analyzer, tokenBuilder: new SentenceTokenBuilder(new CharTokenizer()),
+            sentenceTranslation: preferences);
+        preferences.Enabled = false;
+        var disabled = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        Assert.False(Assert.Single(disabled.Sentences).Requested);
+        Assert.Null(Assert.Single(disabled.Sentences).Translation);
+        preferences.Enabled = true;
+        var enabled = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        Assert.Equal("Translation", Assert.Single(enabled.Sentences).Translation);
+        preferences.Enabled = false;
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        Assert.Equal(2, analyzer.CallCount);
+    }
+
+    [Fact]
+    public async Task Rewrapped_sentence_rebinds_translation_and_group_to_the_current_segment()
+    {
+        var analyzer = new TranslationAnalyzer();
+        var orchestrator = Create(analyzer);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ句。")]);
+        var second = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ"), Line("句。", 30)]);
+        var sentence = Assert.Single(second.Sentences);
+        Assert.Equal("s0-1", sentence.SegmentId);
+        Assert.Equal("同じ句。", sentence.SourceText);
+        Assert.Equal("Translation", sentence.Translation);
+        Assert.Equal(sentence.SegmentId, Assert.Single(second.Groups).SegmentId);
+        Assert.Equal(1, analyzer.CallCount);
+    }
+
+    [Fact]
+    public async Task Missing_translation_does_not_repeat_a_successful_request()
+    {
+        var analyzer = new CountingAnalyzer();
+        var orchestrator = Create(analyzer);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        var cached = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        Assert.True(cached.Succeeded);
+        Assert.Null(Assert.Single(cached.Sentences).Translation);
+        Assert.Equal(1, analyzer.CallCount);
+    }
+
+    private sealed class TranslationSettings : KotobaSenpai.TestSupport.SettingsStub
+    {
+        private readonly Dictionary<string, string?> _values = [];
+        public override string? GetValue(string key) => _values.GetValueOrDefault(key);
+        public override void SetValue(string key, string? value) => _values[key] = value;
+    }
+
+    private sealed class TranslationAnalyzer : ILlmPhraseAnalyzer
+    {
+        public int CallCount { get; private set; }
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
+                [new ParsedPhraseGroup("group", "grammar", [[request.Tokens[0].Id]], "label", "meaning", "grammar")])
+                { Translation = "Translation" });
+        }
+    }
+
     [Fact]
     public async Task Logs_cache_hits_and_new_provider_requests_with_the_recognition_id()
     {

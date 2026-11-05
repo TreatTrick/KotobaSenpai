@@ -25,7 +25,7 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
     // ponytail: fixed cap — group JSON output is tiny, no need to estimate per request; very long segments are backstopped by the PromptBuilder's size limit.
     private const int MaxTokens = 4096;
 
-    public string BuildBody(string systemPrompt, string userContent, string model)
+    public string BuildBody(string systemPrompt, string userContent, string model, bool includeSentenceTranslation = true)
     {
         var payload = new JsonObject
         {
@@ -39,7 +39,7 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
             {
                 ["name"] = "return_groups",
                 ["description"] = "Return exactly one object with the required groups and words arrays. Copy token IDs exactly from the request.",
-                ["input_schema"] = PhraseGroupSchema.Root.DeepClone(),
+                ["input_schema"] = PhraseGroupSchema.ForRequest(includeSentenceTranslation),
             }),
             ["tool_choice"] = new JsonObject { ["type"] = "tool", ["name"] = "return_groups" },
         };
@@ -51,6 +51,9 @@ public sealed class AnthropicMessagesProtocol : ILlmProtocol
 
     public JsonElement ExtractWordsJson(string envelopeJson)
         => ExtractToolInput(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+
+    public string? ExtractTranslation(string envelopeJson)
+        => PhraseResponseParser.ParseTranslation(ExtractToolInput(envelopeJson));
 
     private static JsonElement ExtractToolInput(string envelopeJson)
     {

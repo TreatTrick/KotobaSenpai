@@ -23,9 +23,12 @@ public sealed partial class PhrasePopup : Window
     private readonly IStringLocalizer? _localizer;
     private readonly ILogger? _logger;
     private readonly PhrasePopupHoverTracker _hoverTracker = new();
+    private ScreenRect? _anchor;
+    private bool _sentenceTranslationEnabled = true;
 
     public PhrasePopup(IStringLocalizer? localizer = null, ILogger? logger = null)
     {
+        _mouseInputCallback = InterceptMouseInput;
         InitializeComponent();
         ApplyAppearance(OverlayAppearanceSettings.Default);
         // Resolve dynamic Fluent brushes from the host while keeping standalone use self-contained.
@@ -38,6 +41,8 @@ public sealed partial class PhrasePopup : Window
         }
         _localizer = localizer;
         _logger = logger;
+        IsVisibleChanged += (_, _) => UpdateMouseInputHook();
+        Closed += (_, _) => ReleaseMouseInputHook();
         SourceInitialized += (_, _) =>
         {
             ConfigureMouseInput();
@@ -51,29 +56,30 @@ public sealed partial class PhrasePopup : Window
 
     public void ShowResult(
         string label, string meaning, string grammar, ScreenRect anchor,
-        IReadOnlyList<WordMeaningView>? memberMeanings = null, string reading = "")
+        IReadOnlyList<WordMeaningView>? memberMeanings = null, string reading = "", SentenceTranslation? sentence = null)
     {
-        DataContext = PhrasePopupViewModel.ForPhrase(label, meaning, grammar, memberMeanings, _localizer, reading);
+        DataContext = PhrasePopupViewModel.ForPhrase(label, meaning, grammar, memberMeanings, _localizer, reading, sentence);
         ShowAndPosition(anchor);
     }
 
     /// <summary>Shows a single word's LLM meaning: headword + pos + reading + meaning + grammar.</summary>
-    public void ShowWordMeaning(WordMeaningView meaning, ScreenRect anchor)
+    public void ShowWordMeaning(WordMeaningView meaning, ScreenRect anchor, SentenceTranslation? sentence = null)
     {
-        DataContext = PhrasePopupViewModel.ForWord(meaning, _localizer);
+        DataContext = PhrasePopupViewModel.ForWord(meaning, _localizer, sentence: sentence);
         ShowAndPosition(anchor);
     }
 
     /// <summary>Shows a word that has no LLM meaning: headword + reading + a "no meaning" hint.</summary>
-    public void ShowWordWithoutMeaning(WordMeaningView meaning, ScreenRect anchor)
+    public void ShowWordWithoutMeaning(WordMeaningView meaning, ScreenRect anchor, SentenceTranslation? sentence = null)
     {
-        DataContext = PhrasePopupViewModel.ForWord(meaning, _localizer, showMeaning: false);
+        DataContext = PhrasePopupViewModel.ForWord(meaning, _localizer, showMeaning: false, sentence);
         ShowAndPosition(anchor);
     }
 
     public void HidePopup()
     {
         _hoverTracker.Reset();
+        ResetTranslation();
         if (IsVisible)
             Hide();
     }
@@ -101,10 +107,41 @@ public sealed partial class PhrasePopup : Window
 
     private void ShowAndPosition(ScreenRect anchor)
     {
+        _anchor = anchor;
+        ResetTranslation();
         _hoverTracker.Reset();
         PopupScrollViewer.ScrollToTop();
         new WindowInteropHelper(this).EnsureHandle();
         Position(anchor);
+    }
+
+    public void SetSentenceTranslationEnabled(bool enabled)
+    {
+        if (_sentenceTranslationEnabled == enabled) return;
+        _sentenceTranslationEnabled = enabled;
+        ResetTranslation();
+        if (IsVisible && _anchor is { } anchor) Position(anchor);
+    }
+
+    private void ResetTranslation()
+    {
+        _translationVersion++;
+        TranslationButton.Opacity = 1;
+        TranslationButton.IsChecked = false;
+        SentenceTranslationContent.Visibility = Visibility.Collapsed;
+        SentenceTranslationSection.Visibility = _sentenceTranslationEnabled ? Visibility.Visible : Visibility.Collapsed;
+        if (DataContext is PhrasePopupViewModel model) TranslationButton.Content = model.TranslationShowLabel;
+    }
+
+    private void OnTranslationToggled(object sender, RoutedEventArgs e)
+    {
+        var expanded = TranslationButton.IsChecked == true;
+        SentenceTranslationContent.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        if (DataContext is PhrasePopupViewModel model)
+            TranslationButton.Content = expanded ? model.TranslationHideLabel : model.TranslationShowLabel;
+        if (IsVisible && _anchor is { } anchor) Position(anchor);
+        // Resizing can move the button away from the cursor; establish distance against the new bounds.
+        _hoverTracker.Reset();
     }
 
     private void MeasureContent(ScreenRect workArea, double scale)
@@ -220,16 +257,13 @@ public sealed partial class PhrasePopup : Window
         {
             // Route directly to the scroll viewer even though this window never takes keyboard focus.
             var delta = unchecked((short)(wParam.ToInt64() >> 16));
-            PopupScrollViewer.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, delta)
-            {
-                RoutedEvent = Mouse.MouseWheelEvent,
-            });
+            ScrollPopup(delta);
             handled = true;
         }
         return nint.Zero;
     }
 
-    private static class Native
+    private static partial class Native
     {
         public const int GwlExStyle = -20;
         public const int WmMouseActivate = 0x0021;

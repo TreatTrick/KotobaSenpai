@@ -28,18 +28,24 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     private readonly ISettingsService? _settings;
     private readonly ITargetWindowTracker? _tracker;
     private readonly ILogger? _logger;
+    private readonly SentenceTranslationPreferences? _sentenceTranslation;
     private OverlayWindow? _window;
 
     public WpfOverlayRenderer(
         IStringLocalizer? localizer = null,
         ISettingsService? settings = null,
         ITargetWindowTracker? tracker = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        SentenceTranslationPreferences? sentenceTranslation = null)
     {
         _localizer = localizer;
         _settings = settings;
         _tracker = tracker;
         _logger = logger;
+        _sentenceTranslation = sentenceTranslation ?? (settings is null ? null : new SentenceTranslationPreferences(settings));
+        if (_sentenceTranslation is not null)
+            _sentenceTranslation.Changed += (_, _) => _window?.Dispatcher.Invoke(() =>
+                _window?.SetSentenceTranslationEnabled(_sentenceTranslation.Enabled));
     }
 
     public void Show(WordOverlaySession session, Func<bool>? canRender = null)
@@ -64,6 +70,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 _tracker is not null,
                 session.Target.Bounds);
             _window ??= new OverlayWindow(_localizer, _tracker, _logger);
+            _window.SetSentenceTranslationEnabled(_sentenceTranslation?.Enabled ?? true);
             _window.ApplyAppearance(ResolveAppearance());
             _window.Render(session, ResolveFontScale());
         });
@@ -185,6 +192,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 IsHitTestVisible,
                 _tracker is not null);
         }
+
+        internal void SetSentenceTranslationEnabled(bool enabled) => _phrasePopup.SetSentenceTranslationEnabled(enabled);
 
         public void Render(WordOverlaySession session, double fontScale)
         {
@@ -888,7 +897,8 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 ? Array.Empty<WordMeaningView>()
                 : session.GetCoveredWordMeanings(group);
             var reading = string.Join(" ", group.Parts.Select(part => part.Reading).Where(value => !string.IsNullOrWhiteSpace(value)));
-            _phrasePopup.ShowResult(group.Label, group.Meaning, group.Grammar, anchor, memberMeanings, reading);
+            _phrasePopup.ShowResult(group.Label, group.Meaning, group.Grammar, anchor, memberMeanings, reading,
+                session?.GetSentenceTranslation(group.SegmentId));
         }
 
         /// <summary>Shows the hovered word's LLM meaning popup, or headword + reading + "no meaning" when the provider returned none.</summary>
@@ -905,9 +915,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             var anchor = word.Rects.First(rect => Contains(rect, cursor));
             var meaning = session.TryGetMeaning(word);
             if (meaning is not null)
-                _phrasePopup.ShowWordMeaning(meaning, anchor);
+                _phrasePopup.ShowWordMeaning(meaning, anchor, session.GetSentenceTranslation(word.SegmentId));
             else
-                _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), anchor);
+                _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), anchor, session.GetSentenceTranslation(word.SegmentId));
         }
 
         private void SetClickThrough()

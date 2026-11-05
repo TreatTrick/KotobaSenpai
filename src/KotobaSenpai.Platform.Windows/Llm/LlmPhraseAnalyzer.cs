@@ -77,7 +77,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.InvalidResponse, [], ex.Message);
         }
 
-        var body = protocol.BuildBody(systemPrompt, userContent, model);
+        var body = protocol.BuildBody(systemPrompt, userContent, model, request.IncludeSentenceTranslation);
         var candidates = singleEndpoint ? [endpointUri] : LlmEndpointHelper.AnalysisCandidates(endpointUri, protocol.Path);
         string? envelope = null;
         string? acceptedEndpoint = null;
@@ -147,6 +147,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         string wordsJson = "[]";
         IReadOnlyList<ParsedPhraseGroup> groups;
         IReadOnlyList<ParsedWordMeaning> words;
+        string? translation;
         try
         {
             var groupsPayload = protocol.ExtractGroupsJson(envelope);
@@ -155,6 +156,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
             wordsJson = wordsPayload.GetRawText();
             groups = _parser.ParseGroups(groupsPayload);
             words = _parser.ParseWords(wordsPayload);
+            translation = request.IncludeSentenceTranslation ? protocol.ExtractTranslation(envelope) : null;
         }
         catch (Exception ex) when (ex is PhraseResponseException or JsonException or KeyNotFoundException or ArgumentNullException)
         {
@@ -165,6 +167,6 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
 
         // Capture the raw request/response and extracted arrays with one shared exchange stamp for offline inspection.
         _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
-        return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words, Endpoint = acceptedEndpoint };
+        return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words, Translation = translation, Endpoint = acceptedEndpoint };
     }
 }

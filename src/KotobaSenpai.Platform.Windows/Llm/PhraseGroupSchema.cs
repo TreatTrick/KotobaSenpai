@@ -10,6 +10,17 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// </summary>
 public static class PhraseGroupSchema
 {
+    public static JsonObject ForRequest(bool includeSentenceTranslation)
+    {
+        var schema = (JsonObject)Root.DeepClone();
+        if (includeSentenceTranslation)
+        {
+            schema["properties"]!.AsObject()["translation"] = new JsonObject { ["type"] = "string" };
+            schema["required"]!.AsArray().Add("translation");
+        }
+        return schema;
+    }
+
     /// <summary>Root object: { "groups": [ group, ... ] }.</summary>
     public static JsonObject Root { get; } = new()
     {

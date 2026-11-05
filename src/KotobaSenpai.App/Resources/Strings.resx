@@ -725,4 +725,14 @@ Meet your next word.</value>
   <data name="Reading_AutoOff" xml:space="preserve"><value>Automatic recognition is not running. Start a scan when needed.</value></data>
   <data name="Reading_ResumeFirst" xml:space="preserve"><value>Resume reading before starting another scan.</value></data>
   <data name="Reading_StartFirst" xml:space="preserve"><value>Start recognition first.</value></data>
+  <data name="SentenceTranslation_Title" xml:space="preserve"><value>Sentence translation</value></data>
+  <data name="SentenceTranslation_Description" xml:space="preserve"><value>Generate a translation with each analysis. View it using the button at the top of word or phrase details. Turning this off hides the button and skips translations in subsequent requests.</value></data>
+  <data name="SentenceTranslation_Saved" xml:space="preserve"><value>Saved. Translation visibility changes immediately; generation follows this setting on the next recognition.</value></data>
+  <data name="SentenceTranslation_SaveFailed" xml:space="preserve"><value>Could not save the sentence translation setting. The previous setting remains active.</value></data>
+  <data name="SentenceTranslation_Show" xml:space="preserve"><value>Show sentence translation</value></data>
+  <data name="SentenceTranslation_Hide" xml:space="preserve"><value>Hide sentence translation</value></data>
+  <data name="SentenceTranslation_Original" xml:space="preserve"><value>Original</value></data>
+  <data name="SentenceTranslation_Reference" xml:space="preserve"><value>AI reference translation</value></data>
+  <data name="SentenceTranslation_Unavailable" xml:space="preserve"><value>No sentence translation is available. Run recognition again to retry.</value></data>
+  <data name="SentenceTranslation_NextRecognition" xml:space="preserve"><value>A sentence translation will be generated on the next recognition.</value></data>
 </root>

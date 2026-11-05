@@ -30,6 +30,8 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private readonly IStringLocalizer _localizer;
     private readonly IExplanationLanguagePreferences _explanationPreferences;
     private readonly CaptureBorderPreferences _captureBorder;
+    private readonly SentenceTranslationPreferences _sentenceTranslation;
+    private string? _sentenceTranslationStatusKey;
     private string? _captureBorderErrorKey;
     private string? _logLevelErrorKey;
     private string? _explanationStatusKey;
@@ -40,7 +42,8 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     public SettingsPageViewModel(ISettingsService settings, IThemePreferenceStore themePreferences,
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
         IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance,
-        CaptureBorderPreferences? captureBorder = null, ShortcutSettingsViewModel? shortcuts = null)
+        CaptureBorderPreferences? captureBorder = null, ShortcutSettingsViewModel? shortcuts = null,
+        SentenceTranslationPreferences? sentenceTranslation = null)
     {
         _settings = settings;
         Shortcuts = shortcuts;
@@ -48,6 +51,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         _localizer = localizer;
         _explanationPreferences = explanationLanguage;
         _captureBorder = captureBorder ?? new CaptureBorderPreferences(settings);
+        _sentenceTranslation = sentenceTranslation ?? new SentenceTranslationPreferences(settings);
         _explanationLanguage = explanationLanguage.CustomLanguage ?? string.Empty;
         Language = language;
         Llm = llm;
@@ -65,6 +69,28 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     public LlmSettingsViewModel Llm { get; }
     public OverlayAppearanceViewModel OverlayAppearance { get; }
     public ShortcutSettingsViewModel? Shortcuts { get; }
+
+    public bool SentenceTranslationEnabled
+    {
+        get => _sentenceTranslation.Enabled;
+        set
+        {
+            if (value == SentenceTranslationEnabled) return;
+            try
+            {
+                _sentenceTranslation.Enabled = value;
+                _sentenceTranslationStatusKey = ResourceKeys.SentenceTranslation_Saved;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _sentenceTranslationStatusKey = ResourceKeys.SentenceTranslation_SaveFailed;
+            }
+            OnPropertyChanged(nameof(SentenceTranslationEnabled));
+            OnPropertyChanged(nameof(SentenceTranslationStatus));
+        }
+    }
+
+    public string SentenceTranslationStatus => _sentenceTranslationStatusKey is null ? string.Empty : _localizer.Get(_sentenceTranslationStatusKey);
     public IReadOnlyList<ThemeModeChoice> ThemeModes { get; }
     public IReadOnlyList<LogLevel> LogLevels { get; } = Enum.GetValues<LogLevel>();
 
@@ -188,6 +214,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         OnPropertyChanged(nameof(ExplanationLanguageStatus));
         OnPropertyChanged(nameof(CaptureBorderError));
         OnPropertyChanged(nameof(LogLevelError));
+        OnPropertyChanged(nameof(SentenceTranslationStatus));
     }
 
     public void Dispose()

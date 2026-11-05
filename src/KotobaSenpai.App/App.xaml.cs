@@ -306,6 +306,7 @@ public partial class App : Application
         services.AddSingleton<ReadingShortcutCoordinator>();
         services.AddSingleton<ShortcutSettingsViewModel>();
         services.AddSingleton<CaptureBorderPreferences>();
+        services.AddSingleton<SentenceTranslationPreferences>();
 
         // Localization: the concrete implementation and the Core port point at the same singleton, so LanguageService and the ViewModel share culture state.
         services.AddSingleton<ResourceManagerStringLocalizer>();
