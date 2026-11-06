@@ -18,6 +18,8 @@ public sealed class PhraseAnalysisOrchestrator
     private const int MaxConcurrency = 4;
     // ponytail: cache cap of 50 — enough for typical VN sessions; FIFO eviction keeps memory bounded.
     private const int MaxCacheSize = 50;
+    private static readonly char[] OpeningDialogueQuotes = ['「', '『'];
+    private static readonly char[] ClosingDialogueQuotes = ['」', '』'];
 
     private readonly ILlmPhraseAnalyzer _analyzer;
     private readonly SentenceSegmenter _segmenter;
@@ -26,6 +28,9 @@ public sealed class PhraseAnalysisOrchestrator
     private readonly ILogger? _logger;
     private readonly SentenceTranslationPreferences? _sentenceTranslation;
     private readonly object _cacheGate = new();
+    private readonly SemaphoreSlim _providerSlots = new(MaxConcurrency);
+    private readonly Dictionary<(string SegmentText, string Language, bool Translation), PendingAnalysis> _inFlight = new();
+    private int _cacheGeneration;
     private readonly Dictionary<(string SegmentText, string Language, bool Translation), CachedAnalysis> _cache = new();
     private readonly LinkedList<(string SegmentText, string Language, bool Translation)> _cacheOrder = new();
     private readonly Dictionary<(string SegmentText, string Language, bool Translation, string ModelGroupId), Guid> _sessionGroupIds = new();
@@ -70,11 +75,18 @@ public sealed class PhraseAnalysisOrchestrator
         try
         {
             var (cached, uncached) = SplitByCache(requests);
+            var tasks = new List<Task<PhraseAnalysisResult>>();
+            var sharedRequests = 0;
+            foreach (var item in uncached)
+            {
+                tasks.Add(GetOrStartAnalysis(item.Request, cancellationToken, out var shared));
+                if (shared) sharedRequests++;
+            }
             _logger?.LogInformation("[PHRASE] Recognition {0:N}: segments={1}, cacheHits={2}, providerRequests={3}.",
-                recognitionId, requests.Count, cached.Count, uncached.Count);
-            var freshResults = uncached.Count > 0
-                ? await RunThrottledAsync(uncached, cancellationToken).ConfigureAwait(false)
-                : Array.Empty<PhraseAnalysisResult>();
+                recognitionId, requests.Count, cached.Count, uncached.Count - sharedRequests);
+            if (sharedRequests > 0)
+                _logger?.LogInformation("[PHRASE] Recognition {0:N}: inFlightHits={1}.", recognitionId, sharedRequests);
+            var freshResults = await Task.WhenAll(tasks).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             // Merge: build a lookup for fresh results by request index in the uncached list
             var freshByIndex = new Dictionary<int, PhraseAnalysisResult>();
@@ -177,30 +189,63 @@ public sealed class PhraseAnalysisOrchestrator
         return requests;
     }
 
-    // ponytail: throttle logic folded into a private method so the main flow stays flat and readable.
-    private async Task<PhraseAnalysisResult[]> RunThrottledAsync(
-        IReadOnlyList<CacheableRequest> requests,
-        CancellationToken cancellationToken)
+    private Task<PhraseAnalysisResult> GetOrStartAnalysis(PhraseAnalysisRequest request, CancellationToken cancellationToken, out bool shared)
     {
-        using var throttler = new SemaphoreSlim(MaxConcurrency);
-        var tasks = requests.Select(async cacheableRequest =>
+        PendingAnalysis pending;
+        var key = GetCacheKey(request);
+        lock (_cacheGate)
         {
-            await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
-            try
+            // Another batch may have finished between the initial cache lookup and scheduling.
+            if (TryGetCached(request, out var cached))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var result = await _analyzer.AnalyzeAsync(cacheableRequest.Request, cancellationToken).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-                // Keep completed sentences even if another sentence is cancelled later in the same batch.
-                if (result.Succeeded) CacheResult(cacheableRequest.Request, result);
-                return result;
+                shared = true;
+                return Task.FromResult(cached);
             }
-            finally
+            if (_inFlight.TryGetValue(key, out pending!)
+                && !pending.CancellationToken.IsCancellationRequested
+                && HaveMatchingContentTokens(pending.Tokens, request.Tokens))
             {
-                throttler.Release();
+                shared = true;
+                return AwaitAnalysisAsync(pending, request, cancellationToken);
             }
-        });
-        return await Task.WhenAll(tasks).ConfigureAwait(false);
+            shared = false;
+            pending = new PendingAnalysis(request.Tokens, _cacheGeneration, cancellationToken,
+                new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously));
+            _inFlight[key] = pending;
+        }
+        _ = RunProviderAsync(request, pending, cancellationToken);
+        // The owner tracks the actual transport lifetime; shared waiters can cancel their own wait independently.
+        return AwaitAnalysisAsync(pending, request, CancellationToken.None);
+    }
+
+    private async Task<PhraseAnalysisResult> AwaitAnalysisAsync(PendingAnalysis pending, PhraseAnalysisRequest request, CancellationToken cancellationToken)
+    {
+        var result = await pending.Completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return RebindResult(request, pending.Tokens, result);
+    }
+
+    private async Task RunProviderAsync(PhraseAnalysisRequest request, PendingAnalysis pending, CancellationToken cancellationToken)
+    {
+        var entered = false;
+        try
+        {
+            await _providerSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
+            entered = true;
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await _analyzer.AnalyzeAsync(request, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (result.Succeeded) CacheResult(request, result, pending.Generation);
+            pending.Completion.TrySetResult(result);
+        }
+        catch (OperationCanceledException exception) { pending.Completion.TrySetCanceled(exception.CancellationToken); }
+        catch (Exception exception) { pending.Completion.TrySetException(exception); }
+        finally
+        {
+            if (entered) _providerSlots.Release();
+            var key = GetCacheKey(request);
+            lock (_cacheGate)
+                if (_inFlight.TryGetValue(key, out var current) && ReferenceEquals(current, pending)) _inFlight.Remove(key);
+        }
     }
 
     private static PhraseAnalysisRun Failed(
@@ -239,12 +284,13 @@ public sealed class PhraseAnalysisOrchestrator
         return (cached, uncached);
     }
 
-    private void CacheResult(PhraseAnalysisRequest request, PhraseAnalysisResult result)
+    private void CacheResult(PhraseAnalysisRequest request, PhraseAnalysisResult result, int generation)
     {
-        var key = (request.SegmentText, request.ExplanationLanguage, request.IncludeSentenceTranslation);
+        var key = GetCacheKey(request);
         var cached = new CachedAnalysis(request.Tokens, result);
         lock (_cacheGate)
         {
+            if (generation != _cacheGeneration) return;
             if (_cache.ContainsKey(key))
             {
                 _cache[key] = cached;
@@ -270,6 +316,8 @@ public sealed class PhraseAnalysisOrchestrator
     {
         lock (_cacheGate)
         {
+            _cacheGeneration++;
+            _inFlight.Clear();
             _cache.Clear();
             _cacheOrder.Clear();
             _sessionGroupIds.Clear();
@@ -280,41 +328,53 @@ public sealed class PhraseAnalysisOrchestrator
     {
         CachedAnalysis? cached;
         lock (_cacheGate)
-            _cache.TryGetValue((request.SegmentText, request.ExplanationLanguage, request.IncludeSentenceTranslation), out cached);
+            _cache.TryGetValue(GetCacheKey(request), out cached);
 
         result = null!;
-        if (cached is null || !cached.Tokens.Select(token => token.Token).SequenceEqual(request.Tokens.Select(token => token.Token)))
+        if (cached is null || !HaveMatchingContentTokens(cached.Tokens, request.Tokens))
             return false;
 
-        result = cached.Result;
-        if (cached.Tokens.Select(token => token.Id).SequenceEqual(request.Tokens.Select(token => token.Id)))
-            return true;
-
-        // Token order is stable for identical text, but line ids change when OCR wraps the same sentence differently.
-        var ids = cached.Tokens.Select((token, index) => (token.Id, CurrentId: request.Tokens[index].Id))
-            .ToDictionary(pair => pair.Id, pair => pair.CurrentId);
-        var groups = cached.Result.Groups
-            // An unknown provider reference must not accidentally become valid in the new layout.
-            .Where(group => group.PartTokenIds.SelectMany(part => part).All(ids.ContainsKey))
-            .Select(group => new ParsedPhraseGroup(group.ModelGroupId, group.Type,
-                group.PartTokenIds.Select(part => (IReadOnlyList<SentenceTokenId>)part.Select(id => ids[id]).ToArray()).ToArray(),
-                group.Label, group.Meaning, group.Grammar))
-            .ToArray();
-        result = new PhraseAnalysisResult(cached.Result.Outcome, groups, cached.Result.Warning)
-        {
-            Words = cached.Result.Words,
-            Translation = cached.Result.Translation,
-            Endpoint = cached.Result.Endpoint,
-            ProviderStatusCode = cached.Result.ProviderStatusCode,
-        };
+        result = RebindResult(request, cached.Tokens, cached.Result);
         return true;
+    }
+
+    private static PhraseAnalysisResult RebindResult(PhraseAnalysisRequest request,
+        IReadOnlyList<SentenceTokenReference> tokens, PhraseAnalysisResult result)
+    {
+        if (tokens.Select(token => token.Id).SequenceEqual(request.Tokens.Select(token => token.Id)))
+            return result;
+
+        // Quote recognition can shift every token id; bind unchanged content to the current OCR references.
+        var content = GetContentTokens(tokens);
+        var currentContent = GetContentTokens(request.Tokens);
+        var ids = content.Select((token, index) => (token.Id, CurrentId: currentContent[index].Id))
+            .ToDictionary(pair => pair.Id, pair => pair.CurrentId);
+        var validGroupIds = PhraseGroupValidator.ValidateAndBuild(result.Groups, tokens.ToDictionary(token => token.Id))
+            .ValidGroups.Select(group => group.ModelGroupId).ToHashSet(StringComparer.Ordinal);
+        var groups = result.Groups
+            // Removing a quote must not turn an originally invalid provider group into a valid group.
+            .Where(group => validGroupIds.Contains(group.ModelGroupId))
+            .DistinctBy(group => group.ModelGroupId, StringComparer.Ordinal)
+            .Select(group => new ParsedPhraseGroup(group.ModelGroupId, group.Type,
+                group.PartTokenIds.Select(part => (IReadOnlyList<SentenceTokenId>)part.Where(ids.ContainsKey).Select(id => ids[id]).ToArray())
+                    .Where(part => part.Count > 0).ToArray(),
+                group.Label, group.Meaning, group.Grammar))
+            .Where(group => group.PartTokenIds.Count > 0)
+            .ToArray();
+        return new PhraseAnalysisResult(result.Outcome, groups, result.Warning)
+        {
+            Words = result.Words,
+            Translation = result.Translation,
+            Endpoint = result.Endpoint,
+            ProviderStatusCode = result.ProviderStatusCode,
+        };
     }
 
     private Guid GetSessionGroupId(PhraseAnalysisRequest request, string modelGroupId)
     {
         lock (_cacheGate)
         {
-            var key = (request.SegmentText, request.ExplanationLanguage, request.IncludeSentenceTranslation, modelGroupId);
+            var key = (NormalizeSegmentText(request.SegmentText), request.ExplanationLanguage, request.IncludeSentenceTranslation, modelGroupId);
             if (_sessionGroupIds.TryGetValue(key, out var id))
                 return id;
             id = Guid.NewGuid();
@@ -323,7 +383,41 @@ public sealed class PhraseAnalysisOrchestrator
         }
     }
 
+    private static (string SegmentText, string Language, bool Translation) GetCacheKey(PhraseAnalysisRequest request)
+        => (NormalizeSegmentText(request.SegmentText), request.ExplanationLanguage, request.IncludeSentenceTranslation);
+
+    private static string NormalizeSegmentText(string text)
+        => text.TrimStart(OpeningDialogueQuotes).TrimEnd(ClosingDialogueQuotes);
+
+    private static IReadOnlyList<SentenceTokenReference> GetContentTokens(IReadOnlyList<SentenceTokenReference> tokens)
+    {
+        var start = 0;
+        var end = tokens.Count;
+        while (start < end && tokens[start].Token.Surface.All(OpeningDialogueQuotes.Contains)) start++;
+        while (end > start && tokens[end - 1].Token.Surface.All(ClosingDialogueQuotes.Contains)) end--;
+        return tokens.Skip(start).Take(end - start).ToArray();
+    }
+
+    private static bool HaveMatchingContentTokens(IReadOnlyList<SentenceTokenReference> original, IReadOnlyList<SentenceTokenReference> current)
+    {
+        var left = GetContentTokens(original);
+        var right = GetContentTokens(current);
+        if (left.Count != right.Count) return false;
+        if (left.Count == 0) return original.Select(token => token.Token).SequenceEqual(current.Select(token => token.Token));
+        // Only the quote-induced offset changes; lexical metadata and offsets inside the content must agree.
+        return left.Select(token => TokenIdentity(token.Token, left[0].Token.StartOffset))
+            .SequenceEqual(right.Select(token => TokenIdentity(token.Token, right[0].Token.StartOffset)));
+    }
+
+    private static (string Surface, string Lemma, string OrthBase, string Reading, string BaseReading, string Pronunciation,
+        PartsOfSpeech PartsOfSpeech, string ConjugationType, string ConjugationForm, string AType, int Offset)
+        TokenIdentity(Token token, int contentStart)
+        => (token.Surface, token.Lemma, token.OrthBase, token.Reading, token.BaseReading, token.Pronunciation,
+            token.PartsOfSpeech, token.ConjugationType, token.ConjugationForm, token.AType, token.StartOffset - contentStart);
+
     private sealed record CacheableRequest(PhraseAnalysisRequest Request, int OriginalIndex);
 
     private sealed record CachedAnalysis(IReadOnlyList<SentenceTokenReference> Tokens, PhraseAnalysisResult Result);
+    private sealed record PendingAnalysis(IReadOnlyList<SentenceTokenReference> Tokens, int Generation, CancellationToken CancellationToken,
+        TaskCompletionSource<PhraseAnalysisResult> Completion);
 }

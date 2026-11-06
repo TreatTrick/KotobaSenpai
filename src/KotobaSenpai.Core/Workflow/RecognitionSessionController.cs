@@ -151,39 +151,60 @@ public sealed class RecognitionSessionController : IDisposable
     public async Task StopAsync()
     {
         Stop();
-        Task[] pending;
-        lock (_taskGate) pending = _tasks.ToArray();
-        await Task.WhenAll(pending);
+        while (true)
+        {
+            Task[] pending;
+            lock (_taskGate) pending = _tasks.ToArray();
+            if (pending.Length == 0) return;
+            // An observation can register its publication while shutdown is awaiting that observation.
+            await Task.WhenAll(pending);
+        }
     }
 
     private void StartAutomatic()
     {
         var target = _target;
         if (_disposed || !_autoEnabled || _phase != RecognitionPhase.Ready || target is null || _automatic is null) return;
-        _automatic.Start(target, token => Track(RunAutomaticAsync(target, token)));
+        CancelAutomatic();
+        _automaticCancellation = new CancellationTokenSource();
+        var sessionToken = _automaticCancellation.Token;
+        _automatic.Start(target, token => Track(RunAutomaticAsync(target, token, sessionToken)));
     }
 
-    private async Task RunAutomaticAsync(WindowTarget target, CancellationToken token)
+    private async Task RunAutomaticAsync(WindowTarget target, CancellationToken token, CancellationToken sessionToken)
     {
         if (_disposed || !_autoEnabled || _phase != RecognitionPhase.Ready || target.Handle != _target?.Handle) return;
-        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
-        _automaticCancellation = cancellation;
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token, sessionToken);
         var version = _version;
+        var completionOwnsCancellation = false;
         try
         {
-            var result = await _workflow.RecognizeChangedAndShowAsync(target, cancellation.Token);
-            if (result is not null && IsCurrent(version, cancellation.Token))
-            {
-                _wordCount = result.Lines.Sum(line => line.Words.Count);
-                Completed?.Invoke(this, new(result, true));
-                Changed?.Invoke(this, EventArgs.Empty);
-            }
+            var update = await _workflow.BeginChangedAndShowAsync(target, cancellation.Token);
+            if (update is null) return;
+            completionOwnsCancellation = true;
+            _ = Track(CompleteAutomaticAsync(update, version, cancellation));
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested || version != _version) { }
         catch (Exception exception) { _logger?.LogError(exception, "Automatic recognition failed."); }
         finally
         {
-            if (ReferenceEquals(_automaticCancellation, cancellation)) _automaticCancellation = null;
+            if (!completionOwnsCancellation) cancellation.Dispose();
+        }
+    }
+
+    private async Task CompleteAutomaticAsync(RecognitionUpdate update, int version, CancellationTokenSource cancellation)
+    {
+        using (cancellation)
+        {
+            try
+            {
+                if (!await update.Completion || !IsCurrent(version, cancellation.Token)) return;
+                _wordCount = update.Result.Lines.Sum(line => line.Words.Count);
+                Completed?.Invoke(this, new(update.Result, true));
+                Changed?.Invoke(this, EventArgs.Empty);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested || version != _version) { }
+            catch (Exception exception) { _logger?.LogError(exception, "Automatic recognition failed."); }
         }
     }
 
@@ -209,6 +230,8 @@ public sealed class RecognitionSessionController : IDisposable
     {
         _automatic?.Stop();
         _automaticCancellation?.Cancel();
+        _automaticCancellation?.Dispose();
+        _automaticCancellation = null;
     }
 
     private void SetState(RecognitionPhase phase, Exception? error = null)

@@ -66,11 +66,11 @@ The system SHALL show the red neon region warning only when a completed, current
 - **THEN** any warning from a preceding manual empty recognition stops
 
 ### Requirement: 像素差异变化检测
-系统 SHALL 以可配置的间隔（默认 300ms）从当前选中 HWND 的 WGC 会话读取识别区域，并与上一份可比较样本进行像素级差异比较。当差异超过阈值时，系统 SHALL 触发一次 OCR 文本确认。差异采样和后续 OCR SHALL 使用同一目标的 WGC 画面，不依赖桌面屏幕拷贝，也 SHALL NOT 被 WGC 到帧事件直接驱动。遮挡和失去前台焦点 SHALL NOT 暂停检测；目标隐藏、最小化、关闭或捕获不可用时 SHALL 暂停提供有效样本，失败后按当前轮询间隔有限重试，不执行无界内部重试。
+系统 SHALL 以可配置的间隔（默认 300ms）从当前选中 HWND 的 WGC 会话读取识别区域，并与上一次触发 OCR 的可比较样本进行像素级差异比较，使低于阈值的小变化能够累计。当差异超过阈值时，系统 SHALL 触发 OCR 文本稳定确认。差异采样和后续 OCR SHALL 使用同一目标的 WGC 画面，不依赖桌面屏幕拷贝，也 SHALL NOT 被 WGC 到帧事件直接驱动。遮挡和失去前台焦点 SHALL NOT 暂停检测；目标隐藏、最小化、关闭或捕获不可用时 SHALL 暂停提供有效样本，失败后按当前轮询间隔有限重试，不执行无界内部重试。
 
 #### Scenario: 无变化时不触发识别
 - **WHEN** 连续两份可比较样本的像素差异低于阈值
-- **THEN** 系统 SHALL 不触发 OCR，不启动新一轮识别
+- **THEN** 系统 SHALL 不启动新的 OCR 确认；已经开始的文字稳定确认 SHALL 继续按自己的采样间隔执行
 
 #### Scenario: 有变化时触发 OCR 确认
 - **WHEN** 连续两份可比较样本的像素差异超过阈值
@@ -97,15 +97,15 @@ The system SHALL show the red neon region warning only when a completed, current
 - **THEN** 系统 SHALL 按无变化处理，不强制运行 OCR 或 LLM，也不将重复像素报告为捕获失败
 
 ### Requirement: 全变模式识别
-当新旧 OCR 文本之间没有包含关系时，系统 SHALL 执行全变模式识别：关闭当前 overlay，清空 LLM 缓存，从头执行完整的识别流程。
+当新旧 OCR 文本之间没有包含关系时，系统 SHALL 按句段分别检查缓存，保留仍然匹配的结果。自动识别 SHALL NOT 因一个句段改字而清空全部 LLM 缓存。稳定确认完成后，系统 SHALL 移除已消失内容的标注，为缺少分析的句段显示本地预览，并保留未变化句段的有效标注。
 
 #### Scenario: 文本完全不同
 - **WHEN** 新 OCR 文本与旧文本无包含关系（非子串/超集）
-- **THEN** 系统 SHALL 关闭旧 overlay、清空 LLM 缓存，并执行完整的 OCR + 分词 + LLM 分析 + overlay 渲染流程
+- **THEN** 系统 SHALL 在文字稳定后替换已经消失的内容，复用仍匹配的句段缓存，仅为缺少分析的句段请求模型
 
-#### Scenario: 全变模式清空缓存
-- **WHEN** 系统进入全变模式识别
-- **THEN** 之前的 LLM 结果缓存 SHALL 被完全清空，不复用任何旧结果
+#### Scenario: 一个句段改字时保留其他缓存
+- **WHEN** 一个新句段的 OCR 被修正，其他句段文字未变化
+- **THEN** 系统 SHALL 保留未变化句段的缓存、振假名和下划线，不因全文包含关系改变而重新分析这些句段
 
 ### Requirement: 增量模式识别
 当新 OCR 文本包含旧文本时，系统 SHALL 执行增量模式：保留旧 overlay 中未变化部分，仅对新内容执行 LLM 分析。
@@ -121,6 +121,16 @@ The system SHALL show the red neon region warning only when a completed, current
 #### Scenario: 缓存命中跳过 LLM
 - **WHEN** 分段文本"今日はいい天気ですね"在 LLM 缓存中存在
 - **THEN** 系统 SHALL 直接使用缓存结果，SHALL NOT 发送 LLM 请求
+
+#### Scenario: OCR adds or removes a boundary dialogue quote
+- **WHEN** an OCR segment differs only by leading `「`/`『` or trailing `」`/`』`, and its content tokens retain identical lexical metadata and relative offsets
+- **THEN** the system SHALL reuse its cached or matching in-flight analysis, keep its group identity, and rebind token references to the current geometry
+- **AND** current source text SHALL retain the currently recognized quotation marks; changed words, internal quotes, or other punctuation SHALL NOT be normalized into a cache hit
+
+#### Scenario: Closing dialogue quotes follow terminal punctuation
+- **WHEN** a line ends with sentence-final punctuation followed by closing quotes, including an ASCII `?` or `!`
+- **THEN** the next line SHALL begin a separate segment, so appending a new dialogue does not replace the preceding segment's cache key
+- **AND** a closing quote without preceding terminal punctuation SHALL NOT by itself split a wrapped sentence
 
 #### Scenario: 缓存未命中调用 LLM
 - **WHEN** 分段文本"散歩に行きましょう"不在 LLM 缓存中
@@ -159,3 +169,27 @@ The system SHALL show the red neon region warning only when a completed, current
 #### Scenario: Retry a failed automatic sample
 - **WHEN** 一次自动采样发生可重试的 WGC 捕获失败或超时
 - **THEN** 系统记录英文错误并清理失效基线，不进行 OCR、不重复弹窗，并在后续采样机会重新检查目标及捕获状态
+
+### Requirement: Confirm stable OCR text before cloud analysis
+
+Manual recognition, automatic recognition, and resume SHALL confirm locally recognized text for at least 600 ms before submitting the confirmed snapshot for phrase analysis. Local confirmation SHALL sample at 200 ms intervals, restart the confirmation window whenever text changes, and retain the latest sample geometry. Pixel differences SHALL NOT gate samples within confirmation. Background-only changes SHALL NOT restart the text confirmation window. Existing annotations SHALL remain during automatic confirmation. Continuously changing text SHALL wait until stable or cancelled, without a timeout that forces a partial sentence to the provider.
+
+#### Scenario: Typewriter text becomes complete
+- **WHEN** OCR first returns a partial line and subsequent samples return its completed text
+- **THEN** only the completed snapshot that remains unchanged for 600 ms is submitted for analysis
+
+#### Scenario: Pause while confirming text
+- **WHEN** the user stops, hides, or disables automatic recognition during automatic confirmation
+- **THEN** confirmation is cancelled and its partial text cannot trigger a model request
+
+### Requirement: Continue local observation during provider requests
+
+Automatic observation SHALL finish after local confirmation and scheduling rather than awaiting provider I/O. The application SHALL keep one active publication batch and at most one waiting snapshot, replacing an obsolete waiting snapshot with the newest confirmed one. Superseded snapshots SHALL NOT publish late results. Matching in-flight sentence requests SHALL be shared; total concurrent provider requests SHALL remain bounded at four across overlapping batches. Stopping SHALL cancel and await tracked automatic observation and publication work.
+
+#### Scenario: More text appears while a provider is slow
+- **WHEN** a provider batch is pending and multiple newer snapshots become stable
+- **THEN** local observation continues, only the newest waiting snapshot is retained, and the current sentence cache is reused when that snapshot is processed
+
+#### Scenario: Duplicate sentences share an in-flight request
+- **WHEN** matching text, tokenization, explanation language, and translation mode are requested before an existing request completes
+- **THEN** the application reuses that request and rebinds its token ids to the current layout without sending another request

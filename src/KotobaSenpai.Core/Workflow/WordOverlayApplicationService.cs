@@ -28,6 +28,14 @@ public sealed class WordOverlayApplicationService : IDisposable
     private readonly SentenceTranslationPreferences? _sentenceTranslation;
     private int _recognitionGeneration;
     private string? _lastRecognizedText;
+    private readonly object _publicationGate = new();
+    private QueuedPublication? _pendingPublication;
+    private bool _publishing;
+
+    private sealed record PreparedPublication(Guid RecognitionId, int Generation, WindowTarget Target,
+        WordRecognitionResult Result, IReadOnlyList<GroupedWord> Words);
+    private sealed record QueuedPublication(PreparedPublication Prepared, CancellationToken CancellationToken,
+        TaskCompletionSource<bool> Completion);
 
     public WordOverlayApplicationService(
         IWindowWordRecognizer recognizer,
@@ -92,10 +100,8 @@ public sealed class WordOverlayApplicationService : IDisposable
         return result;
     }
 
-    /// <summary>Recognizes a changed frame and reuses successful analysis independently for each unchanged segment.</summary>
-    public async Task<WordRecognitionResult?> RecognizeChangedAndShowAsync(
-        WindowTarget target,
-        CancellationToken cancellationToken = default)
+    /// <summary>Confirms local OCR and schedules cloud publication without blocking subsequent observations.</summary>
+    public async Task<RecognitionUpdate?> BeginChangedAndShowAsync(WindowTarget target, CancellationToken cancellationToken = default)
     {
         var observedGeneration = Volatile.Read(ref _recognitionGeneration);
         var activeTarget = ValidateTarget(target);
@@ -103,18 +109,70 @@ public sealed class WordOverlayApplicationService : IDisposable
         var result = await RecognizeCoreAsync(recognitionId, activeTarget, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsCurrent(observedGeneration))
-            return result;
+            return new RecognitionUpdate(result, Task.FromResult(false));
 
         var newText = GetRecognizedText(result.Lines);
         if (string.Equals(_lastRecognizedText, newText, StringComparison.Ordinal))
-            return result;
+            return new RecognitionUpdate(result, Task.FromResult(true));
 
         var generation = Interlocked.Increment(ref _recognitionGeneration);
 
         _lastRecognizedText = newText;
-        await PublishAsync(recognitionId, generation, activeTarget, result, cancellationToken)
-            .ConfigureAwait(false);
-        return result;
+        var prepared = PreparePublication(recognitionId, generation, activeTarget, result);
+        ShowPreview(prepared, cancellationToken);
+        var queued = new QueuedPublication(prepared, cancellationToken,
+            new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
+        var startWorker = false;
+        lock (_publicationGate)
+        {
+            _pendingPublication?.Completion.TrySetResult(false);
+            _pendingPublication = queued;
+            if (!_publishing) { _publishing = true; startWorker = true; }
+        }
+        if (startWorker) _ = PublishLatestAsync();
+        return new RecognitionUpdate(result, queued.Completion.Task);
+    }
+
+    /// <summary>Waits for both local confirmation and the queued cloud publication.</summary>
+    public async Task<WordRecognitionResult?> RecognizeChangedAndShowAsync(WindowTarget target, CancellationToken cancellationToken = default)
+    {
+        var update = await BeginChangedAndShowAsync(target, cancellationToken).ConfigureAwait(false);
+        if (update is null) return null;
+        await update.Completion.ConfigureAwait(false);
+        return update.Result;
+    }
+
+    private async Task PublishLatestAsync()
+    {
+        var refreshPreview = false;
+        while (true)
+        {
+            QueuedPublication? queued;
+            lock (_publicationGate)
+            {
+                queued = _pendingPublication;
+                _pendingPublication = null;
+                if (queued is null) { _publishing = false; return; }
+            }
+            try
+            {
+                queued.CancellationToken.ThrowIfCancellationRequested();
+                // A waiting snapshot can now reuse sentences completed by the preceding batch.
+                if (refreshPreview) ShowPreview(queued.Prepared, queued.CancellationToken);
+                await AnalyzeAndPublishAsync(queued.Prepared, queued.CancellationToken).ConfigureAwait(false);
+                queued.CancellationToken.ThrowIfCancellationRequested();
+                queued.Completion.TrySetResult(IsCurrent(queued.Prepared.Generation));
+            }
+            catch (OperationCanceledException exception)
+            {
+                queued.Completion.TrySetCanceled(exception.CancellationToken);
+            }
+            catch (Exception exception)
+            {
+                queued.Completion.TrySetException(exception);
+            }
+            refreshPreview = true;
+        }
     }
 
     private async Task<WordRecognitionResult> RecognizeCoreAsync(
@@ -150,7 +208,7 @@ public sealed class WordOverlayApplicationService : IDisposable
         _overlay.Suspend();
     }
 
-    private async Task PublishAsync(
+    private Task PublishAsync(
         Guid recognitionId,
         int generation,
         WindowTarget activeTarget,
@@ -158,7 +216,13 @@ public sealed class WordOverlayApplicationService : IDisposable
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        bool CanRender() => !cancellationToken.IsCancellationRequested && IsCurrent(generation);
+        var prepared = PreparePublication(recognitionId, generation, activeTarget, result);
+        ShowPreview(prepared, cancellationToken);
+        return AnalyzeAndPublishAsync(prepared, cancellationToken);
+    }
+
+    private PreparedPublication PreparePublication(Guid recognitionId, int generation, WindowTarget activeTarget, WordRecognitionResult result)
+    {
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
         var screenWords = _grouping.Group(result.Lines)
             .Select(word =>
@@ -176,7 +240,13 @@ public sealed class WordOverlayApplicationService : IDisposable
             .ToArray();
 
         _diagnostics?.RecordTokens(recognitionId, activeTarget, screenWords);
+        return new PreparedPublication(recognitionId, generation, activeTarget, result, screenWords);
+    }
 
+    private void ShowPreview(PreparedPublication prepared, CancellationToken cancellationToken)
+    {
+        var (recognitionId, generation, activeTarget, result, screenWords) = prepared;
+        bool CanRender() => !cancellationToken.IsCancellationRequested && IsCurrent(generation);
         // Reproject cached annotations immediately; an OCR correction in one segment must not erase the others.
         if (!IsCurrent(generation))
             return;
@@ -189,8 +259,14 @@ public sealed class WordOverlayApplicationService : IDisposable
             cachedRun.Words,
             cachedRun.SuccessfulSegmentIds,
             cachedRun.Sentences), CanRender);
+    }
 
+    private async Task AnalyzeAndPublishAsync(PreparedPublication prepared, CancellationToken cancellationToken)
+    {
+        var (recognitionId, generation, activeTarget, result, screenWords) = prepared;
+        bool CanRender() => !cancellationToken.IsCancellationRequested && IsCurrent(generation);
         cancellationToken.ThrowIfCancellationRequested();
+        if (!IsCurrent(generation)) return;
         var phraseRun = await _phraseOrchestrator
             .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
             .ConfigureAwait(false);
@@ -276,3 +352,6 @@ public sealed class WordOverlayApplicationService : IDisposable
                 })
                 .ToArray()) { SegmentId = group.SegmentId };
 }
+
+/// <summary>A confirmed local snapshot and its tracked publication; false completion means it was superseded.</summary>
+public sealed record RecognitionUpdate(WordRecognitionResult Result, Task<bool> Completion);

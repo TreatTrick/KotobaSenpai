@@ -14,6 +14,179 @@ namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 public sealed class PhraseAnalysisCacheTests
 {
     [Fact]
+    public async Task Groups_covering_boundary_quotes_keep_only_current_content_references_after_rebinding()
+    {
+        var analyzer = new ContentAnalyzer(includeQuotes: true);
+        var orchestrator = Create(analyzer);
+        var previous = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「同じ。」")]);
+        var current = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+
+        Assert.Equal(1, analyzer.CallCount);
+        var group = Assert.Single(current.Groups);
+        Assert.Equal(Assert.Single(previous.Groups).SessionGroupId, group.SessionGroupId);
+        Assert.Equal("同じ。", Assert.Single(group.Parts).Surface);
+        Assert.Equal(new ScreenRect(0, 0, 30, 20), Assert.Single(Assert.Single(group.Parts).Rects));
+        Assert.Null(current.Warning);
+    }
+
+    [Fact]
+    public async Task An_invalid_group_cannot_become_valid_by_removing_repeated_boundary_quote_references()
+    {
+        var analyzer = new ContentAnalyzer(includeQuotes: true, repeatFirstToken: true);
+        var orchestrator = Create(analyzer);
+        var previous = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「同じ。」")]);
+        Assert.Empty(previous.Groups);
+
+        var current = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+
+        Assert.Equal(1, analyzer.CallCount);
+        Assert.Empty(current.Groups);
+    }
+
+    [Theory]
+    [InlineData("同じ。", "「同じ。", 10)]
+    [InlineData("「同じ。", "同じ。", 0)]
+    [InlineData("『同じ。』", "同じ。", 0)]
+    public async Task Boundary_quote_OCR_changes_reuse_analysis_and_rebind_current_token_offsets(string firstText, string nextText, int x)
+    {
+        var analyzer = new ContentAnalyzer();
+        var orchestrator = Create(analyzer);
+        var first = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line(firstText)]);
+        var preview = orchestrator.GetCachedAnalysis(Guid.NewGuid(), [Line(nextText)]);
+
+        Assert.Contains("s0-0", preview.SuccessfulSegmentIds);
+        var next = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line(nextText)]);
+
+        Assert.Equal(1, analyzer.CallCount);
+        var group = Assert.Single(next.Groups);
+        Assert.Equal(Assert.Single(first.Groups).SessionGroupId, group.SessionGroupId);
+        var part = Assert.Single(group.Parts);
+        Assert.Equal("同じ", part.Surface);
+        Assert.Equal(new ScreenRect(x, 0, 20, 20), Assert.Single(part.Rects));
+        Assert.Equal(nextText, Assert.Single(next.Sentences).SourceText);
+        Assert.Null(next.Warning);
+    }
+
+    [Theory]
+    [InlineData("来る。", "来ない。")]
+    [InlineData("彼は「行く」と言う。", "彼は行くと言う。")]
+    [InlineData("同じ。", "同じ？")]
+    public async Task Changed_words_internal_quotes_and_sentence_punctuation_still_require_new_analysis(string first, string next)
+    {
+        var analyzer = new ContentAnalyzer();
+        var orchestrator = Create(analyzer);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line(first)]);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line(next)]);
+        Assert.Equal(2, analyzer.CallCount);
+    }
+
+    [Fact]
+    public async Task An_in_flight_sentence_is_shared_when_only_its_boundary_quote_is_added()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        var first = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        var next = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「同じ。")]);
+        try { Assert.Single(analyzer.Requests); }
+        finally
+        {
+            analyzer.Release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
+                [new ParsedPhraseGroup("first", "grammar", [[analyzer.Requests[0].Tokens[0].Id]], "label", "meaning", "grammar")]));
+        }
+        var runs = await Task.WhenAll(first, next);
+        Assert.Equal(Assert.Single(runs[0].Groups).SessionGroupId, Assert.Single(runs[1].Groups).SessionGroupId);
+        Assert.Equal(10, Assert.Single(Assert.Single(Assert.Single(runs[1].Groups).Parts).Rects).X);
+    }
+
+    private sealed class ContentAnalyzer(bool includeQuotes = false, bool repeatFirstToken = false) : ILlmPhraseAnalyzer
+    {
+        public int CallCount { get; private set; }
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            var ids = includeQuotes ? request.Tokens.Select(token => token.Id).ToArray()
+                : request.Tokens.Where(token => !token.Token.Surface.All(c => "「」『』".Contains(c)))
+                    .Take(2).Select(token => token.Id).ToArray();
+            if (repeatFirstToken) ids = [ids[0], .. ids];
+            return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
+                [new ParsedPhraseGroup("content", "grammar", [ids], "label", "meaning", "grammar")]));
+        }
+    }
+
+    [Fact]
+    public async Task A_cancelled_request_is_not_shared_when_reading_resumes_before_its_transport_finishes()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        using var cancellation = new CancellationTokenSource();
+        var first = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")], cancellation.Token);
+        cancellation.Cancel();
+        var resumed = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ。")]);
+        try { Assert.Equal(2, analyzer.Requests.Count); }
+        finally { analyzer.Release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, [])); }
+
+        Assert.Equal(PhraseAnalysisOutcome.Cancelled, (await first).Outcome);
+        Assert.Equal(PhraseAnalysisOutcome.Success, (await resumed).Outcome);
+    }
+
+    [Fact]
+    public async Task Concurrent_analyses_share_a_matching_request_and_rebind_its_current_line_ids()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        var first = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ句。")]);
+        var second = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ"), Line("句。", 30)]);
+        try { Assert.Single(analyzer.Requests); }
+        finally
+        {
+            analyzer.Release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
+                [new ParsedPhraseGroup("last", "grammar", [[analyzer.Requests[0].Tokens[^1].Id]], "label", "meaning", "grammar")]));
+        }
+        await first;
+        var run = await second;
+        Assert.Equal(new ScreenRect(10, 30, 10, 20), Assert.Single(Assert.Single(Assert.Single(run.Groups).Parts).Rects));
+    }
+
+    [Fact]
+    public async Task Provider_concurrency_is_bounded_across_overlapping_batches()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        var first = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("一。"), Line("二。"), Line("三。")]);
+        var second = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("四。"), Line("五。"), Line("六。")]);
+        try { Assert.Equal(4, analyzer.Requests.Count); }
+        finally { analyzer.Release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, [])); }
+        await Task.WhenAll(first, second);
+        Assert.Equal(6, analyzer.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Clearing_the_cache_prevents_a_late_request_from_repopulating_it()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        var first = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("旧句。")]);
+        orchestrator.ClearCache();
+        analyzer.Release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        await first;
+
+        Assert.Empty(orchestrator.GetCachedAnalysis(Guid.NewGuid(), [Line("旧句。")]).SuccessfulSegmentIds);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("旧句。")]);
+        Assert.Equal(2, analyzer.Requests.Count);
+    }
+
+    private sealed class PendingAnalyzer : ILlmPhraseAnalyzer
+    {
+        public List<PhraseAnalysisRequest> Requests { get; } = [];
+        public TaskCompletionSource<PhraseAnalysisResult> Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            lock (Requests) Requests.Add(request);
+            return Release.Task;
+        }
+    }
+
+    [Fact]
     public async Task An_in_flight_result_is_cached_under_its_request_mode_after_the_setting_changes()
     {
         var preferences = new SentenceTranslationPreferences(new TranslationSettings());

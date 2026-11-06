@@ -10,6 +10,27 @@ namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 
 public sealed class PhraseSegmentationTests
 {
+    [Theory]
+    [InlineData("静希君で頼む。君は蒼崎でいいんだよな?」")]
+    [InlineData("確認!』")]
+    [InlineData("確認。』」")]
+    [InlineData("確認？」  ")]
+    public void Final_punctuation_before_closing_quotes_keeps_the_next_dialogue_separate(string first)
+    {
+        var firstLine = new OcrLine([new OcrWord(first, new ScreenRect(0, 0, first.Length * 10, 20))]);
+        var segments = new SentenceSegmenter().Segment([firstLine, Line("「ええ、よろしく」", 40)]);
+        Assert.Equal(2, segments.Count);
+        Assert.Equal([0], segments[0].LineIndices);
+        Assert.Equal([1], segments[1].LineIndices);
+    }
+
+    [Fact]
+    public void A_closing_quote_without_final_punctuation_can_continue_on_the_next_line()
+    {
+        var segments = new SentenceSegmenter().Segment([Line("彼は「行く」"), Line("と言った。", 30)]);
+        Assert.Single(segments);
+    }
+
     private static OcrLine Line(string text, int y = 0, int xStart = 0)
         => new(text.Select((c, i) => new OcrWord(c.ToString(), new ScreenRect(xStart + 10 * i, y, 10, 20))).ToArray());
 

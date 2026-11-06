@@ -127,6 +127,9 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         private readonly Canvas _canvas = new();
         private readonly List<OverlayAnnotation> _lineElements = new();
         private readonly List<int> _lineOwner = new(); // parallel to _lineElements: the word index each line belongs to
+        private readonly List<RenderedWord> _renderedWords = new();
+        private sealed record RenderedWord(GroupedWord Word, bool Underlined, double Scale, double FontScale,
+            IReadOnlyList<OverlayAnnotation> Elements, IReadOnlyList<OverlayAnnotation> Underlines);
         private readonly DispatcherTimer _hoverTimer;
         private readonly PhrasePopup _phrasePopup;
         private readonly ITargetWindowTracker? _tracker;
@@ -376,16 +379,28 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             Width = session.Target.Bounds.Width / scale + edgePaddingDip * 2;
             Height = session.Target.Bounds.Height / scale + edgePaddingDip * 2;
             PositionAboveTarget(session.Target);
-            _canvas.Children.Clear();
+            var previousWords = _renderedWords.ToList();
+            _renderedWords.Clear();
             _lineElements.Clear();
             _lineOwner.Clear();
 
-            // One underline per word rect (a cross-line word has one per line); kanji words get hiragana
-            // furigana centered above each source-token line fragment. Furigana is cleared with the underlines on
-            // refresh, and the click-through window never receives mouse events, so hover logic stays untouched.
+            // Retain unchanged annotations so adding a sentence does not remove and recreate earlier text.
             for (int wordIndex = 0; wordIndex < session.Words.Count; wordIndex++)
             {
                 var word = session.Words[wordIndex];
+                var underlined = session.ShouldUnderline(word);
+                var previousIndex = previousWords.FindIndex(previous => Matches(previous, word, underlined, scale, fontScale));
+                if (previousIndex >= 0)
+                {
+                    var previous = previousWords[previousIndex];
+                    previousWords.RemoveAt(previousIndex);
+                    _renderedWords.Add(previous);
+                    _lineElements.AddRange(previous.Underlines);
+                    _lineOwner.AddRange(previous.Underlines.Select(_ => wordIndex));
+                    continue;
+                }
+                var firstElement = _canvas.Children.Count;
+                var firstUnderline = _lineElements.Count;
                 if (session.ShouldUnderline(word))
                 {
                     foreach (var rect in word.Rects)
@@ -402,7 +417,12 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
                 if (!string.IsNullOrEmpty(word.Reading))
                     AddPitchAnnotations(word, scale, fontScale);
+                _renderedWords.Add(new RenderedWord(word, underlined, scale, fontScale,
+                    _canvas.Children.Cast<OverlayAnnotation>().Skip(firstElement).ToArray(),
+                    _lineElements.Skip(firstUnderline).ToArray()));
             }
+            foreach (var obsolete in previousWords)
+                foreach (var element in obsolete.Elements) _canvas.Children.Remove(element);
             _renderedSnapshot = _tracker?.Current;
             _hoverTimer.Start();
 
@@ -433,6 +453,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
                 }, DispatcherPriority.ContextIdle);
             }
         }
+
+        private static bool Matches(RenderedWord previous, GroupedWord word, bool underlined, double scale, double fontScale)
+            => previous.Underlined == underlined && previous.Scale == scale && previous.FontScale == fontScale
+                && previous.Word.Surface == word.Surface && previous.Word.Reading == word.Reading
+                && previous.Word.Rects.SequenceEqual(word.Rects)
+                && previous.Word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType))
+                    .SequenceEqual(word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType)))
+                && previous.Word.SourceTokenLines.Count == word.SourceTokenLines.Count
+                && previous.Word.SourceTokenLines.Zip(word.SourceTokenLines).All(pair => pair.First.SequenceEqual(pair.Second));
 
         private void LogWindowDiagnostics(string reason)
         {
@@ -522,6 +551,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
             _renderedSnapshot = null;
             StopHover();
             _canvas.Children.Clear();
+            _renderedWords.Clear();
             _lineElements.Clear();
             _lineOwner.Clear();
         }

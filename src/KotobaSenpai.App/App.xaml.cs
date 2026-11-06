@@ -245,7 +245,9 @@ public partial class App : Application
     {
         services.AddSingleton<IWindowPicker, Win32WindowPicker>();
         services.AddSingleton<IWindowFrameCapture, WgcWindowFrameCapture>();
-        services.AddSingleton<IWindowWordRecognizer, MeikiOcrWordRecognizer>();
+        services.AddSingleton<MeikiOcrWordRecognizer>();
+        services.AddSingleton<IWindowWordRecognizer>(sp => new StableWindowWordRecognizer(
+            sp.GetRequiredService<MeikiOcrWordRecognizer>(), logger: sp.GetRequiredService<ILogger>()));
         services.AddSingleton<ITargetWindowTracker, WinEventTargetWindowTracker>();
         services.AddSingleton<IAutoRecognitionController, AutoRecognitionController>();
         services.AddSingleton<WpfOverlayRenderer>();

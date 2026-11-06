@@ -15,6 +15,33 @@ public sealed class RecognitionSessionTests
     private static readonly WindowTarget Target = new((nint)42, "Reading target", new(0, 0, 1000, 500));
 
     [Fact]
+    public async Task Automatic_sampling_returns_before_the_model_and_pause_cancels_all_tracked_analysis()
+    {
+        var recognizer = new Recognizer();
+        var analyzer = new Analyzer();
+        var overlay = new Overlay();
+        var automatic = new Automatic();
+        using var workflow = CreateWorkflow(recognizer, analyzer, overlay);
+        using var session = new RecognitionSessionController(workflow, new Settings(), automatic);
+        await session.RecognizeAsync(Target);
+        await session.SetAutoRecognitionAsync(true, Target);
+        analyzer.Pending = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        recognizer.Text = "ChangedSentence.";
+
+        await automatic.TriggerAsync().WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.Equal(2, analyzer.Calls);
+        var preview = overlay.Saved;
+        session.PauseAndHide();
+        Assert.True(analyzer.LastToken.IsCancellationRequested);
+        var stop = session.StopAsync();
+        Assert.False(stop.IsCompleted);
+        analyzer.Pending.SetResult(new(PhraseAnalysisOutcome.Success, []));
+        await stop.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.Null(overlay.Saved);
+        Assert.NotNull(preview);
+    }
+
+    [Fact]
     public async Task Pausing_a_partial_batch_keeps_completed_sentences_and_retries_only_unfinished_work()
     {
         var analyzer = new Analyzer

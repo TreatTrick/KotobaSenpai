@@ -4,7 +4,7 @@
 TBD - created by archiving change defer-overlay-underlines-until-ai. Update Purpose after archive.
 ## Requirements
 ### Requirement: Stage local furigana before cloud analysis
-For initial or full-change recognition, the application SHALL publish a local overlay containing UniDic-resolved words and furigana immediately after local grouping, without waiting for provider I/O. Cloud phrase analysis SHALL be required; historical enable settings SHALL NOT bypass the analysis workflow. The staged overlay SHALL contain no underline elements or LLM meanings. Publication SHALL update the saved session while target visibility rules determine whether it is displayed; temporary hiding due to target invisibility, minimization, or an occlusion union strictly greater than 30% of the full client area SHALL retain the latest completed result for restoration. 在增量识别场景中，系统 SHALL 在增量模式完成前保持上一轮 overlay 不变（未变化部分的下划线、短语组、词义均保留），增量模式完成后再刷新。
+After stable local recognition and grouping, the application SHALL publish UniDic-resolved words and furigana without waiting for provider I/O. Cached successful segments SHALL retain their underlines, groups, meanings, and corresponding translations. Segments without successful analysis SHALL have local annotations only. Historical enable settings SHALL NOT bypass cloud analysis. Publication SHALL update the saved session while target visibility rules determine whether it is displayed; temporary hiding due to target invisibility, minimization, or an occlusion union strictly greater than 30% of the full client area SHALL retain the latest completed result for restoration.
 
 #### Scenario: Initial overlay appears before a slow provider
 - **WHEN** initial or full-change local recognition and grouping finish, the provider has not returned yet, and the target is renderable
@@ -18,9 +18,13 @@ For initial or full-change recognition, the application SHALL publish a local ov
 - **WHEN** incremental recognition is in progress (some segments reuse cached LLM results, others need fresh analysis)
 - **THEN** the prior overlay session SHALL NOT be cleared; unchanged word underlines, phrase groups, and word meanings SHALL remain visible while the target is renderable until the incremental cycle completes
 
-#### Scenario: Incremental cycle completion refreshes overlay once
+#### Scenario: Incremental cycle completion adds the fresh annotations
 - **WHEN** all incremental segments (both cached and fresh) are processed
-- **THEN** the application SHALL issue exactly one overlay refresh containing the merged result
+- **THEN** the application SHALL issue one post-analysis publication containing the merged result and reuse unchanged annotation elements from the local preview
+
+#### Scenario: A second sentence preserves existing drawing elements
+- **WHEN** a stable new sentence is appended while previous words keep the same text, reading, geometry, underline eligibility, and font scale
+- **THEN** existing furigana, pitch markers, and underlines remain the same drawing elements; the renderer adds or replaces only affected word annotations
 
 ### Requirement: Publish one post-analysis overlay refresh
 After all sentence requests in an analysis batch complete, the application SHALL replace the staged overlay exactly once. The replacement SHALL add underlines and validated meanings for successful sentence segments, preserve furigana for every local word, and retain a warning for failed segments. 在增量模式下，替换 SHALL 保留上一轮缓存命中段的下划线和短语组，仅新增或更新有变化的段。

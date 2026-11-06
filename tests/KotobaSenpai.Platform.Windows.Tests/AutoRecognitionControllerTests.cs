@@ -10,6 +10,29 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class AutoRecognitionControllerTests
 {
     [Fact]
+    public async Task Small_typewriter_changes_accumulate_against_the_last_OCR_trigger()
+    {
+        var target = new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 200, 1));
+        var oneCharacter = new byte[800];
+        oneCharacter[0] = 255;
+        var twoCharacters = (byte[])oneCharacter.Clone();
+        twoCharacters[4] = 255;
+        var capture = new SequencedCapture(new CapturedFrame(200, 1, new byte[800]),
+            new CapturedFrame(200, 1, oneCharacter), new CapturedFrame(200, 1, twoCharacters));
+        using var controller = new AutoRecognitionController(capture, new FakeTracker(target), new FakeSettings());
+        var changes = 0;
+        controller.Start(target, _ => { changes++; return Task.CompletedTask; });
+
+        await controller.PollOnceAsync();
+        await controller.PollOnceAsync();
+        Assert.Equal(0, changes);
+        await controller.PollOnceAsync();
+        await controller.PollOnceAsync();
+
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
     public async Task Stopping_during_capture_cancels_the_run_and_discards_its_late_sample()
     {
         var target = new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 2, 1));

@@ -14,6 +14,106 @@ namespace KotobaSenpai.Core.Tests.Workflow;
 public sealed class AutoRecognitionWorkflowTests
 {
     [Fact]
+    public async Task The_recorded_third_dialogue_reuses_both_older_sentences_despite_an_added_opening_quote()
+    {
+        const string first = "いや、いいんだ、ごく一般的なんだろう。";
+        const string second = "静希君で頼む。君は蒼崎でいいんだよな?」";
+        const string third = "「ええ、よろしく」";
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new RecordingAnalyzer(release);
+        var overlay = new RecordingOverlay();
+        using var service = CreateService(new SequencedRecognizer([Line(first), Line(second, 40)],
+            [Line("「" + first), Line(second, 40), Line(third, 80)]), overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        var previous = overlay.LastSession!;
+        analyzer.DelayNewRequests = true;
+
+        var pending = service.RecognizeChangedAndShowAsync(Target());
+        try
+        {
+            var preview = overlay.LastSession!;
+            Assert.Contains("s0-0", preview.UnderlineSegmentIds!);
+            Assert.Contains("s1-1", preview.UnderlineSegmentIds!);
+            Assert.DoesNotContain("s2-2", preview.UnderlineSegmentIds!);
+            Assert.Equal(previous.PhraseGroups.Select(group => group.SessionGroupId),
+                preview.PhraseGroups.Select(group => group.SessionGroupId));
+            Assert.Equal(previous.WordMeanings.Select(word => word.Headword), preview.WordMeanings.Select(word => word.Headword));
+            Assert.Equal([first, second, third], analyzer.Requests.Select(request => request.SegmentText));
+            Assert.Equal(1, overlay.HideCount);
+        }
+        finally
+        {
+            release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await pending;
+        }
+        Assert.Contains("s2-2", overlay.LastSession!.UnderlineSegmentIds!);
+    }
+
+    [Fact]
+    public async Task A_waiting_snapshot_shows_newly_cached_sentences_before_its_own_model_request_finishes()
+    {
+        var analyzer = new SentenceAnalyzer();
+        var overlay = new RecordingOverlay();
+        using var service = CreateService(new SequencedRecognizer([Line("旧句。")],
+            [Line("旧句。"), Line("追加。", 60)], [Line("旧句。"), Line("追加。", 60), Line("最新。", 120)]), overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        var first = await service.BeginChangedAndShowAsync(Target());
+        var second = await service.BeginChangedAndShowAsync(Target());
+        analyzer.First.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        await analyzer.SecondStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        try
+        {
+            Assert.Contains("s1-1", overlay.LastSession!.UnderlineSegmentIds!);
+            Assert.DoesNotContain("s2-2", overlay.LastSession.UnderlineSegmentIds!);
+        }
+        finally
+        {
+            analyzer.Second.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await Task.WhenAll(first!.Completion, second!.Completion);
+        }
+    }
+
+    private sealed class SentenceAnalyzer : ILlmPhraseAnalyzer
+    {
+        public TaskCompletionSource<PhraseAnalysisResult> First { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<PhraseAnalysisResult> Second { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource SecondStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            if (request.SegmentText == "追加。") return First.Task;
+            if (request.SegmentText == "最新。") { SecondStarted.TrySetResult(); return Second.Task; }
+            return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        }
+    }
+
+    [Fact]
+    public async Task Automatic_observation_returns_while_analysis_is_pending_and_keeps_only_the_latest_waiting_snapshot()
+    {
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new RecordingAnalyzer(release);
+        var overlay = new RecordingOverlay();
+        using var service = CreateService(new SequencedRecognizer([Line("旧句。")],
+            [Line("旧句。"), Line("最初。", 60)], [Line("旧句。"), Line("途中。", 60)],
+            [Line("旧句。"), Line("最後。", 60)]), overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        analyzer.DelayNewRequests = true;
+
+        var first = await service.BeginChangedAndShowAsync(Target()).WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.False(first!.Completion.IsCompleted);
+        var middle = await service.BeginChangedAndShowAsync(Target()).WaitAsync(TimeSpan.FromSeconds(1));
+        var last = await service.BeginChangedAndShowAsync(Target()).WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.False(await middle!.Completion);
+        Assert.Contains(overlay.LastSession!.Words, word => word.Surface == "最");
+        Assert.Contains("s0-0", overlay.LastSession.UnderlineSegmentIds!);
+        release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        Assert.False(await first.Completion);
+        Assert.True(await last!.Completion);
+        Assert.DoesNotContain(analyzer.Requests, request => request.SegmentText == "途中。");
+        Assert.Equal(["旧句。", "最初。", "最後。"], analyzer.Requests.Select(request => request.SegmentText));
+    }
+
+    [Fact]
     public async Task Translation_setting_keeps_the_overlay_and_reanalyzes_unchanged_text_on_the_next_scan()
     {
         var preferences = new SentenceTranslationPreferences(new TranslationSettings());

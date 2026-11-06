@@ -5,6 +5,9 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Platform.Windows;
 using KotobaSenpai.Platform.Windows.Japanese;
+using KotobaSenpai.Core.Ocr;
+using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.PhraseAnalysis;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 
@@ -16,6 +19,47 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 /// </summary>
 public sealed class UniDicTokenizerTests
 {
+    [Fact]
+    public async Task Recorded_dialogue_reuses_two_cached_sentences_with_real_UniDic_after_a_third_sentence_appears()
+    {
+        var dict = TryResolveDictionary();
+        if (dict is null) return;
+        using var tokenizer = new UniDicTokenizer(Logger, dict);
+        var analyzer = new ReplayAnalyzer();
+        var orchestrator = new PhraseAnalysisOrchestrator(analyzer, tokenBuilder: new SentenceTokenBuilder(tokenizer));
+        const string first = "いや、いいんだ、ごく一般的なんだろう。";
+        const string second = "静希君で頼む。君は蒼崎でいいんだよな?」";
+        const string third = "「ええ、よろしく」";
+        static OcrLine Line(string text, int y) => new(text.Select((c, i) =>
+            new OcrWord(c.ToString(), new ScreenRect(i * 10, y, 10, 20))).ToArray());
+        var previous = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line(first, 0), Line(second, 40)]);
+        var lines = new[] { Line("「" + first, 0), Line(second, 40), Line(third, 80) };
+
+        var preview = orchestrator.GetCachedAnalysis(Guid.NewGuid(), lines);
+        Assert.Contains("s0-0", preview.SuccessfulSegmentIds);
+        Assert.Contains("s1-1", preview.SuccessfulSegmentIds);
+        Assert.Equal(previous.Groups.Select(group => group.SessionGroupId), preview.Groups.Select(group => group.SessionGroupId));
+        var completed = await orchestrator.AnalyzeAsync(Guid.NewGuid(), lines);
+
+        Assert.Equal([first, second, third], analyzer.Texts);
+        Assert.Equal(3, completed.SuccessfulSegmentIds.Count);
+        Assert.Equal("いや", Assert.Single(preview.Groups[0].Parts).Surface);
+        Assert.Equal(10, Assert.Single(Assert.Single(preview.Groups[0].Parts).Rects).X);
+        Assert.Null(completed.Warning);
+    }
+
+    private sealed class ReplayAnalyzer : ILlmPhraseAnalyzer
+    {
+        public List<string> Texts { get; } = [];
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            Texts.Add(request.SegmentText);
+            var token = request.Tokens.First(reference => !reference.Token.Surface.All(c => "「」『』".Contains(c)));
+            return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
+                [new ParsedPhraseGroup("content", "grammar", [[token.Id]], "label", "meaning", "grammar")]));
+        }
+    }
+
     private static readonly ILogger Logger = new NullLogger();
 
     [Fact]

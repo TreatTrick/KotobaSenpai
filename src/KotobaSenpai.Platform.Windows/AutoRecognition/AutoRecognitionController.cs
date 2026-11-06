@@ -142,22 +142,25 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
             if (cancellationToken.IsCancellationRequested || !IsRunning)
                 return;
 
-            CapturedFrame? previous;
+            bool changed;
             lock (_gate)
             {
                 if (_cancellation?.Token != cancellationToken || cancellationToken.IsCancellationRequested)
                     return;
                 var baseline = _baseline;
-                previous = baseline is not null
+                var previous = baseline is not null
                     && baseline.Handle == snapshot.Handle && baseline.Region == region
                     && baseline.ClientWidth == snapshot.Bounds.Width && baseline.ClientHeight == snapshot.Bounds.Height
                     && baseline.Frame.Width == frame.Width && baseline.Frame.Height == frame.Height
                     && baseline.Frame.CaptureGeneration == frame.CaptureGeneration
                     ? baseline.Frame : null;
-                _baseline = new Baseline(snapshot.Handle, region, snapshot.Bounds.Width, snapshot.Bounds.Height, frame);
+                changed = FrameDifference.Exceeds(previous, frame, threshold);
+                // Keep the last trigger as the baseline so slow typewriter updates can accumulate.
+                if (previous is null || changed)
+                    _baseline = new Baseline(snapshot.Handle, region, snapshot.Bounds.Width, snapshot.Bounds.Height, frame);
             }
 
-            if (!FrameDifference.Exceeds(previous, frame, threshold) || onChange is null)
+            if (!changed || onChange is null)
                 return;
 
             await onChange(cancellationToken);

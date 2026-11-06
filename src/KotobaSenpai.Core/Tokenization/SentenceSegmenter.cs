@@ -6,10 +6,12 @@ namespace KotobaSenpai.Core.Tokenization;
 /// Divides OCR lines into sentence segments. Adjacent lines are merged into one segment unless the previous line ends
 /// with sentence-final punctuation or there is a paragraph gap; a wrapped sentence (no punctuation or gap) stays one
 /// segment so cross-line words are not split. Cross-segment token references are forbidden to avoid joining unrelated blocks.
+/// Closing quotation marks do not hide preceding sentence-final punctuation, including ASCII question/exclamation marks.
 /// </summary>
 public sealed class SentenceSegmenter
 {
-    private static readonly string SentenceFinalPunctuation = "。！？…‥．";
+    private static readonly string SentenceFinalPunctuation = "。！？…‥．?!";
+    private static readonly string ClosingQuotationMarks = "」』”’\"'";
 
     /// <summary>Vertical gap factor treated as a paragraph gap (relative to the previous line's height).</summary>
     private const double ParagraphGapFactor = 1.5;
@@ -52,6 +54,9 @@ public sealed class SentenceSegmenter
     private static bool IsSentenceFinal(string text)
     {
         var trimmed = text.TrimEnd();
+        // OCR may return ASCII punctuation and keep the dialogue's closing quotation marks.
+        while (trimmed.Length > 0 && ClosingQuotationMarks.Contains(trimmed[^1]))
+            trimmed = trimmed[..^1].TrimEnd();
         if (trimmed.Length == 0)
             return true;
         var last = trimmed[^1];
