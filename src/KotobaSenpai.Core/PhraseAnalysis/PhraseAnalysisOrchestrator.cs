@@ -6,7 +6,7 @@ using KotobaSenpai.Core.Settings;
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
 /// <summary>
-/// Orchestrates phrase analysis: first performs local sentence segmentation and token references, then calls
+/// Orchestrates phrase analysis: first prepares stable text blocks and token references, then calls
 /// the provider concurrently (one independent request per sentence, concurrency-limited), validates groups,
 /// assigns session ids, maps geometry, and preserves provider order. Any failure only produces a retryable
 /// warning and never throws through the recognition flow; local words/spans remain usable.
@@ -31,6 +31,7 @@ public sealed class PhraseAnalysisOrchestrator
     private readonly SemaphoreSlim _providerSlots = new(MaxConcurrency);
     private readonly Dictionary<(string SegmentText, string Language, bool Translation), PendingAnalysis> _inFlight = new();
     private int _cacheGeneration;
+    private IReadOnlyList<PhraseAnalysisRequest> _completedBlocks = [];
     private readonly Dictionary<(string SegmentText, string Language, bool Translation), CachedAnalysis> _cache = new();
     private readonly LinkedList<(string SegmentText, string Language, bool Translation)> _cacheOrder = new();
     private readonly Dictionary<(string SegmentText, string Language, bool Translation, string ModelGroupId), Guid> _sessionGroupIds = new();
@@ -53,21 +54,33 @@ public sealed class PhraseAnalysisOrchestrator
 
     /// <summary>Rebuilds successful cached annotations against the current OCR geometry without calling the provider.</summary>
     public PhraseAnalysisRun GetCachedAnalysis(Guid recognitionId, IReadOnlyList<OcrLine> lines)
+        => GetCachedAnalysis(PrepareAnalysis(recognitionId, lines));
+
+    public PhraseAnalysisRun GetCachedAnalysis(PhraseAnalysisPlan plan)
     {
-        var requests = BuildRequests(recognitionId, lines);
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.CacheGeneration != Volatile.Read(ref _cacheGeneration))
+            return new PhraseAnalysisRun(PhraseAnalysisOutcome.Success, [], null);
+        var requests = plan.Requests;
         var (cached, _) = SplitByCache(requests);
         var indices = cached.Keys.Order().ToArray();
         return BuildRun(indices.Select(index => requests[index]).ToArray(),
             indices.Select(index => cached[index]).ToArray());
     }
 
-    public async Task<PhraseAnalysisRun> AnalyzeAsync(
+    public Task<PhraseAnalysisRun> AnalyzeAsync(
         Guid recognitionId,
         IReadOnlyList<OcrLine> lines,
         CancellationToken cancellationToken = default)
+        => AnalyzeAsync(PrepareAnalysis(recognitionId, lines), cancellationToken);
+
+    public async Task<PhraseAnalysisRun> AnalyzeAsync(PhraseAnalysisPlan plan, CancellationToken cancellationToken = default)
     {
-        // First build the requests purely locally (fast, zero I/O), preserving segment order; Task.WhenAll returns results in input order, so no re-sorting is needed.
-        var requests = BuildRequests(recognitionId, lines);
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.CacheGeneration != Volatile.Read(ref _cacheGeneration))
+            return Failed(PhraseAnalysisOutcome.Cancelled, "The prepared analysis was superseded by a cache reset.", []);
+        var recognitionId = plan.RecognitionId;
+        var requests = plan.Requests;
         if (requests.Count == 0)
             return new PhraseAnalysisRun(PhraseAnalysisOutcome.Success, [], null);
 
@@ -87,7 +100,7 @@ public sealed class PhraseAnalysisOrchestrator
             var sharedRequests = 0;
             foreach (var item in uncached)
             {
-                tasks.Add(GetOrStartAnalysis(item.Request, cancellationToken, out var shared));
+                tasks.Add(GetOrStartAnalysis(item.Request, plan.CacheGeneration, cancellationToken, out var shared));
                 if (shared) sharedRequests++;
             }
             _logger?.LogInformation("[PHRASE] Recognition {0:N}: segments={1}, cacheHits={2}, providerRequests={3}.",
@@ -115,6 +128,10 @@ public sealed class PhraseAnalysisOrchestrator
             return Failed(PhraseAnalysisOutcome.Cancelled, "Phrase analysis cancelled.", []);
         }
 
+        lock (_cacheGate)
+            if (plan.CacheGeneration == _cacheGeneration)
+                _completedBlocks = requests.Where((request, index) => results[index].Succeeded
+                    && HasCompletedBoundary(request.SegmentText)).ToArray();
         return BuildRun(requests, results);
     }
 
@@ -172,14 +189,36 @@ public sealed class PhraseAnalysisOrchestrator
         };
     }
 
-    private IReadOnlyList<PhraseAnalysisRequest> BuildRequests(Guid recognitionId, IReadOnlyList<OcrLine> lines)
+    /// <summary>Retains completed block boundaries before either local grouping or provider analysis begins.</summary>
+    public PhraseAnalysisPlan PrepareAnalysis(Guid recognitionId, IReadOnlyList<OcrLine> lines)
     {
         if (recognitionId == Guid.Empty)
             throw new ArgumentException("Recognition id must not be empty.", nameof(recognitionId));
         ArgumentNullException.ThrowIfNull(lines);
 
+        var language = _explanationLanguage?.EffectiveLanguage ?? "English";
+        var translation = _sentenceTranslation?.Enabled ?? true;
+        int generation;
+        IReadOnlyList<PhraseAnalysisRequest> boundaries;
+        lock (_cacheGate)
+        {
+            generation = _cacheGeneration;
+            boundaries = _completedBlocks.Concat(_inFlight.Values
+                    .Where(pending => !pending.CancellationToken.IsCancellationRequested)
+                    .Select(pending => pending.Request))
+                .Where(request => HasCompletedBoundary(request.SegmentText))
+                .ToArray();
+        }
+        var (layout, segments) = PreserveCompletedBlocks(lines, boundaries);
+        return new PhraseAnalysisPlan(recognitionId, generation, layout, segments,
+            BuildRequests(recognitionId, layout, segments, language, translation));
+    }
+
+    private IReadOnlyList<PhraseAnalysisRequest> BuildRequests(Guid recognitionId, IReadOnlyList<OcrLine> lines,
+        IReadOnlyList<SentenceSegment> segments, string language, bool translation)
+    {
         var requests = new List<PhraseAnalysisRequest>();
-        foreach (var segment in _segmenter.Segment(lines))
+        foreach (var segment in segments)
         {
             var segmentTokens = _tokenBuilder.Build(lines, segment);
             if (segmentTokens.References.Count == 0)
@@ -191,18 +230,102 @@ public sealed class PhraseAnalysisOrchestrator
                 string.Concat(segment.LineIndices.Select(i => lines[i].Text)),
                 segmentTokens.References,
                 segmentTokens.LocalSpans,
-                _explanationLanguage?.EffectiveLanguage ?? "English",
-                _sentenceTranslation?.Enabled ?? true));
+                language, translation));
         }
         return requests;
     }
 
-    private Task<PhraseAnalysisResult> GetOrStartAnalysis(PhraseAnalysisRequest request, CancellationToken cancellationToken, out bool shared)
+    private (IReadOnlyList<OcrLine> Lines, IReadOnlyList<SentenceSegment> Segments) PreserveCompletedBlocks(
+        IReadOnlyList<OcrLine> source, IReadOnlyList<PhraseAnalysisRequest> boundaries)
+    {
+        if (boundaries.Count == 0) return (source, _segmenter.Segment(source));
+        var candidates = boundaries.GroupBy(request => NormalizeSegmentText(request.SegmentText))
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+        var text = string.Concat(source.Select(line => line.Text));
+        var cuts = new SortedSet<int> { 0 };
+        var offset = 0;
+        foreach (var line in source)
+        {
+            foreach (var word in line.Words)
+            {
+                offset += word.Text.Length;
+                if ("。！？…‥．?!」』、，,.".Contains(text[offset - 1])
+                    && HasCompletedBoundary(text[..offset])) cuts.Add(offset);
+            }
+            cuts.Add(offset);
+        }
+        var positions = cuts.ToArray();
+        var retained = new List<(int Start, int End)>();
+        for (int start = 0; start < positions.Length - 1; start++)
+        {
+            for (int end = positions.Length - 1; end > start; end--)
+            {
+                var key = NormalizeSegmentText(text[positions[start]..positions[end]]);
+                if (!candidates.TryGetValue(key, out var matches)) continue;
+                var fragment = SliceLines(source, positions[start], positions[end]);
+                var tokens = _tokenBuilder.Build(fragment, new SentenceSegment(Enumerable.Range(0, fragment.Count).ToArray()));
+                if (!matches.Any(request => HaveMatchingContentTokens(request.Tokens, tokens.References))) continue;
+                retained.Add((positions[start], positions[end]));
+                start = end - 1;
+                break;
+            }
+        }
+        if (retained.Count == 0) return (source, _segmenter.Segment(source));
+
+        var layout = new List<OcrLine>();
+        var segments = new List<SentenceSegment>();
+        offset = 0;
+        foreach (var range in retained)
+        {
+            AppendRange(offset, range.Start, false);
+            AppendRange(range.Start, range.End, true);
+            offset = range.End;
+        }
+        AppendRange(offset, text.Length, false);
+        return (layout, segments);
+
+        void AppendRange(int start, int end, bool completed)
+        {
+            if (start == end) return;
+            var fragment = SliceLines(source, start, end);
+            var firstLine = layout.Count;
+            layout.AddRange(fragment);
+            var blocks = completed ? [new SentenceSegment(Enumerable.Range(0, fragment.Count).ToArray())]
+                : _segmenter.Segment(fragment);
+            segments.AddRange(blocks.Select(block => new SentenceSegment(block.LineIndices.Select(index => index + firstLine).ToArray())));
+        }
+    }
+
+    private static IReadOnlyList<OcrLine> SliceLines(IReadOnlyList<OcrLine> lines, int start, int end)
+    {
+        var result = new List<OcrLine>();
+        var offset = 0;
+        foreach (var line in lines)
+        {
+            var words = new List<OcrWord>();
+            foreach (var word in line.Words)
+            {
+                var wordStart = offset;
+                offset += word.Text.Length;
+                if (wordStart >= start && offset <= end) words.Add(word);
+            }
+            if (words.Count > 0) result.Add(new OcrLine(words));
+        }
+        return result;
+    }
+
+    private static bool HasCompletedBoundary(string text)
+        => text.Length > 0 && (GetContentEnd(text) < text.Length || SentenceSegmenter.IsSentenceFinal(text));
+
+    private Task<PhraseAnalysisResult> GetOrStartAnalysis(PhraseAnalysisRequest request, int generation,
+        CancellationToken cancellationToken, out bool shared)
     {
         PendingAnalysis pending;
         var key = GetCacheKey(request);
         lock (_cacheGate)
         {
+            if (generation != _cacheGeneration)
+                throw new OperationCanceledException("The prepared analysis was superseded by a cache reset.");
             // Another batch may have finished between the initial cache lookup and scheduling.
             if (TryGetCached(request, out var cached))
             {
@@ -211,13 +334,13 @@ public sealed class PhraseAnalysisOrchestrator
             }
             if (_inFlight.TryGetValue(key, out pending!)
                 && !pending.CancellationToken.IsCancellationRequested
-                && HaveMatchingContentTokens(pending.Tokens, request.Tokens))
+                && HaveMatchingContentTokens(pending.Request.Tokens, request.Tokens))
             {
                 shared = true;
                 return AwaitAnalysisAsync(pending, request, cancellationToken);
             }
             shared = false;
-            pending = new PendingAnalysis(request.Tokens, _cacheGeneration, cancellationToken,
+            pending = new PendingAnalysis(request, generation, cancellationToken,
                 new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously));
             _inFlight[key] = pending;
         }
@@ -229,7 +352,7 @@ public sealed class PhraseAnalysisOrchestrator
     private async Task<PhraseAnalysisResult> AwaitAnalysisAsync(PendingAnalysis pending, PhraseAnalysisRequest request, CancellationToken cancellationToken)
     {
         var result = await pending.Completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
-        return RebindResult(request, pending.Tokens, result);
+        return RebindResult(request, pending.Request.Tokens, result);
     }
 
     private async Task RunProviderAsync(PhraseAnalysisRequest request, PendingAnalysis pending, CancellationToken cancellationToken)
@@ -326,6 +449,7 @@ public sealed class PhraseAnalysisOrchestrator
         {
             _cacheGeneration++;
             _inFlight.Clear();
+            _completedBlocks = [];
             _cache.Clear();
             _cacheOrder.Clear();
             _sessionGroupIds.Clear();
@@ -444,6 +568,6 @@ public sealed class PhraseAnalysisOrchestrator
     private sealed record CacheableRequest(PhraseAnalysisRequest Request, int OriginalIndex);
 
     private sealed record CachedAnalysis(IReadOnlyList<SentenceTokenReference> Tokens, PhraseAnalysisResult Result);
-    private sealed record PendingAnalysis(IReadOnlyList<SentenceTokenReference> Tokens, int Generation, CancellationToken CancellationToken,
+    private sealed record PendingAnalysis(PhraseAnalysisRequest Request, int Generation, CancellationToken CancellationToken,
         TaskCompletionSource<PhraseAnalysisResult> Completion);
 }

@@ -43,7 +43,7 @@ public sealed record SentenceTokenReference
     /// <summary>The token's global ordinal within the whole sentence's reading order.</summary>
     public int SentenceIndex { get; }
 
-    /// <summary>The source OCR line index.</summary>
+    /// <summary>The prepared OCR line index within this analysis block.</summary>
     public int LineId { get; }
 
     /// <summary>The token's ordinal within its source line.</summary>

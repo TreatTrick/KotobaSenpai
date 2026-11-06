@@ -148,7 +148,7 @@ public sealed class TargetWindowGeometryTests
 
     private sealed class EmptyGroupingService : IOcrWordGroupingService
     {
-        public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines) => [];
+        public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines, IReadOnlyList<SentenceSegment>? segments = null) => [];
     }
 
     private sealed class NullOverlay : IOverlayRenderer

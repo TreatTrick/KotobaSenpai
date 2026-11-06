@@ -13,6 +13,87 @@ namespace KotobaSenpai.Core.Tests.Workflow;
 
 public sealed class AutoRecognitionWorkflowTests
 {
+    [Theory]
+    [InlineData(false, "「また会おう」", "彼女は微笑んだ。")]
+    [InlineData(false, "また会おう」", "それは助かる。")]
+    [InlineData(true, "「また会おう」", "彼女は微笑んだ。")]
+    [InlineData(true, "最初の文。", "次の文。")]
+    public async Task Completed_block_keeps_its_annotations_when_narration_or_unquoted_text_is_appended(
+        bool sameLine, string completed, string added)
+    {
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new RecordingAnalyzer(release);
+        var overlay = new RecordingOverlay();
+        IReadOnlyList<OcrLine> next = sameLine ? [Line(completed + added)] : [Line(completed), Line(added, 30)];
+        using var service = CreateService(new SequencedRecognizer([Line(completed)], next), overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        var previous = overlay.LastSession!;
+        analyzer.DelayNewRequests = true;
+
+        var pending = service.RecognizeChangedAndShowAsync(Target());
+        try
+        {
+            var preview = overlay.LastSession!;
+            Assert.Equal(previous.PhraseGroups.Select(group => group.SessionGroupId),
+                preview.PhraseGroups.Select(group => group.SessionGroupId));
+            Assert.Equal(previous.WordMeanings.Select(word => word.Headword), preview.WordMeanings.Select(word => word.Headword));
+            Assert.Equal(previous.GetSentenceTranslation("s0-0")!.Translation,
+                preview.GetSentenceTranslation("s0-0")!.Translation);
+            Assert.All(previous.Lines, line => Assert.Contains(line, preview.Lines));
+            Assert.Contains("s0-0", preview.UnderlineSegmentIds!);
+            Assert.DoesNotContain("s1-1", preview.UnderlineSegmentIds!);
+            Assert.Equal([completed, added], analyzer.Requests.Select(request => request.SegmentText));
+        }
+        finally
+        {
+            release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await pending;
+        }
+        Assert.Contains("s1-1", overlay.LastSession!.UnderlineSegmentIds!);
+    }
+
+    [Fact]
+    public async Task Completed_block_survives_when_another_block_changes_and_its_opening_quote_is_lost()
+    {
+        const string first = "「最初の発言」";
+        const string second = "「次の発言」";
+        const string changed = "「変更された発言」";
+        const string narration = "彼女は微笑んだ。";
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new RecordingAnalyzer(release);
+        var overlay = new RecordingOverlay();
+        using var service = CreateService(new SequencedRecognizer([Line(first), Line(second, 30)],
+            [Line(changed), Line(second[1..], 30), Line(narration, 60)]), overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        var retained = overlay.LastSession!.PhraseGroups.Single(group => group.SegmentId == "s1-1").SessionGroupId;
+        analyzer.DelayNewRequests = true;
+
+        var pending = service.RecognizeChangedAndShowAsync(Target());
+        try
+        {
+            Assert.Equal(retained, Assert.Single(overlay.LastSession!.PhraseGroups).SessionGroupId);
+            Assert.Equal(new[] { "s1-1" }, overlay.LastSession.UnderlineSegmentIds!);
+            Assert.Equal([first, second, changed, narration], analyzer.Requests.Select(request => request.SegmentText));
+        }
+        finally
+        {
+            release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await pending;
+        }
+    }
+
+    [Fact]
+    public async Task Completed_block_planning_keeps_an_initial_cross_line_quotation_with_its_reporting_clause()
+    {
+        var analyzer = new RecordingAnalyzer(new(TaskCreationOptions.RunContinuationsAsynchronously));
+        using var service = CreateService(new SequencedRecognizer([Line("彼は「明日行く」"), Line("と言った。", 30)]),
+            new RecordingOverlay(), analyzer);
+
+        await service.RecognizeAndShowAsync(Target());
+
+        Assert.Equal("彼は「明日行く」と言った。", Assert.Single(analyzer.Requests).SegmentText);
+    }
+
     [Fact]
     public async Task The_recorded_four_sentence_sequence_preserves_every_completed_annotation()
     {
@@ -507,6 +588,7 @@ public sealed class AutoRecognitionWorkflowTests
                     [new ParsedPhraseGroup("first", "grammar", [[content.Id]], "label", "meaning", "grammar")])
                 {
                     Words = [new ParsedWordMeaning(content.Token.Surface, "noun", "meaning", "grammar")],
+                    Translation = "Translation",
                 });
         }
     }

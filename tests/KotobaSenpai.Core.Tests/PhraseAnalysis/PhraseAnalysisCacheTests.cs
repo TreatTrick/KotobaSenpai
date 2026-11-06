@@ -14,6 +14,86 @@ namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 public sealed class PhraseAnalysisCacheTests
 {
     [Fact]
+    public async Task Completed_block_boundaries_survive_translation_mode_changes_without_reusing_the_wrong_results()
+    {
+        var preferences = new SentenceTranslationPreferences(new TranslationSettings());
+        var analyzer = new PendingAnalyzer();
+        analyzer.Release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        var orchestrator = new PhraseAnalysisOrchestrator(analyzer, tokenBuilder: new SentenceTokenBuilder(new CharTokenizer()),
+            sentenceTranslation: preferences);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「引用」")]);
+        preferences.Enabled = false;
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「引用」という説明。")]);
+        preferences.Enabled = true;
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「引用」という説明。")]);
+
+        Assert.Equal([("「引用」", true), ("「引用」", false), ("という説明。", false), ("という説明。", true)],
+            analyzer.Requests.Select(request => (request.SegmentText, request.IncludeSentenceTranslation)));
+    }
+
+    [Fact]
+    public async Task Completed_block_boundaries_are_forgotten_when_the_cache_is_cleared()
+    {
+        var analyzer = new PendingAnalyzer();
+        analyzer.Release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        var orchestrator = Create(analyzer);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「引用」")]);
+        orchestrator.ClearCache();
+
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「引用」"), Line("という説明。", 30)]);
+
+        Assert.Equal(["「引用」", "「引用」という説明。"], analyzer.Requests.Select(request => request.SegmentText));
+    }
+
+    [Theory]
+    [InlineData("続き", PhraseAnalysisOutcome.Success)]
+    [InlineData("「引用」", PhraseAnalysisOutcome.TransportError)]
+    public async Task Incomplete_or_failed_blocks_do_not_freeze_a_boundary(string previous, PhraseAnalysisOutcome outcome)
+    {
+        var analyzer = new PendingAnalyzer();
+        analyzer.Release.SetResult(new PhraseAnalysisResult(outcome, []));
+        var orchestrator = Create(analyzer);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line(previous)]);
+
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line(previous), Line("という説明。", 30)]);
+
+        Assert.Equal([previous, previous + "という説明。"], analyzer.Requests.Select(request => request.SegmentText));
+    }
+
+    [Fact]
+    public async Task A_completed_block_in_flight_is_not_resent_with_appended_narration()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        var first = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「引用」")]);
+        var second = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("「引用」という説明。")]);
+        try
+        {
+            Assert.Equal(["「引用」", "という説明。"], analyzer.Requests.Select(request => request.SegmentText));
+        }
+        finally
+        {
+            analyzer.Release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await Task.WhenAll(first, second);
+        }
+    }
+
+    [Fact]
+    public async Task A_plan_prepared_before_cache_reset_does_not_repopulate_the_cache()
+    {
+        var analyzer = new PendingAnalyzer();
+        analyzer.Release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+        var orchestrator = Create(analyzer);
+        var plan = orchestrator.PrepareAnalysis(Guid.NewGuid(), [Line("旧句。")]);
+        orchestrator.ClearCache();
+
+        await orchestrator.AnalyzeAsync(plan);
+
+        Assert.Empty(analyzer.Requests);
+        Assert.Empty(orchestrator.GetCachedAnalysis(Guid.NewGuid(), [Line("旧句。")]).SuccessfulSegmentIds);
+    }
+
+    [Fact]
     public async Task Groups_covering_boundary_quotes_keep_only_current_content_references_after_rebinding()
     {
         var analyzer = new ContentAnalyzer(includeQuotes: true);

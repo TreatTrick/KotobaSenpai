@@ -267,7 +267,7 @@ public sealed class RecognitionSessionTests
     }
     private sealed class Grouping : IOcrWordGroupingService
     {
-        public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines) => [];
+        public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines, IReadOnlyList<SentenceSegment>? segments = null) => [];
     }
     private sealed class Overlay : IOverlayRenderer
     {

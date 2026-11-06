@@ -8,6 +8,10 @@ using KotobaSenpai.Platform.Windows.Japanese;
 using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.Dictionary;
+using KotobaSenpai.Core.Overlay;
+using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.WordGrouping;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 
@@ -19,6 +23,52 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 /// </summary>
 public sealed class UniDicTokenizerTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Completed_block_plan_keeps_real_UniDic_grouping_and_provider_requests_aligned_after_reflow(bool sameLine)
+    {
+        var dict = TryResolveDictionary();
+        if (dict is null) return;
+        using var tokenizer = new UniDicTokenizer(Logger, dict);
+        var resolver = new TokenBoundarySpanResolver(new EmptyDictionary());
+        var analyzer = new ReplayAnalyzer();
+        var orchestrator = new PhraseAnalysisOrchestrator(analyzer, tokenBuilder: new SentenceTokenBuilder(tokenizer, resolver));
+        var grouping = new WordGroupingService(tokenizer, new SentenceSegmenter(), resolver);
+        const string completed = "「時間も惜しいし、手早くいくわよ」";
+        const string added = "青子の直球は、またも効果なくスルーされた。";
+        static OcrLine Line(string text, int y = 0) => new(text.Select((c, i) =>
+            new OcrWord(c.ToString(), new ScreenRect(i * 10, y, 10, 20))).ToArray());
+        var originalPlan = orchestrator.PrepareAnalysis(Guid.NewGuid(), [Line(completed)]);
+        var originalWords = grouping.Group(originalPlan.Lines, originalPlan.Segments);
+        var original = await orchestrator.AnalyzeAsync(originalPlan);
+        var currentText = completed[1..] + "、";
+        IReadOnlyList<OcrLine> current = sameLine ? [Line(currentText + added)] : [Line(currentText), Line(added, 30)];
+        var plan = orchestrator.PrepareAnalysis(Guid.NewGuid(), current);
+        var preview = orchestrator.GetCachedAnalysis(plan);
+        var words = grouping.Group(plan.Lines, plan.Segments);
+        var session = WordOverlaySession.Start(new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 1000, 500)),
+            words, preview.Groups, underlineSegmentIds: preview.SuccessfulSegmentIds);
+
+        Assert.Equal(original.Groups.Select(group => group.SessionGroupId), preview.Groups.Select(group => group.SessionGroupId));
+        Assert.Equal(originalWords.Select(word => (word.Surface, word.Reading)),
+            words.Where(word => word.SegmentId == "s0-0").Select(word => (word.Surface, word.Reading)));
+        Assert.Equal(originalWords.Count, session.Lines.Count);
+        Assert.All(words.Where(word => word.SegmentId == "s0-0"), word => Assert.True(session.ShouldUnderline(word)));
+        Assert.All(words.Where(word => word.SegmentId == "s1-1"), word => Assert.False(session.ShouldUnderline(word)));
+        Assert.Equal(0, Assert.Single(Assert.Single(preview.Groups[0].Parts).Rects).X);
+        var result = await orchestrator.AnalyzeAsync(plan);
+        Assert.Equal([completed, added], analyzer.Texts);
+        Assert.Equal(2, result.SuccessfulSegmentIds.Count);
+        Assert.Null(result.Warning);
+    }
+
+    private sealed class EmptyDictionary : IBatchDictionaryLookup
+    {
+        public IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> LookupForms(IReadOnlyCollection<string> forms)
+            => new Dictionary<string, IReadOnlyList<DictionaryEntry>>();
+    }
+
     [Fact]
     public async Task Recorded_four_sentence_sequence_reuses_real_UniDic_results_despite_trailing_quote_punctuation()
     {

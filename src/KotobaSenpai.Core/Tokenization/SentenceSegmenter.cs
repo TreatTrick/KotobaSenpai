@@ -62,7 +62,7 @@ public sealed class SentenceSegmenter
             && beginning.Length > 0 && "「『".Contains(beginning[0]);
     }
 
-    private static bool IsSentenceFinal(string text)
+    internal static bool IsSentenceFinal(string text)
     {
         var trimmed = text.TrimEnd();
         // OCR may return ASCII punctuation and keep the dialogue's closing quotation marks.

@@ -6,7 +6,7 @@ using KotobaSenpai.Core.Geometry;
 namespace KotobaSenpai.Core.WordGrouping;
 
 /// <summary>
-/// Groups OCR characters into words by tokenizing each sentence segment (a set of merged lines) as one text block, so a
+/// Groups OCR characters into words by tokenizing each prepared analysis block (a set of merged lines) as one text block, so a
 /// word split across lines becomes a single word with one rect per line. Produces one underline geometry per word rect.
 /// Word boundaries and geometry are resolved entirely by the injected <see cref="ITokenSpanResolver"/>, which is
 /// responsible for punctuation/whitespace filtering; tokens with no character box are skipped.
@@ -24,12 +24,12 @@ public sealed class WordGroupingService : IOcrWordGroupingService
         _spanResolver = spanResolver ?? throw new ArgumentNullException(nameof(spanResolver));
     }
 
-    public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines)
+    public IReadOnlyList<GroupedWord> Group(IReadOnlyList<OcrLine> lines, IReadOnlyList<SentenceSegment>? segments = null)
     {
         ArgumentNullException.ThrowIfNull(lines);
 
         var result = new List<GroupedWord>();
-        foreach (var segment in _segmenter.Segment(lines))
+        foreach (var segment in segments ?? _segmenter.Segment(lines))
         {
             var block = segment.LineIndices.Select(i => lines[i]).ToArray(); // Include every OCR line in the segment.
             var splitTokens = LineBlockTokenizer.Tokenize(_tokenizer, block);

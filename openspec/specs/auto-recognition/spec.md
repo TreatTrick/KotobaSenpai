@@ -143,6 +143,34 @@ The system SHALL show the red neon region warning only when a completed, current
 - **THEN** the next line SHALL begin a separate segment even without terminal punctuation before the closing quote
 - **AND** appending the new dialogue SHALL retain the preceding segment's cache entry and visible annotations
 
+#### Scenario: A completed analysis block is followed by narration or unquoted dialogue
+- **WHEN** a successfully analyzed block ends in a closing Japanese dialogue quote or sentence-final punctuation, and subsequent OCR appends adjacent narration or dialogue without an opening quote
+- **THEN** the system SHALL retain the completed block's boundaries when its normalized text and lexical token identity still match
+- **AND** its underlines, phrase group identities, meanings, and translations SHALL remain available while only the new content is analyzed
+- **AND** appended content SHALL NOT merge the completed block into a larger provider request
+
+#### Scenario: OCR reflows a completed block into the same line as new content
+- **WHEN** current OCR combines a completed block and newly appended content into one line
+- **THEN** a shared prepared layout SHALL preserve the boundary using the existing character boxes
+- **AND** local word grouping, cached preview, and provider requests SHALL use that same layout and block identifiers
+- **AND** cached token references SHALL bind to the current character geometry
+
+#### Scenario: Block boundaries remain independent of analysis settings
+- **WHEN** the explanation language or sentence translation mode changes without clearing the recognition cache
+- **THEN** known completed boundaries SHALL remain available for planning
+- **AND** provider results SHALL still be looked up separately by the current language and translation mode
+
+#### Scenario: Incomplete, failed, changed, or reset blocks
+- **WHEN** a block has no completed ending, its analysis failed, or its content tokens changed
+- **THEN** its old boundaries SHALL NOT force reuse of stale results or prevent natural regrouping
+- **WHEN** the recognition cache is cleared
+- **THEN** completed boundaries SHALL also be cleared, and previously prepared plans SHALL NOT start requests or repopulate the new cache generation
+
+#### Scenario: Initial cross-line quotations retain their reporting clauses
+- **WHEN** a quotation and its following reporting clause are observed together with no matching completed block
+- **THEN** the system SHALL retain natural sentence segmentation rather than split every closing quote unconditionally
+- **AND** no previous-text context SHALL be added automatically to new provider requests
+
 #### Scenario: 缓存未命中调用 LLM
 - **WHEN** 分段文本"散歩に行きましょう"不在 LLM 缓存中
 - **THEN** 系统 SHALL 发送 LLM 请求分析该分段，并将结果写入缓存

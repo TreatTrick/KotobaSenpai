@@ -33,7 +33,7 @@ public sealed class WordOverlayApplicationService : IDisposable
     private bool _publishing;
 
     private sealed record PreparedPublication(Guid RecognitionId, int Generation, WindowTarget Target,
-        WordRecognitionResult Result, IReadOnlyList<GroupedWord> Words);
+        WordRecognitionResult Result, IReadOnlyList<GroupedWord> Words, PhraseAnalysisPlan Analysis);
     private sealed record QueuedPublication(PreparedPublication Prepared, CancellationToken CancellationToken,
         TaskCompletionSource<bool> Completion);
 
@@ -157,9 +157,11 @@ public sealed class WordOverlayApplicationService : IDisposable
             try
             {
                 queued.CancellationToken.ThrowIfCancellationRequested();
-                // A waiting snapshot can now reuse sentences completed by the preceding batch.
-                if (refreshPreview) ShowPreview(queued.Prepared, queued.CancellationToken);
-                await AnalyzeAndPublishAsync(queued.Prepared, queued.CancellationToken).ConfigureAwait(false);
+                // Rebuild the shared layout after the preceding batch establishes new completed boundaries.
+                var prepared = refreshPreview ? PreparePublication(queued.Prepared.RecognitionId, queued.Prepared.Generation,
+                    queued.Prepared.Target, queued.Prepared.Result) : queued.Prepared;
+                if (refreshPreview) ShowPreview(prepared, queued.CancellationToken);
+                await AnalyzeAndPublishAsync(prepared, queued.CancellationToken).ConfigureAwait(false);
                 queued.CancellationToken.ThrowIfCancellationRequested();
                 queued.Completion.TrySetResult(IsCurrent(queued.Prepared.Generation));
             }
@@ -224,7 +226,8 @@ public sealed class WordOverlayApplicationService : IDisposable
     private PreparedPublication PreparePublication(Guid recognitionId, int generation, WindowTarget activeTarget, WordRecognitionResult result)
     {
         // First regroup characters into words in the frame coordinate system via the tokenizer (pure logic, coordinates unchanged), then map each word's union box to screen.
-        var screenWords = _grouping.Group(result.Lines)
+        var analysis = _phraseOrchestrator.PrepareAnalysis(recognitionId, result.Lines);
+        var screenWords = _grouping.Group(analysis.Lines, analysis.Segments)
             .Select(word =>
             {
                 var map = (ScreenRect rect) =>
@@ -240,17 +243,17 @@ public sealed class WordOverlayApplicationService : IDisposable
             .ToArray();
 
         _diagnostics?.RecordTokens(recognitionId, activeTarget, screenWords);
-        return new PreparedPublication(recognitionId, generation, activeTarget, result, screenWords);
+        return new PreparedPublication(recognitionId, generation, activeTarget, result, screenWords, analysis);
     }
 
     private void ShowPreview(PreparedPublication prepared, CancellationToken cancellationToken)
     {
-        var (recognitionId, generation, activeTarget, result, screenWords) = prepared;
+        var (_, generation, activeTarget, result, screenWords, analysis) = prepared;
         bool CanRender() => !cancellationToken.IsCancellationRequested && IsCurrent(generation);
         // Reproject cached annotations immediately; an OCR correction in one segment must not erase the others.
         if (!IsCurrent(generation))
             return;
-        var cachedRun = _phraseOrchestrator.GetCachedAnalysis(recognitionId, result.Lines);
+        var cachedRun = _phraseOrchestrator.GetCachedAnalysis(analysis);
         _overlay.Show(WordOverlaySession.Start(
             activeTarget,
             screenWords,
@@ -263,12 +266,12 @@ public sealed class WordOverlayApplicationService : IDisposable
 
     private async Task AnalyzeAndPublishAsync(PreparedPublication prepared, CancellationToken cancellationToken)
     {
-        var (recognitionId, generation, activeTarget, result, screenWords) = prepared;
+        var (recognitionId, generation, activeTarget, result, screenWords, analysis) = prepared;
         bool CanRender() => !cancellationToken.IsCancellationRequested && IsCurrent(generation);
         cancellationToken.ThrowIfCancellationRequested();
         if (!IsCurrent(generation)) return;
         var phraseRun = await _phraseOrchestrator
-            .AnalyzeAsync(recognitionId, result.Lines, cancellationToken)
+            .AnalyzeAsync(analysis, cancellationToken)
             .ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
