@@ -47,6 +47,9 @@ public sealed class PhraseAnalysisCacheTests
     [InlineData("同じ。", "「同じ。", 10)]
     [InlineData("「同じ。", "同じ。", 0)]
     [InlineData("『同じ。』", "同じ。", 0)]
+    [InlineData("同じ」", "同じ」、", 0)]
+    [InlineData("同じ」、", "同じ」", 0)]
+    [InlineData("「同じ。」", "同じ。」。", 0)]
     public async Task Boundary_quote_OCR_changes_reuse_analysis_and_rebind_current_token_offsets(string firstText, string nextText, int x)
     {
         var analyzer = new ContentAnalyzer();
@@ -71,6 +74,8 @@ public sealed class PhraseAnalysisCacheTests
     [InlineData("来る。", "来ない。")]
     [InlineData("彼は「行く」と言う。", "彼は行くと言う。")]
     [InlineData("同じ。", "同じ？")]
+    [InlineData("同じ。", "同じ、")]
+    [InlineData("「同じ、」", "「同じ。」")]
     public async Task Changed_words_internal_quotes_and_sentence_punctuation_still_require_new_analysis(string first, string next)
     {
         var analyzer = new ContentAnalyzer();

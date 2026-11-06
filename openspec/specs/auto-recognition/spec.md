@@ -125,12 +125,23 @@ The system SHALL show the red neon region warning only when a completed, current
 #### Scenario: OCR adds or removes a boundary dialogue quote
 - **WHEN** an OCR segment differs only by leading `「`/`『` or trailing `」`/`』`, and its content tokens retain identical lexical metadata and relative offsets
 - **THEN** the system SHALL reuse its cached or matching in-flight analysis, keep its group identity, and rebind token references to the current geometry
-- **AND** current source text SHALL retain the currently recognized quotation marks; changed words, internal quotes, or other punctuation SHALL NOT be normalized into a cache hit
+- **AND** current source text SHALL retain the currently recognized quotation marks; changed words, internal quotes, or punctuation within the content SHALL NOT be normalized into a cache hit
+
+#### Scenario: OCR appends punctuation outside a closing dialogue quote
+- **WHEN** an otherwise unchanged segment gains or loses a comma or period immediately after its closing `」`/`』`
+- **THEN** the system SHALL reuse its cached or matching in-flight analysis and retain its annotations
+- **AND** token references SHALL be rebound by their content identity even when the old and current token counts are equal
+- **AND** current source text SHALL retain the currently recognized punctuation
 
 #### Scenario: Closing dialogue quotes follow terminal punctuation
 - **WHEN** a line ends with sentence-final punctuation followed by closing quotes, including an ASCII `?` or `!`
 - **THEN** the next line SHALL begin a separate segment, so appending a new dialogue does not replace the preceding segment's cache key
 - **AND** a closing quote without preceding terminal punctuation SHALL NOT by itself split a wrapped sentence
+
+#### Scenario: A new speaker follows an unpunctuated dialogue
+- **WHEN** a line ends with `」`/`』`, optionally followed by an OCR comma, and the next line begins with `「`/`『`
+- **THEN** the next line SHALL begin a separate segment even without terminal punctuation before the closing quote
+- **AND** appending the new dialogue SHALL retain the preceding segment's cache entry and visible annotations
 
 #### Scenario: 缓存未命中调用 LLM
 - **WHEN** 分段文本"散歩に行きましょう"不在 LLM 缓存中

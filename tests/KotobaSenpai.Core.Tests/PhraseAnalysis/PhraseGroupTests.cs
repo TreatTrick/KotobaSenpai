@@ -11,6 +11,18 @@ namespace KotobaSenpai.Core.Tests.PhraseAnalysis;
 public sealed class PhraseSegmentationTests
 {
     [Theory]
+    [InlineData("時間も惜しいし、手早くいくわよ」", "「それは助かる。やっぱり時間は大切だ」")]
+    [InlineData("時間も惜しいし、手早くいくわよ」、", "「それは助かる。やっぱり時間は大切だ」")]
+    [InlineData("確認』", "『返答』")]
+    public void A_new_dialogue_after_a_closing_quote_starts_a_separate_segment(string previous, string next)
+    {
+        var segments = new SentenceSegmenter().Segment([Line(previous), Line(next, 40)]);
+        Assert.Equal(2, segments.Count);
+        Assert.Equal([0], segments[0].LineIndices);
+        Assert.Equal([1], segments[1].LineIndices);
+    }
+
+    [Theory]
     [InlineData("静希君で頼む。君は蒼崎でいいんだよな?」")]
     [InlineData("確認!』")]
     [InlineData("確認。』」")]

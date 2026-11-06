@@ -4,8 +4,9 @@ namespace KotobaSenpai.Core.Tokenization;
 
 /// <summary>
 /// Divides OCR lines into sentence segments. Adjacent lines are merged into one segment unless the previous line ends
-/// with sentence-final punctuation or there is a paragraph gap; a wrapped sentence (no punctuation or gap) stays one
-/// segment so cross-line words are not split. Cross-segment token references are forbidden to avoid joining unrelated blocks.
+/// with sentence-final punctuation, a new quoted dialogue begins after a closing quote, or there is a paragraph gap.
+/// A wrapped sentence stays one segment so cross-line words are not split. Cross-segment token references are forbidden
+/// to avoid joining unrelated blocks.
 /// Closing quotation marks do not hide preceding sentence-final punctuation, including ASCII question/exclamation marks.
 /// </summary>
 public sealed class SentenceSegmenter
@@ -27,7 +28,7 @@ public sealed class SentenceSegmenter
         for (int i = 0; i < lines.Count; i++)
         {
             var bounds = ComputeBounds(lines[i]);
-            if (current.Count > 0 && ShouldBreak(previousBounds, lines[i - 1], bounds))
+            if (current.Count > 0 && ShouldBreak(previousBounds, lines[i - 1], bounds, lines[i]))
             {
                 segments.Add(new SentenceSegment(current.ToArray()));
                 current = new List<int>();
@@ -41,14 +42,24 @@ public sealed class SentenceSegmenter
         return segments;
     }
 
-    private static bool ShouldBreak(LineBounds previous, OcrLine previousLine, LineBounds next)
+    private static bool ShouldBreak(LineBounds previous, OcrLine previousLine, LineBounds next, OcrLine nextLine)
     {
-        if (previousLine.Words.Count == 0 || IsSentenceFinal(previousLine.Text))
+        if (previousLine.Words.Count == 0 || IsSentenceFinal(previousLine.Text)
+            || StartsNewDialogue(previousLine.Text, nextLine.Text))
             return true;
         // ponytail: reading-order reversals are no longer a break — a wrapped line may start further left; only a
         // paragraph gap separates unrelated blocks.
         var gap = next.Top - previous.Bottom;
         return gap > Math.Max(1, previous.Height) * ParagraphGapFactor;
+    }
+
+    private static bool StartsNewDialogue(string previous, string next)
+    {
+        var ending = previous.TrimEnd().TrimEnd('、', '，', ',');
+        var beginning = next.TrimStart();
+        // Separate speakers even when the preceding dialogue has no terminal punctuation.
+        return ending.Length > 0 && "」』".Contains(ending[^1])
+            && beginning.Length > 0 && "「『".Contains(beginning[0]);
     }
 
     private static bool IsSentenceFinal(string text)

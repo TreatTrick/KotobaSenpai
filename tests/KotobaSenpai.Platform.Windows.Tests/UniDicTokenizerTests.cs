@@ -20,6 +20,41 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class UniDicTokenizerTests
 {
     [Fact]
+    public async Task Recorded_four_sentence_sequence_reuses_real_UniDic_results_despite_trailing_quote_punctuation()
+    {
+        var dict = TryResolveDictionary();
+        if (dict is null) return;
+        using var tokenizer = new UniDicTokenizer(Logger, dict);
+        var analyzer = new ReplayAnalyzer();
+        var orchestrator = new PhraseAnalysisOrchestrator(analyzer, tokenBuilder: new SentenceTokenBuilder(tokenizer));
+        const string first = "悪いけど、優しくしてあげる気はないから。";
+        const string second = "時間も惜しいし、手早くいくわよ」";
+        const string third = "「それは助かる。やっぱり時間は大切だ」";
+        const string fourth = "青子の直球は、またも効果なくスルーされた。";
+        static OcrLine Line(string text, int y) => new(text.Select((c, i) =>
+            new OcrWord(c.ToString(), new ScreenRect(i * 10, y, 10, 20))).ToArray());
+        IReadOnlyList<OcrLine>[] snapshots = [
+            [Line("「" + first, 0)],
+            [Line(first, 0), Line(second, 40)],
+            [Line(first, 0), Line(second, 40), Line(third, 80)],
+            [Line(first, 0), Line(second + "、", 40), Line(third, 80), Line("いやみ", 180), Line(fourth, 200)],
+        ];
+        PhraseAnalysisRun? previous = null;
+        for (int i = 0; i < snapshots.Length; i++)
+        {
+            var preview = orchestrator.GetCachedAnalysis(Guid.NewGuid(), snapshots[i]);
+            Assert.Equal(i, preview.SuccessfulSegmentIds.Count);
+            if (previous is not null)
+                Assert.Equal(previous.Groups.Select(group => group.SessionGroupId), preview.Groups.Select(group => group.SessionGroupId));
+            previous = await orchestrator.AnalyzeAsync(Guid.NewGuid(), snapshots[i]);
+            Assert.Equal(i + 1, previous.SuccessfulSegmentIds.Count);
+            Assert.Equal(i + 1, analyzer.Texts.Count);
+            Assert.Null(previous.Warning);
+        }
+        Assert.Equal(["「" + first, second, third, "いやみ" + fourth], analyzer.Texts);
+    }
+
+    [Fact]
     public async Task Recorded_dialogue_reuses_two_cached_sentences_with_real_UniDic_after_a_third_sentence_appears()
     {
         var dict = TryResolveDictionary();

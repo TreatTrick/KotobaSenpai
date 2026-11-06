@@ -75,6 +75,14 @@ public sealed class PhraseAnalysisOrchestrator
         try
         {
             var (cached, uncached) = SplitByCache(requests);
+            for (int i = 0; i < requests.Count; i++)
+            {
+                var request = requests[i];
+                _logger?.Log(LogLevel.Debug, null,
+                    "[PHRASE] Recognition {0:N}: segment={1}, cached={2}, tokens={3}, source='{4}', normalized='{5}'.",
+                    recognitionId, request.SegmentId, cached.ContainsKey(i), request.Tokens.Count,
+                    request.SegmentText, NormalizeSegmentText(request.SegmentText));
+            }
             var tasks = new List<Task<PhraseAnalysisResult>>();
             var sharedRequests = 0;
             foreach (var item in uncached)
@@ -341,7 +349,8 @@ public sealed class PhraseAnalysisOrchestrator
     private static PhraseAnalysisResult RebindResult(PhraseAnalysisRequest request,
         IReadOnlyList<SentenceTokenReference> tokens, PhraseAnalysisResult result)
     {
-        if (tokens.Select(token => token.Id).SequenceEqual(request.Tokens.Select(token => token.Id)))
+        if (tokens.Select(token => (token.Id, token.Token))
+            .SequenceEqual(request.Tokens.Select(token => (token.Id, token.Token))))
             return result;
 
         // Quote recognition can shift every token id; bind unchanged content to the current OCR references.
@@ -387,14 +396,31 @@ public sealed class PhraseAnalysisOrchestrator
         => (NormalizeSegmentText(request.SegmentText), request.ExplanationLanguage, request.IncludeSentenceTranslation);
 
     private static string NormalizeSegmentText(string text)
-        => text.TrimStart(OpeningDialogueQuotes).TrimEnd(ClosingDialogueQuotes);
+        => text[..GetContentEnd(text)].TrimStart(OpeningDialogueQuotes);
+
+    private static int GetContentEnd(string text)
+    {
+        var end = text.Length;
+        // Only punctuation outside a closing dialogue quote is ignored; sentence punctuation remains significant.
+        while (end > 0 && "、。，,.".Contains(text[end - 1])) end--;
+        if (end == 0 || !ClosingDialogueQuotes.Contains(text[end - 1])) return text.Length;
+        while (end > 0 && ClosingDialogueQuotes.Contains(text[end - 1])) end--;
+        return end;
+    }
 
     private static IReadOnlyList<SentenceTokenReference> GetContentTokens(IReadOnlyList<SentenceTokenReference> tokens)
     {
         var start = 0;
         var end = tokens.Count;
         while (start < end && tokens[start].Token.Surface.All(OpeningDialogueQuotes.Contains)) start++;
-        while (end > start && tokens[end - 1].Token.Surface.All(ClosingDialogueQuotes.Contains)) end--;
+        var text = string.Concat(tokens.Select(token => token.Token.Surface));
+        var contentEnd = GetContentEnd(text);
+        var remainingLength = text.Length;
+        while (end > start && remainingLength - tokens[end - 1].Token.Surface.Length >= contentEnd)
+        {
+            remainingLength -= tokens[end - 1].Token.Surface.Length;
+            end--;
+        }
         return tokens.Skip(start).Take(end - start).ToArray();
     }
 

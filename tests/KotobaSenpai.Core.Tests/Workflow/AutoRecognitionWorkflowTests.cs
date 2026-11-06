@@ -14,6 +14,108 @@ namespace KotobaSenpai.Core.Tests.Workflow;
 public sealed class AutoRecognitionWorkflowTests
 {
     [Fact]
+    public async Task The_recorded_four_sentence_sequence_preserves_every_completed_annotation()
+    {
+        const string first = "悪いけど、優しくしてあげる気はないから。";
+        const string second = "時間も惜しいし、手早くいくわよ」";
+        const string third = "「それは助かる。やっぱり時間は大切だ」";
+        const string fourth = "青子の直球は、またも効果なくスルーされた。";
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new RecordingAnalyzer(release);
+        var overlay = new RecordingOverlay();
+        using var service = CreateService(new SequencedRecognizer([Line("「" + first)],
+            [Line(first), Line(second, 40)],
+            [Line(first), Line(second, 40), Line(third, 80)],
+            [Line(first), Line(second + "、", 40), Line(third, 80), Line("いやみ", 180), Line(fourth, 200)]),
+            overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        await service.RecognizeChangedAndShowAsync(Target());
+        await service.RecognizeChangedAndShowAsync(Target());
+        var previous = overlay.LastSession!;
+        analyzer.DelayNewRequests = true;
+
+        var pending = service.RecognizeChangedAndShowAsync(Target());
+        try
+        {
+            var preview = overlay.LastSession!;
+            Assert.Equal(previous.PhraseGroups.Select(group => group.SessionGroupId),
+                preview.PhraseGroups.Select(group => group.SessionGroupId));
+            Assert.Equal(previous.WordMeanings.Select(word => word.Headword), preview.WordMeanings.Select(word => word.Headword));
+            Assert.All(previous.Lines, line => Assert.Contains(line, preview.Lines));
+            Assert.Equal(new[] { "s0-0", "s1-1", "s2-2" }, preview.UnderlineSegmentIds!.Order());
+            Assert.Equal(["「" + first, second, third, "いやみ" + fourth],
+                analyzer.Requests.Select(request => request.SegmentText));
+            Assert.Equal(1, overlay.HideCount);
+        }
+        finally
+        {
+            release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await pending;
+        }
+        Assert.Contains("s3-4", overlay.LastSession!.UnderlineSegmentIds!);
+    }
+
+    [Fact]
+    public async Task The_recorded_unpunctuated_dialogue_stays_cached_when_the_next_speaker_appears()
+    {
+        const string first = "悪いけど、優しくしてあげる気はないから。";
+        const string second = "時間も惜しいし、手早くいくわよ」";
+        const string third = "「それは助かる。やっぱり時間は大切だ」";
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new RecordingAnalyzer(release);
+        var overlay = new RecordingOverlay();
+        using var service = CreateService(new SequencedRecognizer([Line(first), Line(second, 40)],
+            [Line(first), Line(second, 40), Line(third, 80)]), overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        var previous = overlay.LastSession!;
+        analyzer.DelayNewRequests = true;
+
+        var pending = service.RecognizeChangedAndShowAsync(Target());
+        try
+        {
+            Assert.Equal(previous.PhraseGroups.Select(group => group.SessionGroupId),
+                overlay.LastSession!.PhraseGroups.Select(group => group.SessionGroupId));
+            Assert.Contains("s1-1", overlay.LastSession.UnderlineSegmentIds!);
+            Assert.Equal([first, second, third], analyzer.Requests.Select(request => request.SegmentText));
+        }
+        finally
+        {
+            release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await pending;
+        }
+    }
+
+    [Fact]
+    public async Task The_recorded_trailing_comma_after_a_dialogue_quote_preserves_cached_annotations()
+    {
+        const string previousText = "時間も惜しいし、手早くいくわよ」";
+        const string currentText = "時間も惜しいし、手早くいくわよ」、";
+        const string newText = "青子の直球は、またも効果なくスルーされた。";
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var analyzer = new RecordingAnalyzer(release);
+        var overlay = new RecordingOverlay();
+        using var service = CreateService(new SequencedRecognizer([Line(previousText)],
+            [Line(currentText), Line(newText, 100)]), overlay, analyzer);
+        await service.RecognizeAndShowAsync(Target());
+        var previous = overlay.LastSession!;
+        analyzer.DelayNewRequests = true;
+
+        var pending = service.RecognizeChangedAndShowAsync(Target());
+        try
+        {
+            Assert.Equal(previous.PhraseGroups.Select(group => group.SessionGroupId),
+                overlay.LastSession!.PhraseGroups.Select(group => group.SessionGroupId));
+            Assert.Contains("s0-0", overlay.LastSession.UnderlineSegmentIds!);
+            Assert.Equal([previousText, newText], analyzer.Requests.Select(request => request.SegmentText));
+        }
+        finally
+        {
+            release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await pending;
+        }
+    }
+
+    [Fact]
     public async Task The_recorded_third_dialogue_reuses_both_older_sentences_despite_an_added_opening_quote()
     {
         const string first = "いや、いいんだ、ごく一般的なんだろう。";
@@ -398,12 +500,13 @@ public sealed class AutoRecognitionWorkflowTests
         public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
         {
             Requests.Add(request);
+            var content = request.Tokens.First(reference => !reference.Token.Surface.All(c => "「」『』".Contains(c)));
             return DelayNewRequests
                 ? release.Task
                 : Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
-                    [new ParsedPhraseGroup("first", "grammar", [[request.Tokens[0].Id]], "label", "meaning", "grammar")])
+                    [new ParsedPhraseGroup("first", "grammar", [[content.Id]], "label", "meaning", "grammar")])
                 {
-                    Words = [new ParsedWordMeaning(request.Tokens[0].Token.Surface, "noun", "meaning", "grammar")],
+                    Words = [new ParsedWordMeaning(content.Token.Surface, "noun", "meaning", "grammar")],
                 });
         }
     }
