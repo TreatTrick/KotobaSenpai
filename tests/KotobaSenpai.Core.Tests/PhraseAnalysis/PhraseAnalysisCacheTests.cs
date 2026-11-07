@@ -246,6 +246,32 @@ public sealed class PhraseAnalysisCacheTests
     }
 
     [Fact]
+    public async Task Cancelling_a_shared_waiter_does_not_cancel_the_provider_owner()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        var owner = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ句。")]);
+        using var cancellation = new CancellationTokenSource();
+        var waiter = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ句。")], cancellation.Token);
+        cancellation.Cancel();
+        try
+        {
+            Assert.Equal(PhraseAnalysisOutcome.Cancelled, (await waiter).Outcome);
+            Assert.False(owner.IsCompleted);
+            Assert.Single(analyzer.Requests);
+        }
+        finally
+        {
+            analyzer.Release.TrySetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, []));
+            await owner;
+        }
+
+        Assert.Equal(PhraseAnalysisOutcome.Success, (await owner).Outcome);
+        await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("同じ句。")]);
+        Assert.Single(analyzer.Requests);
+    }
+
+    [Fact]
     public async Task Clearing_the_cache_prevents_a_late_request_from_repopulating_it()
     {
         var analyzer = new PendingAnalyzer();
@@ -257,6 +283,25 @@ public sealed class PhraseAnalysisCacheTests
 
         Assert.Empty(orchestrator.GetCachedAnalysis(Guid.NewGuid(), [Line("旧句。")]).SuccessfulSegmentIds);
         await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("旧句。")]);
+        Assert.Equal(2, analyzer.Requests.Count);
+    }
+
+    [Fact]
+    public async Task A_late_result_from_a_cleared_generation_cannot_seed_current_group_identities()
+    {
+        var analyzer = new PendingAnalyzer();
+        var orchestrator = Create(analyzer);
+        var pending = orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("旧句。")]);
+        orchestrator.ClearCache();
+        analyzer.Release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success,
+            [new ParsedPhraseGroup("group", "grammar", [[analyzer.Requests[0].Tokens[0].Id]], "label", "meaning", "grammar")]));
+        var late = await pending;
+
+        var current = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("旧句。")]);
+        var reused = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("旧句。")]);
+
+        Assert.NotEqual(Assert.Single(late.Groups).SessionGroupId, Assert.Single(current.Groups).SessionGroupId);
+        Assert.Equal(Assert.Single(current.Groups).SessionGroupId, Assert.Single(reused.Groups).SessionGroupId);
         Assert.Equal(2, analyzer.Requests.Count);
     }
 
@@ -494,6 +539,31 @@ public sealed class PhraseAnalysisCacheTests
         var second = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("安定。")]);
 
         Assert.Equal(Assert.Single(first.Groups).SessionGroupId, Assert.Single(second.Groups).SessionGroupId);
+    }
+
+    [Fact]
+    public async Task Clearing_the_cache_also_resets_materialized_group_identity()
+    {
+        var orchestrator = Create(new GroupAnalyzer());
+        var first = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("安定。")]);
+
+        orchestrator.ClearCache();
+        var next = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("安定。")]);
+
+        Assert.NotEqual(Assert.Single(first.Groups).SessionGroupId, Assert.Single(next.Groups).SessionGroupId);
+    }
+
+    [Fact]
+    public async Task Evicting_a_sentence_also_forgets_its_materialized_group_identity()
+    {
+        var orchestrator = Create(new GroupAnalyzer());
+        var first = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("句0。")]);
+        for (var index = 1; index <= 50; index++)
+            await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line($"句{index}。")]);
+
+        var next = await orchestrator.AnalyzeAsync(Guid.NewGuid(), [Line("句0。")]);
+
+        Assert.NotEqual(Assert.Single(first.Groups).SessionGroupId, Assert.Single(next.Groups).SessionGroupId);
     }
 
     [Fact]

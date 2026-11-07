@@ -20,6 +20,7 @@ public sealed class CompositionRootTests
     {
         var services = new ServiceCollection();
         DesktopComposition.ConfigureServices(services);
+        services.AddSingleton<KotobaSenpai.Core.Threading.IUiThread>(ViewModelDependencies.UiThread());
         var settings = new MemorySettings();
         services.AddSingleton<ISettingsService>(settings);
         services.AddScoped<RecognitionPageViewModel>(_ => throw new InvalidOperationException("Recognition was initialized too early."));
@@ -40,6 +41,7 @@ public sealed class CompositionRootTests
     {
         var services = new ServiceCollection();
         DesktopComposition.ConfigureServices(services);
+        services.AddSingleton<KotobaSenpai.Core.Threading.IUiThread>(ViewModelDependencies.UiThread());
         services.AddSingleton<ISettingsService>(new MemorySettings());
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
         using var first = provider.CreateScope();
@@ -66,6 +68,7 @@ public sealed class CompositionRootTests
     {
         var services = new ServiceCollection();
         DesktopComposition.ConfigureServices(services);
+        services.AddSingleton<KotobaSenpai.Core.Threading.IUiThread>(ViewModelDependencies.UiThread());
         services.RemoveAll(dependency);
 
         var exception = Assert.Throws<AggregateException>(() => services.BuildServiceProvider(
@@ -79,6 +82,7 @@ public sealed class CompositionRootTests
     {
         var services = new ServiceCollection();
         DesktopComposition.ConfigureServices(services);
+        services.AddSingleton<KotobaSenpai.Core.Threading.IUiThread>(ViewModelDependencies.UiThread());
         var settings = new MemorySettings();
         services.AddSingleton<ISettingsService>(settings);
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
@@ -105,11 +109,12 @@ public sealed class CompositionRootTests
     {
         var services = new ServiceCollection();
         DesktopComposition.ConfigureServices(services);
+        services.AddSingleton<KotobaSenpai.Core.Threading.IUiThread>(ViewModelDependencies.UiThread());
         var settings = new MemorySettings();
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         services.AddSingleton<ISettingsService>(settings);
-        services.AddSingleton(new OnboardingViewModel(settings, new ResourceManagerStringLocalizer(), () => new(false, false),
+        services.AddSingleton(ViewModelDependencies.Onboarding(settings, new ResourceManagerStringLocalizer(), () => new(false, false),
             async token => { entered.SetResult(); await cleanup.Task; token.ThrowIfCancellationRequested(); }, () => Task.CompletedTask));
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
         using var scope = provider.CreateScope();
@@ -130,6 +135,7 @@ public sealed class CompositionRootTests
     {
         var services = new ServiceCollection();
         DesktopComposition.ConfigureServices(services);
+        services.AddSingleton<KotobaSenpai.Core.Threading.IUiThread>(ViewModelDependencies.UiThread());
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
         using var scope = provider.CreateScope();
         var scoped = scope.ServiceProvider;

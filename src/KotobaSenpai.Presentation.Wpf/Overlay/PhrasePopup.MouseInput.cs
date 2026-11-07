@@ -4,6 +4,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
+using Native = KotobaSenpai.Platform.Windows.Overlay.PhrasePopupNativeMethods;
 
 namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
@@ -94,38 +95,4 @@ public sealed partial class PhrasePopup
         {
             RoutedEvent = Mouse.MouseWheelEvent,
         });
-
-    private static partial class Native
-    {
-        public const int WmLeftButtonDown = 0x0201;
-        public const int WmLeftButtonUp = 0x0202;
-        public delegate nint MouseHook(int code, nint message, nint data);
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Point { public int X, Y; }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MouseHookData
-        {
-            public Point Point;
-            public uint MouseData, Flags, Time;
-            public nuint ExtraInfo;
-        }
-
-        [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", SetLastError = true)]
-        public static extern nint SetWindowsHookEx(int kind, MouseHook callback, nint module, uint thread);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool UnhookWindowsHookEx(nint hook);
-
-        [DllImport("user32.dll")]
-        public static extern nint CallNextHookEx(nint hook, int code, nint message, nint data);
-
-        [DllImport("user32.dll")]
-        public static extern nint WindowFromPoint(Point point);
-
-        [DllImport("kernel32.dll", EntryPoint = "GetModuleHandleW")]
-        public static extern nint GetModuleHandle(string? name);
-    }
 }

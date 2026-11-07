@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
-using System.Windows.Interop;
-using System.Windows.Threading;
+using KotobaSenpai.Core.Threading;
 using KotobaSenpai.Core.Shortcuts;
 
 namespace KotobaSenpai.Platform.Windows.Shortcuts;
@@ -8,26 +7,30 @@ namespace KotobaSenpai.Platform.Windows.Shortcuts;
 /// <summary>Owns native registrations and a message-only window; knows nothing about reading actions.</summary>
 public sealed class Win32GlobalShortcutRegistrar : IGlobalShortcutRegistrar
 {
-    private HwndSource? _source;
+    private readonly IUiThread _uiThread;
+    private HotkeyMessageWindow? _source;
     private readonly HashSet<int> _registrations = [];
     private bool _disposed;
 
-    private HwndSource CreateSource()
-    {
-        var source = new HwndSource(new HwndSourceParameters("KotobaSenpai shortcuts")
-        { ParentWindow = new nint(-3), WindowStyle = 0, Width = 0, Height = 0 });
-        source.AddHook(WindowProc);
-        return source;
-    }
+    public Win32GlobalShortcutRegistrar(IUiThread uiThread)
+        => _uiThread = uiThread ?? throw new ArgumentNullException(nameof(uiThread));
 
     public event EventHandler<int>? Triggered;
 
     public bool TryRegister(int registrationId, ShortcutGesture gesture, out int error)
     {
+        var nativeError = 0;
+        var registered = _uiThread.Invoke(() => TryRegisterCore(registrationId, gesture, out nativeError));
+        error = nativeError;
+        return registered;
+    }
+
+    private bool TryRegisterCore(int registrationId, ShortcutGesture gesture, out int error)
+    {
         error = 87;
         if (_disposed || registrationId is <= 0 or > 0xBFFF || _registrations.Contains(registrationId)
             || !ShortcutGesture.TryParse(gesture.ToString(), out var parsed) || parsed != gesture) return false;
-        _source ??= CreateSource();
+        _source ??= new HotkeyMessageWindow(OnHotkey);
         var key = parsed.Key;
         var virtualKey = key.Length == 1 ? key[0]
             : key.StartsWith('F') && int.TryParse(key.AsSpan(1), out var number) ? 0x70 + number - 1
@@ -49,30 +52,29 @@ public sealed class Win32GlobalShortcutRegistrar : IGlobalShortcutRegistrar
     }
 
     public void Unregister(int registrationId)
+        => _uiThread.Invoke(() => UnregisterCore(registrationId));
+
+    private void UnregisterCore(int registrationId)
     {
         if (_registrations.Remove(registrationId) && _source is not null) Native.UnregisterHotKey(_source.Handle, registrationId);
     }
 
-    private nint WindowProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
+    private void OnHotkey(int id)
     {
-        if (message == 0x0312)
+        _uiThread.Post(() =>
         {
-            var id = wParam.ToInt32();
-            handled = true;
-            _source!.Dispatcher.BeginInvoke(() =>
-            {
-                if (!_disposed && _registrations.Contains(id)) Triggered?.Invoke(this, id);
-            }, DispatcherPriority.Input);
-        }
-        return nint.Zero;
+            if (!_disposed && _registrations.Contains(id)) Triggered?.Invoke(this, id);
+        });
     }
 
     public void Dispose()
+        => _uiThread.Invoke(DisposeCore);
+
+    private void DisposeCore()
     {
         if (_disposed) return;
         _disposed = true;
-        foreach (var id in _registrations.ToArray()) Unregister(id);
-        _source?.RemoveHook(WindowProc);
+        foreach (var id in _registrations.ToArray()) UnregisterCore(id);
         _source?.Dispose();
     }
 

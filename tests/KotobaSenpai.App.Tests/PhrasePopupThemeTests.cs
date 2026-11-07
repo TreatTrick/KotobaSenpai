@@ -395,10 +395,10 @@ public sealed partial class PhrasePopupThemeTests
         var readiness = new OnboardingReadiness(false, false);
         var preparation = new TaskCompletionSource();
         var preparations = 0;
-        using var onboarding = new OnboardingViewModel(settings, localizer, () => readiness,
+        using var onboarding = ViewModelDependencies.Onboarding(settings, localizer, () => readiness,
             _ => { preparations++; return preparation.Task; },
             () => throw new InvalidOperationException("Recognition must not start when switching languages."));
-        using var shell = new MainWindowViewModel(settingsViewModel, dictionary, onboarding);
+        using var shell = new MainWindowViewModel(settingsViewModel, dictionary, onboarding, ViewModelDependencies.Support(), ViewModelDependencies.Guidance());
         var initializing = onboarding.InitializeCommand.ExecuteAsync(null);
         var page = new OnboardingPage { DataContext = shell };
         var host = new Window

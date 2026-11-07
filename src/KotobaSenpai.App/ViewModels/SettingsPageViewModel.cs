@@ -43,10 +43,10 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
         IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance,
         CaptureBorderPreferences captureBorder, SentenceTranslationPreferences sentenceTranslation,
-        ShortcutSettingsViewModel? shortcuts = null)
+        ShortcutSettingsViewModel shortcuts)
     {
         _settings = settings;
-        Shortcuts = shortcuts;
+        Shortcuts = shortcuts ?? throw new ArgumentNullException(nameof(shortcuts));
         _themePreferences = themePreferences;
         _localizer = localizer;
         _explanationPreferences = explanationLanguage;
@@ -68,7 +68,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     public ILanguagePreferences Language { get; }
     public LlmSettingsViewModel Llm { get; }
     public OverlayAppearanceViewModel OverlayAppearance { get; }
-    public ShortcutSettingsViewModel? Shortcuts { get; }
+    public ShortcutSettingsViewModel Shortcuts { get; }
 
     public bool SentenceTranslationEnabled
     {

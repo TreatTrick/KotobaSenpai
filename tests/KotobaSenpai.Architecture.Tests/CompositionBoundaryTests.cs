@@ -9,6 +9,20 @@ namespace KotobaSenpai.Architecture.Tests;
 public sealed class CompositionBoundaryTests
 {
     [Fact]
+    public void View_model_constructors_do_not_silently_accept_missing_dependencies()
+    {
+        var optionalDependencies = typeof(RecognitionPageViewModel).Assembly.GetTypes()
+            .Where(type => type.Namespace == "KotobaSenpai.App.ViewModels" && type.Name.EndsWith("ViewModel", StringComparison.Ordinal))
+            .SelectMany(type => type.GetConstructors().SelectMany(constructor => constructor.GetParameters()
+                .Where(parameter => parameter.IsOptional)
+                .Select(parameter => $"{type.Name}.{parameter.Name}")))
+            .ToArray();
+
+        Assert.True(optionalDependencies.Length == 0,
+            $"View model dependencies must be explicitly composed: {string.Join(", ", optionalDependencies)}");
+    }
+
+    [Fact]
     public void Wpf_entry_point_delegates_container_access_to_composition()
     {
         var result = Types.InAssembly(typeof(KotobaSenpai.App.App).Assembly).That().HaveName("App")

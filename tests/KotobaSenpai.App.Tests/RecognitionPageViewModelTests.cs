@@ -848,12 +848,15 @@ public sealed class RecognitionPageViewModelTests
         var localizer = new FakeStringLocalizer();
         var resolver = new UserMessageResolver(localizer);
         var logger = new FakeLogger();
+        tracker ??= ViewModelDependencies.Tracker();
+        capture ??= ViewModelDependencies.Capture();
+        support ??= ViewModelDependencies.Support();
         var selection = new TargetSelectionViewModel(picker, localizer, resolver, logger, frame => frame, tracker, capture);
         var region = regionSelector ?? new FakeRegionSelector();
         var preferences = settings ?? new FakeSettings();
         var session = new RecognitionSessionController(workflow, preferences, controller, logger);
         var actions = new KotobaSenpai.App.Reading.ReadingActions(selection, session, region, preferences, tracker, support);
-        return (new RecognitionPageViewModel(selection, session, actions, region, preferences, localizer, resolver, logger, capture, support), overlay, localizer, logger);
+        return (new RecognitionPageViewModel(selection, session, actions, region, preferences, localizer, resolver, logger, capture, support, ViewModelDependencies.Shortcuts()), overlay, localizer, logger);
     }
 
     private sealed class FakeWindowPicker : IWindowPicker

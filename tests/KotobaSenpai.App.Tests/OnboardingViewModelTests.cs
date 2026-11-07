@@ -265,7 +265,7 @@ public sealed class OnboardingViewModelTests
     private static OnboardingViewModel Create(MemorySettings settings, Func<OnboardingReadiness> readiness,
         Func<CancellationToken, Task>? prepare = null, Func<Task>? start = null)
         => new(settings, new ResourceManagerStringLocalizer(), readiness,
-            prepare ?? (_ => Task.CompletedTask), start ?? (() => Task.CompletedTask));
+            prepare ?? (_ => Task.CompletedTask), start ?? (() => Task.CompletedTask), static () => { });
 
     private sealed class MemorySettings : SettingsStub
     {

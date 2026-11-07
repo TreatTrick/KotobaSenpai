@@ -18,12 +18,12 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 {
     private readonly RecognitionSessionController _session;
     private readonly IRegionSelector _region;
-    private readonly IWindowFrameCapture? _capture;
+    private readonly IWindowFrameCapture _capture;
     private readonly ISettingsService _settings;
     private readonly IStringLocalizer _localizer;
     private readonly IUserMessageResolver _messages;
     private readonly ILogger _logger;
-    private readonly SupportService? _support;
+    private readonly SupportService _support;
     private Func<string> _renderStatus = () => string.Empty;
     private RecognitionPhase _previousPhase;
     private Exception? _shownError;
@@ -31,21 +31,21 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 
     public RecognitionPageViewModel(TargetSelectionViewModel selection, RecognitionSessionController session, ReadingActions actions,
         IRegionSelector regionSelector, ISettingsService settings, IStringLocalizer localizer,
-        IUserMessageResolver messageResolver, ILogger logger, IWindowFrameCapture? capture = null,
-        SupportService? support = null,
-        ShortcutSettingsViewModel? shortcuts = null)
+        IUserMessageResolver messageResolver, ILogger logger, IWindowFrameCapture capture,
+        SupportService support,
+        ShortcutSettingsViewModel shortcuts)
     {
         Selection = selection;
-        Shortcuts = shortcuts;
+        Shortcuts = shortcuts ?? throw new ArgumentNullException(nameof(shortcuts));
         _session = session ?? throw new ArgumentNullException(nameof(session));
         Actions = actions ?? throw new ArgumentNullException(nameof(actions));
         _region = regionSelector;
-        _capture = capture;
+        _capture = capture ?? throw new ArgumentNullException(nameof(capture));
         _settings = settings;
         _localizer = localizer;
         _messages = messageResolver;
         _logger = logger;
-        _support = support;
+        _support = support ?? throw new ArgumentNullException(nameof(support));
         Selection.SelectionCommitted += OnSelectionCommitted;
         Selection.PropertyChanged += OnSelectionPropertyChanged;
         _region.SelectionStateChanged += OnRegionChanged;
@@ -60,7 +60,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
 
     public TargetSelectionViewModel Selection { get; }
     public ReadingActions Actions { get; }
-    public ShortcutSettingsViewModel? Shortcuts { get; }
+    public ShortcutSettingsViewModel Shortcuts { get; }
     public bool IsHidden => _session.State.Phase == RecognitionPhase.Hidden;
     public string VisibilityButtonText => _localizer.Get(IsHidden ? "Reading_Resume" : "Reading_HidePause");
     public string RunState => _localizer.Get(IsHidden ? "Reading_HiddenPaused"
@@ -92,7 +92,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private async Task ExecuteAsync(ReadingAction action)
     {
         if (_disposed) return;
-        _support?.CancelStartupReminder();
+        _support.CancelStartupReminder();
         try { await Actions.ExecuteAsync(action); }
         catch (Exception exception) { SetError(exception, action == ReadingAction.SelectRegion ? ErrorCodes.TargetWindowUnavailable : ErrorCodes.RecognitionFailed); }
     }
@@ -102,7 +102,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
         try
         {
             if (!Actions.CanExecute(ReadingAction.ToggleAutomatic)) return;
-            _support?.CancelStartupReminder();
+            _support.CancelStartupReminder();
             await Actions.SetAutomaticAsync(enabled);
         }
         catch (Exception exception) { SetError(exception, ErrorCodes.RecognitionFailed); }
@@ -112,7 +112,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private void OnSelectionCommitted(object? sender, EventArgs e) => _session.Stop();
     private void OnSelectionPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (Selection.IsSelectingWindow) _support?.CancelStartupReminder();
+        if (Selection.IsSelectingWindow) _support.CancelStartupReminder();
         if (e.PropertyName == nameof(TargetSelectionViewModel.Status))
         {
             _renderStatus = () => Selection.Status;
@@ -144,7 +144,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
             if (state.Phase is RecognitionPhase.Hidden or RecognitionPhase.Stopped or RecognitionPhase.Failed)
             {
                 _region.StopFlashing();
-                if (!Selection.IsAcquiringPreview) _capture?.Stop();
+                if (!Selection.IsAcquiringPreview) _capture.Stop();
                 if (state.Phase != RecognitionPhase.Hidden) Selection.EndRecognition();
             }
         }
@@ -171,7 +171,7 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private void OnCompleted(object? sender, RecognitionCompleted completion)
     {
         if (_disposed) return;
-        _support?.RecordRecognition(DateTime.Now);
+        _support.RecordRecognition(DateTime.Now);
         if (!completion.IsAutomatic && !completion.Result.Lines.Any(line => line.Words.Count > 0))
         {
             var saved = RecognitionRegion.TryParse(_settings.GetValue(RecognitionRegion.SettingsKey), out var parsed) ? parsed : null;

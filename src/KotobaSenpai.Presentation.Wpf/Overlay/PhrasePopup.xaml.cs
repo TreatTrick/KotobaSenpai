@@ -8,6 +8,7 @@ using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 using System.Runtime.InteropServices;
 using KotobaSenpai.Platform.Windows.Overlay;
+using Native = KotobaSenpai.Platform.Windows.Overlay.PhrasePopupNativeMethods;
 
 namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
@@ -242,9 +243,7 @@ public sealed partial class PhrasePopup : Window
     private void ConfigureMouseInput()
     {
         var handle = new WindowInteropHelper(this).Handle;
-        var style = Native.GetWindowLongPtr(handle, Native.GwlExStyle).ToInt64();
-        Native.SetWindowLongPtr(handle, Native.GwlExStyle,
-            new nint((style & ~Native.WsExTransparent) | Native.WsExNoActivate | Native.WsExToolWindow));
+        OverlayWindowNativeHost.ConfigureInput(handle, clickThrough: false);
     }
 
     private nint WindowProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
@@ -262,58 +261,5 @@ public sealed partial class PhrasePopup : Window
             handled = true;
         }
         return nint.Zero;
-    }
-
-    private static partial class Native
-    {
-        public const int GwlExStyle = -20;
-        public const int WmMouseActivate = 0x0021;
-        public const int WmMouseWheel = 0x020A;
-        public const int MaNoActivate = 3;
-        public const long WsExTransparent = 0x20;
-        public const long WsExNoActivate = 0x08000000;
-        public const long WsExToolWindow = 0x80;
-        public const uint MonitorDefaultToNearest = 2;
-        public const uint SwpNoActivate = 0x0010;
-        public const uint SwpNoZOrder = 0x0004;
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Rect
-        {
-            public int Left, Top, Right, Bottom;
-            public readonly ScreenRect ToScreenRect() => new(Left, Top, Right - Left, Bottom - Top);
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct MonitorInfo
-        {
-            public int Size;
-            public Rect Bounds, WorkArea;
-            public uint Flags;
-        }
-
-        [DllImport("user32.dll")]
-        public static extern nint MonitorFromRect(in Rect rect, uint flags);
-
-        [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
-
-        [DllImport("user32.dll")]
-        public static extern uint GetDpiForWindow(nint handle);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetWindowRect(nint handle, out Rect rect);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool SetWindowPos(nint handle, nint insertAfter, int x, int y, int width, int height, uint flags);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
-        public static extern nint GetWindowLongPtr(nint hWnd, int index);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
-        public static extern nint SetWindowLongPtr(nint hWnd, int index, nint value);
     }
 }

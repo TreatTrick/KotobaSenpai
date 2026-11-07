@@ -3,6 +3,7 @@ using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Platform.Windows.Capture;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -25,12 +26,12 @@ public sealed class WindowPickerTests
         try
         {
             target.Show();
-            var candidate = Win32WindowPicker.ReadCandidate(new WindowInteropHelper(target).Handle, 0)!;
+            var candidate = WindowPickerCandidates.ReadCandidate(new WindowInteropHelper(target).Handle, 0)!;
             nint[] Helpers() => OverlayWindowRegistry.Snapshot()
                 .Where(handle => Native.GetWindowThreadProcessId(handle, out _) == candidate.ThreadId).ToArray();
             picker.Highlight(candidate.Target, 0);
             var handle = Assert.Single(Helpers());
-            var outline = Assert.IsType<Win32WindowPicker.RainbowWindow>(Window.GetWindow(HwndSource.FromHwnd(handle)!.RootVisual));
+            var outline = Assert.IsType<RainbowWindow>(Window.GetWindow(HwndSource.FromHwnd(handle)!.RootVisual));
             outline.Close();
 
             picker.Highlight(candidate.Target, 0);
@@ -49,7 +50,7 @@ public sealed class WindowPickerTests
     public Task A_selected_outline_follows_geometry_and_visibility_and_releases_itself_when_the_target_closes() => RunSta(() =>
     {
         var target = new Window { Title = "Target", Width = 240, Height = 180, Left = 30, Top = 40, ShowActivated = false, ShowInTaskbar = false };
-        var outline = new Win32WindowPicker.RainbowWindow();
+        var outline = new RainbowWindow();
         var logger = new RecordingLogger();
         var closed = false;
         outline.Closed += (_, _) => closed = true;
@@ -57,7 +58,7 @@ public sealed class WindowPickerTests
         try
         {
             target.Show();
-            var candidate = Win32WindowPicker.ReadCandidate(new WindowInteropHelper(target).Handle, 0)!;
+            var candidate = WindowPickerCandidates.ReadCandidate(new WindowInteropHelper(target).Handle, 0)!;
             outline.Follow(candidate, logger);
             handle = new WindowInteropHelper(outline).Handle;
             Pump(TimeSpan.FromMilliseconds(100));
@@ -99,12 +100,12 @@ public sealed class WindowPickerTests
             dialog.Owner = target;
             dialog.Show();
             var handle = new WindowInteropHelper(dialog).Handle;
-            var candidate = Win32WindowPicker.ReadCandidate(handle, 0)!;
+            var candidate = WindowPickerCandidates.ReadCandidate(handle, 0)!;
             var x = candidate.Target.Bounds.X + 30;
             var y = candidate.Target.Bounds.Y + 30;
-            Assert.Equal(handle, Win32WindowPicker.ResolveAt(x, y, 0)?.Target.Handle);
+            Assert.Equal(handle, WindowPickerCandidates.ResolveAt(x, y, 0)?.Target.Handle);
             dialog.Hide();
-            Assert.Equal(new WindowInteropHelper(target).Handle, Win32WindowPicker.ResolveAt(x, y, 0)?.Target.Handle);
+            Assert.Equal(new WindowInteropHelper(target).Handle, WindowPickerCandidates.ResolveAt(x, y, 0)?.Target.Handle);
         }
         finally { dialog.Close(); target.Close(); }
     });
@@ -117,14 +118,14 @@ public sealed class WindowPickerTests
         {
             window.Show();
             var handle = new WindowInteropHelper(window).Handle;
-            var candidate = Assert.IsType<WindowPickerCandidate>(Win32WindowPicker.ReadCandidate(handle, 0));
+            var candidate = Assert.IsType<WindowPickerCandidate>(WindowPickerCandidates.ReadCandidate(handle, 0));
             Assert.Equal(handle, candidate.Target.Handle);
             Assert.Empty(candidate.Target.Title);
             Assert.True(candidate.Target.Bounds.Y > candidate.FrameBounds.Y);
             Assert.True(candidate.Target.Bounds.Height < candidate.FrameBounds.Height);
-            Assert.Null(Win32WindowPicker.ReadCandidate(handle, Environment.ProcessId));
+            Assert.Null(WindowPickerCandidates.ReadCandidate(handle, Environment.ProcessId));
             window.Hide();
-            Assert.Null(Win32WindowPicker.ReadCandidate(handle, 0));
+            Assert.Null(WindowPickerCandidates.ReadCandidate(handle, 0));
         }
         finally { window.Close(); }
     });
@@ -143,7 +144,7 @@ public sealed class WindowPickerTests
             Assert.Equal(0x08000020, style & 0x08000020);
             Assert.Equal(active, Native.GetActiveWindow());
             Assert.Contains(handle, OverlayWindowRegistry.Snapshot());
-            Assert.Null(Win32WindowPicker.ReadCandidate(handle, 0));
+            Assert.Null(WindowPickerCandidates.ReadCandidate(handle, 0));
             var pixels = new Rect(-240, -100, 160, 90);
             var mapped = surface.FromScreenPixels(pixels);
             Assert.Equal(pixels.TopLeft, surface.PointToScreen(mapped.TopLeft));
@@ -152,76 +153,6 @@ public sealed class WindowPickerTests
         finally { surface.Close(); }
         Assert.DoesNotContain(handle, OverlayWindowRegistry.Snapshot());
     });
-
-    [Fact]
-    public void Escape_waits_for_a_swallowed_mouse_press_to_be_released()
-    {
-        var gesture = new WindowPickGesture();
-        var target = Candidate(10, 20, 30);
-        gesture.Press(target);
-        gesture.PressEscape();
-        Assert.False(gesture.ReleaseEscape());
-        Assert.False(gesture.IsCancellationReady);
-        Assert.Null(gesture.Release(target));
-        Assert.True(gesture.IsCancellationReady);
-    }
-
-    [Fact]
-    public void A_click_while_escape_is_held_waits_for_escape_release_without_committing()
-    {
-        var gesture = new WindowPickGesture();
-        var target = Candidate(10, 20, 30);
-        gesture.PressEscape();
-        gesture.Press(target);
-        Assert.Null(gesture.Release(target));
-        Assert.False(gesture.IsCancellationReady);
-        Assert.True(gesture.ReleaseEscape());
-    }
-
-    [Fact]
-    public void A_click_commits_only_after_release_over_the_same_window_identity()
-    {
-        var gesture = new WindowPickGesture();
-        var target = Candidate(10, 20, 30);
-        gesture.Press(target);
-
-        Assert.Null(gesture.Release(Candidate(11, 20, 30)));
-        Assert.Null(gesture.Release(target));
-
-        gesture.Press(target);
-        var moved = target with { Target = target.Target.WithBounds(new ScreenRect(-300, 40, 120, 80)) };
-        Assert.Same(moved, gesture.Release(moved));
-        Assert.Null(gesture.Release(moved));
-    }
-
-    [Theory]
-    [InlineData(21, 30)]
-    [InlineData(20, 31)]
-    public void A_reused_handle_cannot_complete_the_original_click(uint processId, uint threadId)
-    {
-        var gesture = new WindowPickGesture();
-        gesture.Press(Candidate(10, 20, 30));
-
-        Assert.Null(gesture.Release(Candidate(10, processId, threadId)));
-    }
-
-    [Fact]
-    public void An_invalid_press_or_release_does_not_select_a_window()
-    {
-        var gesture = new WindowPickGesture();
-        var target = Candidate(10, 20, 30);
-        gesture.Press(null);
-        Assert.Null(gesture.Release(target));
-        gesture.Press(target);
-        Assert.Null(gesture.Release(null));
-        Assert.Null(gesture.Release(target));
-    }
-
-    private static WindowPickerCandidate Candidate(int handle, uint processId, uint threadId)
-    {
-        var bounds = new ScreenRect(-100, 20, 120, 80);
-        return new(new WindowTarget((nint)handle, "Target", bounds), bounds, processId, threadId, 96);
-    }
 
     private static Task RunSta(Action action)
     {

@@ -1,7 +1,7 @@
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.TargetWindow;
 
-namespace KotobaSenpai.Presentation.Wpf.Capture;
+namespace KotobaSenpai.Platform.Windows.Capture;
 
 internal sealed record WindowPickerCandidate(
     WindowTarget Target, ScreenRect FrameBounds, uint ProcessId, uint ThreadId, uint Dpi);

@@ -57,8 +57,9 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer, IDisposable
         IReadOnlyList<MeikiLine> lines;
         try
         {
-            lines = _engine.RunOcr(frame.Bgra32, frame.Width, frame.Height);
+            lines = _engine.RunOcr(frame.Bgra32, frame.Width, frame.Height, cancellationToken: cancellationToken);
         }
+        catch (OperationCanceledException) { throw; }
         catch (WindowsPlatformException)
         {
             throw;

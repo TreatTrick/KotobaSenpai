@@ -13,7 +13,7 @@ public sealed class LlmSettingsViewModelTests
     public void Unconfigured_protocol_defaults_to_responses_in_the_ui_and_runtime(string? saved)
     {
         var settings = new FakeSettings(new Dictionary<string, string?> { [LlmSettingsKeys.Protocol] = saved });
-        using var viewModel = new LlmSettingsViewModel(settings, new FakeCatalog(), new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(settings, new FakeCatalog(), new FakeLocalizer());
 
         Assert.Equal(LlmProtocolIds.OpenAiResponses, viewModel.Protocol);
         Assert.Equal(viewModel.Protocol, LlmConfiguration.Read(settings).Protocol);
@@ -27,7 +27,7 @@ public sealed class LlmSettingsViewModelTests
     public void An_explicitly_saved_protocol_keeps_its_selection(string saved)
     {
         var settings = new FakeSettings(new Dictionary<string, string?> { [LlmSettingsKeys.Protocol] = saved });
-        using var viewModel = new LlmSettingsViewModel(settings, new FakeCatalog(), new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(settings, new FakeCatalog(), new FakeLocalizer());
 
         Assert.Equal(saved, viewModel.Protocol);
         Assert.Equal(saved, LlmConfiguration.Read(settings).Protocol);
@@ -37,7 +37,7 @@ public sealed class LlmSettingsViewModelTests
     public void Culture_changes_translate_protocol_choices_without_replacing_the_selected_item()
     {
         var localizer = new FakeLocalizer();
-        using var viewModel = new LlmSettingsViewModel(new FakeSettings(), new FakeCatalog(), localizer);
+        using var viewModel = ViewModelDependencies.Llm(new FakeSettings(), new FakeCatalog(), localizer);
         viewModel.Protocol = LlmProtocolIds.OpenAiResponses;
         var selected = viewModel.Protocols.Single(option => option.Id == viewModel.Protocol);
         var previousName = selected.Name;
@@ -60,7 +60,7 @@ public sealed class LlmSettingsViewModelTests
             [LlmSettingsKeys.Model] = "model-a",
             ["Theme"] = "Dark",
         });
-        using var viewModel = new LlmSettingsViewModel(settings, new FakeCatalog(), new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(settings, new FakeCatalog(), new FakeLocalizer());
 
         Assert.Equal(LlmProtocolIds.Anthropic, viewModel.Protocol);
         Assert.Equal("secret", viewModel.ApiKey);
@@ -80,7 +80,7 @@ public sealed class LlmSettingsViewModelTests
         {
             Result = LlmModelCatalogResult.Success([new("model-a"), new("model-b")]),
         };
-        using var viewModel = new LlmSettingsViewModel(settings, catalog, new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(settings, catalog, new FakeLocalizer());
         viewModel.Endpoint = "https://provider.example";
         viewModel.ApiKey = "secret";
 
@@ -96,7 +96,7 @@ public sealed class LlmSettingsViewModelTests
     public async Task Missing_endpoint_is_reported_without_network_call()
     {
         var catalog = new FakeCatalog();
-        using var viewModel = new LlmSettingsViewModel(new FakeSettings(), catalog, new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(new FakeSettings(), catalog, new FakeLocalizer());
         viewModel.ApiKey = "secret";
 
         await viewModel.FetchModelsCommand.ExecuteAsync(null);
@@ -109,7 +109,7 @@ public sealed class LlmSettingsViewModelTests
     public async Task Missing_api_key_is_reported_without_network_call()
     {
         var catalog = new FakeCatalog();
-        using var viewModel = new LlmSettingsViewModel(new FakeSettings(), catalog, new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(new FakeSettings(), catalog, new FakeLocalizer());
         viewModel.Endpoint = "https://provider.example";
 
         await viewModel.FetchModelsCommand.ExecuteAsync(null);
@@ -124,7 +124,7 @@ public sealed class LlmSettingsViewModelTests
         var catalog = new SequencedCatalog(
             LlmModelCatalogResult.Success([new("model-a")]),
             LlmModelCatalogResult.Failed(LlmModelCatalogFailure.Authentication));
-        using var viewModel = new LlmSettingsViewModel(new FakeSettings(), catalog, new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(new FakeSettings(), catalog, new FakeLocalizer());
         viewModel.Endpoint = "https://provider.example";
         viewModel.ApiKey = "secret";
         viewModel.Model = "model-a";
@@ -141,7 +141,7 @@ public sealed class LlmSettingsViewModelTests
     public async Task A_new_fetch_cancels_and_ignores_the_previous_result()
     {
         var catalog = new SupersededCatalog();
-        using var viewModel = new LlmSettingsViewModel(new FakeSettings(), catalog, new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(new FakeSettings(), catalog, new FakeLocalizer());
         viewModel.Endpoint = "https://provider.example";
         viewModel.ApiKey = "secret";
 
@@ -158,7 +158,7 @@ public sealed class LlmSettingsViewModelTests
     public async Task Changing_provider_settings_cancels_the_inflight_fetch()
     {
         var catalog = new SupersededCatalog();
-        using var viewModel = new LlmSettingsViewModel(new FakeSettings(), catalog, new FakeLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(new FakeSettings(), catalog, new FakeLocalizer());
         viewModel.Endpoint = "https://provider.example";
         viewModel.ApiKey = "secret";
 

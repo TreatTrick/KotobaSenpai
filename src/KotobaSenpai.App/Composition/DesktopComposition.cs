@@ -34,6 +34,9 @@ using KotobaSenpai.Platform.Windows.AutoRecognition;
 using Microsoft.Extensions.DependencyInjection;
 using KotobaSenpai.Core.Shortcuts;
 using KotobaSenpai.Core.Japanese;
+using KotobaSenpai.Core.Threading;
+using KotobaSenpai.Presentation.Wpf.Threading;
+using System.Windows.Threading;
 using KotobaSenpai.Platform.Windows.Shortcuts;
 using KotobaSenpai.App.Shortcuts;
 using KotobaSenpai.App.Reading;
@@ -147,6 +150,7 @@ internal sealed class DesktopComposition : IDisposable
     /// <summary>Registers application-wide resources and window-scoped presentation and recognition state.</summary>
     internal static void ConfigureServices(IServiceCollection services)
     {
+        services.AddSingleton<IUiThread>(_ => new WpfUiThread(Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher));
         services.AddScoped<IWindowPicker, Win32WindowPicker>();
         services.AddScoped<IWindowFrameCapture, WgcWindowFrameCapture>();
         services.AddScoped<MeikiOcrWordRecognizer>();

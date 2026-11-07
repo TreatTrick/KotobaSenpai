@@ -21,6 +21,7 @@ using KotobaSenpai.Platform.Windows.Capture;
 using KotobaSenpai.Platform.Windows.Overlay;
 using KotobaSenpai.Presentation.Wpf.Overlay;
 using KotobaSenpai.Presentation.Wpf.Capture;
+using KotobaSenpai.Presentation.Wpf.Threading;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -43,7 +44,7 @@ internal static class WindowPickerFixture
         using var localization = new LocalizationHost(localizer);
         application.Resources[LocalizationHost.ResourceKey] = localization;
         var logger = new FixtureLogger(directory);
-        using var tracker = new WinEventTargetWindowTracker(logger);
+        using var tracker = new WinEventTargetWindowTracker(new WpfUiThread(application.Dispatcher), logger);
         using var capture = new WgcWindowFrameCapture(tracker);
         var workflow = new WordOverlayApplicationService(new Recognizer(),
             new WordGroupingService(new Tokenizer(), new SentenceSegmenter(), new SpanResolver()),
@@ -55,7 +56,7 @@ internal static class WindowPickerFixture
         var session = new RecognitionSessionController(workflow, settings, logger: logger);
         var actions = new KotobaSenpai.App.Reading.ReadingActions(selection, session, region, settings, tracker);
         using var vm = new RecognitionPageViewModel(selection, session, actions, region, settings, localizer,
-            new UserMessageResolver(localizer), logger, capture);
+            new UserMessageResolver(localizer), logger, capture, ViewModelDependencies.Support(), ViewModelDependencies.Shortcuts());
         var page = new RecognitionPage { DataContext = vm };
         var host = new Window { Title = "Window picker host", Width = 660, Height = 760, Left = 620, Top = 60, Content = page };
         var previews = 0;

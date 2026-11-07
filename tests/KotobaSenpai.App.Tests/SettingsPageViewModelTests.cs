@@ -443,9 +443,9 @@ public sealed class SettingsPageViewModelTests
         language.Initialize();
         var settings = new RecordingSettings();
         var theme = new RecordingThemeStore { Mode = AppThemeMode.Dark };
-        using var llm = new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer);
+        using var llm = ViewModelDependencies.Llm(settings, new EmptyCatalog(), localizer);
         using var viewModel = new SettingsPageViewModel(settings, theme, language, llm, localizer, language,
-            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings));
+            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings), ViewModelDependencies.Shortcuts());
         var choice = viewModel.ThemeModes.Single(option => option.Mode == AppThemeMode.Dark);
         var originalName = choice.Name;
 
@@ -464,11 +464,11 @@ public sealed class SettingsPageViewModelTests
     {
         var localizer = new RecordingLocalizer();
         var settings = new RecordingSettings();
-        var llm = new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer);
+        var llm = ViewModelDependencies.Llm(settings, new EmptyCatalog(), localizer);
         var language = new LanguageService(LocalizerFactory.Create(new CultureInfo("en")),
             new RecordingLanguageStore(), () => new CultureInfo("en"), _ => { });
         var viewModel = new SettingsPageViewModel(settings, new RecordingThemeStore(), language, llm, localizer, language,
-            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings));
+            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings), ViewModelDependencies.Shortcuts());
         Assert.Equal(2, localizer.SubscriberCount);
 
         viewModel.Dispose();
@@ -483,8 +483,8 @@ public sealed class SettingsPageViewModelTests
         var language = new LanguageService(localizer, new RecordingLanguageStore(), () => new CultureInfo(culture), _ => { }, settings);
         language.Initialize();
         return new SettingsPageViewModel(settings, theme, language,
-            new LlmSettingsViewModel(settings, new EmptyCatalog(), localizer), localizer, language,
-            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings));
+            ViewModelDependencies.Llm(settings, new EmptyCatalog(), localizer), localizer, language,
+            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings), ViewModelDependencies.Shortcuts());
     }
 
     private sealed class RecordingSettings : KotobaSenpai.TestSupport.SettingsStub

@@ -6,7 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.Overlay;
@@ -30,19 +29,14 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
     private readonly RegionSelectionVisuals _visuals;
     private Canvas _canvas => _visuals.Canvas;
     private Button _confirmButton => _visuals.ConfirmButton;
-    private Grid _flashOutline => _visuals.FlashOutline;
-    private readonly DispatcherTimer _flashTimer;
+    private readonly RegionSelectionFeedback _feedback;
+    private readonly RegionSelectionDragController _drag;
 
     private WindowTarget? _target;
     private nint _ownerHandle;
     private RecognitionRegion _normalizedRegion = RecognitionRegion.Full;
     private ScreenRect _region;   // window-relative pixels
     private double _scale = 1.0;
-    private RegionDragMode _dragMode;
-    private Point _dragStart;
-    private ScreenRect _dragRegion;
-    private bool _isFlashing;
-    private int _flashesRemaining;
     private bool _disposed;
 
     public RegionSelectorWindow(
@@ -59,11 +53,9 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         _visuals = new RegionSelectionVisuals(localizer, guidance, decorateBubble);
         _confirmButton.Click += (_, _) => Confirm();
         if (_guidance is not null) _guidance.Changed += OnGuidanceChanged;
-        _flashTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher)
-        {
-            Interval = TimeSpan.FromMilliseconds(250),
-        };
-        _flashTimer.Tick += OnFlashTick;
+        _feedback = new RegionSelectionFeedback(_visuals.FlashOutline, Dispatcher);
+        _feedback.Completed += (_, _) => StopFlashing();
+        _drag = new RegionSelectionDragController(this, _confirmButton);
 
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -77,7 +69,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         IsVisibleChanged += (_, _) =>
         {
             if (!IsVisible)
-                EndDrag();
+                _drag.End();
             UpdateConfirmAnimation();
         };
         SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
@@ -98,6 +90,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         {
             _disposed = true;
             ClearSelection();
+            _feedback.Dispose();
             SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
             if (_tracker is not null)
                 _tracker.Changed -= OnTargetChanged;
@@ -112,7 +105,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         // NOTE: intentionally NOT click-through — this window must capture mouse for dragging and the confirm button.
     }
 
-    public bool IsSelecting => _target is not null && !_isFlashing;
+    public bool IsSelecting => _target is not null && !_feedback.IsActive;
 
     public void Dispose()
     {
@@ -145,7 +138,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
     }
 
     private void UpdateConfirmAnimation()
-        => _visuals.UpdateConfirmAnimation(IsVisible && _target is not null && !_isFlashing);
+        => _visuals.UpdateConfirmAnimation(IsVisible && _target is not null && !_feedback.IsActive);
 
     private void OnCultureChanged(object? sender, EventArgs e)
     {
@@ -175,8 +168,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         }
 
         _target = activeTarget;
-        _isFlashing = flashing;
-        _flashesRemaining = 5;
+        if (flashing) _feedback.Activate();
         _canvas.IsHitTestVisible = !flashing;
         _ownerHandle = activeTarget.Handle;
         SetOwnerHandle();
@@ -189,7 +181,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         PositionAndRedraw();
         if (!flashing) _guidance?.Start();
         if (flashing)
-            _flashTimer.Start();
+            _feedback.Start();
     }
 
     public void Flash(WindowTarget target, RecognitionRegion? region = null)
@@ -200,7 +192,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
             return;
         }
         // Keep an active editor intact when an asynchronous recognition finishes.
-        if (IsVisible && !_isFlashing)
+        if (IsVisible && !_feedback.IsActive)
             return;
         ShowCore(target, region, flashing: true);
     }
@@ -212,24 +204,10 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
             Dispatcher.Invoke(StopFlashing);
             return;
         }
-        if (!_isFlashing)
+        if (!_feedback.IsActive)
             return;
         ClearSelection();
         Hide();
-    }
-
-    private void OnFlashTick(object? sender, EventArgs e)
-    {
-        if (_flashOutline.Visibility == Visibility.Visible)
-        {
-            _flashOutline.Visibility = Visibility.Hidden;
-            if (--_flashesRemaining == 0)
-                StopFlashing();
-        }
-        else
-        {
-            _flashOutline.Visibility = Visibility.Visible;
-        }
     }
 
     private void OnTargetChanged(object? sender, TargetWindowSnapshot snapshot)
@@ -250,19 +228,19 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         }
         if (!snapshot.IsRenderable)
         {
-            if (_isFlashing)
+            if (_feedback.IsActive)
             {
                 StopFlashing();
                 return;
             }
-            EndDrag();
+            _drag.End();
             if (IsVisible)
                 Hide();
             return;
         }
 
         if (_target.Bounds != snapshot.Bounds)
-            EndDrag();
+            _drag.End();
         _target = snapshot.Target;
         _ownerHandle = snapshot.Handle;
         SetOwnerHandle();
@@ -275,15 +253,13 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
     private void ClearSelection()
     {
         var wasSelecting = IsSelecting;
-        _flashTimer.Stop();
-        _isFlashing = false;
+        _feedback.Stop();
         _canvas.Children.Clear();
         _canvas.IsHitTestVisible = true;
-        _flashOutline.Visibility = Visibility.Visible;
         SetNoActivate();
         _target = null;
         _guidance?.Stop();
-        EndDrag();
+        _drag.End();
         UpdateConfirmAnimation();
         if (wasSelecting)
             SelectionStateChanged?.Invoke(this, EventArgs.Empty);
@@ -298,41 +274,22 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
-        if (_target is null || _isFlashing || _guidance?.Target is not null || _confirmButton.IsMouseOver)
+        if (_target is null || _feedback.IsActive || _guidance?.Target is not null || _confirmButton.IsMouseOver)
             return;
-        var p = e.GetPosition(_canvas);
-        _dragMode = RegionSelectionGeometry.HitTest(_region, _scale, p.X, p.Y);
-        if (_dragMode == RegionDragMode.None)
-            return;
-        _dragStart = new Point(p.X * _scale, p.Y * _scale);
-        _dragRegion = _region;
-        if (CaptureMouse())
-        {
-            UpdatePointerCursor(p);
-            e.Handled = true;
-        }
-        else
-            EndDrag();
+        e.Handled = _drag.Begin(e.GetPosition(_canvas), _region, _scale);
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (_target is null || _isFlashing || _guidance?.Target is not null)
+        if (_target is null || _feedback.IsActive || _guidance?.Target is not null)
             return;
         var p = e.GetPosition(_canvas);
-        if (_dragMode != RegionDragMode.None)
+        if (_drag.Move(p, e.LeftButton, _scale, _target.Bounds.Width, _target.Bounds.Height) is { } updated)
         {
-            if (e.LeftButton != MouseButtonState.Pressed)
-                EndDrag();
-            else
-            {
-                var current = new Point(p.X * _scale, p.Y * _scale);
-                _region = RegionSelectionGeometry.Drag(_dragRegion, _dragMode, current.X - _dragStart.X, current.Y - _dragStart.Y,
-                    _target.Bounds.Width, _target.Bounds.Height);
-                _normalizedRegion = RecognitionRegion.FromPixelRect(_region, _target.Bounds.Width, _target.Bounds.Height);
-                Redraw();
-            }
+            _region = updated;
+            _normalizedRegion = RecognitionRegion.FromPixelRect(_region, _target.Bounds.Width, _target.Bounds.Height);
+            Redraw();
         }
         UpdatePointerCursor(p);
     }
@@ -340,46 +297,23 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
-        EndDrag();
-        if (_target is not null && !_isFlashing)
+        _drag.End();
+        if (_target is not null && !_feedback.IsActive)
             UpdatePointerCursor(e.GetPosition(_canvas));
     }
 
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
         base.OnLostMouseCapture(e);
-        _dragMode = RegionDragMode.None;
-        if (_target is not null && !_isFlashing)
+        _drag.CaptureLost();
+        if (_target is not null && !_feedback.IsActive)
             UpdatePointerCursor(Mouse.GetPosition(_canvas));
-    }
-
-    private void EndDrag()
-    {
-        _dragMode = RegionDragMode.None;
-        if (IsMouseCaptured)
-            ReleaseMouseCapture();
-        Cursor = Cursors.Arrow;
     }
 
     private void UpdatePointerCursor(Point point)
     {
         if (_guidance?.Target is not null) { Cursor = Cursors.Arrow; return; }
-        if (_dragMode == RegionDragMode.None && _confirmButton.IsMouseOver)
-        {
-            Cursor = Cursors.Hand;
-            return;
-        }
-        var mode = _dragMode == RegionDragMode.None
-            ? RegionSelectionGeometry.HitTest(_region, _scale, point.X, point.Y) : _dragMode;
-        Cursor = mode switch
-        {
-            RegionDragMode.Left or RegionDragMode.Right => Cursors.SizeWE,
-            RegionDragMode.Top or RegionDragMode.Bottom => Cursors.SizeNS,
-            RegionDragMode.TopLeft or RegionDragMode.BottomRight => Cursors.SizeNWSE,
-            RegionDragMode.TopRight or RegionDragMode.BottomLeft => Cursors.SizeNESW,
-            RegionDragMode.Move => Cursors.SizeAll,
-            _ => Cursors.Arrow,
-        };
+        _drag.UpdateCursor(point, _region, _scale);
     }
 
     private void PositionAndRedraw()
@@ -387,7 +321,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         var handle = new WindowInteropHelper(this).Handle;
         var scale = OverlayWindowNativeHost.ReadDpiScale(handle);
         if (_scale != scale)
-            EndDrag();
+            _drag.End();
         _scale = scale;
         Width = _target!.Bounds.Width / _scale;
         Height = _target.Bounds.Height / _scale;
@@ -395,7 +329,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
         Redraw();
     }
 
-    private void Redraw() => _visuals.Render(_target!, _region, _scale, _isFlashing);
+    private void Redraw() => _visuals.Render(_target!, _region, _scale, _feedback.IsActive);
 
     private void OnGuidanceChanged(object? sender, EventArgs e)
     {
@@ -404,7 +338,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
             Dispatcher.Invoke(() => OnGuidanceChanged(sender, e));
             return;
         }
-        if (_target is not null && !_isFlashing) _visuals.DrawGuidance();
+        if (_target is not null && !_feedback.IsActive) _visuals.DrawGuidance();
     }
 
     private void Confirm()
@@ -419,7 +353,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
     }
 
     private void SetNoActivate()
-        => OverlayWindowNativeHost.ConfigureInput(new WindowInteropHelper(this).Handle, clickThrough: _isFlashing);
+        => OverlayWindowNativeHost.ConfigureInput(new WindowInteropHelper(this).Handle, clickThrough: _feedback.IsActive);
 
     private void SetOwnerHandle()
     {

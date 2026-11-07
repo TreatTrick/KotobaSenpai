@@ -93,11 +93,11 @@ public sealed class AutoRecognitionSettingsTests
             new WordGroupingService(new FakeTokenizer(), new SentenceSegmenter(), new FakeSpanResolver()),
             new FakeOverlay(), KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
         var logger = new FakeLogger();
-        var selection = new TargetSelectionViewModel(new FakeWindowPicker(target), localizer, new UserMessageResolver(localizer), logger, frame => frame);
+        var selection = new TargetSelectionViewModel(new FakeWindowPicker(target), localizer, new UserMessageResolver(localizer), logger, frame => frame, ViewModelDependencies.Tracker(), ViewModelDependencies.Capture());
         var region = new FakeRegionSelector();
         var session = new RecognitionSessionController(workflow, settings, controller, logger);
         var actions = new KotobaSenpai.App.Reading.ReadingActions(selection, session, region, settings);
-        return new RecognitionPageViewModel(selection, session, actions, region, settings, localizer, new UserMessageResolver(localizer), logger);
+        return new RecognitionPageViewModel(selection, session, actions, region, settings, localizer, new UserMessageResolver(localizer), logger, ViewModelDependencies.Capture(), ViewModelDependencies.Support(), ViewModelDependencies.Shortcuts());
     }
 
     private sealed class FakeWindowPicker(WindowTarget? target) : IWindowPicker

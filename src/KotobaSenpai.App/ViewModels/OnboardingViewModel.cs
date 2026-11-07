@@ -19,10 +19,10 @@ public sealed partial class OnboardingViewModel : ObservableObject, IDisposable
 
     public OnboardingViewModel(ISettingsService settings, IStringLocalizer localizer,
         Func<OnboardingReadiness> readiness, Func<CancellationToken, Task> prepare, Func<Task> start,
-        Action? refreshTarget = null)
+        Action refreshTarget)
     {
         _localizer = localizer;
-        _flow = new(settings, readiness, prepare, start, refreshTarget);
+        _flow = new(settings, readiness, prepare, start, refreshTarget ?? throw new ArgumentNullException(nameof(refreshTarget)));
         _flow.Changed += NotifyPresentation;
         _localizer.CultureChanged += OnCultureChanged;
     }

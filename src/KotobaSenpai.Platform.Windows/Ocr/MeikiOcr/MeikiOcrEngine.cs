@@ -48,6 +48,7 @@ public sealed class MeikiOcrEngine : IDisposable
     private readonly int _maxBatchSize;
     private readonly ILogger? _logger;
     private bool _disposed;
+    private readonly object _gate = new();
 
     public MeikiOcrEngine(string modelDirectory, int maxBatchSize = 8, ILogger? logger = null)
     {
@@ -83,52 +84,64 @@ public sealed class MeikiOcrEngine : IDisposable
         int height,
         float detThreshold = 0.5f,
         float recThreshold = 0.1f,
-        float punctConfFactor = 0.2f)
+        float punctConfFactor = 0.2f,
+        CancellationToken cancellationToken = default)
     {
-        using var image = OcrBitmap.FromBgra(bgra32, width, height);
-        var boxes = RunDetection(image, detThreshold);
-        _logger?.LogInformation("MeikiOcr: frame {0}x{1}, detected {2} text boxes", width, height, boxes.Count);
-        if (boxes.Count == 0)
-            return Array.Empty<MeikiLine>();
-
-        var results = new MeikiLine[boxes.Count];
-        var hIndices = new List<int>();
-        for (int i = 0; i < boxes.Count; i++)
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_gate)
         {
-            var (x1, y1, x2, y2) = boxes[i];
-            if (x2 - x1 <= 0 || y2 - y1 <= 0)
-                continue;
-            // Phase one only handles horizontal text (width >= height); vertical boxes are skipped.
-            if (y2 - y1 > x2 - x1)
-                continue;
-            hIndices.Add(i);
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return OnnxRunCancellation.Execute(cancellationToken, options =>
+            {
+                using var image = OcrBitmap.FromBgra(bgra32, width, height);
+                var boxes = RunDetection(image, detThreshold, options, cancellationToken);
+                _logger?.LogInformation("MeikiOcr: frame {0}x{1}, detected {2} text boxes", width, height, boxes.Count);
+                if (boxes.Count == 0)
+                    return Array.Empty<MeikiLine>();
+
+                var results = new MeikiLine[boxes.Count];
+                var hIndices = new List<int>();
+                for (int i = 0; i < boxes.Count; i++)
+                {
+                    var (x1, y1, x2, y2) = boxes[i];
+                    if (x2 - x1 <= 0 || y2 - y1 <= 0)
+                        continue;
+                    // Phase one only handles horizontal text (width >= height); vertical boxes are skipped.
+                    if (y2 - y1 > x2 - x1)
+                        continue;
+                    hIndices.Add(i);
+                }
+                _logger?.LogInformation("MeikiOcr: {0} horizontal, {1} vertical (skipped)", hIndices.Count, boxes.Count - hIndices.Count);
+
+                ProcessRecognitionPipeline(image, boxes, hIndices, results, recThreshold, punctConfFactor, options, cancellationToken);
+
+                var lines = results.Where(r => r is not null).Cast<MeikiLine>().ToArray();
+                _logger?.LogInformation("MeikiOcr: recognized {0} lines, {1} chars", lines.Length, lines.Sum(l => l.Chars.Count));
+                // Diagnostics: print the text actually recognized on each line, to tell a misrecognized character from a mapping offset.
+                foreach (var line in lines.Where(l => l.Text.Length > 0))
+                    _logger?.LogInformation("MeikiOcr: line '{0}' ({1} chars)", line.Text, line.Chars.Count);
+                cancellationToken.ThrowIfCancellationRequested();
+                return lines;
+            });
         }
-        _logger?.LogInformation("MeikiOcr: {0} horizontal, {1} vertical (skipped)", hIndices.Count, boxes.Count - hIndices.Count);
-
-        ProcessRecognitionPipeline(image, boxes, hIndices, results, recThreshold, punctConfFactor);
-
-        var lines = results.Where(r => r is not null).Cast<MeikiLine>().ToArray();
-        _logger?.LogInformation("MeikiOcr: recognized {0} lines, {1} chars", lines.Length, lines.Sum(l => l.Chars.Count));
-        // Diagnostics: print the text actually recognized on each line, to tell a misrecognized character from a mapping offset.
-        foreach (var line in lines.Where(l => l.Text.Length > 0))
-            _logger?.LogInformation("MeikiOcr: line '{0}' ({1} chars)", line.Text, line.Chars.Count);
-        return lines;
     }
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-        _detSession.Dispose();
-        _recSession.Dispose();
-        _disposed = true;
+        lock (_gate)
+        {
+            if (_disposed) return;
+            _detSession.Dispose();
+            _recSession.Dispose();
+            _disposed = true;
+        }
     }
 
     // --- Text detection (corresponding to run_detection in ocr.py) ---
 
-    private List<(int X1, int Y1, int X2, int Y2)> RunDetection(Bitmap image, float confThreshold)
+    private List<(int X1, int Y1, int X2, int Y2)> RunDetection(Bitmap image, float confThreshold, RunOptions options, CancellationToken cancellationToken)
     {
-        var (tensor, scale) = PreprocessForDetection(image);
+        var (tensor, scale) = PreprocessForDetection(image, cancellationToken);
 
         var inputNames = _detSession.InputNames.ToArray();
         var origSizes = new DenseTensor<long>(new[] { 1, 2 });
@@ -138,7 +151,7 @@ public sealed class MeikiOcrEngine : IDisposable
         {
             NamedOnnxValue.CreateFromTensor(inputNames[0], tensor),
             NamedOnnxValue.CreateFromTensor(inputNames[1], origSizes),
-        });
+        }, _detSession.OutputNames, options);
 
         var boxes = outputs[1].AsTensor<float>();
         var scores = outputs[2].AsTensor<float>();
@@ -161,7 +174,7 @@ public sealed class MeikiOcrEngine : IDisposable
         return list;
     }
 
-    private static (DenseTensor<float> Tensor, float Scale) PreprocessForDetection(Bitmap image)
+    private static (DenseTensor<float> Tensor, float Scale) PreprocessForDetection(Bitmap image, CancellationToken cancellationToken)
     {
         float scale = MathF.Min((float)InputDetWidth / image.Width, (float)InputDetHeight / image.Height);
         int wResized = (int)(image.Width * scale);
@@ -172,6 +185,7 @@ public sealed class MeikiOcrEngine : IDisposable
         var pixels = OcrBitmap.CopyPixels(resized);
         for (int y = 0; y < hResized; y++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (int x = 0; x < wResized; x++)
             {
                 var p = (y * wResized + x) * 4;
@@ -191,9 +205,9 @@ public sealed class MeikiOcrEngine : IDisposable
         IReadOnlyList<int> indices,
         MeikiLine?[] results,
         float recThreshold,
-        float punctConfFactor)
+        float punctConfFactor, RunOptions options, CancellationToken cancellationToken)
     {
-        var prep = PreprocessForRecognition(image, boxes, indices);
+        var prep = PreprocessForRecognition(image, boxes, indices, cancellationToken);
         if (prep is null)
             return;
         var (batch, validIndices, metadata) = prep.Value;
@@ -203,9 +217,10 @@ public sealed class MeikiOcrEngine : IDisposable
         var allScores = new List<Tensor<float>>();
         for (int start = 0; start < batch.Length; start += _maxBatchSize)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             int len = Math.Min(_maxBatchSize, batch.Length - start);
             var chunk = StackTensors(batch.AsSpan(start, len));
-            (var labels, var boxesOut, var scores) = RunRecognitionInference(chunk);
+            (var labels, var boxesOut, var scores) = RunRecognitionInference(chunk, options);
             allLabels.Add(labels);
             allBoxes.Add(boxesOut);
             allScores.Add(scores);
@@ -220,7 +235,7 @@ public sealed class MeikiOcrEngine : IDisposable
         PreprocessForRecognition(
             Bitmap image,
             IReadOnlyList<(int X1, int Y1, int X2, int Y2)> boxes,
-            IReadOnlyList<int> indices)
+            IReadOnlyList<int> indices, CancellationToken cancellationToken)
     {
         var tensors = new List<float[]>();
         var validIndices = new List<int>();
@@ -228,6 +243,7 @@ public sealed class MeikiOcrEngine : IDisposable
 
         foreach (var i in indices)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var (x1, y1, x2, y2) = boxes[i];
             int w = x2 - x1, h = y2 - y1;
             if (w <= 0 || h <= 0)
@@ -251,6 +267,7 @@ public sealed class MeikiOcrEngine : IDisposable
             var pixels = OcrBitmap.CopyPixels(resized);
             for (int y = 0; y < newH; y++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 for (int x = 0; x < newW; x++)
                 {
                     var p = (y * newW + x) * 4;
@@ -279,7 +296,7 @@ public sealed class MeikiOcrEngine : IDisposable
     }
 
     private (Tensor<int> Labels, Tensor<float> Boxes, Tensor<float> Scores)
-        RunRecognitionInference(DenseTensor<float> batch)
+        RunRecognitionInference(DenseTensor<float> batch, RunOptions options)
     {
         var inputNames = _recSession.InputNames.ToArray();
         var origSizes = new DenseTensor<long>(new[] { 1, 2 });
@@ -289,7 +306,7 @@ public sealed class MeikiOcrEngine : IDisposable
         {
             NamedOnnxValue.CreateFromTensor(inputNames[0], batch),
             NamedOnnxValue.CreateFromTensor(inputNames[1], origSizes),
-        });
+        }, _recSession.OutputNames, options);
         // char_codes output is Int32 (see the rec model's output metadata).
         var labels = outputs[0].AsTensor<int>();
         var boxes = outputs[1].AsTensor<float>();

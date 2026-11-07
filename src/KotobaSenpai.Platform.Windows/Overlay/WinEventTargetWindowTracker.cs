@@ -1,5 +1,5 @@
 using KotobaSenpai.Core.TargetWindow;
-using System.Windows.Threading;
+using KotobaSenpai.Core.Threading;
 using KotobaSenpai.Core.Logging;
 using static KotobaSenpai.Platform.Windows.Overlay.WinEventHooks;
 using static KotobaSenpai.Core.TargetWindow.WindowOcclusionGeometry;
@@ -11,7 +11,7 @@ namespace KotobaSenpai.Platform.Windows.Overlay;
 public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 {
     private readonly object _gate = new();
-    private readonly Dispatcher _dispatcher;
+    private readonly IUiThread _uiThread;
     private readonly ILogger? _logger;
     private readonly TargetWindowSnapshotReader _snapshotReader;
     private WinEventHooks? _hooks;
@@ -23,10 +23,10 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     private bool _disposed;
     private TargetWindowSnapshot? _current;
 
-    public WinEventTargetWindowTracker(ILogger? logger = null, Dispatcher? dispatcher = null)
+    public WinEventTargetWindowTracker(IUiThread uiThread, ILogger? logger = null)
     {
         _logger = logger;
-        _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
+        _uiThread = uiThread ?? throw new ArgumentNullException(nameof(uiThread));
         _snapshotReader = new TargetWindowSnapshotReader(logger);
         var assembly = typeof(WinEventTargetWindowTracker).Assembly;
         _logger?.LogInformation("[OVERLAY] Diagnostics initialized: diagnosticsVersion=coverage30-v2, processId={0}, assemblyPath={1}, moduleVersionId={2}, occlusionRule=client-union-area, hideAboveRatio={3:R}.",
@@ -54,7 +54,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             target.Handle,
             target.Title,
             target.Bounds);
-        return InvokeOnDispatcher(() =>
+        return InvokeOnUiThread(() =>
         {
             ThrowIfDisposed();
             var threadId = WindowNativeMethods.GetWindowThreadProcessId(target.Handle, out var processId);
@@ -92,7 +92,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     }
 
     public TargetWindowSnapshot Refresh()
-        => InvokeOnDispatcher(() =>
+        => InvokeOnUiThread(() =>
         {
             ThrowIfDisposed();
             var current = Current ?? throw new InvalidOperationException("No target window is attached.");
@@ -108,7 +108,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         });
 
     public void Detach()
-        => InvokeOnDispatcher(() =>
+        => InvokeOnUiThread(() =>
         {
             DetachCore();
             return 0;
@@ -116,7 +116,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
     public void Dispose()
     {
-        if (_dispatcher.CheckAccess())
+        if (_uiThread.CheckAccess())
         {
             DisposeCore();
             return;
@@ -124,7 +124,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
         try
         {
-            _dispatcher.Invoke(DisposeCore);
+            _uiThread.Invoke(DisposeCore);
         }
         catch (Exception ex)
         {
@@ -162,7 +162,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
                 eventType,
                 hwnd,
                 _targetHandle);
-            _dispatcher.BeginInvoke(RefreshFromEvent, DispatcherPriority.DataBind);
+            _uiThread.Post(RefreshFromEvent);
         }
         catch (Exception ex)
         {
@@ -287,6 +287,6 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             throw new ObjectDisposedException(nameof(WinEventTargetWindowTracker));
     }
 
-    private T InvokeOnDispatcher<T>(Func<T> action)
-        => _dispatcher.CheckAccess() ? action() : _dispatcher.Invoke(action);
+    private T InvokeOnUiThread<T>(Func<T> action)
+        => _uiThread.CheckAccess() ? action() : _uiThread.Invoke(action);
 }

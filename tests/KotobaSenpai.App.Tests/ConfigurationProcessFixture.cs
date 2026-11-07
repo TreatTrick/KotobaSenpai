@@ -12,7 +12,8 @@ public static class ConfigurationProcessFixture
     {
         if (Environment.GetEnvironmentVariable("KOTOBA_SHORTCUT_CONFLICT_FIXTURE") == "1")
         {
-            using var registrar = new KotobaSenpai.Platform.Windows.Shortcuts.Win32GlobalShortcutRegistrar();
+            using var registrar = new KotobaSenpai.Platform.Windows.Shortcuts.Win32GlobalShortcutRegistrar(
+                new KotobaSenpai.Presentation.Wpf.Threading.WpfUiThread(System.Windows.Threading.Dispatcher.CurrentDispatcher));
             if (!KotobaSenpai.Core.Shortcuts.ShortcutGesture.TryParse("Ctrl+Alt+Shift+F11", out var gesture)
                 || !registrar.TryRegister(1, gesture, out _)) return 1;
             Console.WriteLine("ready");

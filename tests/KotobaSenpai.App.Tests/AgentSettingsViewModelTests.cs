@@ -93,7 +93,7 @@ public sealed class AgentSettingsViewModelTests
     {
         var settings = new CountingSettings();
         settings.SetValue(LlmSettingsKeys.ApiKey, "saved-test-key");
-        using var viewModel = new LlmSettingsViewModel(settings, new EmptyCatalog(), new ResourceManagerStringLocalizer());
+        using var viewModel = ViewModelDependencies.Llm(settings, new EmptyCatalog(), new ResourceManagerStringLocalizer());
         Assert.DoesNotContain("saved-test-key", viewModel.CreateAgentPrompt(@"C:\App\KotobaSenpai.Cli.exe")!);
         Assert.Null(viewModel.CreateAgentPrompt(null));
         Assert.NotEmpty(viewModel.PromptCopyStatus);
@@ -106,7 +106,7 @@ public sealed class AgentSettingsViewModelTests
     {
         var localizer = new ResourceManagerStringLocalizer();
         localizer.ApplyCulture(new System.Globalization.CultureInfo("en"));
-        using var viewModel = new LlmSettingsViewModel(new CountingSettings(), new EmptyCatalog(), localizer);
+        using var viewModel = ViewModelDependencies.Llm(new CountingSettings(), new EmptyCatalog(), localizer);
         Assert.Empty(viewModel.PromptCopyStatus);
 
         viewModel.ReportPromptCopy(true);

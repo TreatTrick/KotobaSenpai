@@ -10,22 +10,19 @@ public sealed class OverlaySeamArchitectureTests
 {
     private static readonly Assembly Presentation = typeof(WpfOverlayRenderer).Assembly;
 
-    [Theory]
-    [InlineData("WpfOverlayRenderer")]
-    [InlineData("OverlayWindow")]
-    [InlineData("OverlayAnnotationLayer")]
-    [InlineData("OverlayHoverController")]
-    [InlineData("RegionSelectorWindow")]
-    [InlineData("RegionSelectionVisuals")]
-    public void Overlay_presentation_delegates_native_imports_to_the_windows_adapter(string name)
+    [Fact]
+    public void Presentation_has_no_native_imports_at_all()
     {
-        var module = Presentation.GetType($"KotobaSenpai.Presentation.Wpf.Overlay.{name}", throwOnError: true)!;
-        AssertNoNativeImports(module);
+        AssertNoNativeImports(Presentation.GetTypes());
     }
 
     [Fact]
     public void Target_tracking_orchestration_delegates_native_imports()
-        => AssertNoNativeImports(typeof(KotobaSenpai.Platform.Windows.Overlay.WinEventTargetWindowTracker));
+    {
+        var tracker = typeof(KotobaSenpai.Platform.Windows.Overlay.WinEventTargetWindowTracker);
+        AssertNoNativeImports(tracker.Assembly.GetTypes().Where(type => type == tracker
+            || type.FullName?.StartsWith(tracker.FullName + "+", StringComparison.Ordinal) == true));
+    }
 
     [Theory]
     [InlineData("OverlayAnnotationLayer")]
@@ -52,13 +49,14 @@ public sealed class OverlaySeamArchitectureTests
         Assert.Same(core, typeof(KotobaSenpai.Core.Overlay.WordHoverResolver).Assembly);
     }
 
-    private static void AssertNoNativeImports(Type module)
+    private static void AssertNoNativeImports(IEnumerable<Type> types)
     {
-        var imports = module.Assembly.GetTypes()
-            .Where(type => type == module || type.FullName?.StartsWith(module.FullName + "+", StringComparison.Ordinal) == true)
-            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance))
-            .Where(method => method.GetCustomAttribute<DllImportAttribute>() is not null)
-            .Select(method => method.Name)
+        var imports = types
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            .Where(method => (method.Attributes & MethodAttributes.PinvokeImpl) != 0
+                || method.GetCustomAttribute<DllImportAttribute>() is not null
+                || method.GetCustomAttribute<LibraryImportAttribute>() is not null)
+            .Select(method => $"{method.DeclaringType!.FullName}.{method.Name}")
             .ToArray();
 
         Assert.Empty(imports);

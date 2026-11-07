@@ -7,14 +7,14 @@ namespace KotobaSenpai.App.ViewModels;
 
 /// <summary>Composes the main window's page state and coordinates its lifetime.</summary>
 public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, UniDicInstallController dictionary,
-    OnboardingViewModel onboarding, SupportService? support = null, ContextualGuidance? guidance = null) : ObservableObject, IDisposable
+    OnboardingViewModel onboarding, SupportService support, ContextualGuidance guidance) : ObservableObject, IDisposable
 {
     private bool _disposed;
     public SettingsPageViewModel Settings { get; } = settings;
     public UniDicInstallController Dictionary { get; } = dictionary;
     public OnboardingViewModel Onboarding { get; } = onboarding;
-    public SupportService? Support { get; } = support;
-    public ContextualGuidance? Guidance { get; } = guidance;
+    public SupportService Support { get; } = support ?? throw new ArgumentNullException(nameof(support));
+    public ContextualGuidance Guidance { get; } = guidance ?? throw new ArgumentNullException(nameof(guidance));
     [ObservableProperty, NotifyPropertyChangedFor(nameof(Selection))]
     private RecognitionPageViewModel? _recognition;
     public TargetSelectionViewModel? Selection => Recognition?.Selection;

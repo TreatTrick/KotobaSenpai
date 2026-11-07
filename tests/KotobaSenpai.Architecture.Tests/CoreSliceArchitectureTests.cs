@@ -12,6 +12,7 @@ public sealed class CoreSliceArchitectureTests
     public static IEnumerable<object[]> SliceLayers() =>
     [
         ["Geometry", 0],
+        ["Threading", 0],
         ["Japanese", 0],
         ["Errors", 0],
         ["Localization", 0],

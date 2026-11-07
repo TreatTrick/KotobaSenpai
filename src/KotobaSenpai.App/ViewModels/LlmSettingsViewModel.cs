@@ -25,7 +25,7 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
     private string? _modelStatusKey;
     private object[] _modelStatusArguments = [];
     private bool _disposed;
-    private readonly LlmConfigurationService? _configuration;
+    private readonly LlmConfigurationService _configuration;
     private string? _configurationStatusKey;
     private string? _promptCopyStatusKey;
     private CancellationTokenSource? _configurationCancellation;
@@ -34,18 +34,18 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
     private string? _validationErrorDetail;
 
     public LlmSettingsViewModel(ISettingsService settings, ILlmModelCatalog catalog, IStringLocalizer localizer,
-        LlmConfigurationService? configuration = null)
+        LlmConfigurationService configuration)
     {
         _settings = settings;
         _catalog = catalog;
         _localizer = localizer;
-        _configuration = configuration;
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _protocol = LlmProtocolIds.Normalize(settings.GetValue(LlmSettingsKeys.Protocol));
         _endpoint = settings.GetValue(LlmSettingsKeys.Endpoint) ?? string.Empty;
         _apiKey = settings.GetValue(LlmSettingsKeys.ApiKey) ?? string.Empty;
         _model = settings.GetValue(LlmSettingsKeys.Model) ?? string.Empty;
         RefreshProtocolChoices();
-        IsConfigurationUsable = _configuration?.GetStatus().Verified == true;
+        IsConfigurationUsable = _configuration.GetStatus().Verified;
         _localizer.CultureChanged += OnCultureChanged;
     }
 
@@ -146,7 +146,7 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task CheckConfigurationAsync(CancellationToken cancellationToken)
     {
-        if (_configuration is null || IsCheckingConfiguration)
+        if (IsCheckingConfiguration)
             return;
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _configurationCancellation = linked;

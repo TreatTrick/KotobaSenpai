@@ -67,7 +67,7 @@ public sealed class TargetWindowTrackerTests
     [Fact]
     public void Invalid_target_is_reported_uncapturable_and_can_be_detached()
     {
-        using var tracker = new WinEventTargetWindowTracker();
+        using var tracker = new WinEventTargetWindowTracker(new InlineUiThread());
         var target = new WindowTarget((nint)int.MaxValue, "missing", new ScreenRect(0, 0, 100, 100));
 
         var snapshot = tracker.Attach(target);

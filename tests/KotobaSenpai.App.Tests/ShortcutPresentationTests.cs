@@ -19,6 +19,7 @@ using KotobaSenpai.Platform.Windows.Overlay;
 using KotobaSenpai.Platform.Windows.Shortcuts;
 using Wpf.Ui.Appearance;
 using KotobaSenpai.Presentation.Wpf.Overlay;
+using KotobaSenpai.Presentation.Wpf.Threading;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -62,7 +63,7 @@ public sealed partial class PhrasePopupThemeTests
 
     private static void CheckNativeShortcuts()
     {
-        using var registrar = new Win32GlobalShortcutRegistrar();
+        using var registrar = new Win32GlobalShortcutRegistrar(new WpfUiThread(Dispatcher.CurrentDispatcher));
         using var shortcuts = new ReadingShortcutCoordinator(new MemorySettings(), registrar);
         var actions = new NativeReadingActions();
         shortcuts.Attach(actions);
@@ -86,7 +87,7 @@ public sealed partial class PhrasePopupThemeTests
             PressFunctionKey(0x71, repeat: true);
             Assert.Equal(previous + 1, actions.Executed.Count);
             CheckExternalConflict(shortcuts, actions);
-            using var contender = new Win32GlobalShortcutRegistrar();
+            using var contender = new Win32GlobalShortcutRegistrar(new WpfUiThread(Dispatcher.CurrentDispatcher));
             Assert.False(contender.TryRegister(100, new("F1"), out var conflict));
             Assert.Equal(1409, conflict);
             Assert.True(shortcuts.ChangeBinding(ReadingAction.Recognize, new("F6")).Succeeded);
@@ -167,7 +168,7 @@ public sealed partial class PhrasePopupThemeTests
             Assert.Equal(previous, shortcuts.GetBinding(ReadingAction.Recognize));
             var settings = new MemorySettings();
             settings.SetValue(ReadingShortcutCoordinator.SettingsKey(ReadingAction.Recognize), gesture.ToString());
-            using (var registrar = new Win32GlobalShortcutRegistrar())
+            using (var registrar = new Win32GlobalShortcutRegistrar(new WpfUiThread(Dispatcher.CurrentDispatcher)))
             using (var startup = new ReadingShortcutCoordinator(settings, registrar))
             {
                 startup.Start();

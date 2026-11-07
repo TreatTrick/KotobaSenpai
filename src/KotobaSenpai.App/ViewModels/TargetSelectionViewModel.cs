@@ -15,8 +15,8 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
     private readonly IStringLocalizer _localizer;
     private readonly IUserMessageResolver _messageResolver;
     private readonly ILogger _logger;
-    private readonly ITargetWindowTracker? _tracker;
-    private readonly IWindowFrameCapture? _capture;
+    private readonly ITargetWindowTracker _tracker;
+    private readonly IWindowFrameCapture _capture;
     private readonly Func<CapturedFrame, CapturedFrame> _createPreview;
     private bool _disposed;
     private bool _recognitionActive;
@@ -25,17 +25,17 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
 
     public TargetSelectionViewModel(IWindowPicker picker, IStringLocalizer localizer,
         IUserMessageResolver messageResolver, ILogger logger, Func<CapturedFrame, CapturedFrame> createPreview,
-        ITargetWindowTracker? tracker = null,
-        IWindowFrameCapture? capture = null)
+        ITargetWindowTracker tracker,
+        IWindowFrameCapture capture)
     {
         _picker = picker;
         _localizer = localizer;
         _messageResolver = messageResolver;
         _logger = logger;
-        _tracker = tracker;
-        _capture = capture;
+        _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
+        _capture = capture ?? throw new ArgumentNullException(nameof(capture));
         _createPreview = createPreview;
-        if (_tracker is not null) _tracker.Changed += OnTargetStateChanged;
+        _tracker.Changed += OnTargetStateChanged;
         _localizer.CultureChanged += OnCultureChanged;
         SetStatus(ResourceKeys.Status_SelectTarget);
     }
@@ -56,9 +56,9 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
         try
         {
             if (value is null)
-                _tracker?.Detach();
+                _tracker.Detach();
             else
-                _tracker?.Attach(value);
+                _tracker.Attach(value);
         }
         catch (Exception ex)
         {
@@ -75,7 +75,7 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
 
     public bool RefreshTarget()
     {
-        _tracker?.Refresh();
+        _tracker.Refresh();
         return IsTargetReady && !IsSelectingWindow;
     }
 
@@ -126,7 +126,7 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
         UpdateSelectionHighlight();
         CancelWindowSelection();
         InvalidatePreview();
-        if (_tracker is not null) _tracker.Changed -= OnTargetStateChanged;
+        _tracker.Changed -= OnTargetStateChanged;
         _localizer.CultureChanged -= OnCultureChanged;
     }
 
@@ -224,20 +224,20 @@ public sealed partial class TargetSelectionViewModel : ObservableObject, IDispos
     {
         var target = SelectedWindow;
         var version = SelectionVersion;
-        if (target is null || _capture is null) return;
+        if (target is null) return;
         _acquiringPreview = true;
         HasPreviewError = false;
         _previewError = null;
         NotifySelectionState();
         try
         {
-            var before = _tracker?.Refresh();
+            var before = _tracker.Refresh();
             if (before is not null && (before.Handle != target.Handle || !before.IsCapturable))
                 throw new InvalidOperationException("The selected target is unavailable for preview.");
             var frame = await _capture.CaptureAsync(before?.Target ?? target, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (_disposed || version != SelectionVersion) return;
-            var after = _tracker?.Refresh();
+            var after = _tracker.Refresh();
             if (after is not null && (after.Handle != target.Handle || !after.IsCapturable
                 || after.Bounds.Width != frame.Width || after.Bounds.Height != frame.Height))
                 throw new InvalidOperationException("The target layout changed during preview acquisition.");

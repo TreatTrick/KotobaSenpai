@@ -1,4 +1,4 @@
-using System.Windows.Threading;
+using KotobaSenpai.Core.Threading;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
@@ -10,6 +10,32 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class AutoRecognitionControllerTests
 {
     [Fact]
+    public void Timer_posts_are_coalesced_and_stopped_generations_cannot_sample_a_restarted_run()
+    {
+        var target = new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 2, 1));
+        var capture = new SequencedCapture(new CapturedFrame(2, 1, new byte[8]));
+        var thread = new InlineUiThread();
+        using var controller = new AutoRecognitionController(capture, new FakeTracker(target), new FakeSettings(), thread);
+        controller.Start(target);
+        controller.SchedulePoll();
+        controller.SchedulePoll();
+        Assert.Equal(1, thread.PendingCount);
+
+        controller.Stop();
+        controller.Start(target);
+        thread.RunPosted();
+        Assert.Equal(0, capture.CallCount);
+
+        controller.SchedulePoll();
+        thread.RunPosted();
+        Assert.Equal(1, capture.CallCount);
+        controller.Dispose();
+        controller.Stop();
+        controller.SchedulePoll();
+        Assert.Equal(0, thread.PendingCount);
+    }
+
+    [Fact]
     public async Task Small_typewriter_changes_accumulate_against_the_last_OCR_trigger()
     {
         var target = new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 200, 1));
@@ -19,7 +45,7 @@ public sealed class AutoRecognitionControllerTests
         twoCharacters[4] = 255;
         var capture = new SequencedCapture(new CapturedFrame(200, 1, new byte[800]),
             new CapturedFrame(200, 1, oneCharacter), new CapturedFrame(200, 1, twoCharacters));
-        using var controller = new AutoRecognitionController(capture, new FakeTracker(target), new FakeSettings());
+        using var controller = new AutoRecognitionController(capture, new FakeTracker(target), new FakeSettings(), new InlineUiThread());
         var changes = 0;
         controller.Start(target, _ => { changes++; return Task.CompletedTask; });
 
@@ -37,7 +63,7 @@ public sealed class AutoRecognitionControllerTests
     {
         var target = new WindowTarget((nint)42, "Target", new ScreenRect(0, 0, 2, 1));
         var capture = new DeferredCapture();
-        var controller = new AutoRecognitionController(capture, new FakeTracker(target), new FakeSettings());
+        var controller = new AutoRecognitionController(capture, new FakeTracker(target), new FakeSettings(), new InlineUiThread());
         var changes = 0;
         controller.Start(target, _ => { changes++; return Task.CompletedTask; });
         var pending = controller.PollOnceAsync();
@@ -65,7 +91,7 @@ public sealed class AutoRecognitionControllerTests
         var settings = new FakeSettings();
         var capture = new SequencedCapture(new CapturedFrame(2, 1, new byte[8]),
             new CapturedFrame(2, 1, Enumerable.Repeat((byte)255, 8).ToArray(), change == "generation" ? 1 : 0));
-        using var controller = new AutoRecognitionController(capture, tracker, settings);
+        using var controller = new AutoRecognitionController(capture, tracker, settings, new InlineUiThread());
         var changes = 0;
         controller.Start(target, _ => { changes++; return Task.CompletedTask; });
         await controller.PollOnceAsync();
@@ -94,7 +120,7 @@ public sealed class AutoRecognitionControllerTests
         var tracker = new FakeTracker(target);
         var capture = new SequencedCapture(new CapturedFrame(2, 1, new byte[8]),
             new CapturedFrame(2, 1, Enumerable.Repeat((byte)255, 8).ToArray()));
-        using var controller = new AutoRecognitionController(capture, tracker, new FakeSettings());
+        using var controller = new AutoRecognitionController(capture, tracker, new FakeSettings(), new InlineUiThread());
         var changes = 0;
         controller.Start(target, _ => { changes++; return Task.CompletedTask; });
         await controller.PollOnceAsync();
@@ -120,7 +146,7 @@ public sealed class AutoRecognitionControllerTests
             capture,
             tracker,
             settings,
-            dispatcher: Dispatcher.CurrentDispatcher);
+            uiThread: new InlineUiThread());
         var callbackCount = 0;
         controller.Start(target, _ =>
         {

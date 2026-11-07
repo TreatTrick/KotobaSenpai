@@ -1,5 +1,5 @@
 using System.Globalization;
-using System.Windows.Threading;
+using KotobaSenpai.Core.Threading;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
@@ -15,9 +15,11 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
     private readonly IWindowFrameCapture _capture;
     private readonly ITargetWindowTracker _tracker;
     private readonly ISettingsService _settings;
-    private readonly Dispatcher _dispatcher;
+    private readonly IUiThread _uiThread;
     private readonly ILogger? _logger;
-    private readonly DispatcherTimer _timer;
+    private readonly Timer _timer;
+    private int _tickPosted;
+    private int _timerGeneration;
     private readonly object _gate = new();
     private CancellationTokenSource? _cancellation;
     private WindowTarget? _target;
@@ -34,16 +36,15 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
         IWindowFrameCapture capture,
         ITargetWindowTracker tracker,
         ISettingsService settings,
-        ILogger? logger = null,
-        Dispatcher? dispatcher = null)
+        IUiThread uiThread,
+        ILogger? logger = null)
     {
         _capture = capture ?? throw new ArgumentNullException(nameof(capture));
         _tracker = tracker ?? throw new ArgumentNullException(nameof(tracker));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger;
-        _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
-        _timer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher);
-        _timer.Tick += OnTimerTick;
+        _uiThread = uiThread ?? throw new ArgumentNullException(nameof(uiThread));
+        _timer = new Timer(_ => SchedulePoll(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
     public bool IsRunning
@@ -58,7 +59,7 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
     public void Start(WindowTarget target, Func<CancellationToken, Task>? onChange = null)
     {
         ArgumentNullException.ThrowIfNull(target);
-        InvokeOnDispatcher(() =>
+        InvokeOnUiThread(() =>
         {
             ThrowIfDisposed();
             StopCore();
@@ -72,17 +73,17 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
                 _running = true;
             }
 
-            _timer.Interval = TimeSpan.FromMilliseconds(ReadIntervalMilliseconds());
-            _timer.Start();
+            var interval = ReadIntervalMilliseconds();
+            _timer.Change(interval, interval);
         });
     }
 
     public void Stop()
-        => InvokeOnDispatcher(StopCore);
+        => InvokeOnUiThread(() => { if (!_disposed) StopCore(); });
 
     public void Dispose()
     {
-        if (_dispatcher.CheckAccess())
+        if (_uiThread.CheckAccess())
         {
             DisposeCore();
             return;
@@ -90,7 +91,7 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
 
         try
         {
-            _dispatcher.Invoke(DisposeCore);
+            _uiThread.Invoke(DisposeCore);
         }
         catch (Exception ex)
         {
@@ -103,9 +104,25 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
             ? Math.Max(AutoRecognitionSettings.MinimumIntervalMs, interval)
             : AutoRecognitionSettings.DefaultIntervalMs;
 
-    private void OnTimerTick(object? sender, EventArgs e)
+    internal void SchedulePoll()
     {
-        _ = PollOnceAsync();
+        var generation = Volatile.Read(ref _timerGeneration);
+        if (!IsRunning) return;
+        if (Interlocked.Exchange(ref _tickPosted, 1) != 0) return;
+        try
+        {
+            _uiThread.Post(() =>
+            {
+                Interlocked.Exchange(ref _tickPosted, 0);
+                if (!_disposed && generation == Volatile.Read(ref _timerGeneration))
+                    _ = PollOnceAsync();
+            });
+        }
+        catch (Exception exception)
+        {
+            Interlocked.Exchange(ref _tickPosted, 0);
+            _logger?.LogError(exception, "Failed to schedule auto-recognition polling.");
+        }
     }
 
     internal async Task PollOnceAsync()
@@ -211,7 +228,8 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
 
     private void StopCore()
     {
-        _timer.Stop();
+        Interlocked.Increment(ref _timerGeneration);
+        _timer.Change(Timeout.Infinite, Timeout.Infinite);
         lock (_gate)
         {
             _running = false;
@@ -229,8 +247,8 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
         if (_disposed)
             return;
         _disposed = true;
-        _timer.Tick -= OnTimerTick;
         StopCore();
+        _timer.Dispose();
     }
 
     private void ThrowIfDisposed()
@@ -239,14 +257,14 @@ public sealed class AutoRecognitionController : IAutoRecognitionController
             throw new ObjectDisposedException(nameof(AutoRecognitionController));
     }
 
-    private void InvokeOnDispatcher(Action action)
+    private void InvokeOnUiThread(Action action)
     {
-        if (_dispatcher.CheckAccess())
+        if (_uiThread.CheckAccess())
         {
             action();
             return;
         }
 
-        _dispatcher.Invoke(action);
+        _uiThread.Invoke(action);
     }
 }

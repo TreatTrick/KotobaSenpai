@@ -336,9 +336,9 @@ public sealed class DependencyDirectionTests
             name => name.EndsWith(".g.resources", StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>Native threading and HWND interop may remain, while all WPF visual dependencies are forbidden.</summary>
+    /// <summary>Platform adapters use Core threading ports and native HWNDs without referencing WPF.</summary>
     [Fact]
-    public void Platform_wpf_usage_is_limited_to_threading_and_interop()
+    public void Platform_has_no_WPF_dependencies_at_all()
     {
         var assembly = typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly;
         using var stream = File.OpenRead(assembly.Location);
@@ -349,13 +349,14 @@ public sealed class DependencyDirectionTests
             .Select(reference => (Namespace: metadata.GetString(reference.Namespace), Name: metadata.GetString(reference.Name)))
             .Where(reference => reference.Namespace == "System.Windows"
                 || reference.Namespace.StartsWith("System.Windows.", StringComparison.Ordinal))
-            .Where(reference => reference.Namespace is not ("System.Windows.Threading" or "System.Windows.Interop"))
             .Select(reference => $"{reference.Namespace}.{reference.Name}")
             .OrderBy(name => name)
             .ToArray();
 
         Assert.True(forbiddenReferences.Length == 0,
-            $"Platform.Windows may reference only WPF threading and HWND interop types: {string.Join(", ", forbiddenReferences)}");
+            $"Platform.Windows must not reference any WPF types: {string.Join(", ", forbiddenReferences)}");
+        var wpfAssemblies = new[] { "WindowsBase", "PresentationCore", "PresentationFramework", "System.Xaml" };
+        Assert.DoesNotContain(assembly.GetReferencedAssemblies(), reference => wpfAssemblies.Contains(reference.Name));
     }
 
     /// <summary>
