@@ -9,11 +9,11 @@ namespace KotobaSenpai.Core.PhraseAnalysis;
 /// </summary>
 public sealed class PhraseAnalysisPlan
 {
-    internal PhraseAnalysisPlan(Guid recognitionId, int cacheGeneration, IReadOnlyList<OcrLine> lines,
+    internal PhraseAnalysisPlan(Guid recognitionId, long epoch, IReadOnlyList<OcrLine> lines,
         IReadOnlyList<SentenceSegment> segments, IReadOnlyList<PhraseAnalysisRequest> requests)
     {
         RecognitionId = recognitionId;
-        CacheGeneration = cacheGeneration;
+        Epoch = epoch;
         Lines = lines.ToArray();
         Segments = segments.ToArray();
         Requests = requests.ToArray();
@@ -22,6 +22,6 @@ public sealed class PhraseAnalysisPlan
     public IReadOnlyList<OcrLine> Lines { get; }
     public IReadOnlyList<SentenceSegment> Segments { get; }
     internal Guid RecognitionId { get; }
-    internal int CacheGeneration { get; }
+    internal long Epoch { get; }
     internal IReadOnlyList<PhraseAnalysisRequest> Requests { get; }
 }

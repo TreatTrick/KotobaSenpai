@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Threading;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Overlay;
@@ -17,6 +16,7 @@ internal sealed class OverlayWindow : Window
 {
     private readonly OverlayAnnotationLayer _annotations = new();
     private Canvas _canvas => _annotations.Canvas;
+    private readonly OverlayDiagnostics _diagnostics;
     private readonly OverlayHoverController _hover;
     private readonly PhrasePopup _phrasePopup;
     private readonly ITargetWindowTracker? _tracker;
@@ -24,7 +24,6 @@ internal sealed class OverlayWindow : Window
     private WordOverlaySession? _session;
     private bool _presentationSuspended;
     private TargetWindowSnapshot? _renderedSnapshot;
-    private int _renderDiagnosticGeneration;
     private nint _ownerHandle;
     private double _fontScale;
     private int _edgePaddingPixels = 1;
@@ -36,6 +35,7 @@ internal sealed class OverlayWindow : Window
     {
         _phrasePopup = new PhrasePopup(localizer, logger);
         _hover = new OverlayHoverController(_annotations, _phrasePopup);
+        _diagnostics = new OverlayDiagnostics(logger);
         _tracker = tracker;
         _logger = logger;
 
@@ -65,8 +65,8 @@ internal sealed class OverlayWindow : Window
             OverlayWindowRegistry.Register(handle);
             Closed += (_, _) => OverlayWindowRegistry.Unregister(handle);
         };
-        IsVisibleChanged += (_, _) => LogWindowDiagnostics("visibility-changed");
-        StateChanged += (_, _) => LogWindowDiagnostics("window-state-changed");
+        IsVisibleChanged += (_, _) => _diagnostics.LogWindowState(this, _ownerHandle, _session, "visibility-changed");
+        StateChanged += (_, _) => _diagnostics.LogWindowState(this, _ownerHandle, _session, "window-state-changed");
 
         _logger?.Log(
             LogLevel.Trace,
@@ -270,61 +270,7 @@ internal sealed class OverlayWindow : Window
             _annotations.UnderlineCount,
             session.PhraseGroups.Count,
             _canvas.Children.Count);
-        if (_logger is not null)
-        {
-            var generation = ++_renderDiagnosticGeneration;
-            Dispatcher.BeginInvoke(() =>
-            {
-                if (generation == _renderDiagnosticGeneration)
-                {
-                    LogWindowDiagnostics("after-layout");
-                    LogCanvasDiagnostics();
-                }
-            }, DispatcherPriority.ContextIdle);
-        }
-    }
-
-    private void LogWindowDiagnostics(string reason)
-    {
-        if (_logger is null)
-            return;
-        var handle = new WindowInteropHelper(this).Handle;
-        OverlayWindowNativeHost.LogDiagnostics(_logger, handle, _ownerHandle, reason,
-            _session?.Id.ToString() ?? "<none>", IsVisible, Visibility.ToString(), WindowState.ToString());
-    }
-
-    private void LogCanvasDiagnostics()
-    {
-        if (_logger is null)
-            return;
-        var canvasBounds = new Rect(0, 0, _canvas.ActualWidth, _canvas.ActualHeight);
-        var contentBounds = Rect.Empty;
-        var outside = 0;
-        var clipped = 0;
-        var unmeasured = 0;
-        foreach (var child in _canvas.Children.OfType<FrameworkElement>())
-        {
-            if (child.RenderSize.Width <= 0 || child.RenderSize.Height <= 0)
-            {
-                unmeasured++;
-                continue;
-            }
-            var left = Canvas.GetLeft(child);
-            var top = Canvas.GetTop(child);
-            var childBounds = new Rect(double.IsNaN(left) ? 0 : left, double.IsNaN(top) ? 0 : top,
-                child.RenderSize.Width, child.RenderSize.Height);
-            contentBounds.Union(childBounds);
-            var intersection = Rect.Intersect(canvasBounds, childBounds);
-            if (intersection.IsEmpty || intersection.Width <= 0 || intersection.Height <= 0)
-                outside++;
-            else if (!canvasBounds.Contains(childBounds))
-                clipped++;
-        }
-        var dpi = VisualTreeHelper.GetDpi(this);
-        _logger.Log(LogLevel.Trace, null, "[OVERLAY] Canvas layout: sessionId={0}, widthDip={1:0.###}, heightDip={2:0.###}, actualWidthDip={3:0.###}, actualHeightDip={4:0.###}, dpiScaleX={5:0.###}, dpiScaleY={6:0.###}, opacity={7:0.###}, canvasOpacity={8:0.###}, canvasVisible={9}, canvasBoundsDip={10}, contentBoundsDip={11}, childCount={12}, outsideChildren={13}, clippedChildren={14}, unmeasuredChildren={15}, underlineCount={16}, fontScale={17:0.###}.",
-            _session?.Id.ToString() ?? "<none>", Width, Height, ActualWidth, ActualHeight, dpi.DpiScaleX, dpi.DpiScaleY,
-            Opacity, _canvas.Opacity, _canvas.IsVisible, canvasBounds, contentBounds, _canvas.Children.Count,
-            outside, clipped, unmeasured, _annotations.UnderlineCount, _fontScale);
+        _diagnostics.ScheduleAfterLayout(this, _canvas, _annotations, _fontScale, _ownerHandle, _session);
     }
 
     private void PositionAboveTarget(WindowTarget target)
@@ -343,7 +289,7 @@ internal sealed class OverlayWindow : Window
             _annotations.UnderlineCount,
             _session?.PhraseGroups.Count ?? 0);
         _session = null;
-        _renderDiagnosticGeneration++;
+        _diagnostics.InvalidateScheduledLayout();
         _renderedSnapshot = null;
         _hover.ClearSession();
         _annotations.Clear();

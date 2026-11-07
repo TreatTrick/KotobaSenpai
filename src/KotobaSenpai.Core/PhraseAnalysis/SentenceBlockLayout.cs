@@ -11,11 +11,11 @@ internal sealed class SentenceBlockLayout(SentenceSegmenter segmenter, SentenceT
     private readonly SentenceSegmenter _segmenter = segmenter;
     private readonly SentenceTokenBuilder _tokenBuilder = tokenBuilder;
 
-    public PhraseAnalysisPlan Prepare(Guid recognitionId, int generation, IReadOnlyList<OcrLine> lines,
+    public PhraseAnalysisPlan Prepare(Guid recognitionId, long epoch, IReadOnlyList<OcrLine> lines,
         IReadOnlyList<PhraseAnalysisRequest> boundaries, string language, bool translation)
     {
         var (layout, segments) = PreserveCompletedBlocks(lines, boundaries);
-        return new PhraseAnalysisPlan(recognitionId, generation, layout, segments,
+        return new PhraseAnalysisPlan(recognitionId, epoch, layout, segments,
             BuildRequests(recognitionId, layout, segments, language, translation));
     }
 

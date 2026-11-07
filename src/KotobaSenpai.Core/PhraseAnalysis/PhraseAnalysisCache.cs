@@ -1,11 +1,12 @@
 using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.Session;
 using static KotobaSenpai.Core.PhraseAnalysis.SentenceBlockLayout;
 using static KotobaSenpai.Core.PhraseAnalysis.PhraseRunAssembler;
 
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
-/// <summary>Owns bounded sentence caching, reset generations, shared requests and provider concurrency.</summary>
-internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRunAssembler assembler)
+/// <summary>Owns bounded sentence caching, reset epochs, shared requests and provider concurrency.</summary>
+internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRunAssembler assembler, SessionEpoch sessionEpoch)
 {
     // ponytail: four provider slots cover typical dialogue without encouraging rate-limit failures.
     private const int MaxConcurrency = 4;
@@ -13,42 +14,43 @@ internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRun
     private const int MaxCacheSize = 50;
     private readonly ILlmPhraseAnalyzer _analyzer = analyzer;
     private readonly PhraseRunAssembler _assembler = assembler;
+    private readonly SessionEpoch _sessionEpoch = sessionEpoch;
     private readonly object _cacheGate = new();
     private readonly SemaphoreSlim _providerSlots = new(MaxConcurrency);
     private readonly Dictionary<(string SegmentText, string Language, bool Translation), PendingAnalysis> _inFlight = new();
-    private int _cacheGeneration;
     private IReadOnlyList<PhraseAnalysisRequest> _completedBlocks = [];
     private readonly Dictionary<(string SegmentText, string Language, bool Translation), CachedAnalysis> _cache = new();
     private readonly LinkedList<(string SegmentText, string Language, bool Translation)> _cacheOrder = new();
 
-    public bool IsCurrent(int generation) => generation == Volatile.Read(ref _cacheGeneration);
+    public bool IsCurrent(long epoch) => _sessionEpoch.IsCurrent(epoch);
 
-    public (int Generation, IReadOnlyList<PhraseAnalysisRequest> Boundaries) CaptureBoundaries()
+    public (long Epoch, IReadOnlyList<PhraseAnalysisRequest> Boundaries) CaptureBoundaries()
     {
         lock (_cacheGate)
-            return (_cacheGeneration, _completedBlocks.Concat(_inFlight.Values
-                    .Where(pending => !pending.CancellationToken.IsCancellationRequested)
+            return (_sessionEpoch.Capture().Value, _completedBlocks.Concat(_inFlight.Values
+                    .Where(pending => !pending.CancellationToken.IsCancellationRequested
+                        && _sessionEpoch.IsCurrent(pending.Epoch))
                     .Select(pending => pending.Request))
                 .Where(request => HasCompletedBoundary(request.SegmentText)).ToArray());
     }
 
-    public void RememberCompletedBlocks(int generation, IReadOnlyList<PhraseAnalysisRequest> requests,
+    public void RememberCompletedBlocks(long epoch, IReadOnlyList<PhraseAnalysisRequest> requests,
         IReadOnlyList<PhraseAnalysisResult> results)
     {
         lock (_cacheGate)
-            if (generation == _cacheGeneration)
+            if (_sessionEpoch.IsCurrent(epoch))
                 _completedBlocks = requests.Where((request, index) => results[index].Succeeded
                     && HasCompletedBoundary(request.SegmentText)).ToArray();
     }
 
-    public Task<PhraseAnalysisResult> GetOrStartAnalysis(PhraseAnalysisRequest request, int generation,
+    public Task<PhraseAnalysisResult> GetOrStartAnalysis(PhraseAnalysisRequest request, long epoch,
         CancellationToken cancellationToken, out bool shared)
     {
         PendingAnalysis pending;
         var key = GetCacheKey(request);
         lock (_cacheGate)
         {
-            if (generation != _cacheGeneration)
+            if (!_sessionEpoch.IsCurrent(epoch))
                 throw new OperationCanceledException("The prepared analysis was superseded by a cache reset.");
             // Another batch may have finished between the initial cache lookup and scheduling.
             if (TryGetCached(request, out var cached))
@@ -58,13 +60,14 @@ internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRun
             }
             if (_inFlight.TryGetValue(key, out pending!)
                 && !pending.CancellationToken.IsCancellationRequested
+                && _sessionEpoch.IsCurrent(pending.Epoch)
                 && HaveMatchingContentTokens(pending.Request.Tokens, request.Tokens))
             {
                 shared = true;
                 return AwaitAnalysisAsync(pending, request, cancellationToken);
             }
             shared = false;
-            pending = new PendingAnalysis(request, generation, cancellationToken,
+            pending = new PendingAnalysis(request, epoch, cancellationToken,
                 new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously));
             _inFlight[key] = pending;
         }
@@ -89,7 +92,7 @@ internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRun
             cancellationToken.ThrowIfCancellationRequested();
             var result = await _analyzer.AnalyzeAsync(request, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            if (result.Succeeded) CacheResult(request, result, pending.Generation);
+            if (result.Succeeded) CacheResult(request, result, pending.Epoch);
             pending.Completion.TrySetResult(result);
         }
         catch (OperationCanceledException exception) { pending.Completion.TrySetCanceled(exception.CancellationToken); }
@@ -118,13 +121,13 @@ internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRun
         return (cached, uncached);
     }
 
-    private void CacheResult(PhraseAnalysisRequest request, PhraseAnalysisResult result, int generation)
+    private void CacheResult(PhraseAnalysisRequest request, PhraseAnalysisResult result, long epoch)
     {
         var key = GetCacheKey(request);
         var cached = new CachedAnalysis(request.Tokens, result);
         lock (_cacheGate)
         {
-            if (generation != _cacheGeneration) return;
+            if (!_sessionEpoch.IsCurrent(epoch)) return;
             if (_cache.ContainsKey(key))
             {
                 _cache[key] = cached;
@@ -143,16 +146,17 @@ internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRun
         }
     }
 
-    public void ClearCache()
+    public SessionEpochSnapshot ClearCache()
     {
         lock (_cacheGate)
         {
-            _cacheGeneration++;
+            var epoch = _sessionEpoch.Advance();
             _inFlight.Clear();
             _completedBlocks = [];
             _cache.Clear();
             _cacheOrder.Clear();
-            _assembler.ClearSessionIds(_cacheGeneration);
+            _assembler.ClearSessionIds();
+            return epoch;
         }
     }
 
@@ -176,6 +180,6 @@ internal sealed class PhraseAnalysisCache(ILlmPhraseAnalyzer analyzer, PhraseRun
     internal sealed record CacheableRequest(PhraseAnalysisRequest Request, int OriginalIndex);
 
     private sealed record CachedAnalysis(IReadOnlyList<SentenceTokenReference> Tokens, PhraseAnalysisResult Result);
-    private sealed record PendingAnalysis(PhraseAnalysisRequest Request, int Generation, CancellationToken CancellationToken,
+    private sealed record PendingAnalysis(PhraseAnalysisRequest Request, long Epoch, CancellationToken CancellationToken,
         TaskCompletionSource<PhraseAnalysisResult> Completion);
 }

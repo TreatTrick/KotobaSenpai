@@ -2,6 +2,7 @@ using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Core.Session;
 
 namespace KotobaSenpai.Core.Workflow;
 
@@ -21,12 +22,12 @@ public sealed class RecognitionSessionController : IDisposable
     private readonly ISettingsService _settings;
     private readonly IAutoRecognitionController? _automatic;
     private readonly ILogger? _logger;
+    private readonly SessionEpoch _sessionEpoch;
     private readonly object _taskGate = new();
     private readonly HashSet<Task> _tasks = [];
     private CancellationTokenSource? _manualCancellation;
     private CancellationTokenSource? _automaticCancellation;
     private WindowTarget? _target;
-    private int _version;
     private bool _disposed;
     private RecognitionPhase _phase;
     private bool _autoEnabled;
@@ -37,6 +38,7 @@ public sealed class RecognitionSessionController : IDisposable
         IAutoRecognitionController? automatic = null, ILogger? logger = null)
     {
         _workflow = workflow;
+        _sessionEpoch = workflow.SessionEpoch;
         _settings = settings;
         _automatic = automatic;
         _logger = logger;
@@ -60,31 +62,32 @@ public sealed class RecognitionSessionController : IDisposable
         if (_disposed || IsBusy) return Task.CompletedTask;
         CancelAutomatic();
         _target = target;
-        var version = Interlocked.Increment(ref _version);
         var cancellation = new CancellationTokenSource();
         _manualCancellation = cancellation;
         SetState(resume ? RecognitionPhase.Restoring : RecognitionPhase.Recognizing);
-        return Track(RunManualAsync(target, resume, version, cancellation));
+        var work = resume
+            ? _workflow.ResumeAndShowAsync(target, cancellation.Token)
+            : _workflow.RecognizeAndShowAsync(target, cancellation.Token);
+        return Track(RunManualAsync(work, resume, _sessionEpoch.Capture(), cancellation));
     }
 
-    private async Task RunManualAsync(WindowTarget target, bool resume, int version, CancellationTokenSource cancellation)
+    private async Task RunManualAsync(Task<WordRecognitionResult> work, bool resume,
+        SessionEpochSnapshot epoch, CancellationTokenSource cancellation)
     {
         try
         {
-            var result = resume
-                ? await _workflow.ResumeAndShowAsync(target, cancellation.Token)
-                : await _workflow.RecognizeAndShowAsync(target, cancellation.Token);
-            if (!IsCurrent(version, cancellation.Token)) return;
+            var result = await work;
+            if (!IsCurrent(epoch, cancellation.Token)) return;
             _wordCount = result.Lines.Sum(line => line.Words.Count);
             _phase = RecognitionPhase.Ready;
             Completed?.Invoke(this, new(result, false));
             StartAutomatic();
             Changed?.Invoke(this, EventArgs.Empty);
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || version != _version) { }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || !_sessionEpoch.IsCurrent(epoch)) { }
         catch (Exception exception)
         {
-            if (version != _version || _disposed) return;
+            if (!IsCurrent(epoch, cancellation.Token)) return;
             if (resume)
             {
                 _workflow.Suspend();
@@ -128,7 +131,6 @@ public sealed class RecognitionSessionController : IDisposable
     public void PauseAndHide()
     {
         if (_disposed || !HasSession) return;
-        Interlocked.Increment(ref _version);
         CancelManual();
         CancelAutomatic();
         _workflow.Suspend();
@@ -139,7 +141,6 @@ public sealed class RecognitionSessionController : IDisposable
 
     private void EndSession(RecognitionPhase phase, Exception? error = null)
     {
-        Interlocked.Increment(ref _version);
         CancelManual();
         CancelAutomatic();
         _target = null;
@@ -175,16 +176,17 @@ public sealed class RecognitionSessionController : IDisposable
     {
         if (_disposed || !_autoEnabled || _phase != RecognitionPhase.Ready || target.Handle != _target?.Handle) return;
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token, sessionToken);
-        var version = _version;
+        var epoch = _sessionEpoch.Capture();
         var completionOwnsCancellation = false;
         try
         {
             var update = await _workflow.BeginChangedAndShowAsync(target, cancellation.Token);
             if (update is null) return;
+            if (!_sessionEpoch.IsCurrent(epoch.Value)) return;
             completionOwnsCancellation = true;
-            _ = Track(CompleteAutomaticAsync(update, version, cancellation));
+            _ = Track(CompleteAutomaticAsync(update, cancellation));
         }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || version != _version) { }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested || !_sessionEpoch.IsCurrent(epoch.Value)) { }
         catch (Exception exception) { _logger?.LogError(exception, "Automatic recognition failed."); }
         finally
         {
@@ -192,18 +194,18 @@ public sealed class RecognitionSessionController : IDisposable
         }
     }
 
-    private async Task CompleteAutomaticAsync(RecognitionUpdate update, int version, CancellationTokenSource cancellation)
+    private async Task CompleteAutomaticAsync(RecognitionUpdate update, CancellationTokenSource cancellation)
     {
         using (cancellation)
         {
             try
             {
-                if (!await update.Completion || !IsCurrent(version, cancellation.Token)) return;
+                if (!await update.Completion || !IsCurrent(update.Epoch, cancellation.Token)) return;
                 _wordCount = update.Result.Lines.Sum(line => line.Words.Count);
                 Completed?.Invoke(this, new(update.Result, true));
                 Changed?.Invoke(this, EventArgs.Empty);
             }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested || version != _version) { }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested || !_sessionEpoch.IsCurrent(update.Epoch)) { }
             catch (Exception exception) { _logger?.LogError(exception, "Automatic recognition failed."); }
         }
     }
@@ -216,8 +218,8 @@ public sealed class RecognitionSessionController : IDisposable
         return task;
     }
 
-    private bool IsCurrent(int version, CancellationToken token)
-        => !_disposed && version == Volatile.Read(ref _version) && !token.IsCancellationRequested;
+    private bool IsCurrent(SessionEpochSnapshot epoch, CancellationToken token)
+        => !_disposed && _sessionEpoch.IsCurrent(epoch) && !token.IsCancellationRequested;
 
     private void CancelManual()
     {

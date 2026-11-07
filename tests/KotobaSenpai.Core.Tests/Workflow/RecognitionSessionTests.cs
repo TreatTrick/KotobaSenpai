@@ -192,6 +192,26 @@ public sealed class RecognitionSessionTests
     }
 
     [Fact]
+    public async Task Clearing_phrase_cache_prevents_an_old_recognition_from_replacing_its_preview()
+    {
+        var analyzer = new Analyzer { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
+        var overlay = new Overlay();
+        var phraseOrchestrator = new PhraseAnalysisOrchestrator(analyzer,
+            tokenBuilder: new SentenceTokenBuilder(new Tokenizer()));
+        using var workflow = CreateWorkflow(new Recognizer(), analyzer, overlay, phraseOrchestrator: phraseOrchestrator);
+
+        var recognition = workflow.RecognizeAndShowAsync(Target);
+        var preview = overlay.Saved;
+        Assert.NotNull(preview);
+
+        phraseOrchestrator.ClearCache();
+        analyzer.Pending.SetResult(new(PhraseAnalysisOutcome.Success, []));
+        await recognition;
+
+        Assert.Same(preview, overlay.Saved);
+    }
+
+    [Fact]
     public async Task Stop_cancels_immediately_and_waits_for_work_started_outside_page_commands()
     {
         var analyzer = new Analyzer { Pending = new(TaskCreationOptions.RunContinuationsAsynchronously) };
@@ -212,9 +232,11 @@ public sealed class RecognitionSessionTests
         Assert.Equal(RecognitionPhase.Stopped, session.State.Phase);
     }
 
-    private static WordOverlayApplicationService CreateWorkflow(Recognizer recognizer, Analyzer analyzer, Overlay overlay, ITargetWindowTracker? tracker = null)
+    private static WordOverlayApplicationService CreateWorkflow(Recognizer recognizer, Analyzer analyzer, Overlay overlay,
+        ITargetWindowTracker? tracker = null, PhraseAnalysisOrchestrator? phraseOrchestrator = null)
         => new(recognizer, new Grouping(), overlay,
-            new PhraseAnalysisOrchestrator(analyzer, tokenBuilder: new SentenceTokenBuilder(new Tokenizer())), tracker: tracker);
+            phraseOrchestrator ?? new PhraseAnalysisOrchestrator(analyzer,
+                tokenBuilder: new SentenceTokenBuilder(new Tokenizer())), tracker: tracker);
 
     private sealed class Tracker : ITargetWindowTracker
     {

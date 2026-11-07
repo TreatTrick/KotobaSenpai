@@ -5,6 +5,7 @@ using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Core.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using KotobaSenpai.App.Reading;
@@ -53,6 +54,10 @@ public sealed class CompositionRootTests
         Assert.NotSame(firstShell, secondShell);
         Assert.NotSame(firstShell.Onboarding, secondShell.Onboarding);
         Assert.NotSame(firstShell.Settings.Llm, secondShell.Settings.Llm);
+        Assert.Same(first.ServiceProvider.GetRequiredService<SessionEpoch>(),
+            first.ServiceProvider.GetRequiredService<PhraseAnalysisOrchestrator>().SessionEpoch);
+        Assert.NotSame(first.ServiceProvider.GetRequiredService<SessionEpoch>(),
+            second.ServiceProvider.GetRequiredService<SessionEpoch>());
         Assert.Same(firstShell.Settings.Language, secondShell.Settings.Language);
         Assert.Same(first.ServiceProvider.GetRequiredService<CaptureBorderPreferences>(), second.ServiceProvider.GetRequiredService<CaptureBorderPreferences>());
         Assert.Same(first.ServiceProvider.GetRequiredService<SentenceTranslationPreferences>(), second.ServiceProvider.GetRequiredService<SentenceTranslationPreferences>());

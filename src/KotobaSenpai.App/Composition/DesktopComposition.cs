@@ -5,6 +5,7 @@ using KotobaSenpai.Core.Workflow;
 using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.Core.Diagnostics;
 using KotobaSenpai.Core.PhraseAnalysis;
+using KotobaSenpai.Core.Session;
 using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Tokenization;
@@ -151,6 +152,7 @@ internal sealed class DesktopComposition : IDisposable
     internal static void ConfigureServices(IServiceCollection services)
     {
         services.AddSingleton<IUiThread>(_ => new WpfUiThread(Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher));
+        services.AddScoped<SessionEpoch>();
         services.AddScoped<IWindowPicker, Win32WindowPicker>();
         services.AddScoped<IWindowFrameCapture, WgcWindowFrameCapture>();
         services.AddScoped<MeikiOcrWordRecognizer>();

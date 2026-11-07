@@ -1,4 +1,5 @@
 using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.Session;
 using static KotobaSenpai.Core.PhraseAnalysis.SentenceBlockLayout;
 
 namespace KotobaSenpai.Core.PhraseAnalysis;
@@ -6,9 +7,11 @@ namespace KotobaSenpai.Core.PhraseAnalysis;
 /// <summary>Validates and rebinds provider responses, maps current geometry and retains session group identities.</summary>
 internal sealed class PhraseRunAssembler
 {
+    private readonly SessionEpoch _sessionEpoch;
     private readonly object _identityGate = new();
     private readonly Dictionary<(string SegmentText, string Language, bool Translation, string ModelGroupId), Guid> _sessionGroupIds = new();
-    private int _generation;
+
+    public PhraseRunAssembler(SessionEpoch sessionEpoch) => _sessionEpoch = sessionEpoch;
 
     public void ForgetSentence((string SegmentText, string Language, bool Translation) key)
     {
@@ -18,17 +21,16 @@ internal sealed class PhraseRunAssembler
                 _sessionGroupIds.Remove(groupKey);
     }
 
-    public void ClearSessionIds(int generation)
+    public void ClearSessionIds()
     {
         lock (_identityGate)
         {
-            _generation = generation;
             _sessionGroupIds.Clear();
         }
     }
 
     public PhraseAnalysisRun BuildRun(IReadOnlyList<PhraseAnalysisRequest> requests,
-        IReadOnlyList<PhraseAnalysisResult> results, int generation)
+        IReadOnlyList<PhraseAnalysisResult> results, long epoch)
     {
         // Evaluate each sentence independently: failed sentences are recorded as warnings and skipped, the rest proceed as usual, matching the "partially usable" positioning.
         var groups = new List<PhraseGroupView>();
@@ -59,7 +61,7 @@ internal sealed class PhraseRunAssembler
             var validation = PhraseGroupValidator.ValidateAndBuild(result.Groups, tokenById);
             warnings.AddRange(validation.Warnings);
             groups.AddRange(validation.ValidGroups.Select(group => PhraseGeometryMapper.MapGroup(group.WithSessionId(
-                GetSessionGroupId(request, group.ModelGroupId, generation))) with { SegmentId = request.SegmentId }));
+                GetSessionGroupId(request, group.ModelGroupId, epoch))) with { SegmentId = request.SegmentId }));
 
             var wordValidation = WordMeaningValidator.ValidateAndBuild(result.Words, requests[i].LocalSpans);
             warnings.AddRange(wordValidation.Warnings);
@@ -115,12 +117,12 @@ internal sealed class PhraseRunAssembler
         };
     }
 
-    private Guid GetSessionGroupId(PhraseAnalysisRequest request, string modelGroupId, int generation)
+    private Guid GetSessionGroupId(PhraseAnalysisRequest request, string modelGroupId, long epoch)
     {
         lock (_identityGate)
         {
             // A late run can still be returned to its caller, but it cannot seed identities after reset.
-            if (generation != _generation) return Guid.NewGuid();
+            if (!_sessionEpoch.IsCurrent(epoch)) return Guid.NewGuid();
             var key = (NormalizeSegmentText(request.SegmentText), request.ExplanationLanguage, request.IncludeSentenceTranslation, modelGroupId);
             if (_sessionGroupIds.TryGetValue(key, out var id))
                 return id;

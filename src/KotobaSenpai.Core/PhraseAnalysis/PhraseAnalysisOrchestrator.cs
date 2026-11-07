@@ -2,6 +2,7 @@ using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Core.Session;
 
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
@@ -16,10 +17,11 @@ public sealed class PhraseAnalysisOrchestrator
 {
     private readonly SentenceBlockLayout _layout;
     private readonly PhraseAnalysisCache _cache;
-    private readonly PhraseRunAssembler _assembler = new();
+    private readonly PhraseRunAssembler _assembler;
     private readonly IExplanationLanguagePreferences? _explanationLanguage;
     private readonly ILogger? _logger;
     private readonly SentenceTranslationPreferences? _sentenceTranslation;
+    private readonly SessionEpoch _sessionEpoch;
 
     public PhraseAnalysisOrchestrator(
         ILlmPhraseAnalyzer analyzer,
@@ -27,16 +29,21 @@ public sealed class PhraseAnalysisOrchestrator
         SentenceTokenBuilder? tokenBuilder = null,
         IExplanationLanguagePreferences? explanationLanguage = null,
         ILogger? logger = null,
-        SentenceTranslationPreferences? sentenceTranslation = null)
+        SentenceTranslationPreferences? sentenceTranslation = null,
+        SessionEpoch? sessionEpoch = null)
     {
         ArgumentNullException.ThrowIfNull(analyzer);
         _layout = new SentenceBlockLayout(segmenter ?? new SentenceSegmenter(),
             tokenBuilder ?? throw new ArgumentNullException(nameof(tokenBuilder)));
-        _cache = new PhraseAnalysisCache(analyzer, _assembler);
+        _sessionEpoch = sessionEpoch ?? new SessionEpoch();
+        _assembler = new PhraseRunAssembler(_sessionEpoch);
+        _cache = new PhraseAnalysisCache(analyzer, _assembler, _sessionEpoch);
         _explanationLanguage = explanationLanguage;
         _logger = logger;
         _sentenceTranslation = sentenceTranslation;
     }
+
+    public SessionEpoch SessionEpoch => _sessionEpoch;
 
     /// <summary>Rebuilds successful cached annotations against the current OCR geometry without calling the provider.</summary>
     public PhraseAnalysisRun GetCachedAnalysis(Guid recognitionId, IReadOnlyList<OcrLine> lines)
@@ -45,13 +52,13 @@ public sealed class PhraseAnalysisOrchestrator
     public PhraseAnalysisRun GetCachedAnalysis(PhraseAnalysisPlan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        if (!_cache.IsCurrent(plan.CacheGeneration))
+        if (!_cache.IsCurrent(plan.Epoch))
             return new PhraseAnalysisRun(PhraseAnalysisOutcome.Success, [], null);
         var requests = plan.Requests;
         var (cached, _) = _cache.SplitByCache(requests);
         var indices = cached.Keys.Order().ToArray();
         return _assembler.BuildRun(indices.Select(index => requests[index]).ToArray(),
-            indices.Select(index => cached[index]).ToArray(), plan.CacheGeneration);
+            indices.Select(index => cached[index]).ToArray(), plan.Epoch);
     }
 
     public Task<PhraseAnalysisRun> AnalyzeAsync(
@@ -63,7 +70,7 @@ public sealed class PhraseAnalysisOrchestrator
     public async Task<PhraseAnalysisRun> AnalyzeAsync(PhraseAnalysisPlan plan, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        if (!_cache.IsCurrent(plan.CacheGeneration))
+        if (!_cache.IsCurrent(plan.Epoch))
             return Cancelled("The prepared analysis was superseded by a cache reset.");
         var recognitionId = plan.RecognitionId;
         var requests = plan.Requests;
@@ -86,7 +93,7 @@ public sealed class PhraseAnalysisOrchestrator
             var sharedRequests = 0;
             foreach (var item in uncached)
             {
-                tasks.Add(_cache.GetOrStartAnalysis(item.Request, plan.CacheGeneration, cancellationToken, out var shared));
+                tasks.Add(_cache.GetOrStartAnalysis(item.Request, plan.Epoch, cancellationToken, out var shared));
                 if (shared) sharedRequests++;
             }
             _logger?.LogInformation("[PHRASE] Recognition {0:N}: segments={1}, cacheHits={2}, providerRequests={3}.",
@@ -114,8 +121,8 @@ public sealed class PhraseAnalysisOrchestrator
             return Cancelled("Phrase analysis cancelled.");
         }
 
-        _cache.RememberCompletedBlocks(plan.CacheGeneration, requests, results);
-        return _assembler.BuildRun(requests, results, plan.CacheGeneration);
+        _cache.RememberCompletedBlocks(plan.Epoch, requests, results);
+        return _assembler.BuildRun(requests, results, plan.Epoch);
     }
 
     /// <summary>Retains completed block boundaries before either local grouping or provider analysis begins.</summary>
@@ -127,11 +134,13 @@ public sealed class PhraseAnalysisOrchestrator
 
         var language = _explanationLanguage?.EffectiveLanguage ?? "English";
         var translation = _sentenceTranslation?.Enabled ?? true;
-        var (generation, boundaries) = _cache.CaptureBoundaries();
-        return _layout.Prepare(recognitionId, generation, lines, boundaries, language, translation);
+        var (epoch, boundaries) = _cache.CaptureBoundaries();
+        return _layout.Prepare(recognitionId, epoch, lines, boundaries, language, translation);
     }
 
     public void ClearCache() => _cache.ClearCache();
+
+    internal SessionEpochSnapshot ClearCacheAndCaptureEpoch() => _cache.ClearCache();
 
     private static PhraseAnalysisRun Cancelled(string warning)
         => new(PhraseAnalysisOutcome.Cancelled, [], warning);

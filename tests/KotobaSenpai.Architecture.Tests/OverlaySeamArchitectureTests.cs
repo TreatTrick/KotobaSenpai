@@ -49,6 +49,21 @@ public sealed class OverlaySeamArchitectureTests
         Assert.Same(core, typeof(KotobaSenpai.Core.Overlay.WordHoverResolver).Assembly);
     }
 
+    [Fact]
+    public void Overlay_window_delegates_visual_diagnostics_to_an_independent_module()
+    {
+        var diagnostics = Presentation.GetType("KotobaSenpai.Presentation.Wpf.Overlay.OverlayDiagnostics");
+        Assert.NotNull(diagnostics);
+        var overlayWindow = Presentation.GetType("KotobaSenpai.Presentation.Wpf.Overlay.OverlayWindow", throwOnError: true)!;
+        Assert.False(overlayWindow.IsAssignableFrom(diagnostics));
+
+        var windowDiagnosticMethods = overlayWindow
+            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+            .Where(method => method.Name is "LogWindowDiagnostics" or "LogCanvasDiagnostics")
+            .ToArray();
+        Assert.Empty(windowDiagnosticMethods);
+    }
+
     private static void AssertNoNativeImports(IEnumerable<Type> types)
     {
         var imports = types

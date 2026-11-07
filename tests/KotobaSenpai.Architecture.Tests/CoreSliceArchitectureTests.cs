@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.IO;
 using System.Text.RegularExpressions;
+using KotobaSenpai.Core.Session;
+using KotobaSenpai.Core.Workflow;
 using NetArchTest.Rules;
 
 namespace KotobaSenpai.Architecture.Tests;
@@ -13,6 +15,7 @@ public sealed class CoreSliceArchitectureTests
     [
         ["Geometry", 0],
         ["Threading", 0],
+        ["Session", 0],
         ["Japanese", 0],
         ["Errors", 0],
         ["Localization", 0],
@@ -81,6 +84,34 @@ public sealed class CoreSliceArchitectureTests
         Assert.True(
             offenders.Length == 0,
             $"Core contains a forbidden namespace or a namespace/folder mismatch: {string.Join(", ", offenders)}");
+    }
+
+    [Fact]
+    public void Recognition_and_phrase_analysis_use_the_shared_core_epoch()
+    {
+        var cache = CoreAssembly.GetType("KotobaSenpai.Core.PhraseAnalysis.PhraseAnalysisCache", throwOnError: true)!;
+        var participants = new[]
+        {
+            typeof(WordOverlayApplicationService),
+            typeof(RecognitionSessionController),
+            cache,
+        };
+
+        foreach (var participant in participants)
+        {
+            var epochField = participant.GetField("_sessionEpoch", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(epochField);
+            Assert.Equal(typeof(SessionEpoch), epochField!.FieldType);
+        }
+
+        var localGenerationFields = new[] { "_recognitionGeneration", "_cacheGeneration", "_version" }
+            .SelectMany(name => participants.SelectMany(participant => participant.GetFields(
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                .Where(field => field.Name == name)
+                .Select(field => $"{participant.Name}.{field.Name}")))
+            .ToArray();
+
+        Assert.Empty(localGenerationFields);
     }
 
     [Fact]
