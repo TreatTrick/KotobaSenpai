@@ -1,0 +1,164 @@
+name: CI
+
+# Every pull request must run this workflow: there are no path filters, so a PR
+# that touches a single comment still selects the merge gate.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore KotobaSenpai.slnx
+      # TreatWarningsAsErrors is set in every source project, so a failure here
+      # also means a warning was introduced.
+      - name: Build
+        run: dotnet build KotobaSenpai.slnx -c Release --no-restore --nologo
+
+  test:
+    name: Test / ${{ matrix.suite }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: Core
+            project: tests/KotobaSenpai.Core.Tests/KotobaSenpai.Core.Tests.csproj
+          # Architecture tests pin the dependency direction of Core / Platform /
+          # App, so they are a gate of their own: a layering violation must fail
+          # the PR even when every behavior test still passes.
+          - suite: Architecture
+            project: tests/KotobaSenpai.Architecture.Tests/KotobaSenpai.Architecture.Tests.csproj
+          - suite: Platform.Windows
+            project: tests/KotobaSenpai.Platform.Windows.Tests/KotobaSenpai.Platform.Windows.Tests.csproj
+          # The desktop acceptance fixture (PhrasePopupThemeTests) is excluded
+          # here: it asserts global focus/activation state, which an unattended
+          # runner does not grant, so it is reported by the separate
+          # "Desktop acceptance" job instead of gating merges. Everything else
+          # in this project is deterministic (verified over repeated runs).
+          - suite: App
+            project: tests/KotobaSenpai.App.Tests/KotobaSenpai.App.Tests.csproj
+            filter: FullyQualifiedName!~PhrasePopupThemeTests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Test ${{ matrix.suite }}
+        shell: pwsh
+        run: |
+          $testArgs = @("${{ matrix.project }}", '-c', 'Release', '--nologo',
+              '--logger', 'trx;LogFileName=results.trx',
+              '--results-directory', 'TestResults',
+              '--blame-hang', '--blame-hang-timeout', '10m')
+          $filter = "${{ matrix.filter }}"
+          if ($filter) { $testArgs += @('--filter', $filter) }
+          dotnet test @testArgs
+          exit $LASTEXITCODE
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 7
+
+  desktop-acceptance:
+    name: Desktop acceptance (not gating)
+    # Runs the full WPF desktop fixture: real windows, global shortcuts, rendered
+    # previews. It needs an interactive session, so it reports signal on main and
+    # on demand instead of blocking every PR. Promotion to a required check is
+    # tracked in docs/ci.md.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Run desktop acceptance fixture
+        shell: pwsh
+        run: |
+          dotnet test tests/KotobaSenpai.App.Tests/KotobaSenpai.App.Tests.csproj -c Release --nologo `
+            --filter "FullyQualifiedName~PhrasePopupThemeTests" `
+            --logger "trx;LogFileName=desktop-acceptance.trx" `
+            --results-directory TestResults --blame-hang --blame-hang-timeout 10m
+          exit $LASTEXITCODE
+      - name: Upload desktop previews and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-acceptance
+          path: |
+            TestResults
+            tests/KotobaSenpai.App.Tests/bin/Release/**/previews
+          if-no-files-found: ignore
+          retention-days: 7
+
+  cli-contract:
+    name: Agent CLI contract
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Publish application
+        run: dotnet publish src/KotobaSenpai.App/KotobaSenpai.App.csproj -c Release -o artifacts/publish --nologo
+      # The CLI is the agent-facing entry point: capability discovery, input
+      # validation and credential redaction are part of the published contract.
+      - name: Check published CLI contract
+        shell: pwsh
+        run: ./tests/Check-AgentCli.ps1 -PublishDirectory ./artifacts/publish
+
+  gate:
+    name: Gate
+    # Single required status check: "Gate" fails unless every gating job succeeded.
+    needs: [build, test, cli-contract]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required jobs
+        env:
+          BUILD: ${{ needs.build.result }}
+          TEST: ${{ needs.test.result }}
+          CLI_CONTRACT: ${{ needs.cli-contract.result }}
+        run: |
+          echo "build=$BUILD test=$TEST cli-contract=$CLI_CONTRACT"
+          for result in "$BUILD" "$TEST" "$CLI_CONTRACT"; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A required job did not succeed ($BUILD / $TEST / $CLI_CONTRACT)."
+              exit 1
+            fi
+          done

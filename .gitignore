@@ -1,6 +1,8 @@
 # Build output
 bin/
 obj/
+TestResults/
+*.trx
 
 # Local verification and publish output
 .codex/tmp/
