@@ -1,51 +1,24 @@
 using KotobaSenpai.Core.TargetWindow;
-using KotobaSenpai.Core.Geometry;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Windows.Threading;
 using KotobaSenpai.Core.Logging;
+using static KotobaSenpai.Platform.Windows.Overlay.WinEventHooks;
+using static KotobaSenpai.Core.TargetWindow.WindowOcclusionGeometry;
+using static KotobaSenpai.Platform.Windows.Overlay.TargetWindowSnapshotReader;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
 /// <summary>Win32 event-driven tracker for one target window.</summary>
 public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 {
-    private const uint EventSystemForeground = 0x0003;
-    private const uint EventSystemMinimizeStart = 0x0016;
-    private const uint EventSystemMinimizeEnd = 0x0017;
-    private const uint EventObjectDestroy = 0x8001;
-    private const uint EventObjectShow = 0x8002;
-    private const uint EventObjectHide = 0x8003;
-    private const uint EventObjectReorder = 0x8004;
-    private const uint EventObjectLocationChange = 0x800B;
-    private const int ObjectIdWindow = 0;
-    private const int ChildIdSelf = 0;
-    private const uint WineventOutOfContext = 0;
-    private const uint SwpNoActivate = 0x0010;
-    private const uint SwpNoZOrder = 0x0004;
-    private const uint SwpShowWindow = 0x0040;
-    private const uint SwpHideWindow = 0x0080;
-    private const uint GwHwndPrev = 3;
-    private const int GwlExStyle = -20;
-    private const long WsExLayered = 0x00080000;
-    private const long WsExTransparent = 0x00000020;
-    private const double OcclusionHideThreshold = 0.30;
-
     private readonly object _gate = new();
     private readonly Dispatcher _dispatcher;
     private readonly ILogger? _logger;
-    private readonly NativeMethods.WinEventDelegate _callback;
-    private nint _locationHook;
-    private nint _systemHook;
-    private nint _destroyHook;
-    private nint _visibilityHook;
-    private nint _reorderHook;
-    private nint _foregroundHook;
+    private readonly TargetWindowSnapshotReader _snapshotReader;
+    private WinEventHooks? _hooks;
     private nint _targetHandle;
     private uint _targetThreadId;
     private uint _targetProcessId;
     private volatile bool _targetDestroyed;
-    private string? _lastOcclusionDiagnosticState;
     private bool _refreshPosted;
     private bool _disposed;
     private TargetWindowSnapshot? _current;
@@ -54,7 +27,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
     {
         _logger = logger;
         _dispatcher = dispatcher ?? Dispatcher.CurrentDispatcher;
-        _callback = OnWinEvent;
+        _snapshotReader = new TargetWindowSnapshotReader(logger);
         var assembly = typeof(WinEventTargetWindowTracker).Assembly;
         _logger?.LogInformation("[OVERLAY] Diagnostics initialized: diagnosticsVersion=coverage30-v2, processId={0}, assemblyPath={1}, moduleVersionId={2}, occlusionRule=client-union-area, hideAboveRatio={3:R}.",
             Environment.ProcessId, assembly.Location, assembly.ManifestModule.ModuleVersionId, OcclusionHideThreshold);
@@ -84,8 +57,8 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         return InvokeOnDispatcher(() =>
         {
             ThrowIfDisposed();
-            var threadId = NativeMethods.GetWindowThreadProcessId(target.Handle, out var processId);
-            if (_targetHandle == target.Handle && HooksRegistered()
+            var threadId = WindowNativeMethods.GetWindowThreadProcessId(target.Handle, out var processId);
+            if (_targetHandle == target.Handle && _hooks?.IsRegistered == true
                 && IsSameIdentity(_targetThreadId, _targetProcessId, threadId, processId, _targetDestroyed))
             {
                 _logger?.Log(
@@ -93,7 +66,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
                     null,
                     "[DEBUG-TRACKER] Reusing registered hooks for handle={0}; refreshing snapshot.",
                     target.Handle);
-                var currentSnapshot = RefreshCore(target.Title, target.Bounds);
+                var currentSnapshot = _snapshotReader.Read(_targetHandle, target.Title, target.Bounds, _targetThreadId, _targetProcessId, _targetDestroyed);
                 Publish(currentSnapshot);
                 return currentSnapshot;
             }
@@ -104,8 +77,8 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             _targetProcessId = processId;
             try
             {
-                RegisterHooks();
-                var snapshot = RefreshCore(target.Title, target.Bounds);
+                _hooks = new WinEventHooks(OnWinEvent, _targetHandle, _logger);
+                var snapshot = _snapshotReader.Read(_targetHandle, target.Title, target.Bounds, _targetThreadId, _targetProcessId, _targetDestroyed);
                 Publish(snapshot);
                 return snapshot;
             }
@@ -129,7 +102,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
                 "[TRACKER] Explicit refresh requested: handle={0}, title='{1}'.",
                 current.Handle,
                 current.Title);
-            var snapshot = RefreshCore(current.Title, current.Bounds);
+            var snapshot = _snapshotReader.Read(_targetHandle, current.Title, current.Bounds, _targetThreadId, _targetProcessId, _targetDestroyed);
             Publish(snapshot);
             return snapshot;
         });
@@ -228,7 +201,7 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
             var current = Current;
             if (current is null || _targetHandle == nint.Zero)
                 return;
-            var snapshot = RefreshCore(current.Title, current.Bounds);
+            var snapshot = _snapshotReader.Read(_targetHandle, current.Title, current.Bounds, _targetThreadId, _targetProcessId, _targetDestroyed);
             Publish(snapshot);
             if (!snapshot.IsValid)
                 DetachCore();
@@ -237,136 +210,6 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         {
             _logger?.LogError(ex, "Target window snapshot refresh failed");
         }
-    }
-
-    private TargetWindowSnapshot RefreshCore(string title, ScreenRect fallbackBounds)
-    {
-        var threadId = NativeMethods.GetWindowThreadProcessId(_targetHandle, out var processId);
-        if (!NativeMethods.IsWindow(_targetHandle)
-            || !IsSameIdentity(_targetThreadId, _targetProcessId, threadId, processId, _targetDestroyed))
-            return new TargetWindowSnapshot(_targetHandle, title, fallbackBounds, 1, false, true, false, false, false);
-
-        var visible = NativeMethods.IsWindowVisible(_targetHandle);
-        var minimized = NativeMethods.IsIconic(_targetHandle);
-        if (!NativeMethods.GetClientRect(_targetHandle, out var rect)
-            || !NativeMethods.ClientToScreen(_targetHandle, out var origin)
-            || rect.Right <= rect.Left
-            || rect.Bottom <= rect.Top)
-            return new TargetWindowSnapshot(_targetHandle, title, fallbackBounds, ReadDpiScale(), visible, minimized, false);
-
-        var bounds = new ScreenRect(origin.X, origin.Y, rect.Right - rect.Left, rect.Bottom - rect.Top);
-        return new TargetWindowSnapshot(
-            _targetHandle,
-            title,
-            bounds,
-            ReadDpiScale(),
-            visible,
-            minimized,
-            NativeMethods.GetForegroundWindow() == _targetHandle,
-            IsOccluded(bounds, _targetHandle));
-    }
-
-    internal static bool IsSameIdentity(uint expectedThread, uint expectedProcess, uint thread, uint process, bool destroyed)
-        => !destroyed && expectedThread != 0 && expectedProcess != 0
-            && thread == expectedThread && process == expectedProcess;
-
-    private bool IsOccluded(ScreenRect targetBounds, nint targetHandle)
-    {
-        var auxiliaryWindowHandles = OverlayWindowRegistry.Snapshot();
-        var occluders = new List<ScreenRect>();
-        var candidates = new List<(nint Handle, ScreenRect Bounds, int ExtendedStyle, string Exclusion)>();
-        for (var above = NativeMethods.GetWindow(targetHandle, GwHwndPrev);
-             above != nint.Zero;
-             above = NativeMethods.GetWindow(above, GwHwndPrev))
-        {
-            if (!NativeMethods.IsWindowVisible(above)
-                || NativeMethods.IsIconic(above)
-                || !NativeMethods.GetWindowRect(above, out var rect)
-                || rect.Right <= rect.Left
-                || rect.Bottom <= rect.Top)
-                continue;
-
-            var occluderBounds = new ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
-            if (!HasPositiveAreaIntersection(targetBounds, occluderBounds))
-                continue;
-            var extendedStyle = NativeMethods.GetWindowLong(above, GwlExStyle);
-            var exclusion = auxiliaryWindowHandles.Contains(above) ? "auxiliary"
-                : !CanOcclude(extendedStyle) ? "layered-click-through" : "none";
-            candidates.Add((above, occluderBounds, extendedStyle, exclusion));
-            if (exclusion == "none")
-                occluders.Add(occluderBounds);
-        }
-
-        var occluded = ExceedsOcclusionThreshold(targetBounds, occluders, out var occlusionRatio);
-        LogOcclusionEvaluation(targetHandle, targetBounds, candidates, occluders.Count, occlusionRatio, occluded);
-        return occluded;
-    }
-
-    private void LogOcclusionEvaluation(nint targetHandle, ScreenRect targetBounds,
-        IReadOnlyList<(nint Handle, ScreenRect Bounds, int ExtendedStyle, string Exclusion)> candidates,
-        int occluderCount, double ratio, bool occluded)
-    {
-        if (_logger is null)
-            return;
-        var state = $"{targetBounds}|{string.Join(";", candidates.Select(window => $"{window.Handle}:{window.Bounds}:{window.ExtendedStyle:X}:{window.Exclusion}"))}";
-        if (state == _lastOcclusionDiagnosticState)
-            return;
-        _lastOcclusionDiagnosticState = state;
-        _logger.Log(LogLevel.Trace, null, "[OVERLAY] Occlusion evaluated: targetHandle={0}, targetBounds={1}, occlusionRatio={2:R}, hideAboveRatio={3:R}, occluded={4}, occluderCount={5}, intersectingWindowCount={6}.",
-            targetHandle, targetBounds, ratio, OcclusionHideThreshold, occluded, occluderCount, candidates.Count);
-        foreach (var window in candidates)
-        {
-            var className = new StringBuilder(256);
-            NativeMethods.GetClassName(window.Handle, className, className.Capacity);
-            NativeMethods.GetWindowThreadProcessId(window.Handle, out var processId);
-            var cloakResult = NativeMethods.DwmGetWindowAttribute(window.Handle, 14, out var cloaked, sizeof(uint));
-            _logger.Log(LogLevel.Trace, null, "[OVERLAY] Occlusion candidate: hwnd={0}, processId={1}, className={2}, exStyle=0x{3:X}, bounds={4}, clientIntersection={5}, exclusion={6}, cloaked={7}.",
-                window.Handle, processId, className.ToString(), window.ExtendedStyle, window.Bounds,
-                window.Bounds.ClampTo(targetBounds), window.Exclusion, cloakResult >= 0 ? cloaked.ToString() : "unknown");
-        }
-    }
-
-    internal static bool HasPositiveAreaIntersection(ScreenRect first, ScreenRect second)
-        => first.X < second.Right
-            && first.Right > second.X
-            && first.Y < second.Bottom
-            && first.Bottom > second.Y;
-
-    internal static bool ExceedsOcclusionThreshold(ScreenRect targetBounds, IEnumerable<ScreenRect> occluders, out double occlusionRatio)
-    {
-        var clipped = occluders.Where(bounds => HasPositiveAreaIntersection(targetBounds, bounds))
-            .Select(bounds => bounds.ClampTo(targetBounds)).ToArray();
-        var edges = clipped.SelectMany(bounds => new[] { bounds.X, bounds.Right }).Distinct().Order().ToArray();
-        long coveredArea = 0;
-        // ponytail: O(n^2 log n) for a small overlapping window set; use a region index only if profiling shows a bottleneck.
-        for (var i = 1; i < edges.Length; i++)
-        {
-            long coveredHeight = 0;
-            var bottom = int.MinValue;
-            foreach (var bounds in clipped.Where(bounds => bounds.X < edges[i] && bounds.Right > edges[i - 1]).OrderBy(bounds => bounds.Y))
-            {
-                var top = Math.Max(bounds.Y, bottom);
-                if (bounds.Bottom > top)
-                    coveredHeight += (long)bounds.Bottom - top;
-                bottom = Math.Max(bottom, bounds.Bottom);
-            }
-            coveredArea += (long)(edges[i] - edges[i - 1]) * coveredHeight;
-        }
-        occlusionRatio = coveredArea / ((double)targetBounds.Width * targetBounds.Height);
-        return occlusionRatio > OcclusionHideThreshold;
-    }
-
-    internal static bool CanOcclude(long extendedStyle)
-    {
-        // A layered click-through helper can span transparent desktop areas; its outer rectangle is not a solid occluder.
-        const long clickThroughLayered = WsExLayered | WsExTransparent;
-        return (extendedStyle & clickThroughLayered) != clickThroughLayered;
-    }
-
-    private double ReadDpiScale()
-    {
-        var dpi = NativeMethods.GetDpiForWindow(_targetHandle);
-        return dpi == 0 ? 1 : dpi / 96d;
     }
 
     private void Publish(TargetWindowSnapshot snapshot)
@@ -405,131 +248,28 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
         }
     }
 
-    private void RegisterHooks()
-    {
-        _locationHook = NativeMethods.SetWinEventHook(
-            EventObjectLocationChange,
-            EventObjectLocationChange,
-            nint.Zero,
-            _callback,
-            0,
-            0,
-            WineventOutOfContext);
-        _systemHook = NativeMethods.SetWinEventHook(
-            EventSystemMinimizeStart,
-            EventSystemMinimizeEnd,
-            nint.Zero,
-            _callback,
-            0,
-            0,
-            WineventOutOfContext);
-        _destroyHook = NativeMethods.SetWinEventHook(
-            EventObjectDestroy,
-            EventObjectDestroy,
-            nint.Zero,
-            _callback,
-            0,
-            0,
-            WineventOutOfContext);
-        _visibilityHook = NativeMethods.SetWinEventHook(
-            EventObjectShow,
-            EventObjectHide,
-            nint.Zero,
-            _callback,
-            0,
-            0,
-            WineventOutOfContext);
-        _reorderHook = NativeMethods.SetWinEventHook(
-            EventObjectReorder,
-            EventObjectReorder,
-            nint.Zero,
-            _callback,
-            0,
-            0,
-            WineventOutOfContext);
-        _foregroundHook = NativeMethods.SetWinEventHook(
-            EventSystemForeground,
-            EventSystemForeground,
-            nint.Zero,
-            _callback,
-            0,
-            0,
-            WineventOutOfContext);
-
-        if (_locationHook == nint.Zero
-            || _systemHook == nint.Zero
-            || _destroyHook == nint.Zero
-            || _visibilityHook == nint.Zero
-            || _reorderHook == nint.Zero
-            || _foregroundHook == nint.Zero)
-            throw new InvalidOperationException("Failed to register one or more WinEvent hooks.");
-
-        _logger?.Log(
-            LogLevel.Debug,
-            null,
-            "[DEBUG-TRACKER] WinEvent hooks registered: targetHandle={0}, locationHook={1}, systemHook={2}, destroyHook={3}, visibilityHook={4}, reorderHook={5}, foregroundHook={6}.",
-            _targetHandle,
-            _locationHook,
-            _systemHook,
-            _destroyHook,
-            _visibilityHook,
-            _reorderHook,
-            _foregroundHook);
-    }
-
-    private bool HooksRegistered()
-        => _locationHook != nint.Zero
-            && _systemHook != nint.Zero
-            && _destroyHook != nint.Zero
-            && _visibilityHook != nint.Zero
-            && _reorderHook != nint.Zero
-            && _foregroundHook != nint.Zero;
-
     private void DetachCore()
     {
-        if (_targetHandle != nint.Zero || HooksRegistered())
+        if (_targetHandle != nint.Zero || _hooks?.IsRegistered == true)
         {
             _logger?.Log(
                 LogLevel.Debug,
                 null,
                 "[DEBUG-TRACKER] Detaching target: handle={0}, hooksRegistered={1}.",
                 _targetHandle,
-                HooksRegistered());
+                _hooks?.IsRegistered == true);
         }
-        Unhook(ref _locationHook, "location");
-        Unhook(ref _systemHook, "system");
-        Unhook(ref _destroyHook, "destroy");
-        Unhook(ref _visibilityHook, "visibility");
-        Unhook(ref _reorderHook, "reorder");
-        Unhook(ref _foregroundHook, "foreground");
+        _hooks?.Dispose();
+        _hooks = null;
         lock (_gate)
         {
             _targetHandle = nint.Zero;
             _targetThreadId = 0;
             _targetProcessId = 0;
             _targetDestroyed = false;
-            _lastOcclusionDiagnosticState = null;
+            _snapshotReader.Reset();
             _current = null;
             _refreshPosted = false;
-        }
-    }
-
-    private void Unhook(ref nint hook, string name)
-    {
-        if (hook == nint.Zero)
-            return;
-        try
-        {
-            if (!NativeMethods.UnhookWinEvent(hook))
-                _logger?.LogWarning("Failed to unregister {0} WinEvent hook", name);
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogError(ex, "Failed to unregister {0} WinEvent hook", name);
-        }
-        finally
-        {
-            hook = nint.Zero;
         }
     }
 
@@ -549,93 +289,4 @@ public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 
     private T InvokeOnDispatcher<T>(Func<T> action)
         => _dispatcher.CheckAccess() ? action() : _dispatcher.Invoke(action);
-
-    private static class NativeMethods
-    {
-        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        public delegate void WinEventDelegate(
-            nint hook,
-            uint eventType,
-            nint hwnd,
-            int idObject,
-            int idChild,
-            uint eventThread,
-            uint eventTime);
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Rect
-        {
-            public int Left;
-            public int Top;
-            public int Right;
-            public int Bottom;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        public struct Point
-        {
-            public int X;
-            public int Y;
-        }
-
-        [DllImport("user32.dll")]
-        public static extern nint SetWinEventHook(
-            uint eventMin,
-            uint eventMax,
-            nint hmodWinEventProc,
-            WinEventDelegate lpfnWinEventProc,
-            uint idProcess,
-            uint idThread,
-            uint flags);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool UnhookWinEvent(nint hook);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool IsWindow(nint hwnd);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool IsWindowVisible(nint hwnd);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool IsIconic(nint hwnd);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetClientRect(nint hwnd, out Rect rect);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool ClientToScreen(nint hwnd, out Point point);
-
-        [DllImport("user32.dll")]
-        public static extern uint GetDpiForWindow(nint hwnd);
-
-        [DllImport("user32.dll")]
-        public static extern nint GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        public static extern nint GetWindow(nint hwnd, uint command);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetWindowRect(nint hwnd, out Rect rect);
-
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern int GetClassName(nint hwnd, StringBuilder className, int maximumCount);
-
-        [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
-        public static extern int GetWindowLong(nint hwnd, int index);
-
-        [DllImport("user32.dll")]
-        public static extern uint GetWindowThreadProcessId(nint hwnd, out uint processId);
-
-        [DllImport("dwmapi.dll")]
-        public static extern int DwmGetWindowAttribute(nint hwnd, int attribute, out uint value, int size);
-
-    }
 }

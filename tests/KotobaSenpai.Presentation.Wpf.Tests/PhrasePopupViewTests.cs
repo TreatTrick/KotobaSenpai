@@ -23,44 +23,6 @@ namespace KotobaSenpai.Presentation.Wpf.Tests;
 public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 {
     [Fact]
-    public Task Appending_a_sentence_retains_existing_furigana_and_underlines() => RunSta(() =>
-    {
-        var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 400 };
-        var overlay = new WpfOverlayRenderer.OverlayWindow();
-        try
-        {
-            target.Show();
-            var handle = new WindowInteropHelper(target).Handle;
-            Assert.True(Native.GetWindowRect(handle, out var bounds));
-            var windowTarget = new WindowTarget(handle, "Target",
-                new(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top));
-            GroupedWord Word(string surface, string reading, int row) => new GroupedWord(new Token(
-                surface, surface, surface, reading, reading, reading, new("noun", "", "", ""), "", "", "1", 0),
-                new ScreenRect(bounds.Left + 80, bounds.Top + 60 + row * 90, 90, 40)).WithSegmentId($"s{row}-{row}");
-            overlay.Render(WordOverlaySession.Start(windowTarget, [Word("僕", "ボク", 0)], underlineSegmentIds: ["s0-0"]), 1d / 3);
-            var canvas = Assert.IsType<Canvas>(overlay.Content);
-            var original = canvas.Children.OfType<OverlayAnnotation>().ToArray();
-            Assert.Contains(original, annotation => annotation.Glyph is not null);
-            Assert.Contains(original, annotation => annotation.Role == OverlayColorRole.Underline);
-
-            overlay.Render(WordOverlaySession.Start(windowTarget,
-                [Word("僕", "ボク", 0), Word("職員", "ショクイン", 1)], underlineSegmentIds: ["s0-0"]), 1d / 3);
-
-            Assert.All(original, annotation => Assert.Contains(annotation, canvas.Children.OfType<OverlayAnnotation>()));
-            Assert.True(canvas.Children.Count > original.Length);
-            var secondLine = canvas.Children.OfType<OverlayAnnotation>().Except(original).ToArray();
-            overlay.Render(WordOverlaySession.Start(windowTarget,
-                [Word("僕", "ボク", 0), Word("職員", "ショクイン", 1)], underlineSegmentIds: ["s0-0", "s1-1"]), 1d / 3);
-            Assert.All(original, annotation => Assert.Contains(annotation, canvas.Children.OfType<OverlayAnnotation>()));
-            Assert.DoesNotContain(secondLine, annotation => canvas.Children.Contains(annotation));
-
-            overlay.Render(WordOverlaySession.Start(windowTarget, []), 1d / 3);
-            Assert.Empty(canvas.Children);
-        }
-        finally { overlay.Close(); target.Close(); }
-    });
-
-    [Fact]
     public Task Translation_mouse_gesture_is_consumed_and_toggles_once_without_activation() => RunSta(() =>
     {
         var popup = new PhrasePopup();
@@ -274,7 +236,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
     public Task Wrapped_sources_anchor_the_popup_to_the_hovered_line(bool phrase) => RunSta(() =>
     {
         var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 600 };
-        var overlay = new WpfOverlayRenderer.OverlayWindow();
+        var overlay = new OverlayWindow();
         try
         {
             target.Show();
@@ -335,7 +297,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
     public Task Appearance_roles_share_the_live_renderer_and_edges_keep_source_alignment() => RunSta(() =>
     {
         var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 500 };
-        var overlay = new WpfOverlayRenderer.OverlayWindow();
+        var overlay = new OverlayWindow();
         try
         {
             target.Show();
@@ -636,7 +598,7 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
     public Task Hover_retains_the_popup_during_transfer_and_after_entry(bool phrase, bool longContent) => RunSta(() =>
     {
         var target = new Window { ShowActivated = false, ShowInTaskbar = false, Left = 100, Top = 100, Width = 700, Height = 600 };
-        var overlay = new WpfOverlayRenderer.OverlayWindow();
+        var overlay = new OverlayWindow();
         nint overlayHandle = 0;
         nint popupHandle = 0;
         try

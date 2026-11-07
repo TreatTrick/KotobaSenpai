@@ -20,7 +20,7 @@ public sealed class OverlayHoverTests
             _ => rendered with { }
         };
 
-        Assert.False(WpfOverlayRenderer.RequiresGeometryRender(rendered, current, isVisible: true));
+        Assert.False(OverlayWindow.RequiresGeometryRender(rendered, current, isVisible: true));
     }
 
     [Fact]
@@ -28,13 +28,13 @@ public sealed class OverlayHoverTests
     {
         var rendered = new TargetWindowSnapshot((nint)42, "Target", new ScreenRect(100, 100, 800, 600), 1, true, false, true);
 
-        Assert.True(WpfOverlayRenderer.RequiresGeometryRender(null, rendered, isVisible: true));
-        Assert.True(WpfOverlayRenderer.RequiresGeometryRender(rendered, rendered, isVisible: false));
-        Assert.True(WpfOverlayRenderer.RequiresGeometryRender(rendered,
+        Assert.True(OverlayWindow.RequiresGeometryRender(null, rendered, isVisible: true));
+        Assert.True(OverlayWindow.RequiresGeometryRender(rendered, rendered, isVisible: false));
+        Assert.True(OverlayWindow.RequiresGeometryRender(rendered,
             rendered with { Bounds = new ScreenRect(200, 100, 800, 600) }, isVisible: true));
-        Assert.True(WpfOverlayRenderer.RequiresGeometryRender(rendered,
+        Assert.True(OverlayWindow.RequiresGeometryRender(rendered,
             rendered with { Bounds = new ScreenRect(100, 100, 1000, 700) }, isVisible: true));
-        Assert.True(WpfOverlayRenderer.RequiresGeometryRender(rendered,
+        Assert.True(OverlayWindow.RequiresGeometryRender(rendered,
             rendered with { DpiScale = 1.25 }, isVisible: true));
     }
 
@@ -43,7 +43,7 @@ public sealed class OverlayHoverTests
     {
         var lineOwners = new[] { 0, 0, 1 };
 
-        var lineIndices = WpfOverlayRenderer.GetLineIndicesForWords([0], lineOwners);
+        var lineIndices = OverlayAnnotationLayer.GetLineIndicesForWords([0], lineOwners);
 
         Assert.Equal([0, 1], lineIndices);
     }
@@ -53,7 +53,7 @@ public sealed class OverlayHoverTests
     {
         var lineOwners = new[] { 0, 0, 1, 2 };
 
-        var lineIndices = WpfOverlayRenderer.GetLineIndicesForWords([0, 2], lineOwners);
+        var lineIndices = OverlayAnnotationLayer.GetLineIndicesForWords([0, 2], lineOwners);
 
         Assert.Equal([0, 1, 3], lineIndices);
     }

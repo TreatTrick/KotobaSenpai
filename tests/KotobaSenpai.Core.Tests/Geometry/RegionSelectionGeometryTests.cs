@@ -1,8 +1,7 @@
-using System.Windows;
 using KotobaSenpai.Core.Geometry;
-using KotobaSenpai.Presentation.Wpf.Overlay;
+using KotobaSenpai.Core.TargetWindow;
 
-namespace KotobaSenpai.Presentation.Wpf.Tests;
+namespace KotobaSenpai.Core.Tests.Geometry;
 
 public sealed class RegionSelectionGeometryTests
 {
@@ -35,7 +34,7 @@ public sealed class RegionSelectionGeometryTests
             var region = new ScreenRect((int)(100 * scale), (int)(80 * scale),
                 (int)(400 * scale), (int)(200 * scale));
 
-            var mode = RegionSelectionGeometry.HitTest(region, scale, new Point(x, y));
+            var mode = RegionSelectionGeometry.HitTest(region, scale, x, y);
 
             Assert.Equal(Enum.Parse<RegionDragMode>(expected), mode);
         }
@@ -54,7 +53,7 @@ public sealed class RegionSelectionGeometryTests
     public void Dragging_only_changes_the_requested_edges(string mode, int x, int y, int width, int height)
     {
         var result = RegionSelectionGeometry.Drag(new ScreenRect(100, 80, 400, 200),
-            Enum.Parse<RegionDragMode>(mode), new Vector(30, 20), 800, 450);
+            Enum.Parse<RegionDragMode>(mode), 30, 20, 800, 450);
 
         Assert.Equal(new ScreenRect(x, y, width, height), result);
     }
@@ -65,7 +64,7 @@ public sealed class RegionSelectionGeometryTests
     public void Moving_clamps_the_entire_region_without_resizing(double dx, double dy, int x, int y)
     {
         var result = RegionSelectionGeometry.Drag(new ScreenRect(100, 80, 400, 200),
-            RegionDragMode.Move, new Vector(dx, dy), 800, 450);
+            RegionDragMode.Move, dx, dy, 800, 450);
 
         Assert.Equal(new ScreenRect(x, y, 400, 200), result);
     }
@@ -79,7 +78,7 @@ public sealed class RegionSelectionGeometryTests
         int x, int y, int width, int height)
     {
         var result = RegionSelectionGeometry.Drag(new ScreenRect(100, 80, 400, 200),
-            Enum.Parse<RegionDragMode>(mode), new Vector(dx, dy), 800, 450);
+            Enum.Parse<RegionDragMode>(mode), dx, dy, 800, 450);
 
         Assert.Equal(new ScreenRect(x, y, width, height), result);
     }
@@ -88,7 +87,7 @@ public sealed class RegionSelectionGeometryTests
     public void A_saved_region_clamped_near_the_window_edge_can_still_be_resized()
     {
         var result = RegionSelectionGeometry.Drag(new ScreenRect(780, 430, 20, 10),
-            RegionDragMode.BottomRight, new Vector(100, 100), 800, 450);
+            RegionDragMode.BottomRight, 100, 100, 800, 450);
 
         Assert.Equal(new ScreenRect(780, 430, 20, 20), result);
     }
