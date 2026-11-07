@@ -136,7 +136,7 @@ public sealed class AgentSettingsViewModelTests
         public Task<LlmDetectionResult> CheckAsync(LlmConfiguration configuration, CancellationToken cancellationToken = default)
             => DetectAsync(configuration, cancellationToken);
         public Task<LlmDetectionResult> DetectAsync(LlmConfiguration candidate, CancellationToken cancellationToken = default)
-            => Task.FromResult(new LlmDetectionResult(null, "authentication_failed", "HTTP 401: credential test-secret was rejected."));
+            => Task.FromResult(new LlmDetectionResult(null, AgentResultCode.AuthenticationFailed, "HTTP 401: credential test-secret was rejected."));
     }
 
     private sealed class PendingDetector : ILlmConnectionDetector

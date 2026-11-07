@@ -30,15 +30,15 @@ public sealed class LlmConfigurationService(ISettingsService settings, ILlmConne
             return invalid;
         var result = await detector.CheckAsync(current, cancellationToken).ConfigureAwait(false);
         if (cancellationToken.IsCancellationRequested)
-            return AgentApiResult.Failure("cancelled", 130);
+            return AgentApiResult.Failure(AgentResultCode.Cancelled, 130);
         if (!result.Succeeded)
         {
-            if (result.Code != "cancelled" && before[VerificationKey] is not null)
+            if (result.Code != AgentResultCode.Cancelled && before[VerificationKey] is not null)
                 settings.TryUpdate(before, new Dictionary<string, string?> { [VerificationKey] = null });
             return DetectionFailure(result, current.ApiKey);
         }
         if (!settings.TryUpdate(before, new Dictionary<string, string?> { [VerificationKey] = current.Fingerprint() }))
-            return AgentApiResult.Failure("conflict", 4);
+            return AgentApiResult.Failure(AgentResultCode.Conflict, 4);
         return new() { Configuration = GetStatus() };
     }
 
@@ -57,11 +57,11 @@ public sealed class LlmConfigurationService(ISettingsService settings, ILlmConne
         var result = await detector.DetectAsync(new(LlmProtocolIds.OpenAiResponses,
             request.Endpoint!.Trim(), request.ApiKey!.Trim(), request.Model!.Trim()), cancellationToken).ConfigureAwait(false);
         if (cancellationToken.IsCancellationRequested)
-            return AgentApiResult.Failure("cancelled", 130);
+            return AgentApiResult.Failure(AgentResultCode.Cancelled, 130);
         if (!result.Succeeded)
         {
             var current = LlmConfiguration.FromSnapshot(before);
-            if (command == "configure" && result.Code != "cancelled"
+            if (command == "configure" && result.Code != AgentResultCode.Cancelled
                 && current.Endpoint.Trim() == request.Endpoint!.Trim()
                 && current.ApiKey.Trim() == request.ApiKey!.Trim() && current.Model.Trim() == request.Model!.Trim()
                 && before[VerificationKey] is not null)
@@ -74,10 +74,10 @@ public sealed class LlmConfigurationService(ISettingsService settings, ILlmConne
 
         progress?.Report("saving");
         if (cancellationToken.IsCancellationRequested)
-            return AgentApiResult.Failure("cancelled", 130);
+            return AgentApiResult.Failure(AgentResultCode.Cancelled, 130);
         var changes = new Dictionary<string, string?>(verified.ToSnapshot()) { [VerificationKey] = verified.Fingerprint() };
         if (!settings.TryUpdate(before, changes))
-            return AgentApiResult.Failure("conflict", 4);
+            return AgentApiResult.Failure(AgentResultCode.Conflict, 4);
         return new() { Applied = true, Configuration = GetStatus() };
     }
 
@@ -86,7 +86,7 @@ public sealed class LlmConfigurationService(ISettingsService settings, ILlmConne
         apiKey = apiKey.Trim();
         var detail = result.ErrorDetail?.Replace(apiKey, "[REDACTED]", StringComparison.Ordinal)
             .Replace(Uri.EscapeDataString(apiKey), "[REDACTED]", StringComparison.Ordinal);
-        return AgentApiResult.Failure(result.Code, result.Code == "cancelled" ? 130 : 3) with { ErrorDetail = detail };
+        return AgentApiResult.Failure(result.Code, result.Code == AgentResultCode.Cancelled ? 130 : 3) with { ErrorDetail = detail };
     }
 
     private async Task<AgentApiResult> DiscoverModelsAsync(AgentApiRequest request, CancellationToken cancellationToken)
@@ -103,12 +103,12 @@ public sealed class LlmConfigurationService(ISettingsService settings, ILlmConne
         }
         return AgentApiResult.Failure(last?.Failure switch
         {
-            LlmModelCatalogFailure.Authentication => "authentication_failed",
-            LlmModelCatalogFailure.Timeout => "timeout",
-            LlmModelCatalogFailure.Cancelled => "cancelled",
-            LlmModelCatalogFailure.Empty => "no_models",
-            LlmModelCatalogFailure.NotFound or LlmModelCatalogFailure.Unsupported => "catalog_unavailable",
-            _ => "transport_error",
+            LlmModelCatalogFailure.Authentication => AgentResultCode.AuthenticationFailed,
+            LlmModelCatalogFailure.Timeout => AgentResultCode.Timeout,
+            LlmModelCatalogFailure.Cancelled => AgentResultCode.Cancelled,
+            LlmModelCatalogFailure.Empty => AgentResultCode.NoModels,
+            LlmModelCatalogFailure.NotFound or LlmModelCatalogFailure.Unsupported => AgentResultCode.CatalogUnavailable,
+            _ => AgentResultCode.TransportError,
         }, last?.Failure == LlmModelCatalogFailure.Cancelled ? 130 : 3);
     }
 

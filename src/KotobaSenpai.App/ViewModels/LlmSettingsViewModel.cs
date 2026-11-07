@@ -30,7 +30,8 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
     private string? _promptCopyStatusKey;
     private CancellationTokenSource? _configurationCancellation;
     private int _configurationRevision;
-    private string? _validationErrorCode;
+    private AgentResultCode? _validationErrorCode;
+    private string? _validationErrorKey;
     private string? _validationErrorDetail;
 
     public LlmSettingsViewModel(ISettingsService settings, ILlmModelCatalog catalog, IStringLocalizer localizer,
@@ -159,10 +160,10 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
             var result = await _configuration.CheckCurrentAsync(linked.Token);
             if (_disposed || revision != _configurationRevision)
                 return;
-            SetConfigurationStatus(result.Code == "cancelled" ? ResourceKeys.Llm_FetchCancelled : null);
-            if (result.Code == "ok")
+            SetConfigurationStatus(result.Code == AgentResultCode.Cancelled ? ResourceKeys.Llm_FetchCancelled : null);
+            if (result.Code == AgentResultCode.Ok)
                 SetValidation(true);
-            else if (result.Code != "cancelled")
+            else if (result.Code != AgentResultCode.Cancelled)
                 SetValidation(false, result.Code, result.ErrorDetail);
         }
         catch (OperationCanceledException)
@@ -175,7 +176,7 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
             if (!_disposed && revision == _configurationRevision)
             {
                 SetConfigurationStatus(null);
-                SetValidation(false, "check_failed");
+                SetLocalValidationFailure("Agent_CheckFailed");
             }
         }
         finally
@@ -201,37 +202,52 @@ public sealed partial class LlmSettingsViewModel : ObservableObject, IDisposable
         IsPromptCopied = copied;
     }
 
-    private void SetValidation(bool? usable, string? errorCode = null, string? detail = null)
+    private void SetValidation(bool? usable, AgentResultCode? errorCode = null, string? detail = null)
     {
         IsConfigurationUsable = usable == true;
         IsConfigurationUnavailable = usable == false;
         _validationErrorCode = errorCode;
+        _validationErrorKey = null;
         _validationErrorDetail = detail;
         RefreshValidationError();
     }
 
+    /// <summary>Failure raised by the page itself rather than by the shared use case, so it carries a resource key.</summary>
+    private void SetLocalValidationFailure(string resourceKey)
+    {
+        IsConfigurationUsable = false;
+        IsConfigurationUnavailable = true;
+        _validationErrorCode = null;
+        _validationErrorKey = resourceKey;
+        _validationErrorDetail = null;
+        RefreshValidationError();
+    }
+
+    /// <summary>Maps a Core result code to its localized explanation; this mapping belongs to the presentation layer.</summary>
+    private static string KeyFor(AgentResultCode code) => code switch
+    {
+        AgentResultCode.MissingApiKey => ResourceKeys.Llm_ApiKeyRequired,
+        AgentResultCode.MissingEndpoint or AgentResultCode.InvalidEndpoint => ResourceKeys.Llm_EndpointRequired,
+        AgentResultCode.MissingModel => "Agent_ModelRequired",
+        AgentResultCode.AuthenticationFailed => ResourceKeys.Llm_AuthenticationFailed,
+        AgentResultCode.Timeout => ResourceKeys.Llm_Timeout,
+        AgentResultCode.TransportError => "Agent_ConnectionFailed",
+        AgentResultCode.RateLimited => "Agent_RateLimited",
+        AgentResultCode.ProviderUnavailable => "Agent_ProviderUnavailable",
+        AgentResultCode.Conflict => "Agent_Conflict",
+        _ => "Agent_ValidationFailed",
+    };
+
     private void RefreshValidationError()
     {
-        if (_validationErrorCode is not { } code)
+        if (_validationErrorCode is null && _validationErrorKey is null)
         {
             ConfigurationErrorDetails = string.Empty;
             return;
         }
-        var key = code switch
-        {
-            "missing_api_key" => ResourceKeys.Llm_ApiKeyRequired,
-            "missing_endpoint" or "invalid_endpoint" => ResourceKeys.Llm_EndpointRequired,
-            "missing_model" => "Agent_ModelRequired",
-            "authentication_failed" => ResourceKeys.Llm_AuthenticationFailed,
-            "timeout" => ResourceKeys.Llm_Timeout,
-            "transport_error" => "Agent_ConnectionFailed",
-            "rate_limited" => "Agent_RateLimited",
-            "provider_unavailable" => "Agent_ProviderUnavailable",
-            "conflict" => "Agent_Conflict",
-            "check_failed" => "Agent_CheckFailed",
-            _ => "Agent_ValidationFailed",
-        };
-        var text = $"{_localizer.Get(key)} [{code}]";
+        var key = _validationErrorKey ?? KeyFor(_validationErrorCode!.Value);
+        var wire = _validationErrorCode is { } mapped ? mapped.ToWire() : "check_failed";
+        var text = $"{_localizer.Get(key)} [{wire}]";
         if (!string.IsNullOrWhiteSpace(_validationErrorDetail))
             text += Environment.NewLine + _validationErrorDetail;
         ConfigurationErrorDetails = string.IsNullOrEmpty(ApiKey) ? text

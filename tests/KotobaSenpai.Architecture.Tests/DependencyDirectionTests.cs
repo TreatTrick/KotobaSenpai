@@ -375,6 +375,18 @@ public sealed class DependencyDirectionTests
         Assert.NotSame(presentationAssembly, implementation.Assembly);
     }
 
+    /// <summary>
+    /// Agent-facing results carry a typed outcome. The CLI wire form is produced by a converter, so the
+    /// shared contract must not fall back to comparing protocol strings inside orchestration or pages.
+    /// </summary>
+    [Fact]
+    public void Agent_contract_codes_are_typed()
+    {
+        Assert.Equal(typeof(KotobaSenpai.Core.Llm.AgentResultCode),
+            typeof(KotobaSenpai.Core.Llm.AgentApiResult).GetProperty(nameof(KotobaSenpai.Core.Llm.AgentApiResult.Code))!.PropertyType);
+        Assert.Equal(typeof(KotobaSenpai.Core.Llm.AgentResultCode),
+            typeof(KotobaSenpai.Core.Llm.LlmDetectionResult).GetProperty(nameof(KotobaSenpai.Core.Llm.LlmDetectionResult.Code))!.PropertyType);
+    }
     private static string FormatFailure(string rule, TestResult result) =>
         result.IsSuccessful
             ? rule

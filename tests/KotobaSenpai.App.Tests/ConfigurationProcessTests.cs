@@ -94,7 +94,7 @@ public sealed class ConfigurationProcessTests : IDisposable
         using var gui = await StartGuiAsync();
         var result = await Runner.ExecuteAsync("configure", Request with { ApiKey = null },
             token => ExecuteConfigurationAsync("configure", token));
-        Assert.Equal("missing_api_key", result.Code);
+        Assert.Equal(AgentResultCode.MissingApiKey, result.Code);
         Assert.False(gui.HasExited);
         Assert.False(File.Exists(Path.Combine(_directory, "operation-ready")));
     }
@@ -178,7 +178,7 @@ public sealed class ConfigurationProcessTests : IDisposable
         if (mode == "unexpected_failure")
             throw new InvalidOperationException("The test callback failed unexpectedly.");
         if (mode == "provider_failure")
-            return AgentApiResult.Failure("invalid_analysis");
+            return AgentApiResult.Failure(AgentResultCode.InvalidAnalysis);
         var writes = command == "configure";
         if (writes)
             File.WriteAllText(Path.Combine(_directory, "applied"), command);

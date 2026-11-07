@@ -16,7 +16,7 @@ public sealed class ConfigurationProcessRunner(string appPath, string? ownership
         if (AgentApiContract.Validate(command, request) is { } invalid)
             return invalid;
         if (cancellationToken.IsCancellationRequested)
-            return AgentApiResult.Failure("cancelled", 130);
+            return AgentApiResult.Failure(AgentResultCode.Cancelled, 130);
         var writes = command == "configure";
         var restoreGui = false;
         AgentApiResult? result = null;
@@ -31,13 +31,13 @@ public sealed class ConfigurationProcessRunner(string appPath, string? ownership
                     {
                         if (!process.CloseMainWindow())
                         {
-                            result = AgentApiResult.Failure("app_busy", 4);
+                            result = AgentApiResult.Failure(AgentResultCode.AppBusy, 4);
                             break;
                         }
                         try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10)); }
                         catch (TimeoutException)
                         {
-                            result = AgentApiResult.Failure("app_busy", 4);
+                            result = AgentApiResult.Failure(AgentResultCode.AppBusy, 4);
                             break;
                         }
                         restoreGui = true;
@@ -53,7 +53,7 @@ public sealed class ConfigurationProcessRunner(string appPath, string? ownership
                     result = await Task.Factory.StartNew(() =>
                     {
                         using var lease = ConfigurationProcessLock.TryAcquire(ownershipLockName);
-                        return lease is null ? AgentApiResult.Failure("app_busy", 4)
+                        return lease is null ? AgentApiResult.Failure(AgentResultCode.AppBusy, 4)
                             : ExecuteSafelyAsync(execute, cancellationToken, writes: true).GetAwaiter().GetResult();
                     }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
                 }
@@ -63,7 +63,7 @@ public sealed class ConfigurationProcessRunner(string appPath, string? ownership
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            result = AgentApiResult.Failure("gui_lifecycle_failed", 5);
+            result = AgentApiResult.Failure(AgentResultCode.GuiLifecycleFailed, 5);
         }
         if (restoreGui)
         {
@@ -87,12 +87,12 @@ public sealed class ConfigurationProcessRunner(string appPath, string? ownership
             cancellationToken.ThrowIfCancellationRequested();
             return await execute(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) { return AgentApiResult.Failure("cancelled", 130); }
+        catch (OperationCanceledException) { return AgentApiResult.Failure(AgentResultCode.Cancelled, 130); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { return AgentApiResult.Failure("storage_failed", 5); }
+        { return AgentApiResult.Failure(AgentResultCode.StorageFailed, 5); }
         catch (Exception)
         {
-            return AgentApiResult.Failure("configuration_failed", 5) with
+            return AgentApiResult.Failure(AgentResultCode.ConfigurationFailed, 5) with
             {
                 Applied = writes ? null : false,
                 NextAction = "Query status before retrying.",

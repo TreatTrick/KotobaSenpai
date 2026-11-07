@@ -21,7 +21,7 @@ public sealed record AgentApiResult
     public int SchemaVersion { get; init; } = 1;
     public Guid OperationId { get; init; } = Guid.NewGuid();
     public string Status { get; init; } = "success";
-    public string Code { get; init; } = "ok";
+    public AgentResultCode Code { get; init; } = AgentResultCode.Ok;
     public int ExitCode { get; init; }
     public IReadOnlyList<string> MissingFields { get; init; } = [];
     public IReadOnlyList<LlmModelInfo> Models { get; init; } = [];
@@ -31,7 +31,7 @@ public sealed record AgentApiResult
     public string? NextAction { get; init; }
     public string? ErrorDetail { get; init; }
 
-    public static AgentApiResult Failure(string code, int exitCode = 3, params string[] missingFields) => new()
+    public static AgentApiResult Failure(AgentResultCode code, int exitCode = 3, params string[] missingFields) => new()
     {
         Code = code, ExitCode = exitCode, MissingFields = missingFields,
         Status = exitCode == 2 ? "input_required" : exitCode == 130 ? "cancelled" : "failed",
@@ -48,26 +48,26 @@ public static class AgentApiContract
     public static AgentApiResult? Validate(string command, AgentApiRequest request)
     {
         if (request.SchemaVersion != SchemaVersion)
-            return AgentApiResult.Failure("unsupported_schema_version", 2, "schemaVersion");
+            return AgentApiResult.Failure(AgentResultCode.UnsupportedSchemaVersion, 2, "schemaVersion");
         if (command is "status" or "capabilities")
             return null;
         if (command is not ("models" or "detect" or "configure"))
-            return AgentApiResult.Failure("unknown_command", 2);
+            return AgentApiResult.Failure(AgentResultCode.UnknownCommand, 2);
         if (string.IsNullOrWhiteSpace(request.ApiKey) || request.ApiKey.Trim().ToUpperInvariant() is
             "YOUR_API_KEY" or "<API_KEY>" or "<YOUR_API_KEY>" or "REPLACE_ME" or "〈填写密钥〉")
-            return AgentApiResult.Failure("missing_api_key", 2, "apiKey");
+            return AgentApiResult.Failure(AgentResultCode.MissingApiKey, 2, "apiKey");
         if (string.IsNullOrWhiteSpace(request.Endpoint))
-            return AgentApiResult.Failure("missing_endpoint", 2, "endpoint");
+            return AgentApiResult.Failure(AgentResultCode.MissingEndpoint, 2, "endpoint");
         if (!Uri.TryCreate(request.Endpoint, UriKind.Absolute, out var uri)
             || uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Fragment))
-            return AgentApiResult.Failure("invalid_endpoint", 2, "endpoint");
+            return AgentApiResult.Failure(AgentResultCode.InvalidEndpoint, 2, "endpoint");
         if (command != "models" && string.IsNullOrWhiteSpace(request.Model))
-            return AgentApiResult.Failure("missing_model", 2, "model");
+            return AgentApiResult.Failure(AgentResultCode.MissingModel, 2, "model");
         return null;
     }
 }
 
-public sealed record LlmDetectionResult(LlmConfiguration? Configuration, string Code = "ok", string? ErrorDetail = null)
+public sealed record LlmDetectionResult(LlmConfiguration? Configuration, AgentResultCode Code = AgentResultCode.Ok, string? ErrorDetail = null)
 {
     public bool Succeeded => Configuration is not null;
 }

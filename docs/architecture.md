@@ -37,6 +37,7 @@ The edges show compile-time project references, except for `Core application wor
 | Platform.Windows references Core and implements its ports. | Win32 window tracking, capture, shortcuts, settings, and provider adapters live in `KotobaSenpai.Platform.Windows`. | Dependency inversion: adapters point to contracts owned by policy. |
 | WPF surfaces live in Presentation.Wpf; App is the composition root. | Views and reusable windows are presentation concerns. App wires those surfaces, Core workflows, and Windows adapters through constructor injection. | Separation of concerns and explicit composition keep framework setup at the system edge. |
 | Native imports are confined to Platform.Windows. | P/Invoke and Win32 calls live beside the Windows adapter code; presentation code uses the adapter seam and WPF's own HWND bridge. | Keep operating-system details behind an infrastructure boundary and prevent native imports from spreading into UI code. |
+| Agent-facing results carry a typed outcome. | `AgentApiResult.Code` and `LlmDetectionResult.Code` are `AgentResultCode` in Core; the snake_case wire value is produced by a Platform converter and the localized explanation is mapped in App. | Typed contracts: orchestration and pages compare outcomes, not protocol strings, while the serialized contract stays a stable, versioned format. |
 
 ## Threading And Interop
 

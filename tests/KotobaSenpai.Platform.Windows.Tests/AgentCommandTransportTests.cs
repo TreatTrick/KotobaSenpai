@@ -29,7 +29,7 @@ public sealed class AgentCommandTransportTests
     public async Task Malformed_input_returns_a_safe_error_without_echoing_the_payload()
     {
         var result = await AgentCommandProtocol.ReadAsync(new StringReader("""{"schemaVersion":1,"apiKey":"secret","model":123}"""), "configure", default);
-        Assert.Equal("invalid_json", result.Error!.Code);
+        Assert.Equal(AgentResultCode.InvalidJson, result.Error!.Code);
         Assert.DoesNotContain("secret", AgentCommandProtocol.Serialize(result.Error));
     }
 

@@ -33,7 +33,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
 
         var result = await service.CheckCurrentAsync();
 
-        Assert.Equal("ok", result.Code);
+        Assert.Equal(AgentResultCode.Ok, result.Code);
         Assert.False(result.Applied);
         Assert.True(result.Configuration!.Verified);
         Assert.Equal(protocol, Assert.Single(handler.Calls).Protocol);
@@ -41,7 +41,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
 
         var differentProtocol = protocol == LlmProtocolIds.OpenAiResponses ? LlmProtocolIds.OpenAiChat : LlmProtocolIds.OpenAiResponses;
         var incompatible = new ProviderHandler(differentProtocol);
-        Assert.Equal("authentication_failed", (await Create(settings, incompatible).CheckCurrentAsync()).Code);
+        Assert.Equal(AgentResultCode.AuthenticationFailed, (await Create(settings, incompatible).CheckCurrentAsync()).Code);
         Assert.Equal(protocol, Assert.Single(incompatible.Calls).Protocol);
         Assert.False(service.GetStatus().Verified);
         Assert.Equal(before.OrderBy(entry => entry.Key), settings.GetSnapshot(LlmConfiguration.Keys).OrderBy(entry => entry.Key));
@@ -55,7 +55,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
             Request.Endpoint!, Request.ApiKey!, Request.Model!).ToSnapshot());
         var service = Create(settings, new ProviderHandler(onRequest: () => settings.SetValue(LlmSettingsKeys.Model, "edited-model")));
         var result = await service.CheckCurrentAsync();
-        Assert.Equal("conflict", result.Code);
+        Assert.Equal(AgentResultCode.Conflict, result.Code);
         Assert.False(result.Applied);
         Assert.False(service.GetStatus().Verified);
         Assert.Equal("edited-model", settings.GetValue(LlmSettingsKeys.Model));
@@ -93,7 +93,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
 
         var failure = await Create(settings, new ProviderHandler(status: HttpStatusCode.ServiceUnavailable))
             .ExecuteAsync("configure", Request with { Endpoint = configuration.Endpoint });
-        Assert.Equal("provider_unavailable", failure.Code);
+        Assert.Equal(AgentResultCode.ProviderUnavailable, failure.Code);
         Assert.Equal(unverified, service.GetStatus());
     }
 
@@ -107,7 +107,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
 
         var result = await Create(settings, handler).ExecuteAsync("undo", new() { SchemaVersion = 1 });
 
-        Assert.Equal("unknown_command", result.Code);
+        Assert.Equal(AgentResultCode.UnknownCommand, result.Code);
         Assert.Equal(2, result.ExitCode);
         Assert.Empty(handler.Calls);
         Assert.Equal(before, File.ReadAllText(FilePath));
@@ -122,7 +122,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
         var settings = new SettingsService(FilePath);
         var handler = new ProviderHandler();
         var result = await Create(settings, handler).ExecuteAsync("configure", Request with { ApiKey = key });
-        Assert.Equal("missing_api_key", result.Code);
+        Assert.Equal(AgentResultCode.MissingApiKey, result.Code);
         Assert.Empty(handler.Calls);
         Assert.False(File.Exists(FilePath));
     }
@@ -162,7 +162,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
         var settings = new SettingsService(FilePath);
         var handler = new ProviderHandler(protocol);
         var result = await Create(settings, handler).ExecuteAsync("detect", Request);
-        Assert.Equal("ok", result.Code);
+        Assert.Equal(AgentResultCode.Ok, result.Code);
         Assert.True(result.Configuration!.Verified);
         Assert.False(result.Applied);
         Assert.False(File.Exists(FilePath));
@@ -184,7 +184,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
         settings.SetValue(LlmSettingsKeys.Model, "old-model");
         var before = File.ReadAllText(FilePath);
         var result = await Create(settings, new ProviderHandler(empty: true, allProtocols: true)).ExecuteAsync("configure", Request);
-        Assert.Equal("invalid_analysis", result.Code);
+        Assert.Equal(AgentResultCode.InvalidAnalysis, result.Code);
         Assert.False(result.Applied);
         Assert.Equal(before, File.ReadAllText(FilePath));
     }
@@ -219,7 +219,7 @@ public sealed class AgentApiConfigurationTests : IDisposable
         var registry = new LlmProtocolRegistry();
         var service = new LlmConfigurationService(settings, new LlmConnectionDetector(new(settings, http), registry), new HttpLlmModelCatalog(http, registry));
         var result = await service.ExecuteAsync("models", Request with { Model = null });
-        Assert.Equal("ok", result.Code);
+        Assert.Equal(AgentResultCode.Ok, result.Code);
         Assert.Equal(2, result.Models.Count);
         Assert.Equal(2, calls.Count);
         Assert.All(calls, message => Assert.Equal(HttpMethod.Get, message.Method));
@@ -259,15 +259,15 @@ public sealed class AgentApiConfigurationTests : IDisposable
     {
         var settings = new SettingsService(FilePath);
         var service = Create(settings, new ProviderHandler(onRequest: () => settings.SetValue(LlmSettingsKeys.Model, "manual")));
-        Assert.Equal("conflict", (await service.ExecuteAsync("configure", Request)).Code);
+        Assert.Equal(AgentResultCode.Conflict, (await service.ExecuteAsync("configure", Request)).Code);
         Assert.Equal("manual", settings.GetValue(LlmSettingsKeys.Model));
     }
 
     [Theory]
-    [InlineData(429, "rate_limited")]
-    [InlineData(503, "provider_unavailable")]
-    [InlineData(302, "redirect_rejected")]
-    public async Task Temporary_errors_stop_without_trying_more_protocols(int status, string code)
+    [InlineData(429, AgentResultCode.RateLimited)]
+    [InlineData(503, AgentResultCode.ProviderUnavailable)]
+    [InlineData(302, AgentResultCode.RedirectRejected)]
+    public async Task Temporary_errors_stop_without_trying_more_protocols(int status, AgentResultCode code)
     {
         var handler = new ProviderHandler(status: (HttpStatusCode)status);
         var result = await Create(new SettingsService(FilePath), handler).ExecuteAsync("configure", Request);

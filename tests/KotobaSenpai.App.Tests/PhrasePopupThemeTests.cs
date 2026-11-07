@@ -355,7 +355,7 @@ public sealed partial class PhrasePopupThemeTests
                     Assert.True(ring.IsVisible);
                     Assert.True(ring.IsIndeterminate);
                     Assert.False(check.IsEnabled);
-                    detector.Pending.SetResult(new(null, "cancelled"));
+                    detector.Pending.SetResult(new(null, AgentResultCode.Cancelled));
                     var completed = new DispatcherFrame();
                     var completionTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
                     var deadline = DateTime.UtcNow.AddSeconds(5);
@@ -783,7 +783,7 @@ public sealed partial class PhrasePopupThemeTests
         public TaskCompletionSource<LlmDetectionResult>? Pending { get; set; }
         public Task<LlmDetectionResult> DetectAsync(LlmConfiguration candidate, CancellationToken cancellationToken = default)
             => Pending?.Task ?? Task.FromResult(Fail
-                ? new LlmDetectionResult(null, "authentication_failed", "HTTP 401: the provider rejected preview-test-key.")
+                ? new LlmDetectionResult(null, AgentResultCode.AuthenticationFailed, "HTTP 401: the provider rejected preview-test-key.")
                 : new LlmDetectionResult(candidate));
     }
 }

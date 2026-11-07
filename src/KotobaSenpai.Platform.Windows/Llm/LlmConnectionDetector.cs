@@ -19,7 +19,7 @@ public sealed class LlmConnectionDetector(LlmPhraseAnalyzer analyzer, LlmProtoco
     public async Task<LlmDetectionResult> DetectAsync(LlmConfiguration candidate, CancellationToken cancellationToken = default)
     {
         var request = CreateSample(sentenceTranslation?.Enabled ?? true);
-        var last = new LlmDetectionResult(null, "unsupported_protocol");
+        var last = new LlmDetectionResult(null, AgentResultCode.UnsupportedProtocol);
         foreach (var protocolId in AgentApiContract.ProtocolOrder)
         {
             var protocol = registry.Resolve(protocolId);
@@ -27,11 +27,11 @@ public sealed class LlmConnectionDetector(LlmPhraseAnalyzer analyzer, LlmProtoco
             foreach (var address in LlmEndpointHelper.AnalysisCandidates(endpoint, protocol.Path))
             {
                 if (cancellationToken.IsCancellationRequested)
-                    return new(null, "cancelled");
+                    return new(null, AgentResultCode.Cancelled);
                 var configuration = candidate with { Protocol = protocolId, Endpoint = address.AbsoluteUri };
                 var result = await analyzer.AnalyzeAsync(request, configuration, cancellationToken, singleEndpoint: true).ConfigureAwait(false);
                 last = Validate(request, configuration, result);
-                if (last.Succeeded || last.Code is "cancelled" or "timeout" or "transport_error" or "rate_limited" or "provider_unavailable" or "redirect_rejected")
+                if (last.Succeeded || last.Code is AgentResultCode.Cancelled or AgentResultCode.Timeout or AgentResultCode.TransportError or AgentResultCode.RateLimited or AgentResultCode.ProviderUnavailable or AgentResultCode.RedirectRejected)
                     return last;
             }
         }
@@ -45,21 +45,21 @@ public sealed class LlmConnectionDetector(LlmPhraseAnalyzer analyzer, LlmProtoco
             var words = WordMeaningValidator.ValidateAndBuild(result.Words, request.LocalSpans);
             var groups = PhraseGroupValidator.ValidateAndBuild(result.Groups, request.Tokens.ToDictionary(token => token.Id));
             return words.ValidWords.Count > 0 || groups.ValidGroups.Count > 0 ? new(configuration)
-                : new(null, "invalid_analysis", "The response contained no valid word meanings or phrase groups.");
+                : new(null, AgentResultCode.InvalidAnalysis, "The response contained no valid word meanings or phrase groups.");
         }
         var code = result.Outcome switch
         {
-            PhraseAnalysisOutcome.Cancelled => "cancelled",
-            PhraseAnalysisOutcome.Timeout => "timeout",
-            PhraseAnalysisOutcome.TransportError => "transport_error",
-            PhraseAnalysisOutcome.MalformedJson or PhraseAnalysisOutcome.InvalidResponse => "invalid_analysis",
+            PhraseAnalysisOutcome.Cancelled => AgentResultCode.Cancelled,
+            PhraseAnalysisOutcome.Timeout => AgentResultCode.Timeout,
+            PhraseAnalysisOutcome.TransportError => AgentResultCode.TransportError,
+            PhraseAnalysisOutcome.MalformedJson or PhraseAnalysisOutcome.InvalidResponse => AgentResultCode.InvalidAnalysis,
             _ => result.ProviderStatusCode switch
             {
-                401 or 403 => "authentication_failed",
-                429 => "rate_limited",
-                >= 500 => "provider_unavailable",
-                >= 300 and < 400 => "redirect_rejected",
-                _ => "incompatible_protocol",
+                401 or 403 => AgentResultCode.AuthenticationFailed,
+                429 => AgentResultCode.RateLimited,
+                >= 500 => AgentResultCode.ProviderUnavailable,
+                >= 300 and < 400 => AgentResultCode.RedirectRejected,
+                _ => AgentResultCode.IncompatibleProtocol,
             },
         };
         return new(null, code, $"{configuration.Protocol}: {configuration.Endpoint}. {result.Warning ?? result.Outcome.ToString()}");

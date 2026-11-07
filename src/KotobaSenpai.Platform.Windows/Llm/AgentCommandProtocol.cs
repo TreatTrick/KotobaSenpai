@@ -9,8 +9,16 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// <summary>Bounded JSON input, capability discovery and safe output for the CLI.</summary>
 public static class AgentCommandProtocol
 {
-    public static JsonSerializerOptions JsonOptions { get; } = new(JsonSerializerDefaults.Web) { MaxDepth = 16 };
+    public static JsonSerializerOptions JsonOptions { get; } = CreateJsonOptions();
     public const int MaximumInputCharacters = 64 * 1024;
+
+    private static JsonSerializerOptions CreateJsonOptions()
+    {
+        // The agent CLI contract keeps snake_case code strings; the enum is an implementation detail.
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { MaxDepth = 16 };
+        options.Converters.Add(new AgentResultCodeJsonConverter());
+        return options;
+    }
 
     public static async Task<(AgentApiRequest? Request, AgentApiResult? Error)> ReadAsync(
         TextReader reader, string command, CancellationToken cancellationToken)
@@ -24,15 +32,15 @@ public static class AgentCommandProtocol
             {
                 text.Append(buffer, 0, count);
                 if (text.Length > MaximumInputCharacters)
-                    return (null, AgentApiResult.Failure("input_too_large", 2));
+                    return (null, AgentApiResult.Failure(AgentResultCode.InputTooLarge, 2));
             }
             var request = JsonSerializer.Deserialize<AgentApiRequest>(text.ToString(), JsonOptions);
-            return request is null ? (null, AgentApiResult.Failure("invalid_json", 2))
+            return request is null ? (null, AgentApiResult.Failure(AgentResultCode.InvalidJson, 2))
                 : (request, AgentApiContract.Validate(command, request));
         }
-        catch (JsonException) { return (null, AgentApiResult.Failure("invalid_json", 2)); }
-        catch (OperationCanceledException) { return (null, AgentApiResult.Failure("input_cancelled", 130)); }
-        catch (IOException) { return (null, AgentApiResult.Failure("input_failed", 5)); }
+        catch (JsonException) { return (null, AgentApiResult.Failure(AgentResultCode.InvalidJson, 2)); }
+        catch (OperationCanceledException) { return (null, AgentApiResult.Failure(AgentResultCode.InputCancelled, 130)); }
+        catch (IOException) { return (null, AgentApiResult.Failure(AgentResultCode.InputFailed, 5)); }
     }
 
     public static string Serialize(object result, string? secret = null)
@@ -58,7 +66,7 @@ public static class AgentCommandProtocol
 
     public static object Capabilities(string installationDirectory, IReadOnlyList<string> protocols) => new
     {
-        schemaVersion = AgentApiContract.SchemaVersion, status = "success", code = "ok", exitCode = 0,
+        schemaVersion = AgentApiContract.SchemaVersion, status = "success", code = AgentResultCode.Ok.ToWire(), exitCode = 0,
         operationId = Guid.NewGuid(),
         installationDirectory, protocols,
         commands = new[]

@@ -25,7 +25,7 @@ public static class Program
             _ => "",
         };
         if (command.Length == 0)
-            return Write(AgentApiResult.Failure("invalid_command", 2) with { NextAction = "Run capabilities --json or --help." });
+            return Write(AgentApiResult.Failure(AgentResultCode.InvalidCommand, 2) with { NextAction = "Run capabilities --json or --help." });
         if (command == "capabilities")
         {
             Console.WriteLine(AgentCommandProtocol.Serialize(AgentCommandProtocol.Capabilities(
@@ -41,7 +41,7 @@ public static class Program
             inputTimeout.CancelAfter(TimeSpan.FromSeconds(30));
             var parsed = await AgentCommandProtocol.ReadAsync(Console.In, command, inputTimeout.Token);
             if (parsed.Error is not null || parsed.Request is null)
-                return Write(parsed.Error ?? AgentApiResult.Failure("invalid_json", 2));
+                return Write(parsed.Error ?? AgentApiResult.Failure(AgentResultCode.InvalidJson, 2));
             request = parsed.Request;
         }
         try
@@ -53,7 +53,7 @@ public static class Program
         }
         catch (Exception)
         {
-            return Write(AgentApiResult.Failure("cli_failed", 5) with { Applied = null, NextAction = "Query status before retrying." });
+            return Write(AgentApiResult.Failure(AgentResultCode.CliFailed, 5) with { Applied = null, NextAction = "Query status before retrying." });
         }
     }
 
