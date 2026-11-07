@@ -72,7 +72,6 @@ public sealed partial class PhrasePopupThemeTests
         shell.Show();
         try
         {
-            var foreground = ShortcutNative.GetForegroundWindow();
             foreach (var action in Enum.GetValues<ReadingAction>())
             {
                 Assert.NotNull(shortcuts.GetBinding(action).RegistrationId);
@@ -80,7 +79,7 @@ public sealed partial class PhrasePopupThemeTests
             }
             Assert.Equal(Enum.GetValues<ReadingAction>(), actions.Executed);
             Assert.Equal(WindowState.Minimized, shell.WindowState);
-            Assert.Equal(foreground, ShortcutNative.GetForegroundWindow());
+            ShortcutNative.AssertNoFocusStealing(new WindowInteropHelper(shell).Handle);
 
             var previous = actions.Executed.Count;
             PressFunctionKey(0x71, repeat: true);
@@ -227,6 +226,24 @@ public sealed partial class PhrasePopupThemeTests
     private static class ShortcutNative
     {
         [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
-        [DllImport("user32.dll")] public static extern nint GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint hWnd, out uint processId);
+
+        /// <summary>
+        /// Asserts that handling the global shortcuts did not activate any window owned by this process.
+        /// Comparing the raw foreground handle before and after the key presses is not usable here: any
+        /// unrelated desktop activity (a browser, another application, the CI agent) can legitimately change
+        /// the foreground window mid-test without the application stealing focus, which produced false
+        /// negatives on developer machines and would make the test unusable as a merge gate.
+        /// </summary>
+        internal static void AssertNoFocusStealing(nint shell)
+        {
+            var foreground = GetForegroundWindow();
+            Assert.NotEqual(shell, foreground);
+            if (foreground == 0)
+                return;
+            GetWindowThreadProcessId(foreground, out var owner);
+            Assert.NotEqual((uint)Environment.ProcessId, owner);
+        }
     }
 }

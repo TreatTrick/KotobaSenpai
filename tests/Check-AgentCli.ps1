@@ -15,10 +15,14 @@ $standaloneRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $standaloneDirectory = Join-Path $standaloneRoot ('ks-cli-' + [Guid]::NewGuid().ToString('N'))
 [void](New-Item -ItemType Directory -Path $standaloneDirectory)
 try {
-    foreach ($name in @('KotobaSenpai.Cli.exe', 'KotobaSenpai.Cli.dll', 'KotobaSenpai.Cli.deps.json',
-            'KotobaSenpai.Cli.runtimeconfig.json', 'KotobaSenpai.Core.dll', 'KotobaSenpai.Platform.Windows.dll')) {
-        Copy-Item -LiteralPath (Join-Path $PublishDirectory $name) -Destination $standaloneDirectory
-    }
+    # The CLI shares the platform infrastructure, so every managed/native dependency of the
+    # published directory is required; only the App entry point itself must be absent.
+    # Keep this list in sync with the App assembly name, not with the dependency set.
+    $appOwnedNames = @('KotobaSenpai.App.exe', 'KotobaSenpai.App.dll', 'KotobaSenpai.App.deps.json',
+        'KotobaSenpai.App.runtimeconfig.json', 'KotobaSenpai.App.pdb')
+    Get-ChildItem -LiteralPath $PublishDirectory -File |
+        Where-Object { $appOwnedNames -notcontains $_.Name -and $_.Extension -ne '.db' } |
+        Copy-Item -Destination $standaloneDirectory
     $standaloneJson = & (Join-Path $standaloneDirectory 'KotobaSenpai.Cli.exe') capabilities --json
     if ($LASTEXITCODE -ne 0 -or ($standaloneJson | ConvertFrom-Json).commands.Count -ne 5) {
         throw 'The CLI cannot discover capabilities without the App executable.'
