@@ -13,11 +13,12 @@ using KotobaSenpai.App.Views;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.TargetWindow;
-using KotobaSenpai.Platform.Windows.Guidance;
+using KotobaSenpai.Presentation.Wpf.Guidance;
 using KotobaSenpai.Platform.Windows.Overlay;
-using KotobaSenpai.Platform.Windows.Presentation;
+using KotobaSenpai.Presentation.Wpf.Resources;
 using KotobaSenpai.App.Controls;
 using Wpf.Ui.Appearance;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -36,7 +37,7 @@ internal static class GuidanceDesktopFixture
             application.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ControlsDictionary());
             foreach (var path in new[]
             {
-                "/KotobaSenpai.Platform.Windows;component/Presentation/FluentDesignTokens.xaml",
+                "/KotobaSenpai.Presentation.Wpf;component/Resources/FluentDesignTokens.xaml",
                 "/KotobaSenpai.App;component/Themes/SettingsStyles.xaml",
                 "/KotobaSenpai.App;component/Themes/FluentColorIcons.xaml",
             }) application.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(path, UriKind.Relative) });

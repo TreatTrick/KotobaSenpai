@@ -1,4 +1,4 @@
-<Window x:Class="KotobaSenpai.Platform.Windows.Overlay.PhrasePopup"
+<Window x:Class="KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
@@ -8,7 +8,7 @@
   <Window.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <ResourceDictionary Source="../Presentation/FluentDesignTokens.xaml" />
+        <ResourceDictionary Source="../Resources/FluentDesignTokens.xaml" />
         <ResourceDictionary Source="PhrasePopupPalette.xaml" />
       </ResourceDictionary.MergedDictionaries>
       <SolidColorBrush x:Key="PosUnderlineBrush" Color="#8BC9F5" />

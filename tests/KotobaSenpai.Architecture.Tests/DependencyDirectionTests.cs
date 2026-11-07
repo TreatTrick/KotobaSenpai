@@ -7,6 +7,7 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 using NetArchTest.Rules;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.Architecture.Tests;
 
@@ -24,16 +25,18 @@ namespace KotobaSenpai.Architecture.Tests;
 /// </summary>
 public sealed class DependencyDirectionTests
 {
-    /// <summary>The three assemblies under check, marked by a public type from each project so the Assembly is resolved stably.</summary>
+    /// <summary>The four assemblies under check, marked by a public type from each project so the Assembly is resolved stably.</summary>
     private static readonly Assembly[] Assemblies =
     [
-        typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly, // Core
-        typeof(KotobaSenpai.Platform.Windows.Overlay.WpfOverlayRenderer).Assembly, // Platform.Windows
-        typeof(KotobaSenpai.App.App).Assembly,                                      // App
+        typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly,       // Core
+        typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly,          // Platform.Windows
+        typeof(KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup).Assembly,               // Presentation.Wpf
+        typeof(KotobaSenpai.App.App).Assembly,                                            // App
     ];
 
     private const string CoreNamespace = @"KotobaSenpai\.Core(\..*)?$";
     private const string PlatformNamespace = @"KotobaSenpai\.Platform\.Windows(\..*)?$";
+    private const string PresentationNamespace = @"KotobaSenpai\.Presentation\.Wpf(\..*)?$";
     private const string ViewModelsNamespace = @"KotobaSenpai\.App\.ViewModels(\..*)?$";
 
     [Fact]
@@ -176,12 +179,13 @@ public sealed class DependencyDirectionTests
         Assert.True(result.IsSuccessful, FormatFailure("ViewModels must not depend on the logging implementation FileLogger (should depend on the Core port)", result));
     }
 
-    /// <summary>The Wpf.Ui assembly is referenced only by App (a view-layer dependency); Core and Platform.Windows must not reference it.</summary>
+    /// <summary>The Wpf.Ui assembly is referenced only by App (a view-layer dependency); Core, Platform.Windows and Presentation.Wpf must not reference it.</summary>
     [Fact]
     public void WpfUi_Assembly_Referenced_OnlyBy_App()
     {
         var coreAssembly = typeof(KotobaSenpai.Core.Workflow.WordOverlayApplicationService).Assembly;
-        var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Overlay.WpfOverlayRenderer).Assembly;
+        var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly;
+        var presentationAssembly = typeof(KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup).Assembly;
         var appAssembly = typeof(KotobaSenpai.App.App).Assembly;
 
         static bool isWpfUi(string? name)
@@ -191,8 +195,8 @@ public sealed class DependencyDirectionTests
         var appRefs = appAssembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
         Assert.Contains(appRefs, isWpfUi);
 
-        // Core and Platform.Windows must not reference Wpf.Ui.
-        foreach (var assembly in new[] { coreAssembly, platformAssembly })
+        // Core, Platform.Windows and Presentation.Wpf must not reference Wpf.Ui.
+        foreach (var assembly in new[] { coreAssembly, platformAssembly, presentationAssembly })
         {
             var refs = assembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
             Assert.DoesNotContain(refs, isWpfUi);
@@ -256,6 +260,107 @@ public sealed class DependencyDirectionTests
             .GetResult();
 
         Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must depend on the Core settings port", result));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Presentation boundary: WPF surfaces live in KotobaSenpai.Presentation.Wpf, never in the
+    // platform adapter. These rules exist because the adapter previously shipped PhrasePopup.xaml,
+    // GuidanceOverlay.xaml and the design tokens, and owned a contract (ITourPresentation) that only
+    // the App implemented — the dependency direction was inverted at the type level.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>Platform.Windows is an adapter: it must not know about the WPF presentation assembly.</summary>
+    [Fact]
+    public void Platform_must_not_reference_the_presentation_assembly()
+    {
+        var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly;
+        var references = platformAssembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
+        Assert.DoesNotContain("KotobaSenpai.Presentation.Wpf", references);
+    }
+
+    /// <summary>Presentation.Wpf is below the composition root; it must not depend on App.</summary>
+    [Fact]
+    public void Presentation_must_not_reference_the_app_assembly()
+    {
+        var presentationAssembly = typeof(KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup).Assembly;
+        var references = presentationAssembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
+        Assert.DoesNotContain("KotobaSenpai.App", references);
+    }
+
+    /// <summary>All WPF surfaces resolve to the presentation assembly, and the adapter exposes none.</summary>
+    [Fact]
+    public void Wpf_surfaces_reside_in_the_presentation_assembly()
+    {
+        var presentationAssembly = typeof(KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup).Assembly;
+        var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly;
+
+        foreach (var surface in new[]
+                 {
+                     typeof(KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup),
+                     typeof(KotobaSenpai.Presentation.Wpf.Overlay.WpfOverlayRenderer),
+                     typeof(KotobaSenpai.Presentation.Wpf.Overlay.RegionSelectorWindow),
+                     typeof(KotobaSenpai.Presentation.Wpf.Overlay.DesktopOverlayWindow),
+                     typeof(KotobaSenpai.Presentation.Wpf.Overlay.OverlayAnnotation),
+                     typeof(KotobaSenpai.Presentation.Wpf.Guidance.GuidanceOverlay),
+                     typeof(KotobaSenpai.Presentation.Wpf.Resources.ThemeResourceKeys),
+                 })
+        {
+            Assert.Same(presentationAssembly, surface.Assembly);
+        }
+
+        Assert.True(typeof(KotobaSenpai.Presentation.Wpf.Overlay.RegionSelectorWindow)
+            .IsSubclassOf(typeof(System.Windows.Window)));
+
+        var visualTypes = platformAssembly.GetTypes()
+            .Where(type => typeof(System.Windows.FrameworkElement).IsAssignableFrom(type)
+                || typeof(System.Windows.Window).IsAssignableFrom(type)
+                || typeof(System.Windows.Controls.Control).IsAssignableFrom(type))
+            .Select(type => type.FullName)
+            .ToArray();
+        Assert.True(visualTypes.Length == 0,
+            $"Platform.Windows must not expose WPF visual types: {string.Join(", ", visualTypes)}");
+    }
+
+    /// <summary>The adapter must not compile XAML; a page or resource dictionary there is a presentation leak.</summary>
+    [Fact]
+    public void Platform_must_not_embed_xaml_resources()
+    {
+        var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly;
+        var presentationAssembly = typeof(KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup).Assembly;
+
+        Assert.Contains(presentationAssembly.GetManifestResourceNames(),
+            name => name.EndsWith(".g.resources", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(platformAssembly.GetManifestResourceNames(),
+            name => name.EndsWith(".g.resources", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Remaining WPF usage in the adapter is threading glue only: no controls, media or shapes.</summary>
+    [Fact]
+    public void Platform_wpf_usage_is_limited_to_threading_and_interop()
+    {
+        var result = Types.InAssembly(typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly)
+            .ShouldNot().HaveDependencyOnAny("System.Windows.Controls", "System.Windows.Media",
+                "System.Windows.Shapes", "System.Windows.Data", "System.Windows.Documents")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful,
+            FormatFailure("Platform.Windows must not depend on WPF visual namespaces", result));
+    }
+
+    /// <summary>
+    /// The guided-tour contract is consumed by the presentation assembly and implemented by the
+    /// composition root, so it is owned by presentation — not by the adapter it used to live in.
+    /// </summary>
+    [Fact]
+    public void Guided_tour_contract_is_owned_by_presentation_and_implemented_by_app()
+    {
+        var presentationAssembly = typeof(KotobaSenpai.Presentation.Wpf.Overlay.PhrasePopup).Assembly;
+        var contract = typeof(KotobaSenpai.Presentation.Wpf.Guidance.ITourPresentation);
+        Assert.Same(presentationAssembly, contract.Assembly);
+
+        var implementation = typeof(KotobaSenpai.App.Guidance.Presentation.TourPresentation);
+        Assert.Contains(contract, implementation.GetInterfaces());
+        Assert.NotSame(presentationAssembly, implementation.Assembly);
     }
 
     private static string FormatFailure(string rule, TestResult result) =>

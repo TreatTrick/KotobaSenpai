@@ -3,8 +3,9 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Platform.Windows.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 /// <summary>A non-activating, native click-through desktop presentation surface.</summary>
 public class DesktopOverlayWindow : Window

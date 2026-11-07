@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.App.Controls;
 

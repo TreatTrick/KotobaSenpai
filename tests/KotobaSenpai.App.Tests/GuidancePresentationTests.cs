@@ -11,10 +11,11 @@ using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.Platform.Windows.Overlay;
-using KotobaSenpai.Platform.Windows.Guidance;
+using KotobaSenpai.Presentation.Wpf.Guidance;
 using KotobaSenpai.App.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.App.Tests;
 

@@ -5,7 +5,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Threading;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 public sealed partial class PhrasePopup
 {

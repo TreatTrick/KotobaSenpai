@@ -13,9 +13,10 @@ using System.Windows.Threading;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.Overlay;
-using KotobaSenpai.Platform.Windows.Guidance;
+using KotobaSenpai.Presentation.Wpf.Guidance;
+using KotobaSenpai.Platform.Windows.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 /// <summary>
 /// Interactive region-selection overlay: draggable L-shaped corner brackets bound a movable recognition sub-region, a

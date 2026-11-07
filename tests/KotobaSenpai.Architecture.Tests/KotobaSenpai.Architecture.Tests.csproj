@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
     <ProjectReference Include="..\..\src\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
+    <ProjectReference Include="..\..\src\KotobaSenpai.Presentation.Wpf\KotobaSenpai.Presentation.Wpf.csproj" />
     <ProjectReference Include="..\..\src\KotobaSenpai.App\KotobaSenpai.App.csproj" />
   </ItemGroup>
   <ItemGroup>

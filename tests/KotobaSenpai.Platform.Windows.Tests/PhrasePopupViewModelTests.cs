@@ -2,6 +2,7 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 

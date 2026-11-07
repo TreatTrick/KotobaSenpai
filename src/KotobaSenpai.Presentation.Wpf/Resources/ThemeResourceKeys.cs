@@ -1,4 +1,4 @@
-namespace KotobaSenpai.Platform.Windows.Presentation;
+namespace KotobaSenpai.Presentation.Wpf.Resources;
 
 /// <summary>Names of theme resources shared by Windows presentation controls.</summary>
 public static class ThemeResourceKeys

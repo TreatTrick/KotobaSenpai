@@ -7,34 +7,6 @@ using KotobaSenpai.Core.Logging;
 
 namespace KotobaSenpai.Platform.Windows.Overlay;
 
-internal static class OverlayWindowRegistry
-{
-    private static readonly object Gate = new();
-    private static readonly HashSet<nint> Handles = new();
-
-    public static void Register(nint handle)
-    {
-        if (handle == nint.Zero)
-            return;
-        lock (Gate)
-            Handles.Add(handle);
-    }
-
-    public static void Unregister(nint handle)
-    {
-        if (handle == nint.Zero)
-            return;
-        lock (Gate)
-            Handles.Remove(handle);
-    }
-
-    public static IReadOnlySet<nint> Snapshot()
-    {
-        lock (Gate)
-            return Handles.ToHashSet();
-    }
-}
-
 /// <summary>Win32 event-driven tracker for one target window.</summary>
 public sealed class WinEventTargetWindowTracker : ITargetWindowTracker
 {

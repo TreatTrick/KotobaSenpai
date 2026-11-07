@@ -13,8 +13,9 @@ using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
+using KotobaSenpai.Platform.Windows.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 /// <summary>
 /// WPF implementation of the <see cref="IOverlayRenderer"/> port: a transparent, target-relative, non-activating, click-through

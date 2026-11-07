@@ -1,7 +1,7 @@
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.App.Resources;
-using KotobaSenpai.Platform.Windows.Guidance;
+using KotobaSenpai.Presentation.Wpf.Guidance;
 
 namespace KotobaSenpai.App.Guidance.Presentation;
 

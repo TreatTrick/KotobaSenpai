@@ -7,8 +7,9 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 using System.Runtime.InteropServices;
+using KotobaSenpai.Platform.Windows.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 /// <summary>
 /// Detail popup for both phrase groups and LLM word meanings: shows the group's label/meaning/grammar (plus per-word

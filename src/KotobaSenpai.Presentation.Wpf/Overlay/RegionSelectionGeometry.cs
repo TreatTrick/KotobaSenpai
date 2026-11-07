@@ -2,7 +2,7 @@ using System.Windows;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.TargetWindow;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 [Flags]
 internal enum RegionDragMode

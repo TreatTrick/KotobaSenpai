@@ -1,7 +1,7 @@
-<Canvas x:Class="KotobaSenpai.Platform.Windows.Guidance.GuidanceOverlay"
+<Canvas x:Class="KotobaSenpai.Presentation.Wpf.Guidance.GuidanceOverlay"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:presentation="clr-namespace:KotobaSenpai.Platform.Windows.Presentation"
+        xmlns:presentation="clr-namespace:KotobaSenpai.Presentation.Wpf.Resources"
         Background="Transparent" ClipToBounds="True" Focusable="True"
         KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.ControlTabNavigation="Cycle">
   <Canvas.Resources>

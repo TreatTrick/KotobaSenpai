@@ -4,6 +4,7 @@ using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 

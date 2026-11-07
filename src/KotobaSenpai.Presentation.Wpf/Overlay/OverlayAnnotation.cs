@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using KotobaSenpai.Core.Settings;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 public enum OverlayColorRole { Furigana, High, Low, Underline, Hover, Heiban }
 

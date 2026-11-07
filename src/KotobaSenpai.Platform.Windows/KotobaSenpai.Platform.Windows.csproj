@@ -3,6 +3,13 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!--
+      WPF remains referenced for threading glue only (Dispatcher in AutoRecognitionController and
+      WinEventTargetWindowTracker, HwndSource in Win32GlobalShortcutRegistrar). Every visual surface
+      — windows, popups, overlays, design tokens — lives in KotobaSenpai.Presentation.Wpf.
+      Do not add XAML or Window/FrameworkElement types to this project: DependencyDirectionTests
+      fails the build if the adapter embeds XAML or exposes visual types.
+    -->
     <UseWPF>true</UseWPF>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

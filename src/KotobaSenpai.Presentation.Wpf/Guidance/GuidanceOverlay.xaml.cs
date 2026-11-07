@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace KotobaSenpai.Platform.Windows.Guidance;
+namespace KotobaSenpai.Presentation.Wpf.Guidance;
 
 /// <summary>Draws one anchored explanation and blocks input to the surface underneath it.</summary>
 public sealed partial class GuidanceOverlay : Canvas

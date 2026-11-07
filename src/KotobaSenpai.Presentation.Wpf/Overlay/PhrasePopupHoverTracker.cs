@@ -1,6 +1,6 @@
 using KotobaSenpai.Core.Geometry;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 internal sealed class PhrasePopupHoverTracker
 {

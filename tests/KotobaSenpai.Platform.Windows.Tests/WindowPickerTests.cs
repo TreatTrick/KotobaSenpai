@@ -10,6 +10,8 @@ using System.Windows.Interop;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using KotobaSenpai.Presentation.Wpf.Overlay;
+using KotobaSenpai.Presentation.Wpf.Capture;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 

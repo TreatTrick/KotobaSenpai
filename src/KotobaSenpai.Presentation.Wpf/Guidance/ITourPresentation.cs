@@ -1,6 +1,6 @@
 using KotobaSenpai.Core.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Guidance;
+namespace KotobaSenpai.Presentation.Wpf.Guidance;
 
 /// <summary>Supplies localized steps to a Windows host without exposing application flow types.</summary>
 public interface ITourPresentation : IDisposable

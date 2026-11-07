@@ -19,6 +19,8 @@ using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Core.Workflow;
 using KotobaSenpai.Platform.Windows.Capture;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Presentation.Wpf.Overlay;
+using KotobaSenpai.Presentation.Wpf.Capture;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -34,7 +36,7 @@ internal static class WindowPickerFixture
         application.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ControlsDictionary());
         foreach (var path in new[]
         {
-            "/KotobaSenpai.Platform.Windows;component/Presentation/FluentDesignTokens.xaml",
+            "/KotobaSenpai.Presentation.Wpf;component/Resources/FluentDesignTokens.xaml",
             "/KotobaSenpai.App;component/Themes/SettingsStyles.xaml",
         }) application.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(path, UriKind.Relative) });
         var localizer = new ResourceManagerStringLocalizer();

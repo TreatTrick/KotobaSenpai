@@ -1,7 +1,7 @@
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.WordGrouping;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 internal readonly record struct FuriganaLinePart(ScreenRect Bounds, int MoraStart, int MoraCount);
 

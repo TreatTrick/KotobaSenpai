@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="src/KotobaSenpai.Core/KotobaSenpai.Core.csproj" />
   <Project Path="src/KotobaSenpai.Platform.Windows/KotobaSenpai.Platform.Windows.csproj" />
+  <Project Path="src/KotobaSenpai.Presentation.Wpf/KotobaSenpai.Presentation.Wpf.csproj" />
   <Project Path="src/KotobaSenpai.App/KotobaSenpai.App.csproj" />
   <Project Path="src/KotobaSenpai.Cli/KotobaSenpai.Cli.csproj" />
   <Project Path="tests/KotobaSenpai.Core.Tests/KotobaSenpai.Core.Tests.csproj" />

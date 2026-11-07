@@ -40,6 +40,8 @@ using KotobaSenpai.Core.Shortcuts;
 using KotobaSenpai.Platform.Windows.Shortcuts;
 using KotobaSenpai.App.Shortcuts;
 using KotobaSenpai.App.Reading;
+using KotobaSenpai.Presentation.Wpf.Overlay;
+using KotobaSenpai.Presentation.Wpf.Capture;
 
 namespace KotobaSenpai.App;
 

@@ -18,6 +18,7 @@ using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.Platform.Windows.Overlay;
 using KotobaSenpai.Platform.Windows.Shortcuts;
 using Wpf.Ui.Appearance;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.App.Tests;
 

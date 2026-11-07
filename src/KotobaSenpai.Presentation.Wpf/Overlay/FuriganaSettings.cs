@@ -1,7 +1,7 @@
 using KotobaSenpai.Core.Japanese;
 using System.Text.RegularExpressions;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 /// <summary>A surface range and the reading assigned to it.</summary>
 public sealed record FuriganaSegment(int SurfaceStart, int SurfaceLength, string Reading, bool IsKana);

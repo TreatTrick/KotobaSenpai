@@ -11,9 +11,11 @@ using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.TargetWindow;
+using KotobaSenpai.Presentation.Wpf.Overlay;
+using KotobaSenpai.Platform.Windows;
 using KotobaSenpai.Platform.Windows.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Capture;
+namespace KotobaSenpai.Presentation.Wpf.Capture;
 
 /// <summary>Picks a top-level window without sending the selection gesture to the source application.</summary>
 public sealed class Win32WindowPicker(IStringLocalizer localizer, ILogger logger) : IWindowPicker, IDisposable

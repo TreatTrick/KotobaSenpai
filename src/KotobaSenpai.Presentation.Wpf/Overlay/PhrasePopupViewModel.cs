@@ -2,7 +2,7 @@ using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.PhraseAnalysis;
 
-namespace KotobaSenpai.Platform.Windows.Overlay;
+namespace KotobaSenpai.Presentation.Wpf.Overlay;
 
 /// <summary>A complete, read-only presentation snapshot for one popup display.</summary>
 internal sealed class PhrasePopupViewModel

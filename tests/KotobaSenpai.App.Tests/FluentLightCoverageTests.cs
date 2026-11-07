@@ -199,7 +199,7 @@ public sealed class FluentLightCoverageTests
                     <markup:ThemesDictionary Theme="{{theme}}" />
                     <markup:ControlsDictionary />
                   </ResourceDictionary.MergedDictionaries>
-                  {{string.Join(Environment.NewLine, Source("../KotobaSenpai.Platform.Windows/Presentation/FluentDesignTokens.xaml").Root!.Elements())}}
+                  {{string.Join(Environment.NewLine, Source("../KotobaSenpai.Presentation.Wpf/Resources/FluentDesignTokens.xaml").Root!.Elements())}}
                   {{string.Join(Environment.NewLine, Source("Themes/SettingsStyles.xaml").Root!.Elements())}}
                   {{string.Join(Environment.NewLine, Source("Themes/OnboardingStyles.xaml").Root!.Elements())}}
                   {{string.Join(Environment.NewLine, Source("Views/Support/SupportWindow.xaml").Root!.Element(Presentation + "Window.Resources")!.Elements())}}

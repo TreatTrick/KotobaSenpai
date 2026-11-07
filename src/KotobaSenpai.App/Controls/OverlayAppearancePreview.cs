@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.App.Controls;
 

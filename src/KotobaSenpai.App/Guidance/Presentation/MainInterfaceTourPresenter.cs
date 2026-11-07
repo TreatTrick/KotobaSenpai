@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
-using KotobaSenpai.Platform.Windows.Guidance;
+using KotobaSenpai.Presentation.Wpf.Guidance;
 using KotobaSenpai.Core.Overlay;
 
 namespace KotobaSenpai.App.Guidance.Presentation;

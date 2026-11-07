@@ -16,6 +16,7 @@ using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Platform.Windows.Overlay;
 using Xunit.Abstractions;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 

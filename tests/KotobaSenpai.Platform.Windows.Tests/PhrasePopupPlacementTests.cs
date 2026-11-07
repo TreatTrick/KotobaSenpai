@@ -1,5 +1,6 @@
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Platform.Windows.Overlay;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 

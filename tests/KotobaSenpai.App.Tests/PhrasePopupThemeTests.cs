@@ -24,6 +24,7 @@ using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Platform.Windows.Overlay;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
+using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -218,7 +219,7 @@ public sealed partial class PhrasePopupThemeTests
     private static void CheckAgentSettingsPresentation(Application application)
     {
         application.Resources.MergedDictionaries.Add(new ResourceDictionary
-            { Source = new Uri("/KotobaSenpai.Platform.Windows;component/Presentation/FluentDesignTokens.xaml", UriKind.Relative) });
+            { Source = new Uri("/KotobaSenpai.Presentation.Wpf;component/Resources/FluentDesignTokens.xaml", UriKind.Relative) });
         application.Resources.MergedDictionaries.Add(new ResourceDictionary
             { Source = new Uri("/KotobaSenpai.App;component/Themes/SettingsStyles.xaml", UriKind.Relative) });
         var previousLocalizer = LocalizationHost.Localizer;
