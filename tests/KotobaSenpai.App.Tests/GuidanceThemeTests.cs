@@ -60,8 +60,9 @@ internal static class GuidanceDesktopFixture
     private static void CheckGuidancePresentation(Application application, string directory)
     {
         var localizer = new ResourceManagerStringLocalizer();
-        var previousLocalizer = LocalizationHost.Localizer;
-        LocalizationHost.Localizer = localizer;
+        var previousLocalization = application.Resources[LocalizationHost.ResourceKey];
+        using var localization = new LocalizationHost(localizer);
+        application.Resources[LocalizationHost.ResourceKey] = localization;
         try
         {
             foreach (var culture in new[] { "en", "zh-CN" })
@@ -157,7 +158,11 @@ internal static class GuidanceDesktopFixture
                 finally { selector.Close(); targetHost.Close(); }
             }
         }
-        finally { LocalizationHost.Localizer = previousLocalizer; }
+        finally
+        {
+            if (previousLocalization is null) application.Resources.Remove(LocalizationHost.ResourceKey);
+            else application.Resources[LocalizationHost.ResourceKey] = previousLocalization;
+        }
     }
 
     internal static void SavePreview(FrameworkElement element, string directory, string name)

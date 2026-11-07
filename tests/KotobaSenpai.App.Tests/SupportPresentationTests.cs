@@ -20,9 +20,10 @@ public sealed partial class PhrasePopupThemeTests
     private static void CheckSupportPresentation(Application application)
     {
         var localizer = new ResourceManagerStringLocalizer();
-        var previousLocalizer = LocalizationHost.Localizer;
+        var previousLocalization = application.Resources[LocalizationHost.ResourceKey];
+        using var localization = new LocalizationHost(localizer);
         var previousCulture = CultureInfo.CurrentUICulture;
-        LocalizationHost.Localizer = localizer;
+        application.Resources[LocalizationHost.ResourceKey] = localization;
         using var support = new SupportService(new MemorySettings(), localizer, new SupportLogger());
         try
         {
@@ -128,7 +129,8 @@ public sealed partial class PhrasePopupThemeTests
         finally
         {
             CultureInfo.CurrentUICulture = previousCulture;
-            LocalizationHost.Localizer = previousLocalizer;
+            if (previousLocalization is null) application.Resources.Remove(LocalizationHost.ResourceKey);
+            else application.Resources[LocalizationHost.ResourceKey] = previousLocalization;
         }
     }
 

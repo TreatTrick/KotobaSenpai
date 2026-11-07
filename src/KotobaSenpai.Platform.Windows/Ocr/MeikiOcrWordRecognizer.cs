@@ -20,7 +20,7 @@ namespace KotobaSenpai.Platform.Windows.Ocr;
 /// (development/testing); otherwise it falls back to Models/ under the app directory (shipped with the release). Throws
 /// <see cref="WindowsPlatformException"/> (<see cref="ErrorCodes.OcrModelMissing"/>) when the model is missing.
 /// </summary>
-public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
+public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer, IDisposable
 {
     private const string DiagEnabledKey = "DiagEnabled";
 
@@ -34,6 +34,8 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
         _engine = new MeikiOcrEngine(ResolveModelDirectory(), logger: logger);
     }
+
+    public void Dispose() => _engine.Dispose();
 
     public async Task<WordRecognitionResult> RecognizeAsync(
         Guid recognitionId,

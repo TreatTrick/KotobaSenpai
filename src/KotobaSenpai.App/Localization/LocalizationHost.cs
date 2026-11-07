@@ -4,42 +4,39 @@ using KotobaSenpai.Core.Localization;
 
 namespace KotobaSenpai.App.Localization;
 
-/// <summary>
-/// Static bridge between the markup extension and the localizer: injects <see cref="IStringLocalizer"/> at startup,
-/// tracks all resolved XAML binding targets (weak references), and resets their property values in place on culture switch.
-/// XAML markup extensions are instantiated by the parser and cannot go through DI, so injection uses this static bridge.
-/// </summary>
-internal static class LocalizationHost
+/// <summary>Owns XAML localization targets for one resource scope and releases its culture subscription.</summary>
+internal sealed class LocalizationHost : IDisposable
 {
-    private static readonly List<Target> _targets = [];
-    private static bool _subscribed;
+    internal const string ResourceKey = "KotobaSenpai.Localization";
+    private readonly List<Target> _targets = [];
+    private bool _disposed;
 
-    public static IStringLocalizer? Localizer { get; set; }
+    public LocalizationHost(IStringLocalizer localizer)
+    {
+        Localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
+        Localizer.CultureChanged += OnCultureChanged;
+    }
 
-    /// <summary>Resolves localized text by key; returns the key name itself when the localizer is not yet injected or the key is missing.</summary>
-    public static string Resolve(string key)
-        => Localizer is null ? key : Localizer.Get(key);
+    public IStringLocalizer Localizer { get; }
+
+    public static LocalizationHost? Find(DependencyObject? target)
+        => (target as FrameworkElement)?.TryFindResource(ResourceKey) as LocalizationHost
+            ?? (target as FrameworkContentElement)?.TryFindResource(ResourceKey) as LocalizationHost
+            ?? Application.Current?.TryFindResource(ResourceKey) as LocalizationHost;
+
+    /// <summary>Resolves localized text using the localizer owned by this resource scope.</summary>
+    public string Resolve(string key) => Localizer.Get(key);
 
     /// <summary>Registers a binding target so it is refreshed in place on culture switch.</summary>
-    public static void Register(DependencyObject target, DependencyProperty property, string key)
+    public void Register(DependencyObject target, DependencyProperty property, string key)
     {
-        EnsureSubscribed();
+        ObjectDisposedException.ThrowIf(_disposed, this);
         _targets.Add(new Target(target, property, key));
     }
 
-    private static void EnsureSubscribed()
+    private void OnCultureChanged(object? sender, EventArgs e)
     {
-        if (_subscribed || Localizer is null)
-            return;
-
-        Localizer.CultureChanged += OnCultureChanged;
-        _subscribed = true;
-    }
-
-    private static void OnCultureChanged(object? sender, EventArgs e)
-    {
-        if (Localizer is null)
-            return;
+        if (_disposed) return;
 
         for (var i = _targets.Count - 1; i >= 0; i--)
         {
@@ -52,6 +49,14 @@ internal static class LocalizationHost
 
             dependencyObject.SetValue(target.Property, Localizer.Get(target.Key));
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        Localizer.CultureChanged -= OnCultureChanged;
+        _targets.Clear();
     }
 
     private readonly struct Target

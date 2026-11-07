@@ -15,7 +15,7 @@ public partial class MainContentView : UserControl
         Loaded += (_, _) =>
         {
             if (DataContext is not MainWindowViewModel main) return;
-            if (_guide is null && main.Guidance is not null && LocalizationHost.Localizer is { } localizer)
+            if (_guide is null && main.Guidance is not null && LocalizationHost.Find(this)?.Localizer is { } localizer)
                 _guide = new MainInterfaceTourPresenter(ContentRoot, MainNavigation, RecognitionView.FindGuideTarget,
                     new TourPresentation(main.Guidance.Main, localizer));
             main.Support?.NotifyMainViewReady();

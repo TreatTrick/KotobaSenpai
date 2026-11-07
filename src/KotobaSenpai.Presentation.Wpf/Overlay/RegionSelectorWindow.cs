@@ -21,7 +21,7 @@ namespace KotobaSenpai.Presentation.Wpf.Overlay;
 /// (window-relative, normalized). Unlike the click-through word-overlay window, this one captures mouse input to drag
 /// bracket arms or junctions, move the region, and click the button. Region is clamped to the window and has a minimum size.
 /// </summary>
-public sealed class RegionSelectorWindow : Window, IRegionSelector
+public sealed class RegionSelectorWindow : Window, IRegionSelector, IDisposable
 {
     private readonly ISettingsService _settings;
     private readonly IStringLocalizer? _localizer;
@@ -43,6 +43,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     private ScreenRect _dragRegion;
     private bool _isFlashing;
     private int _flashesRemaining;
+    private bool _disposed;
 
     public RegionSelectorWindow(
         ISettingsService settings,
@@ -95,6 +96,7 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
             _localizer.CultureChanged += OnCultureChanged;
         Closed += (_, _) =>
         {
+            _disposed = true;
             ClearSelection();
             SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
             if (_tracker is not null)
@@ -111,6 +113,12 @@ public sealed class RegionSelectorWindow : Window, IRegionSelector
     }
 
     public bool IsSelecting => _target is not null && !_isFlashing;
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        Dispatcher.Invoke(Close);
+    }
 
     public event EventHandler? SelectionStateChanged;
 

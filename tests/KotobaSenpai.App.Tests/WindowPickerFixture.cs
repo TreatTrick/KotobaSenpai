@@ -40,16 +40,22 @@ internal static class WindowPickerFixture
             "/KotobaSenpai.App;component/Themes/SettingsStyles.xaml",
         }) application.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(path, UriKind.Relative) });
         var localizer = new ResourceManagerStringLocalizer();
-        LocalizationHost.Localizer = localizer;
+        using var localization = new LocalizationHost(localizer);
+        application.Resources[LocalizationHost.ResourceKey] = localization;
         var logger = new FixtureLogger(directory);
         using var tracker = new WinEventTargetWindowTracker(logger);
         using var capture = new WgcWindowFrameCapture(tracker);
         var workflow = new WordOverlayApplicationService(new Recognizer(),
             new WordGroupingService(new Tokenizer(), new SentenceSegmenter(), new SpanResolver()),
             new Renderer(), KotobaSenpai.TestSupport.PhraseAnalysisStub.Create());
-        using var vm = new RecognitionPageViewModel(new TargetSelectionViewModel(new Win32WindowPicker(localizer, logger), localizer, new UserMessageResolver(localizer), logger, KotobaSenpai.App.Controls.WindowPreviewFlight.CreateThumbnailFrame, tracker, capture), workflow,
-            new RegionSelectorWindow(new Settings(), localizer, tracker), new Settings(), localizer,
-            new UserMessageResolver(localizer), logger, tracker, capture: capture);
+        var settings = new Settings();
+        var selection = new TargetSelectionViewModel(new Win32WindowPicker(localizer, logger), localizer,
+            new UserMessageResolver(localizer), logger, KotobaSenpai.App.Controls.WindowPreviewFlight.CreateThumbnailFrame, tracker, capture);
+        var region = new RegionSelectorWindow(settings, localizer, tracker);
+        var session = new RecognitionSessionController(workflow, settings, logger: logger);
+        var actions = new KotobaSenpai.App.Reading.ReadingActions(selection, session, region, settings, tracker);
+        using var vm = new RecognitionPageViewModel(selection, session, actions, region, settings, localizer,
+            new UserMessageResolver(localizer), logger, capture);
         var page = new RecognitionPage { DataContext = vm };
         var host = new Window { Title = "Window picker host", Width = 660, Height = 760, Left = 620, Top = 60, Content = page };
         var previews = 0;

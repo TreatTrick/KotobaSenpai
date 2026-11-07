@@ -42,16 +42,16 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     public SettingsPageViewModel(ISettingsService settings, IThemePreferenceStore themePreferences,
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
         IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance,
-        CaptureBorderPreferences? captureBorder = null, ShortcutSettingsViewModel? shortcuts = null,
-        SentenceTranslationPreferences? sentenceTranslation = null)
+        CaptureBorderPreferences captureBorder, SentenceTranslationPreferences sentenceTranslation,
+        ShortcutSettingsViewModel? shortcuts = null)
     {
         _settings = settings;
         Shortcuts = shortcuts;
         _themePreferences = themePreferences;
         _localizer = localizer;
         _explanationPreferences = explanationLanguage;
-        _captureBorder = captureBorder ?? new CaptureBorderPreferences(settings);
-        _sentenceTranslation = sentenceTranslation ?? new SentenceTranslationPreferences(settings);
+        _captureBorder = captureBorder ?? throw new ArgumentNullException(nameof(captureBorder));
+        _sentenceTranslation = sentenceTranslation ?? throw new ArgumentNullException(nameof(sentenceTranslation));
         _explanationLanguage = explanationLanguage.CustomLanguage ?? string.Empty;
         Language = language;
         Llm = llm;

@@ -13,7 +13,7 @@ namespace KotobaSenpai.Presentation.Wpf.Overlay;
 /// its LLM meaning popup; hovering a group recolors the underlines of its member words and shows the group detail popup.
 /// Annotation clicks pass through; the detail popup receives mouse input without activating.
 /// </summary>
-public sealed class WpfOverlayRenderer : IOverlayRenderer
+public sealed class WpfOverlayRenderer : IOverlayRenderer, IDisposable
 {
     private readonly IStringLocalizer? _localizer;
     private readonly ISettingsService? _settings;
@@ -21,6 +21,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
     private readonly ILogger? _logger;
     private readonly SentenceTranslationPreferences? _sentenceTranslation;
     private OverlayWindow? _window;
+    private bool _disposed;
 
     public WpfOverlayRenderer(
         IStringLocalizer? localizer = null,
@@ -35,12 +36,15 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
         _logger = logger;
         _sentenceTranslation = sentenceTranslation ?? (settings is null ? null : new SentenceTranslationPreferences(settings));
         if (_sentenceTranslation is not null)
-            _sentenceTranslation.Changed += (_, _) => _window?.Dispatcher.Invoke(() =>
-                _window?.SetSentenceTranslationEnabled(_sentenceTranslation.Enabled));
+            _sentenceTranslation.Changed += OnSentenceTranslationChanged;
     }
+
+    private void OnSentenceTranslationChanged(object? sender, EventArgs e)
+        => _window?.Dispatcher.Invoke(() => _window?.SetSentenceTranslationEnabled(_sentenceTranslation!.Enabled));
 
     public void Show(WordOverlaySession session, Func<bool>? canRender = null)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         Application.Current.Dispatcher.Invoke(() =>
         {
             if (canRender?.Invoke() == false)
@@ -89,4 +93,16 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer
 
     public void Suspend()
         => Application.Current.Dispatcher.Invoke(() => _window?.SuspendPresentation());
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        if (_sentenceTranslation is not null) _sentenceTranslation.Changed -= OnSentenceTranslationChanged;
+        if (_window is not null)
+        {
+            _window.Dispatcher.Invoke(() => _window.Close());
+            _window = null;
+        }
+    }
 }

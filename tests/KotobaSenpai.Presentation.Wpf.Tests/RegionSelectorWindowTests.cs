@@ -18,6 +18,41 @@ namespace KotobaSenpai.Presentation.Wpf.Tests;
 public sealed class RegionSelectorWindowTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Disposal_releases_subscriptions_and_native_registration_even_before_first_show(bool show) => RunSta(() =>
+    {
+        var localizer = new FeedbackLocalizer();
+        var tracker = new FakeTracker();
+        var selector = new RegionSelectorWindow(new RecordingSettings(), localizer, tracker);
+        Window? target = null;
+        nint handle = 0;
+        try
+        {
+            Assert.Equal(1, localizer.SubscriberCount);
+            Assert.Equal(1, tracker.SubscriberCount);
+            if (show)
+            {
+                var created = CreateTarget();
+                target = created.Window;
+                tracker.Attach(created.Target);
+                selector.Show(created.Target);
+                handle = new WindowInteropHelper(selector).Handle;
+                Assert.Contains(handle, OverlayWindowRegistry.Snapshot());
+            }
+
+            selector.Dispose();
+            selector.Dispose();
+
+            Assert.False(selector.IsVisible);
+            Assert.Equal(0, localizer.SubscriberCount);
+            Assert.Equal(0, tracker.SubscriberCount);
+            Assert.DoesNotContain(handle, OverlayWindowRegistry.Snapshot());
+        }
+        finally { selector.Dispose(); target?.Close(); }
+    });
+
+    [Theory]
     [InlineData("confirm")]
     [InlineData("close")]
     [InlineData("target-close")]
@@ -447,6 +482,7 @@ public sealed class RegionSelectorWindowTests
     private sealed class FakeTracker : ITargetWindowTracker
     {
         public event EventHandler<TargetWindowSnapshot>? Changed;
+        public int SubscriberCount => Changed?.GetInvocationList().Length ?? 0;
         public TargetWindowSnapshot? Current { get; private set; }
         public TargetWindowSnapshot Attach(WindowTarget target)
         {

@@ -29,17 +29,16 @@ public sealed partial class RecognitionPageViewModel : ObservableObject, IDispos
     private Exception? _shownError;
     private bool _disposed;
 
-    public RecognitionPageViewModel(TargetSelectionViewModel selection, WordOverlayApplicationService workflow,
+    public RecognitionPageViewModel(TargetSelectionViewModel selection, RecognitionSessionController session, ReadingActions actions,
         IRegionSelector regionSelector, ISettingsService settings, IStringLocalizer localizer,
-        IUserMessageResolver messageResolver, ILogger logger, ITargetWindowTracker? tracker = null,
-        IAutoRecognitionController? autoRecognitionController = null, IWindowFrameCapture? capture = null,
-        SupportService? support = null, RecognitionSessionController? session = null, ReadingActions? actions = null,
+        IUserMessageResolver messageResolver, ILogger logger, IWindowFrameCapture? capture = null,
+        SupportService? support = null,
         ShortcutSettingsViewModel? shortcuts = null)
     {
         Selection = selection;
         Shortcuts = shortcuts;
-        _session = session ?? new RecognitionSessionController(workflow, settings, autoRecognitionController, logger);
-        Actions = actions ?? new ReadingActions(selection, _session, regionSelector, settings, tracker, support);
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        Actions = actions ?? throw new ArgumentNullException(nameof(actions));
         _region = regionSelector;
         _capture = capture;
         _settings = settings;

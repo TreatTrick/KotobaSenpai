@@ -138,9 +138,10 @@ public sealed partial class PhrasePopupThemeTests
 
     private static void CheckWindowSelectionPresentation(Application application)
     {
-        var previousLocalizer = LocalizationHost.Localizer;
+        var previousLocalization = application.Resources[LocalizationHost.ResourceKey];
         var localizer = new ResourceManagerStringLocalizer();
-        LocalizationHost.Localizer = localizer;
+        using var localization = new LocalizationHost(localizer);
+        application.Resources[LocalizationHost.ResourceKey] = localization;
         try
         {
             foreach (var culture in new[] { "en", "zh-CN" })
@@ -213,7 +214,11 @@ public sealed partial class PhrasePopupThemeTests
                 finally { host.Close(); }
             }
         }
-        finally { LocalizationHost.Localizer = previousLocalizer; }
+        finally
+        {
+            if (previousLocalization is null) application.Resources.Remove(LocalizationHost.ResourceKey);
+            else application.Resources[LocalizationHost.ResourceKey] = previousLocalization;
+        }
     }
 
     private static void CheckAgentSettingsPresentation(Application application)
@@ -222,9 +227,10 @@ public sealed partial class PhrasePopupThemeTests
             { Source = new Uri("/KotobaSenpai.Presentation.Wpf;component/Resources/FluentDesignTokens.xaml", UriKind.Relative) });
         application.Resources.MergedDictionaries.Add(new ResourceDictionary
             { Source = new Uri("/KotobaSenpai.App;component/Themes/SettingsStyles.xaml", UriKind.Relative) });
-        var previousLocalizer = LocalizationHost.Localizer;
+        var previousLocalization = application.Resources[LocalizationHost.ResourceKey];
         var localizer = new ResourceManagerStringLocalizer();
-        LocalizationHost.Localizer = localizer;
+        using var localization = new LocalizationHost(localizer);
+        application.Resources[LocalizationHost.ResourceKey] = localization;
         var settings = new MemorySettings();
         settings.SetValue(LlmSettingsKeys.Endpoint, "https://api.example.com/v1");
         settings.SetValue(LlmSettingsKeys.ApiKey, "preview-test-key");
@@ -237,7 +243,7 @@ public sealed partial class PhrasePopupThemeTests
         shortcuts.Start();
         using var shortcutSettings = new ShortcutSettingsViewModel(shortcuts, localizer);
         using var viewModel = new SettingsPageViewModel(settings, new LocalAppDataThemePreferenceStore(settings), language, llm, localizer, language,
-            new OverlayAppearanceViewModel(settings, localizer), shortcuts: shortcutSettings);
+            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings), shortcuts: shortcutSettings);
         try
         {
             foreach (var culture in new[] { "en", "zh-CN" })
@@ -372,7 +378,11 @@ public sealed partial class PhrasePopupThemeTests
             }
             CheckOnboardingLanguageSelection(application, settings, viewModel, language, localizer);
         }
-        finally { LocalizationHost.Localizer = previousLocalizer; }
+        finally
+        {
+            if (previousLocalization is null) application.Resources.Remove(LocalizationHost.ResourceKey);
+            else application.Resources[LocalizationHost.ResourceKey] = previousLocalization;
+        }
     }
 
     private static void CheckOnboardingLanguageSelection(Application application, MemorySettings settings,
