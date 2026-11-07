@@ -5,4 +5,8 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Session validity transitions are internal by design; the behavior tests drive them directly. -->
+    <InternalsVisibleTo Include="KotobaSenpai.Core.Tests" />
+  </ItemGroup>
 </Project>
