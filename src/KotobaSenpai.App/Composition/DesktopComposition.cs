@@ -33,6 +33,7 @@ using KotobaSenpai.Platform.Windows.Overlay;
 using KotobaSenpai.Platform.Windows.AutoRecognition;
 using Microsoft.Extensions.DependencyInjection;
 using KotobaSenpai.Core.Shortcuts;
+using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Platform.Windows.Shortcuts;
 using KotobaSenpai.App.Shortcuts;
 using KotobaSenpai.App.Reading;
@@ -196,7 +197,7 @@ internal sealed class DesktopComposition : IDisposable
         // Japanese tokenization: the adapter is explicitly initialized during startup after the dictionary installer completes.
         services.AddSingleton<UniDicTokenizer>();
         services.AddSingleton<ITokenizer>(sp => sp.GetRequiredService<UniDicTokenizer>());
-        services.AddSingleton(sp => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
+        services.AddSingleton<IUniDicDictionaryInstaller>(_ => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
         // Install coordinator: drives the startup overlay (progress/error/retry).
         services.AddScoped<UniDicInstallController>();
         // Word grouping: first resolve token-boundary spans in a single batched OCR pass, then reuse the same result for both underlines and hover.

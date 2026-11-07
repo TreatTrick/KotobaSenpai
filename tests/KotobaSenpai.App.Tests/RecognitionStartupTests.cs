@@ -4,6 +4,7 @@ using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Startup;
 using KotobaSenpai.App.ViewModels;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Overlay;
@@ -90,8 +91,7 @@ public sealed class RecognitionStartupTests
         var services = new ServiceCollection();
         DesktopComposition.ConfigureServices(services);
         services.AddSingleton<ISettingsService>(new Settings());
-        services.AddScoped(sp => new UniDicInstallController(sp.GetRequiredService<UniDicDictionaryInstaller>(),
-            sp.GetRequiredService<IUserMessageResolver>(), install: (_, _) => Task.CompletedTask));
+        services.AddSingleton<IUniDicDictionaryInstaller>(new DictionaryInstallerStub());
         services.AddScoped<ITargetWindowTracker>(_ => new Tracker());
         services.AddScoped<IWindowFrameCapture>(_ => new Capture());
         services.AddScoped<IRegionSelector>(_ => new Region());

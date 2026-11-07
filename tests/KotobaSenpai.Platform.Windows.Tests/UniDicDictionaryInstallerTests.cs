@@ -1,16 +1,14 @@
-using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Net;
 using System.Security.Cryptography;
-using KotobaSenpai.App.Japanese;
+using KotobaSenpai.Platform.Windows.Japanese;
 using KotobaSenpai.Core.Japanese;
-using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Platform.Windows;
 
-namespace KotobaSenpai.App.Tests;
+namespace KotobaSenpai.Platform.Windows.Tests;
 
 /// <summary>
 /// <see cref="UniDicDictionaryInstaller"/> tests: a small zip fixture covers offline install, SHA-256 verification,
@@ -20,6 +18,35 @@ namespace KotobaSenpai.App.Tests;
 public sealed class UniDicDictionaryInstallerTests : IDisposable
 {
     private readonly List<string> _tempDirs = new();
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Explicit_dictionary_override_is_validated_without_downloading_a_default(bool valid)
+    {
+        var root = NewDir();
+        if (valid)
+        {
+            foreach (var name in UniDicAssets.RequiredRuntimeFiles) File.WriteAllText(Path.Combine(root, name), "fixture");
+            File.WriteAllText(Path.Combine(root, UniDicAssets.DicrcFileName), UniDicAssets.Format);
+        }
+        var cacheRoot = Path.Combine(root, "default");
+        using var installer = new UniDicDictionaryInstaller(new HttpClient(ThrowingHandler.Instance),
+            cacheRoot, Manif(cacheRoot, "test"), dictionaryOverride: () => root);
+        IUniDicDictionaryInstaller port = installer;
+
+        Assert.Equal(valid, port.IsInstalled);
+        if (valid)
+            await port.EnsureInstalledAsync();
+        else
+        {
+            var exception = await Assert.ThrowsAsync<WindowsPlatformException>(() => port.EnsureInstalledAsync());
+            Assert.Equal(ErrorCodes.UniDicDictionaryMissing, exception.ErrorCode);
+        }
+
+        Assert.Equal(valid, port.IsInstalled);
+        Assert.False(Directory.Exists(cacheRoot));
+    }
 
     [Fact]
     public async Task Offline_install_reports_ready_only_after_validation_extraction_and_promotion()

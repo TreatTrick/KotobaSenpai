@@ -6,13 +6,8 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using KotobaSenpai.Core.Japanese;
-using KotobaSenpai.Core.Localization;
-using KotobaSenpai.Platform.Windows;
 
-namespace KotobaSenpai.App.Japanese;
-
-public enum DictionaryInstallStage { Downloading, Validating, Extracting, Installing, Ready }
-public sealed record DictionaryInstallProgress(DictionaryInstallStage Stage, double? Fraction = null);
+namespace KotobaSenpai.Platform.Windows.Japanese;
 
 /// <summary>
 /// UniDic dictionary installer (M1 distribution): on first run downloads from a fixed URL and atomically installs into the local cache directory,
@@ -22,7 +17,7 @@ public sealed record DictionaryInstallProgress(DictionaryInstallStage Stage, dou
 /// Failures throw <see cref="WindowsPlatformException"/>: hash/format mismatches throw <c>UniDicDictionaryInvalid</c>,
 /// network/extraction I/O failures throw <c>UniDicDownloadFailed</c>.
 /// </summary>
-public sealed class UniDicDictionaryInstaller : IDisposable
+public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDisposable
 {
     private const string MutexName = @"Local\KotobaSenpai.UniDic.Install";
 
@@ -30,6 +25,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
     private readonly string _dicDir;
     private readonly HttpClient _http;
     private readonly UniDicManifest _manifest;
+    private readonly Func<string?> _dictionaryOverride;
     private readonly SemaphoreSlim _inProcessLock = new(1, 1);
     private bool _disposed;
 
@@ -38,23 +34,41 @@ public sealed class UniDicDictionaryInstaller : IDisposable
 
     /// <summary>Uses the real cache root directory and the fixed asset manifest.</summary>
     public UniDicDictionaryInstaller(HttpClient http)
-        : this(http, DefaultCacheRoot(), DefaultManifest())
+        : this(http, DefaultCacheRoot(), DefaultManifest(),
+            () => Environment.GetEnvironmentVariable("KOTOBA_UNIDIC_DIR"))
     {
     }
 
     /// <summary>
     /// <paramref name="cacheRoot"/> and <paramref name="manifest"/> can be injected (network-free unit tests use a temp directory and fixture hashes).
     /// </summary>
-    public UniDicDictionaryInstaller(HttpClient http, string cacheRoot, UniDicManifest manifest)
+    public UniDicDictionaryInstaller(HttpClient http, string cacheRoot, UniDicManifest manifest,
+        Func<string?>? dictionaryOverride = null)
     {
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _cacheRoot = cacheRoot ?? throw new ArgumentNullException(nameof(cacheRoot));
         _manifest = manifest;
+        _dictionaryOverride = dictionaryOverride ?? (() => null);
         _dicDir = Path.Combine(_cacheRoot, "dicdir");
     }
 
-    /// <summary>True: the four runtime files, expected version/format, and the installed manifest are all valid.</summary>
+    /// <summary>Checks the explicit runtime override, or the validated default installation when no override is set.</summary>
     public bool IsInstalled
+    {
+        get
+        {
+            var directory = _dictionaryOverride();
+            if (string.IsNullOrWhiteSpace(directory)) return IsCacheInstalled;
+            try
+            {
+                UniDicTokenizer.ValidateDictionary(directory, requireInstalledManifest: false);
+                return true;
+            }
+            catch (Exception) { return false; }
+        }
+    }
+
+    private bool IsCacheInstalled
     {
         get
         {
@@ -73,10 +87,19 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         if (IsInstalled)
             return;
 
+        var directory = _dictionaryOverride();
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            stages?.Report(new(DictionaryInstallStage.Validating));
+            await Task.Run(() => UniDicTokenizer.ValidateDictionary(directory, requireInstalledManifest: false), ct).ConfigureAwait(false);
+            stages?.Report(new(DictionaryInstallStage.Ready));
+            return;
+        }
+
         await _inProcessLock.WaitAsync(ct);
         try
         {
-            if (IsInstalled)
+            if (IsCacheInstalled)
                 return;
 
             var stagingRoot = Path.Combine(_cacheRoot, "staging-" + Guid.NewGuid().ToString("N"));
@@ -173,12 +196,12 @@ public sealed class UniDicDictionaryInstaller : IDisposable
         MoveContents(dicDir, finalStaging);
         WriteManifest(finalStaging);
 
-        await PromoteAsync(finalStaging, ct);
+        Promote(finalStaging, ct);
         stages?.Report(new(DictionaryInstallStage.Ready));
     }
 
     /// <summary>Serializes the dicdir replacement across processes: back up the old directory → atomically rename in the new one → clean up the backup.</summary>
-    private async Task PromoteAsync(string finalStaging, CancellationToken ct)
+    private void Promote(string finalStaging, CancellationToken ct)
     {
         using var mutex = new Mutex(initiallyOwned: false, MutexName);
         try
@@ -196,7 +219,7 @@ public sealed class UniDicDictionaryInstaller : IDisposable
             ct.ThrowIfCancellationRequested();
 
             // Another process may have already installed it; if so, just clean up this run's staging.
-            if (IsInstalled)
+            if (IsCacheInstalled)
             {
                 TryDeleteDirectory(finalStaging);
                 return;

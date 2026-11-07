@@ -1,5 +1,8 @@
 using KotobaSenpai.Core.Workflow;
 using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using System.IO;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.Platform.Windows.Settings;
@@ -333,17 +336,26 @@ public sealed class DependencyDirectionTests
             name => name.EndsWith(".g.resources", StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>Remaining WPF usage in the adapter is threading glue only: no controls, media or shapes.</summary>
+    /// <summary>Native threading and HWND interop may remain, while all WPF visual dependencies are forbidden.</summary>
     [Fact]
     public void Platform_wpf_usage_is_limited_to_threading_and_interop()
     {
-        var result = Types.InAssembly(typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly)
-            .ShouldNot().HaveDependencyOnAny("System.Windows.Controls", "System.Windows.Media",
-                "System.Windows.Shapes", "System.Windows.Data", "System.Windows.Documents")
-            .GetResult();
+        var assembly = typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly;
+        using var stream = File.OpenRead(assembly.Location);
+        using var image = new PEReader(stream);
+        var metadata = image.GetMetadataReader();
+        var forbiddenReferences = metadata.TypeReferences
+            .Select(handle => metadata.GetTypeReference(handle))
+            .Select(reference => (Namespace: metadata.GetString(reference.Namespace), Name: metadata.GetString(reference.Name)))
+            .Where(reference => reference.Namespace == "System.Windows"
+                || reference.Namespace.StartsWith("System.Windows.", StringComparison.Ordinal))
+            .Where(reference => reference.Namespace is not ("System.Windows.Threading" or "System.Windows.Interop"))
+            .Select(reference => $"{reference.Namespace}.{reference.Name}")
+            .OrderBy(name => name)
+            .ToArray();
 
-        Assert.True(result.IsSuccessful,
-            FormatFailure("Platform.Windows must not depend on WPF visual namespaces", result));
+        Assert.True(forbiddenReferences.Length == 0,
+            $"Platform.Windows may reference only WPF threading and HWND interop types: {string.Join(", ", forbiddenReferences)}");
     }
 
     /// <summary>

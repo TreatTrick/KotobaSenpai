@@ -390,11 +390,7 @@ public sealed partial class PhrasePopupThemeTests
     {
         application.Resources.MergedDictionaries.Add(new ResourceDictionary
             { Source = new Uri("/KotobaSenpai.App;component/Themes/FluentColorIcons.xaml", UriKind.Relative) });
-        using var installer = new UniDicDictionaryInstaller(new System.Net.Http.HttpClient(),
-            Path.Combine(Path.GetTempPath(), "kotoba-onboarding-language-tests"),
-            new("test", "https://example.com/dictionary", "test", "test", []));
-        using var dictionary = new UniDicInstallController(installer, new UserMessageResolver(localizer),
-            (_, _) => Task.CompletedTask, localizer);
+        using var dictionary = new UniDicInstallController(new DictionaryInstallerStub(), new UserMessageResolver(localizer), localizer);
         Assert.True(language.TrySave("French"));
         var readiness = new OnboardingReadiness(false, false);
         var preparation = new TaskCompletionSource();

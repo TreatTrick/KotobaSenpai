@@ -1,6 +1,4 @@
 using KotobaSenpai.Core.Errors;
-using System.IO;
-using System.Net.Http;
 using System.Reflection;
 using KotobaSenpai.App.Japanese;
 using KotobaSenpai.App.Localization;
@@ -11,20 +9,13 @@ namespace KotobaSenpai.App.Tests;
 
 public sealed class UniDicInstallControllerTests
 {
-    private static UniDicInstallController Create(Func<CancellationToken, IProgress<double>, Task> install)
-    {
-        var installer = new UniDicDictionaryInstaller(
-            new HttpClient(),
-            Path.Combine(Path.GetTempPath(), "kotoba-unidic-tests"),
-            new UniDicManifest("v", "url", "sha", "fmt", ["char.bin"]));
-        var resolver = new UserMessageResolver(new FakeLocalizer());
-        return new UniDicInstallController(installer, resolver, install);
-    }
+    private static UniDicInstallController Create(Func<CancellationToken, Task> install)
+        => new(new DictionaryInstallerStub(install), new UserMessageResolver(new FakeLocalizer()));
 
     [Fact]
     public async Task Successful_install_hides_overlay()
     {
-        var controller = Create((_, _) => Task.CompletedTask);
+        var controller = Create(_ => Task.CompletedTask);
 
         await controller.InstallCommand.ExecuteAsync(null);
 
@@ -33,44 +24,10 @@ public sealed class UniDicInstallControllerTests
         Assert.False(controller.IsBlocking);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task Explicit_dictionary_override_is_validated_without_downloading_a_default(bool valid)
-    {
-        var root = Path.Combine(Path.GetTempPath(), "kotoba-override-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            if (valid)
-            {
-                foreach (var name in UniDicAssets.RequiredRuntimeFiles) File.WriteAllText(Path.Combine(root, name), "fixture");
-                File.WriteAllText(Path.Combine(root, UniDicAssets.DicrcFileName), UniDicAssets.Format);
-            }
-            using var installer = new UniDicDictionaryInstaller(new HttpClient(new NoNetworkHandler()),
-                Path.Combine(root, "default"), new UniDicManifest("v", "url", "sha", "fmt", ["char.bin"]));
-            using var controller = new UniDicInstallController(installer, new UserMessageResolver(new FakeLocalizer()),
-                dictionaryOverride: () => root);
-            Assert.Equal(valid, controller.CheckInstalled());
-            await controller.InstallAsync();
-            Assert.Equal(valid, controller.IsInstalled);
-            Assert.Equal(!valid, controller.HasError);
-            if (valid) Assert.Equal(DictionaryInstallStage.Ready, controller.Stage);
-            Assert.False(Directory.Exists(Path.Combine(root, "default")));
-        }
-        finally { Directory.Delete(root, recursive: true); }
-    }
-
-    private sealed class NoNetworkHandler : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => throw new InvalidOperationException("An explicit dictionary override must not download the default dictionary.");
-    }
-
     [Fact]
     public async Task Failed_install_shows_error_and_blocks()
     {
-        var controller = Create((_, _) => throw new InvalidOperationException("boom"));
+        var controller = Create(_ => throw new InvalidOperationException("boom"));
 
         await controller.InstallCommand.ExecuteAsync(null);
 
@@ -83,7 +40,7 @@ public sealed class UniDicInstallControllerTests
     public async Task Retry_after_failure_can_succeed_and_unblock()
     {
         var failOnce = true;
-        var controller = Create((_, _) =>
+        var controller = Create(_ =>
         {
             if (failOnce)
             {
@@ -105,7 +62,7 @@ public sealed class UniDicInstallControllerTests
     [Fact]
     public void Validation_after_known_download_progress_keeps_progress_determinate()
     {
-        using var controller = Create((_, _) => Task.CompletedTask);
+        using var controller = Create(_ => Task.CompletedTask);
         var reportStage = typeof(UniDicInstallController).GetMethod("ReportStage", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
         reportStage.Invoke(controller, [new DictionaryInstallProgress(DictionaryInstallStage.Downloading, 0.6)]);
