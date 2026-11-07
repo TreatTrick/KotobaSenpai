@@ -2,7 +2,6 @@ using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.TargetWindow;
-using KotobaSenpai.Platform.Windows.Capture;
 using KotobaSenpai.Platform.Windows.Overlay;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -13,7 +12,7 @@ using System.Windows.Threading;
 using KotobaSenpai.Presentation.Wpf.Overlay;
 using KotobaSenpai.Presentation.Wpf.Capture;
 
-namespace KotobaSenpai.Platform.Windows.Tests;
+namespace KotobaSenpai.Presentation.Wpf.Tests;
 
 public sealed class WindowPickerTests
 {

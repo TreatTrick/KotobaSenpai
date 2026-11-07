@@ -18,7 +18,7 @@ using KotobaSenpai.Platform.Windows.Overlay;
 using Xunit.Abstractions;
 using KotobaSenpai.Presentation.Wpf.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Tests;
+namespace KotobaSenpai.Presentation.Wpf.Tests;
 
 public sealed class PhrasePopupViewTests(ITestOutputHelper output)
 {

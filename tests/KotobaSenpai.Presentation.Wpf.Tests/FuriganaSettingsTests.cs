@@ -1,9 +1,8 @@
 using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Settings;
-using KotobaSenpai.Platform.Windows.Overlay;
 using KotobaSenpai.Presentation.Wpf.Overlay;
 
-namespace KotobaSenpai.Platform.Windows.Tests;
+namespace KotobaSenpai.Presentation.Wpf.Tests;
 
 /// <summary>Pure logic of the furigana overlay: kanji detection and font-scale parsing.</summary>
 public class FuriganaSettingsTests
@@ -71,11 +70,11 @@ public class FuriganaSettingsTests
     }
 
     [Theory]
-    [InlineData("同じ", "おなじ", 1, "おな")]      // 送假名「じ」不标注
-    [InlineData("食べる", "たべる", 1, "た")]      // 送假名「べる」不标注
-    [InlineData("日本語", "にほんご", 3, "にほんご")] // 无送假名，全读音
-    [InlineData("今日", "きょう", 2, "きょう")]    // 无送假名
-    [InlineData("買い物", "かいもの", 1, "かいもの")] // 中部送假名词（汉字-假名-汉字）不剥离尾部，整词读音（同 DokiDokiDict）
+    [InlineData("同じ", "おなじ", 1, "おな")]       // Omit trailing okurigana from the annotation.
+    [InlineData("食べる", "たべる", 1, "た")]       // Omit trailing okurigana from the annotation.
+    [InlineData("日本語", "にほんご", 3, "にほんご")] // Keep the full reading when there is no okurigana.
+    [InlineData("今日", "きょう", 2, "きょう")]     // Keep the full reading when there is no okurigana.
+    [InlineData("買い物", "かいもの", 1, "かいもの")] // Internal kana does not trim the reading, matching DokiDokiDict.
     public void OkuriganaTrim_annotates_only_leading_kanji(string surface, string reading, int kanjiChars, string kanjiReading)
     {
         var (count, trimmed) = FuriganaSettings.OkuriganaTrim(surface, reading);

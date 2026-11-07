@@ -7,12 +7,11 @@ using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 using NetArchTest.Rules;
-using KotobaSenpai.Presentation.Wpf.Overlay;
 
 namespace KotobaSenpai.Architecture.Tests;
 
 /// <summary>
-/// Dependency-direction architecture tests: NetArchTest pins down the dependency direction of Core / Platform.Windows / App,
+/// Dependency-direction architecture tests: NetArchTest pins down the dependency direction of Core / Platform.Windows / Presentation.Wpf / App,
 /// equivalent to ESLint import rules, run as part of <c>dotnet test</c> / CI.
 /// <para>
 /// The rules follow the ports-and-adapters (hexagonal) architecture and composition-root boundaries:
@@ -36,7 +35,7 @@ public sealed class DependencyDirectionTests
 
     private const string CoreNamespace = @"KotobaSenpai\.Core(\..*)?$";
     private const string PlatformNamespace = @"KotobaSenpai\.Platform\.Windows(\..*)?$";
-    private const string PresentationNamespace = @"KotobaSenpai\.Presentation\.Wpf(\..*)?$";
+    private const string PresentationNamespace = "KotobaSenpai.Presentation.Wpf";
     private const string ViewModelsNamespace = @"KotobaSenpai\.App\.ViewModels(\..*)?$";
 
     [Fact]
@@ -44,7 +43,7 @@ public sealed class DependencyDirectionTests
     {
         var result = Types.InAssembly(typeof(KotobaSenpai.App.Guidance.ContextualGuidance).Assembly)
             .That().ResideInNamespaceMatching(@"^KotobaSenpai\.App\.Guidance$")
-            .ShouldNot().HaveDependencyOnAny("System.Windows", "KotobaSenpai.Platform.Windows",
+            .ShouldNot().HaveDependencyOnAny("System.Windows", "KotobaSenpai.Platform.Windows", PresentationNamespace,
                 "KotobaSenpai.App.Views", "KotobaSenpai.App.ViewModels", "Microsoft.Extensions.DependencyInjection")
             .GetResult();
         Assert.True(result.IsSuccessful, FormatFailure("Guidance flow must remain independent of presentation and the container", result));
@@ -55,7 +54,7 @@ public sealed class DependencyDirectionTests
     {
         var result = Types.InAssembly(typeof(KotobaSenpai.App.Onboarding.OnboardingStateMachine).Assembly)
             .That().ResideInNamespace("KotobaSenpai.App.Onboarding")
-            .ShouldNot().HaveDependencyOnAny("System.Windows", "KotobaSenpai.Platform.Windows",
+            .ShouldNot().HaveDependencyOnAny("System.Windows", "KotobaSenpai.Platform.Windows", PresentationNamespace,
                 "KotobaSenpai.App.Views", "KotobaSenpai.App.ViewModels", "Microsoft.Extensions.DependencyInjection", "System.IServiceProvider")
             .GetResult();
         Assert.True(result.IsSuccessful, FormatFailure("Onboarding flow must remain independent of presentation and the container", result));
@@ -68,12 +67,12 @@ public sealed class DependencyDirectionTests
         Assert.True(typeof(ISettingsService).GetMethod(nameof(ISettingsService.TryUpdate))!.IsAbstract);
     }
 
-    /// <summary>Core must not depend on Platform.Windows or App (pure domain, zero external dependencies).</summary>
+    /// <summary>The CLI delegates to shared infrastructure without depending on desktop presentation.</summary>
     [Fact]
     public void Agent_cli_uses_shared_infrastructure_without_implementing_provider_requests_or_file_access()
     {
         var result = Types.InAssembly(typeof(KotobaSenpai.Cli.Program).Assembly)
-            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.App", "System.Windows", "System.Net.Http.HttpRequestMessage", "System.IO.File", "System.IO.Directory")
+            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.App", PresentationNamespace, "System.Windows", "System.Net.Http.HttpRequestMessage", "System.IO.File", "System.IO.Directory")
             .GetResult();
         Assert.True(result.IsSuccessful, FormatFailure("CLI must delegate provider and settings operations", result));
     }
@@ -98,14 +97,14 @@ public sealed class DependencyDirectionTests
     }
 
     [Fact]
-    public void Core_ShouldNotDependOn_Platform_Or_App()
+    public void Core_ShouldNotDependOn_Platform_Presentation_Or_App()
     {
         var result = Types.InAssemblies(Assemblies)
             .That().ResideInNamespaceMatching(CoreNamespace)
-            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.Platform.Windows", "KotobaSenpai.App")
+            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.Platform.Windows", PresentationNamespace, "KotobaSenpai.App")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("Core must not depend on Platform.Windows / App", result));
+        Assert.True(result.IsSuccessful, FormatFailure("Core must not depend on Platform.Windows / Presentation.Wpf / App", result));
     }
 
     /// <summary>Platform.Windows must not depend on App (an adapter only points inward at Core).</summary>
@@ -120,16 +119,16 @@ public sealed class DependencyDirectionTests
         Assert.True(result.IsSuccessful, FormatFailure("Platform.Windows must not depend on App", result));
     }
 
-    /// <summary>ViewModels depend only on Core ports and application services; they must not reference platform implementations or WPF.</summary>
+    /// <summary>ViewModels depend only on Core ports and application services, not platform or presentation implementations.</summary>
     [Fact]
-    public void ViewModels_ShouldNotDependOn_Platform_Or_Wpf()
+    public void ViewModels_ShouldNotDependOn_Platform_Presentation_Or_Wpf()
     {
         var result = Types.InAssemblies(Assemblies)
             .That().ResideInNamespaceMatching(ViewModelsNamespace)
-            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.Platform.Windows", "System.Windows")
+            .ShouldNot().HaveDependencyOnAny("KotobaSenpai.Platform.Windows", PresentationNamespace, "System.Windows")
             .GetResult();
 
-        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must not depend on Platform.Windows / WPF", result));
+        Assert.True(result.IsSuccessful, FormatFailure("App.ViewModels must not depend on Platform.Windows / Presentation.Wpf / WPF", result));
     }
 
     /// <summary>The localization port IStringLocalizer must live in Core; its implementation ResourceManagerStringLocalizer must live in App.</summary>
@@ -275,7 +274,7 @@ public sealed class DependencyDirectionTests
     {
         var platformAssembly = typeof(KotobaSenpai.Platform.Windows.Settings.SettingsService).Assembly;
         var references = platformAssembly.GetReferencedAssemblies().Select(a => a.Name).ToArray();
-        Assert.DoesNotContain("KotobaSenpai.Presentation.Wpf", references);
+        Assert.DoesNotContain(PresentationNamespace, references);
     }
 
     /// <summary>Presentation.Wpf is below the composition root; it must not depend on App.</summary>

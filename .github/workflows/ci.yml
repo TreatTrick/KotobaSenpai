@@ -51,12 +51,14 @@ jobs:
           - suite: Core
             project: tests/KotobaSenpai.Core.Tests/KotobaSenpai.Core.Tests.csproj
           # Architecture tests pin the dependency direction of Core / Platform /
-          # App, so they are a gate of their own: a layering violation must fail
-          # the PR even when every behavior test still passes.
+          # Presentation / App, so they are a gate of their own: a layering
+          # violation must fail the PR even when every behavior test still passes.
           - suite: Architecture
             project: tests/KotobaSenpai.Architecture.Tests/KotobaSenpai.Architecture.Tests.csproj
           - suite: Platform.Windows
             project: tests/KotobaSenpai.Platform.Windows.Tests/KotobaSenpai.Platform.Windows.Tests.csproj
+          - suite: Presentation.Wpf
+            project: tests/KotobaSenpai.Presentation.Wpf.Tests/KotobaSenpai.Presentation.Wpf.Tests.csproj
           # The desktop acceptance fixture (PhrasePopupThemeTests) is excluded
           # here: it asserts global focus/activation state, which an unattended
           # runner does not grant, so it is reported by the separate

@@ -6,6 +6,7 @@
   <Project Path="src/KotobaSenpai.Cli/KotobaSenpai.Cli.csproj" />
   <Project Path="tests/KotobaSenpai.Core.Tests/KotobaSenpai.Core.Tests.csproj" />
   <Project Path="tests/KotobaSenpai.Platform.Windows.Tests/KotobaSenpai.Platform.Windows.Tests.csproj" />
+  <Project Path="tests/KotobaSenpai.Presentation.Wpf.Tests/KotobaSenpai.Presentation.Wpf.Tests.csproj" />
   <Project Path="tests/KotobaSenpai.App.Tests/KotobaSenpai.App.Tests.csproj" />
   <Project Path="tests/KotobaSenpai.Architecture.Tests/KotobaSenpai.Architecture.Tests.csproj" />
 </Solution>

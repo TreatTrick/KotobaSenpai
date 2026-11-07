@@ -22,8 +22,9 @@
 | --- | --- |
 | `Build` | 全解决方案 Release 编译。源工程全部开启 `TreatWarningsAsErrors`，所以编译失败同时意味着引入了警告 |
 | `Test / Core` | 领域逻辑：分词、词典跨度、短语校验、会话状态机、缓存（265 例） |
-| `Test / Architecture` | **分层门禁**：Core 不得依赖 `System.IO`/`Http`/WPF，Platform 不得反向依赖 App，ViewModel 不得依赖 Platform，17 个 Core 切片只能依赖更低层（38 例） |
-| `Test / Platform.Windows` | Win32/WGC/OCR/LLM 适配器（381 例） |
+| `Test / Architecture` | **分层门禁**：Core 不得依赖 `System.IO`/`Http`/WPF；Platform 不得依赖 Presentation/App；ViewModel、Guidance、Onboarding 与 CLI 不得依赖 `Presentation.Wpf`；17 个 Core 切片只能依赖更低层 |
+| `Test / Platform.Windows` | Win32/WGC/OCR/LLM 适配器，不引用 WPF 呈现项目 |
+| `Test / Presentation.Wpf` | WPF 覆层、短语弹窗、注音布局、区域选择与窗口拾取的独立回归测试 |
 | `Test / App` | 表现层与组合根。**已排除**桌面验收 fixture（416 例） |
 | `Agent CLI contract` | `dotnet publish` 后执行 `tests/Check-AgentCli.ps1`：能力发现、输入校验、凭据脱敏不泄漏 |
 | `Gate` | **唯一建议设为必需检查的状态**：上面任一 Job 不是 `success` 就失败 |
@@ -61,6 +62,7 @@ dotnet build KotobaSenpai.slnx -c Release --no-restore
 dotnet test tests/KotobaSenpai.Core.Tests/KotobaSenpai.Core.Tests.csproj -c Release
 dotnet test tests/KotobaSenpai.Architecture.Tests/KotobaSenpai.Architecture.Tests.csproj -c Release
 dotnet test tests/KotobaSenpai.Platform.Windows.Tests/KotobaSenpai.Platform.Windows.Tests.csproj -c Release
+dotnet test tests/KotobaSenpai.Presentation.Wpf.Tests/KotobaSenpai.Presentation.Wpf.Tests.csproj -c Release
 dotnet test tests/KotobaSenpai.App.Tests/KotobaSenpai.App.Tests.csproj -c Release --filter "FullyQualifiedName!~PhrasePopupThemeTests"
 
 dotnet publish src/KotobaSenpai.App/KotobaSenpai.App.csproj -c Release -o artifacts/publish

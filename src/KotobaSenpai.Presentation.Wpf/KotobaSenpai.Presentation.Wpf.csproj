@@ -10,7 +10,7 @@
   <ItemGroup>
     <!-- Presentation seams are internal so the desktop fixtures can drive them. -->
     <InternalsVisibleTo Include="KotobaSenpai.App.Tests" />
-    <InternalsVisibleTo Include="KotobaSenpai.Platform.Windows.Tests" />
+    <InternalsVisibleTo Include="KotobaSenpai.Presentation.Wpf.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
