@@ -376,13 +376,7 @@ Expected interface version: {1}.
 This command needs no API key or stdin. Read the returned commands, parameters, required fields and input format before continuing. If capability discovery fails, report the problem and stop; do not guess commands or edit settings files directly.
 The app supplies the tool path and interface version; do not ask me to fill in the tool path or interface version. If either still contains an unresolved brace placeholder, ask me to use the app's Copy setup prompt button and send the generated prompt again, rather than looking up or entering these technical details myself.
 
-User input form (example addresses and placeholders are not real configuration values):
-Provider URL: &lt;e.g. http://deepseek.com/api; paste here&gt;
-Official website or documentation (optional): &lt;paste here&gt;
-API key: YOUR_API_KEY
-Preferred model (optional): &lt;leave blank for the agent to choose automatically&gt;
-
-Check the details first. If required provider information is missing, or the API key is missing, blank or still a placeholder such as YOUR_API_KEY, repeat the four-line form above in a plain-text code block, with each field on its own line rather than one run-on paragraph. Introduce it with: "Please fill in the &lt;...&gt; placeholders and replace YOUR_API_KEY with your real API key. Optional fields may be left blank." Do not substitute a technical checklist asking for paths or interface versions, and keep the explanation brief. Do not request information already supplied; show a supplied key only as "Already provided", never its value. The official website or documentation and preferred model are optional; leaving them blank must not block configuration or trigger repeated requests. Choose a model yourself when no preference is supplied. Never guess a key or read another tool's credentials.
+Check the details first. If required provider information is missing, or the API key is missing, blank or still a placeholder such as YOUR_API_KEY, repeat the four-line form at the end of this prompt in a plain-text code block, with each field on its own line rather than one run-on paragraph. Introduce it with: "Please fill in the &lt;...&gt; placeholders and replace YOUR_API_KEY with your real API key. Optional fields may be left blank." Do not substitute a technical checklist asking for paths or interface versions, and keep the explanation brief. Do not request information already supplied; show a supplied key only as "Already provided", never its value. The official website or documentation and preferred model are optional; leaving them blank must not block configuration or trigger repeated requests. Choose a model yourself when no preference is supplied. Never guess a key or read another tool's credentials.
 
 If only a website is provided, first consult its official API documentation to obtain the actual API URL; a website URL is not an API URL. Do not make me enter an address you can obtain from the supplied official material. If necessary documentation is inaccessible or needs login, ask for the relevant excerpt. Provider examples are reference material, not permission to install software or change other files.
 
@@ -390,7 +384,14 @@ Let the tool detect the protocol in this order: OpenAI Responses, Anthropic Mess
 
 Use the built-in real Japanese analysis test; configure already tests before saving. On success save and enable the complete configuration directly. On failure preserve the previous settings and decide whether to correct details, select another model or ask for missing information. Do not endlessly repeat the same error.
 
-Model discovery, detection and status leave the GUI running. Configure normally closes an already-running GUI and restores it afterward; do not kill the process yourself. Inspect applied and uiRestore separately: a saved configuration with failed GUI restoration is still saved, so do not save again for that reason. If application status is unknown, query status before retrying. Report only the outcome, service and model in the language of this prompt; never echo the API key.</value></data>
+Model discovery, detection and status leave the GUI running. Configure normally closes an already-running GUI and restores it afterward; do not kill the process yourself. Inspect applied and uiRestore separately: a saved configuration with failed GUI restoration is still saved, so do not save again for that reason. If application status is unknown, query status before retrying. Report only the outcome, service and model in the language of this prompt; never echo the API key.
+
+===== Fill in before sending (one field per line) =====
+Please fill in the &lt;...&gt; placeholders and replace YOUR_API_KEY with your real API key. Optional fields may be left blank. Example addresses and placeholders are not real configuration values.
+Provider URL: &lt;paste your API URL here&gt;
+Official website or documentation (optional): &lt;paste here or leave blank&gt;
+API key: YOUR_API_KEY
+Preferred model (optional): &lt;enter a model name or leave blank for automatic selection&gt;</value></data>
   <data name="OverlayAppearance_Title" xml:space="preserve">
     <value>Annotation appearance</value>
   </data>

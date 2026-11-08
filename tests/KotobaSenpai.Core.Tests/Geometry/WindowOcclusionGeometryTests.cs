@@ -9,10 +9,10 @@ public sealed class WindowOcclusionGeometryTests
     [InlineData(1, false)]
     [InlineData(29, false)]
     [InlineData(30, false)]
-    [InlineData(31, true)]
-    [InlineData(100, true)]
-    [InlineData(150, true)]
-    public void Only_coverage_strictly_above_thirty_percent_hides_the_overlay(int coveredWidth, bool expectedHidden)
+    [InlineData(31, false)]
+    [InlineData(100, false)]
+    [InlineData(150, false)]
+    public void Coverage_up_to_the_full_target_does_not_exceed_the_hide_threshold(int coveredWidth, bool expectedHidden)
     {
         Assert.Equal(expectedHidden, WindowOcclusionGeometry.ExceedsOcclusionThreshold(
             new ScreenRect(100, 100, 100, 100), [new ScreenRect(100, 100, coveredWidth, 100)], out _));
@@ -30,9 +30,9 @@ public sealed class WindowOcclusionGeometryTests
     }
 
     [Fact]
-    public void Multiple_small_disjoint_windows_can_exceed_the_threshold_together()
+    public void Multiple_small_disjoint_windows_combine_coverage_without_hiding_the_overlay()
     {
-        Assert.True(WindowOcclusionGeometry.ExceedsOcclusionThreshold(new ScreenRect(100, 100, 100, 100),
+        Assert.False(WindowOcclusionGeometry.ExceedsOcclusionThreshold(new ScreenRect(100, 100, 100, 100),
             [new ScreenRect(100, 100, 20, 100), new ScreenRect(180, 100, 20, 100)], out var ratio));
         Assert.Equal(0.4, ratio, 10);
     }

@@ -5,7 +5,7 @@ namespace KotobaSenpai.Core.TargetWindow;
 /// <summary>Evaluates the union of occluders clipped to the target client area.</summary>
 public static class WindowOcclusionGeometry
 {
-    public const double OcclusionHideThreshold = 0.30;
+    public const double OcclusionHideThreshold = 1.0;
 
     public static bool HasPositiveAreaIntersection(ScreenRect first, ScreenRect second)
         => first.X < second.Right

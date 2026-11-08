@@ -12,11 +12,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Installer.ps1
 
 .EXAMPLE
 powershell -ExecutionPolicy Bypass -File .\scripts\Build-Installer.ps1 -InnoSetupCompiler "C:\Tools\Inno Setup 7\ISCC.exe"
+
+.EXAMPLE
+powershell -ExecutionPolicy Bypass -File .\scripts\Build-Installer.ps1 -Version "1.0.0"
 #>
 
 [CmdletBinding()]
 param(
     [string]$Configuration = "Release",
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string]$Version = (Get-Date -Format "yyyy.MM.dd"),
     [string]$OutputDirectory,
     [string]$InnoSetupCompiler
 )
@@ -100,16 +105,7 @@ if (-not (Get-Command "dotnet" -ErrorAction SilentlyContinue)) {
 }
 
 $compiler = Find-InnoSetupCompiler -ExplicitPath $InnoSetupCompiler
-$version = Get-Date -Format "yyyy.MM.dd"
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$commit = "source"
-if (Get-Command "git" -ErrorAction SilentlyContinue) {
-    $gitCommit = & git -C $script:RepositoryRoot rev-parse --short=7 HEAD 2>$null
-    if ($LASTEXITCODE -eq 0 -and $gitCommit) {
-        $commit = $gitCommit.Trim()
-    }
-}
-$installerName = "KotobaSenpai-$version-$commit-$timestamp-win-x64-Setup.exe"
+$installerName = "KotobaSenpai-$Version-win-x64-Setup.exe"
 $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $workDirectory = Join-Path $tempRoot ("KotobaSenpai-installer-" + [guid]::NewGuid().ToString("N"))
 $publishDirectory = Join-Path $workDirectory "publish"
@@ -125,12 +121,21 @@ try {
         "--configuration", $Configuration,
         "--runtime", "win-x64",
         "--self-contained", "true",
+        "-p:Version=$Version",
         "--output", $publishDirectory
     )
     & dotnet @publishArguments
     if ($LASTEXITCODE -ne 0) {
         throw ".NET publish failed with exit code $LASTEXITCODE."
     }
+
+    foreach ($model in $requiredModels) {
+        $publishedModel = Join-Path (Join-Path $publishDirectory "Models") $model
+        if (-not (Test-Path -LiteralPath $publishedModel -PathType Leaf)) {
+            throw "Required OCR model is missing from the published application: $publishedModel"
+        }
+    }
+    & (Join-Path $script:RepositoryRoot "tests\Check-AgentCli.ps1") -PublishDirectory $publishDirectory
 
     $setupScript = @"
 #define PublishDir "$(ConvertTo-InnoString $publishDirectory)"
@@ -154,12 +159,12 @@ OutputDir=$(ConvertTo-InnoString $OutputDirectory)
 OutputBaseFilename=$([System.IO.Path]::GetFileNameWithoutExtension($installerName))
 SetupIconFile=$(ConvertTo-InnoString (Join-Path $script:RepositoryRoot "src\KotobaSenpai.App\Assets\Branding\app-icon.ico"))
 UninstallDisplayIcon={app}\KotobaSenpai.App.exe
-UninstallDisplayName=KotobaSenpai (Local Preview $version)
+UninstallDisplayName=KotobaSenpai $Version
 Compression=lzma2/normal
 SolidCompression=yes
 WizardStyle=modern
 VersionInfoVersion=$version.0
-VersionInfoDescription=KotobaSenpai local preview installer
+VersionInfoDescription=KotobaSenpai installer
 VersionInfoProductName=KotobaSenpai
 VersionInfoProductVersion=$version.0
 

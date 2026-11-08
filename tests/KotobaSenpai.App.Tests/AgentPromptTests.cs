@@ -7,8 +7,8 @@ namespace KotobaSenpai.App.Tests;
 public sealed class AgentPromptTests
 {
     [Theory]
-    [InlineData("en", "repeat the four-line form above", "Optional fields may be left blank.", "do not ask me to fill in the tool path or interface version")]
-    [InlineData("zh-CN", "逐行展示上面的四行填写模板", "标注“可选”的项目可以留空", "不要让我填写工具路径或接口版本")]
+    [InlineData("en", "repeat the four-line form at the end of this prompt", "Optional fields may be left blank.", "do not ask me to fill in the tool path or interface version")]
+    [InlineData("zh-CN", "逐行展示本提示词末尾的四行填写模板", "标注“可选”的项目可以留空", "不要让我填写工具路径或接口版本")]
     public void Missing_details_use_a_four_line_form_with_explicit_placeholder_and_optional_field_instructions(
         string language, string formInstruction, string optionalInstruction, string bootstrapInstruction)
     {
