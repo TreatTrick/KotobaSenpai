@@ -1,0 +1,42 @@
+# KotobaSenpai website
+
+An animated, bilingual product website built with Svelte 5, SvelteKit 3, TypeScript, Vite 8, pnpm, and GSAP. English and Simplified Chinese pages are prerendered for GitHub Pages.
+
+## Develop
+
+Use Node.js 24 and pnpm 10.14.0:
+
+```sh
+cd website
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open `/KotobaSenpai/` or `/KotobaSenpai/zh/` on the printed local server URL.
+
+```sh
+pnpm test
+pnpm check
+pnpm build
+pnpm preview
+```
+
+Static output is generated in `build/`. `.github/workflows/website.yml` verifies and deploys this directory on relevant pushes to `main`. The Pages source is GitHub Actions. The desktop application's `v1.0.0` tag stays on its release commit.
+
+## Content and media
+
+- `src/lib/content.ts`: English and Chinese copy, screenshots, installer and repository links.
+- `src/lib/Landing.svelte`: product narrative, language gallery, chapter selection, onboarding, FAQ, and scroll motion.
+- `src/lib/DemoPlayer.svelte`: visible-only playback with pause controls and motion preferences.
+- `src/app.css`: responsive styling and OKLCH design tokens.
+- `static/media/`: optimized derivatives of the existing `../docs/assets` GIFs and screenshots. Original game demonstrations are retained in the repository.
+
+To regenerate optimized media after updating the originals, install `Pillow==13.0.0` and `imageio-ffmpeg==0.8.1` in a Python environment and run `python scripts/prepare-media.py`. Ordinary pnpm builds need neither Python nor FFmpeg.
+
+## Dragon maid
+
+The transparent atlases and playback behavior are reused from `D:/project/Clutch/website`: `mood.webp`, `jump.webp`, `happy.webp`, `mascotFrames.ts`, `mascotPlayback.ts`, and `Mascot.svelte`.
+
+She wags her tail when happy, becomes sad as the pointer moves up through the page's top zone, and loops the original jumping clip when a download link is clicked. Drag horizontally or use the arrow keys, Home, and End. Her normalized position is stored locally under a KotobaSenpai-specific key. Animation pauses in hidden tabs and when motion is disabled. Reduced-motion visitors see still poses. The browser cannot detect a tab-close button; the interaction approximates exit intent.
+
+No analytics, account system, credential collection, or backend is included.

@@ -10,6 +10,8 @@ An AI reading companion for Japanese visual novels. Furigana, pitch accents, con
 
 **English** · [简体中文](README.zh-CN.md)
 
+[Website](https://treattrick.github.io/KotobaSenpai/) · [Download v1.0.0](https://github.com/TreatTrick/KotobaSenpai/releases/tag/v1.0.0)
+
 [Features](#-why-kotobasenpai) · [First run](#-a-simple-first-run) · [Build from source](#-build-from-source)
 
 [![Windows desktop](https://img.shields.io/badge/Windows-Desktop-0078D4?logo=windows&logoColor=white)](#-build-from-source) [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/) [![WPF](https://img.shields.io/badge/UI-WPF-68217A)](https://learn.microsoft.com/dotnet/desktop/wpf/)

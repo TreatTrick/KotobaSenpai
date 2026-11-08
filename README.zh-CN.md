@@ -10,6 +10,8 @@
 
 [English](README.md) · **简体中文**
 
+[官方网站](https://treattrick.github.io/KotobaSenpai/zh/) · [下载 v1.0.0](https://github.com/TreatTrick/KotobaSenpai/releases/tag/v1.0.0)
+
 [核心卖点](#-为什么选择-kotobasenpai) · [首次使用](#-上手只需几步) · [从源码构建](#-从源码构建)
 
 [![Windows 桌面应用](https://img.shields.io/badge/Windows-Desktop-0078D4?logo=windows&logoColor=white)](#-从源码构建) [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/) [![WPF](https://img.shields.io/badge/UI-WPF-68217A)](https://learn.microsoft.com/dotnet/desktop/wpf/)
