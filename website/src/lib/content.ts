@@ -17,8 +17,8 @@ export const LANGUAGES = [
 
 export const CONTENT = {
   en: {
-    title: 'KotobaSenpai — Stay in the story. Read it in Japanese.',
-    description: 'An AI reading companion for Japanese visual novels on Windows. On-screen furigana, pitch accents, contextual explanations, and sentence translations in the language you choose.',
+    title: 'KotobaSenpai — Japanese Visual Novel AI Reading Assistant',
+    description: 'Read Japanese visual novels on Windows with on-screen OCR, furigana, pitch accents, contextual AI explanations, and sentence translation. Download KotobaSenpai.',
     skip: 'Skip to content',
     nav: ['The experience', 'Your language', 'Getting started'],
     download: 'Download for Windows',
@@ -82,8 +82,8 @@ export const CONTENT = {
     motionOff: 'Off'
   },
   zh: {
-    title: 'KotobaSenpai — 少按暂停，多看懂剧情。',
-    description: '为日语视觉小说准备的 AI 阅读助手。振假名、音调、语境释义和整句翻译，直接出现在正在读的台词旁，用你选择的语言理解故事。',
+    title: 'KotobaSenpai — 日语视觉小说 AI 阅读助手｜振假名与翻译',
+    description: '用 KotobaSenpai 辅读日语视觉小说与 Galgame。Windows 屏幕 OCR 识别、振假名、日语音调、AI 语境释义与整句翻译，让理解跟上剧情。下载 Windows 版，自由选择 AI 服务商。',
     skip: '跳至主要内容',
     nav: ['阅读体验', '你的语言', '轻松上手'],
     download: '下载 Windows 版',

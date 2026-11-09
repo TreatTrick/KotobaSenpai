@@ -40,3 +40,14 @@ The transparent atlases and playback behavior are reused from `D:/project/Clutch
 She wags her tail when happy, becomes sad as the pointer moves up through the page's top zone, and loops the original jumping clip when a download link is clicked. Drag horizontally or use the arrow keys, Home, and End. Her normalized position is stored locally under a KotobaSenpai-specific key. Animation pauses in hidden tabs and when motion is disabled. Reduced-motion visitors see still poses. The browser cannot detect a tab-close button; the interaction approximates exit intent.
 
 No analytics, account system, credential collection, or backend is included.
+
+## Search discovery
+
+The Google Search Console URL-prefix property is `https://treattrick.github.io/KotobaSenpai/`.
+Keep the `google-site-verification` meta tag in `src/app.html` after verification; Google periodically checks ownership again.
+The public verification value is not an API credential and must be present in the deployed HTML.
+
+The sitemap is `https://treattrick.github.io/KotobaSenpai/sitemap.xml` and lists both prerendered language pages.
+Each page has a descriptive title, description, canonical URL, and reciprocal language alternates.
+GitHub project Pages serves `robots.txt` under the project path; crawler rules are read from the host-root `/robots.txt`, not this project file.
+Search Console submission requests discovery and crawling; Google decides whether and when to index each page and how to rank it.
