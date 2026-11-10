@@ -18,7 +18,7 @@ Stay with the story while Japanese readings, pitch accents, contextual explanati
 
 ## Conversion and proof
 
-The primary action downloads the published v1.0.0 installer. Secondary actions open the source repository and release notes. Proof comes from the existing GIF demonstrations and screenshots in `../docs/assets`, not invented testimonials or benchmark claims. The documented cost example is one 30-minute session of Witch on the Holy Night with DeepSeek V4.1 Flash, not a guaranteed rate.
+The primary action downloads the latest stable Windows installer through GitHub's version-independent release asset URL. Secondary actions open the source repository and latest release notes. Download links and copy must remain current across releases without a website redeployment. Proof comes from the existing GIF demonstrations and screenshots in `../docs/assets`, not invented testimonials or benchmark claims. The documented cost example is one 30-minute session of Witch on the Holy Night with DeepSeek V4.1 Flash, not a guaranteed rate.
 
 ## Brand personality
 

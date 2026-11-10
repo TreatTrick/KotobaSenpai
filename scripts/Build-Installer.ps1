@@ -200,7 +200,10 @@ Filename: "{app}\KotobaSenpai.App.exe"; Description: "{cm:LaunchProgram,KotobaSe
     }
 
     $installer = Get-Item -LiteralPath $installerPath
+    $stableInstallerPath = Join-Path $OutputDirectory 'KotobaSenpai-win-x64-Setup.exe'
+    Copy-Item -LiteralPath $installerPath -Destination $stableInstallerPath -Force
     Write-Host "Installer created: $($installer.FullName)"
+    Write-Host "Latest-release installer alias created: $stableInstallerPath"
     Write-Host ("Size: {0:N1} MiB" -f ($installer.Length / 1MB))
 }
 finally {

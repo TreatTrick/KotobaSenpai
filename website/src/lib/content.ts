@@ -2,8 +2,8 @@ export type Locale = 'en' | 'zh';
 export type DemoName = 'furigana' | `${'hero' | 'analysis' | 'setup' | 'onboarding'}-${'en' | 'zh'}`;
 
 export const REPOSITORY_URL = 'https://github.com/TreatTrick/KotobaSenpai';
-export const RELEASE_URL = `${REPOSITORY_URL}/releases/tag/v1.0.0`;
-export const DOWNLOAD_URL = `${REPOSITORY_URL}/releases/download/v1.0.0/KotobaSenpai-1.0.0-win-x64-Setup.exe`;
+export const RELEASE_URL = `${REPOSITORY_URL}/releases/latest`;
+export const DOWNLOAD_URL = `${RELEASE_URL}/download/KotobaSenpai-win-x64-Setup.exe`;
 export const SITE_URL = 'https://treattrick.github.io/KotobaSenpai';
 
 export const LANGUAGES = [
@@ -24,7 +24,7 @@ export const CONTENT = {
     download: 'Download for Windows',
     navDownload: 'Download',
     source: 'Explore on GitHub',
-    release: 'Meet version 1.0.0',
+    release: 'Get the latest release',
     hero: ['Stay in the story.', 'Read it in Japanese.'],
     intro: 'The scene. The words. That one unforgettable line. Understand more of it, without looking away.',
     heroNote: 'Windows 10 / 11 · x64 · Your own AI provider',
@@ -70,7 +70,7 @@ export const CONTENT = {
     ],
     finalTitle: ['The next line', 'is waiting for you.'],
     finalCopy: 'Keep the original words. Find a little more meaning.',
-    finalNote: 'v1.0.0 · Windows x64 · 112 MB · .NET runtime included',
+    finalNote: 'Latest release · Windows x64 · .NET runtime included',
     releaseNotes: 'Release notes & checksums',
     footerTag: 'Your Japanese reading companion.',
     footerNote: 'Game footage illustrates the reading experience. Game content belongs to its respective owners.',
@@ -89,7 +89,7 @@ export const CONTENT = {
     download: '下载 Windows 版',
     navDownload: '立即下载',
     source: '在 GitHub 探索',
-    release: '全新 1.0.0，现已登场',
+    release: '获取最新版本',
     hero: ['少按暂停。', '多看懂剧情。'],
     intro: '这一幕，这句话，这份只属于原文的心动。\n让理解跟上故事，让目光留在这里。',
     heroNote: 'Windows 10 / 11 · x64 · 自由选择 AI 服务商',
@@ -135,7 +135,7 @@ export const CONTENT = {
     ],
     finalTitle: ['下一句，', '等你读懂。'],
     finalCopy: '留下原文的心动，也读懂更多故事。',
-    finalNote: 'v1.0.0 · Windows x64 · 112 MB · 自带 .NET 运行时',
+    finalNote: '最新正式版 · Windows x64 · 自带 .NET 运行时',
     releaseNotes: '版本说明与校验文件',
     footerTag: '陪你读日语的故事搭档。',
     footerNote: '游戏画面仅用于展示阅读体验，游戏内容归各自权利人所有。',
