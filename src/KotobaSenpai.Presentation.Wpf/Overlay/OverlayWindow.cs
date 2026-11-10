@@ -21,8 +21,10 @@ internal sealed class OverlayWindow : Window
     private readonly PhrasePopup _phrasePopup;
     private readonly ITargetWindowTracker? _tracker;
     private readonly ILogger? _logger;
+    private readonly IRegionSelector? _regionSelector;
     private WordOverlaySession? _session;
     private bool _presentationSuspended;
+    private bool IsPresentationSuppressed => _presentationSuspended || _regionSelector?.IsSelecting == true;
     private TargetWindowSnapshot? _renderedSnapshot;
     private nint _ownerHandle;
     private double _fontScale;
@@ -31,21 +33,27 @@ internal sealed class OverlayWindow : Window
     public OverlayWindow(
         IStringLocalizer? localizer = null,
         ITargetWindowTracker? tracker = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        IRegionSelector? regionSelector = null)
     {
         _phrasePopup = new PhrasePopup(localizer, logger);
         _hover = new OverlayHoverController(_annotations, _phrasePopup);
         _diagnostics = new OverlayDiagnostics(logger);
         _tracker = tracker;
         _logger = logger;
+        _regionSelector = regionSelector;
 
         if (_tracker is not null)
             _tracker.Changed += OnTargetChanged;
+        if (_regionSelector is not null)
+            _regionSelector.SelectionStateChanged += OnRegionSelectionChanged;
         Closed += (_, _) =>
         {
             StopHover();
             if (_tracker is not null)
                 _tracker.Changed -= OnTargetChanged;
+            if (_regionSelector is not null)
+                _regionSelector.SelectionStateChanged -= OnRegionSelectionChanged;
         };
 
         WindowStyle = WindowStyle.None;
@@ -149,7 +157,26 @@ internal sealed class OverlayWindow : Window
             session = session.Reproject(snapshot.Target);
         }
 
+        if (IsPresentationSuppressed)
+        {
+            StopHover();
+            Hide();
+            return;
+        }
         RenderCurrent(session, fontScale);
+    }
+
+    private void OnRegionSelectionChanged(object? sender, EventArgs e)
+    {
+        if (IsPresentationSuppressed)
+        {
+            StopHover();
+            Hide();
+        }
+        else if (_session is not null)
+        {
+            Render(_session, _fontScale);
+        }
     }
 
     internal void ApplyAppearance(OverlayAppearance appearance)
@@ -212,12 +239,12 @@ internal sealed class OverlayWindow : Window
             Hide();
             return;
         }
-        if (!snapshot.IsRenderable || _presentationSuspended)
+        if (!snapshot.IsRenderable || IsPresentationSuppressed)
         {
             _logger?.Log(
                 IsVisible ? LogLevel.Debug : LogLevel.Trace,
                 null,
-                "[OVERLAY] Tracker change caused overlay hide because target is not renderable: handle={0}, foreground={1}, occluded={2}.",
+                "[OVERLAY] Tracker change caused overlay hide because presentation is suppressed or target is not renderable: handle={0}, foreground={1}, occluded={2}.",
                 snapshot.Handle,
                 snapshot.IsForeground,
                 snapshot.IsOccluded);

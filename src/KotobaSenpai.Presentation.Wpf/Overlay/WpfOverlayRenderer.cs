@@ -20,6 +20,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer, IDisposable
     private readonly ITargetWindowTracker? _tracker;
     private readonly ILogger? _logger;
     private readonly SentenceTranslationPreferences? _sentenceTranslation;
+    private readonly IRegionSelector? _regionSelector;
     private OverlayWindow? _window;
     private bool _disposed;
 
@@ -28,12 +29,14 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer, IDisposable
         ISettingsService? settings = null,
         ITargetWindowTracker? tracker = null,
         ILogger? logger = null,
-        SentenceTranslationPreferences? sentenceTranslation = null)
+        SentenceTranslationPreferences? sentenceTranslation = null,
+        IRegionSelector? regionSelector = null)
     {
         _localizer = localizer;
         _settings = settings;
         _tracker = tracker;
         _logger = logger;
+        _regionSelector = regionSelector;
         _sentenceTranslation = sentenceTranslation ?? (settings is null ? null : new SentenceTranslationPreferences(settings));
         if (_sentenceTranslation is not null)
             _sentenceTranslation.Changed += OnSentenceTranslationChanged;
@@ -64,7 +67,7 @@ public sealed class WpfOverlayRenderer : IOverlayRenderer, IDisposable
                 session.PhraseGroups.Count,
                 _tracker is not null,
                 session.Target.Bounds);
-            _window ??= new OverlayWindow(_localizer, _tracker, _logger);
+            _window ??= new OverlayWindow(_localizer, _tracker, _logger, _regionSelector);
             _window.SetSentenceTranslationEnabled(_sentenceTranslation?.Enabled ?? true);
             _window.ApplyAppearance(ResolveAppearance());
             _window.Render(session, ResolveFontScale());

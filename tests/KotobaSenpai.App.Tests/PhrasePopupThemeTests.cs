@@ -99,6 +99,7 @@ public sealed partial class PhrasePopupThemeTests
                 CheckMainContentStartup(application);
                 CheckSupportPresentation(application);
                 CheckSuspendedOverlay();
+                CheckRegionSelectionOverlay();
                 CheckNativeShortcuts();
                 completion.SetResult();
             }
