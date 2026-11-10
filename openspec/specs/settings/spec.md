@@ -96,11 +96,11 @@ The `ISettingsService` port SHALL be injectable via dependency injection and SHA
 
 ### Requirement: 设置服务中的自动识别开关
 
-系统 SHALL 在 `ISettingsService` 中支持 `AutoRecognitionEnabled` 布尔设置项，用于控制自动轮询识别功能的开关状态。该设置项 SHALL 遵循与既有设置相同的存储和读写约定：通过 `GetValue`/`SetValue` 以字符串形式读写（值 `"true"` 表示启用，其他值或缺省表示禁用）。
+系统 SHALL 在 `ISettingsService` 中支持 `AutoRecognitionEnabled` 布尔设置项，用于控制自动轮询识别功能的开关状态。该设置项 SHALL 遵循与既有设置相同的存储和读写约定：通过 `GetValue`/`SetValue` 以字符串形式读写（值 `"true"` 或缺省表示启用，其他已存储的值表示禁用）。
 
 #### Scenario: 读取自动识别设置
 - **WHEN** 调用方读取 `AutoRecognitionEnabled` 设置
-- **THEN** 已存储的字符串原样返回；未存储时返回 null，SHALL NOT 抛出异常；调用方仅将 `"true"` 解释为启用，其他值或缺省均解释为禁用
+- **THEN** 已存储的字符串原样返回；未存储时返回 null，SHALL NOT 抛出异常；调用方将 `"true"` 或缺省解释为启用，其他已存储的值解释为禁用
 
 #### Scenario: 写入自动识别设置
 - **WHEN** 调用方写入 `AutoRecognitionEnabled = "true"`
@@ -108,7 +108,7 @@ The `ISettingsService` port SHALL be injectable via dependency injection and SHA
 
 #### Scenario: 未设置时返回默认值
 - **WHEN** 用户从未设置过 `AutoRecognitionEnabled`
-- **THEN** 读取返回 null，系统 SHALL 默认禁用自动识别
+- **THEN** 读取返回 null，系统 SHALL 默认启用自动识别，且 SHALL NOT 为此写入设置值
 
 ### Requirement: 自动识别设置开关持久化
 `AutoRecognitionEnabled` 设置项 SHALL 遵循现有 settings 服务的持久化约束：与其他设置共存于同一文件，写入时 SHALL NOT 擦除其他键。

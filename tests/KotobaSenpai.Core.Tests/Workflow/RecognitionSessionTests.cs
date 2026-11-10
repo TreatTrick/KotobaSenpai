@@ -14,6 +14,30 @@ public sealed class RecognitionSessionTests
 {
     private static readonly WindowTarget Target = new((nint)42, "Reading target", new(0, 0, 1000, 500));
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("true", true)]
+    [InlineData("TRUE", true)]
+    [InlineData("false", false)]
+    [InlineData("", false)]
+    [InlineData("invalid", false)]
+    public async Task Automatic_recognition_defaults_to_enabled_and_respects_saved_preferences(string? saved, bool enabled)
+    {
+        var settings = new Settings();
+        settings.SetValue(AutoRecognitionSettings.EnabledKey, saved);
+        var automatic = new Automatic();
+        using var workflow = CreateWorkflow(new Recognizer(), new Analyzer(), new Overlay());
+        using var session = new RecognitionSessionController(workflow, settings, automatic);
+
+        Assert.Equal(enabled, session.State.AutoRecognitionEnabled);
+        Assert.False(automatic.IsRunning);
+
+        await session.RecognizeAsync(Target);
+
+        Assert.Equal(enabled, automatic.IsRunning);
+        Assert.Equal(saved, settings.GetValue(AutoRecognitionSettings.EnabledKey));
+    }
+
     [Fact]
     public async Task Automatic_sampling_returns_before_the_model_and_pause_cancels_all_tracked_analysis()
     {

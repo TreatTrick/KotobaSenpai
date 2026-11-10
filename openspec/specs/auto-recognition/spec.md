@@ -7,11 +7,15 @@ Detect changes in the selected recognition region and run full or incremental re
 ## Requirements
 
 ### Requirement: 自动识别由设置开关控制
-系统 SHALL 提供布尔设置项 `AutoRecognitionEnabled`，默认关闭，用于保存自动识别偏好。未处于主动隐藏暂停状态时，用户通过界面开关或快捷键主动开启，如果已有可用目标且没有会话，系统 SHALL 先识别一次，再开始自动检测；已有会话时 SHALL 直接开始自动检测；正在执行手动识别时 SHALL 等它结束，不重复启动。没有可用目标时 SHALL 只保存偏好并提示先选择或恢复目标。读取启动设置、仅选择目标和预览重试 SHALL NOT 自动发起识别。关闭自动识别 SHALL 停止采样并取消尚未完成的自动任务，保留最后已显示结果和当前会话，不取消独立的手动识别。用户主动隐藏时 SHALL 停止自动检测并取消未完成的手动和自动任务，保留偏好和已完成结果；隐藏期间切换开关 SHALL 只保存偏好，恢复阅读成功后才按当前偏好决定是否自动检测。
+系统 SHALL 提供布尔设置项 `AutoRecognitionEnabled`，默认开启，用于保存自动识别偏好。未处于主动隐藏暂停状态时，用户通过界面开关或快捷键主动开启，如果已有可用目标且没有会话，系统 SHALL 先识别一次，再开始自动检测；已有会话时 SHALL 直接开始自动检测；正在执行手动识别时 SHALL 等它结束，不重复启动。没有可用目标时 SHALL 只保存偏好并提示先选择或恢复目标。读取启动设置、仅选择目标和预览重试 SHALL NOT 自动发起识别。关闭自动识别 SHALL 停止采样并取消尚未完成的自动任务，保留最后已显示结果和当前会话，不取消独立的手动识别。用户主动隐藏时 SHALL 停止自动检测并取消未完成的手动和自动任务，保留偏好和已完成结果；隐藏期间切换开关 SHALL 只保存偏好，恢复阅读成功后才按当前偏好决定是否自动检测。
 
-#### Scenario: 设置开关默认关闭
+#### Scenario: 设置开关默认开启
 - **WHEN** 用户首次使用应用且未修改 `AutoRecognitionEnabled` 设置
-- **THEN** 系统不运行自动识别，用户可以请求一次识别，或者主动开启自动识别
+- **THEN** 自动识别开关为开启，系统等待用户显式开始识别，首次识别成功后启动自动检测
+
+#### Scenario: 保留已保存的关闭偏好
+- **WHEN** 用户已将 `AutoRecognitionEnabled` 保存为 `"false"` 后重新启动应用
+- **THEN** 自动识别开关保持关闭，手动识别成功后也不启动自动检测
 
 #### Scenario: 用户开启自动识别
 - **WHEN** 用户通过界面开关或快捷键主动开启自动识别，已有有效会话且未主动隐藏暂停
@@ -195,7 +199,7 @@ The system SHALL show the red neon region warning only when a completed, current
 - **THEN** 系统 SHALL 将实际间隔钳制为 100ms
 
 ### Requirement: Reset incompatible sampling baselines
-系统 SHALL 在目标改变、捕获会话代次失效、客户区尺寸或采样区域改变、隐藏/最小化及捕获失败后使旧差异基线失效。恢复后的第一份有效样本 SHALL 建立新基线而不单凭重新初始化触发 OCR；只有后续可比较样本的变化才触发 OCR 文本确认。单纯遮挡或失焦 SHALL 保留当前基线。现有默认关闭、首次手动识别后启动、最小 100ms 间隔、关闭开关停止轮询及句子缓存规则 SHALL 保持不变。
+系统 SHALL 在目标改变、捕获会话代次失效、客户区尺寸或采样区域改变、隐藏/最小化及捕获失败后使旧差异基线失效。恢复后的第一份有效样本 SHALL 建立新基线而不单凭重新初始化触发 OCR；只有后续可比较样本的变化才触发 OCR 文本确认。单纯遮挡或失焦 SHALL 保留当前基线。现有默认开启、首次手动识别后启动、最小 100ms 间隔、关闭开关停止轮询及句子缓存规则 SHALL 保持不变。
 
 #### Scenario: Establish a baseline after capture restarts
 - **WHEN** 暂停后的 WGC 会话重新提供第一份有效区域样本

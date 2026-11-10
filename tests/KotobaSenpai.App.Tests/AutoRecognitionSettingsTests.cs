@@ -21,7 +21,9 @@ public sealed class AutoRecognitionSettingsTests
     {
         var controller = new FakeAutoRecognitionController();
         var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
-        using var viewModel = Create(new RecordingSettings(), controller, target);
+        var settings = new RecordingSettings();
+        settings.SetValue(AutoRecognitionSettings.EnabledKey, "false");
+        using var viewModel = Create(settings, controller, target);
         viewModel.Selection.SelectedWindow = target;
 
         viewModel.AutoRecognitionEnabled = true;
@@ -31,12 +33,14 @@ public sealed class AutoRecognitionSettingsTests
     }
 
     [Fact]
-    public void Auto_recognition_defaults_to_disabled_when_the_setting_is_missing()
+    public void Auto_recognition_defaults_to_enabled_without_starting_when_the_setting_is_missing()
     {
         var settings = new RecordingSettings();
-        var viewModel = Create(settings);
+        var controller = new FakeAutoRecognitionController();
+        using var viewModel = Create(settings, controller);
 
-        Assert.False(viewModel.AutoRecognitionEnabled);
+        Assert.True(viewModel.AutoRecognitionEnabled);
+        Assert.False(controller.IsRunning);
         Assert.Null(settings.GetValue(AutoRecognitionSettings.EnabledKey));
     }
 
@@ -44,7 +48,11 @@ public sealed class AutoRecognitionSettingsTests
     public void Changing_auto_recognition_persists_the_setting()
     {
         var settings = new RecordingSettings();
-        var viewModel = Create(settings);
+        using var viewModel = Create(settings);
+
+        viewModel.AutoRecognitionEnabled = false;
+
+        Assert.Equal("false", settings.GetValue(AutoRecognitionSettings.EnabledKey));
 
         viewModel.AutoRecognitionEnabled = true;
 
@@ -52,15 +60,16 @@ public sealed class AutoRecognitionSettingsTests
     }
 
     [Fact]
-    public async Task Enabled_auto_recognition_starts_after_manual_recognition_and_stops_when_disabled()
+    public async Task Default_auto_recognition_starts_after_manual_recognition_and_stops_when_disabled()
     {
         var settings = new RecordingSettings();
         var controller = new FakeAutoRecognitionController();
         var target = new WindowTarget((nint)2, "Target", new ScreenRect(0, 0, 100, 100));
-        var viewModel = Create(settings, controller, target);
+        using var viewModel = Create(settings, controller, target);
 
-        viewModel.AutoRecognitionEnabled = true;
         viewModel.Selection.SelectedWindow = target;
+
+        Assert.False(controller.IsRunning);
 
         await viewModel.RecognizeCommand.ExecuteAsync(null);
 

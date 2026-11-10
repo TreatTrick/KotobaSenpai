@@ -56,10 +56,10 @@ public sealed class RecognitionPageViewModelTests
             vm.Selection.SelectedWindow = target;
             await vm.RecognizeCommand.ExecuteAsync(null);
             await vm.Actions.ExecuteAsync(KotobaSenpai.App.Reading.ReadingAction.ToggleAutomatic);
-            Assert.True(automatic.IsRunning);
+            Assert.False(automatic.IsRunning);
             var saved = overlay.LastSession;
             await vm.Actions.ExecuteAsync(KotobaSenpai.App.Reading.ReadingAction.ToggleAutomatic);
-            Assert.False(automatic.IsRunning);
+            Assert.True(automatic.IsRunning);
             Assert.Same(saved, overlay.LastSession);
             var shown = overlay.ShowCount;
             await vm.ToggleVisibilityCommand.ExecuteAsync(null);

@@ -42,7 +42,7 @@ public sealed class RecognitionSessionController : IDisposable
         _settings = settings;
         _automatic = automatic;
         _logger = logger;
-        _autoEnabled = string.Equals(settings.GetValue(AutoRecognitionSettings.EnabledKey), "true", StringComparison.OrdinalIgnoreCase);
+        _autoEnabled = string.Equals(settings.GetValue(AutoRecognitionSettings.EnabledKey) ?? "true", "true", StringComparison.OrdinalIgnoreCase);
     }
 
     public event EventHandler? Changed;
