@@ -29,6 +29,7 @@ internal sealed class DesktopSession(MainWindowViewModel main, ReadingShortcutCo
         main.Settings.Llm.PropertyChanged += OnReadinessChanged;
         main.Dictionary.PropertyChanged += OnReadinessChanged;
         main.Settings.OverlayAppearance.Changed += OnOverlayAppearanceChanged;
+        main.About.InstallStarted += OnUpdateInstallStarted;
         _window = new MainWindow { ThemeService = theme, DataContext = main };
         application.MainWindow = _window;
         _support = new SupportCoordinator(main.Support!, main, _window, localizer, logger);
@@ -56,6 +57,7 @@ internal sealed class DesktopSession(MainWindowViewModel main, ReadingShortcutCo
 
     private void OnShortcutStateChanged(object? sender, EventArgs e) => main.Recognition?.RefreshInteraction();
     private void OnOverlayAppearanceChanged(object? sender, EventArgs e) => recognition.RefreshAppearance();
+    private void OnUpdateInstallStarted(object? sender, EventArgs e) => _window?.Close();
 
     private async void OnMainWindowClosing(object? sender, CancelEventArgs e)
     {
@@ -86,6 +88,7 @@ internal sealed class DesktopSession(MainWindowViewModel main, ReadingShortcutCo
         main.Settings.Llm.PropertyChanged -= OnReadinessChanged;
         main.Dictionary.PropertyChanged -= OnReadinessChanged;
         main.Settings.OverlayAppearance.Changed -= OnOverlayAppearanceChanged;
+        main.About.InstallStarted -= OnUpdateInstallStarted;
         if (main.Selection is not null) main.Selection.PropertyChanged -= OnReadinessChanged;
         if (_window is not null) _window.Closing -= OnMainWindowClosing;
         main.Dispose();

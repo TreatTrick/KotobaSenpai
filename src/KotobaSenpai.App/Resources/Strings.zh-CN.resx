@@ -709,4 +709,41 @@ API Key：YOUR_API_KEY
   <data name="SentenceTranslation_Reference" xml:space="preserve"><value>AI 参考译文</value></data>
   <data name="SentenceTranslation_Unavailable" xml:space="preserve"><value>暂无整句译文，可重新识别后再试。</value></data>
   <data name="SentenceTranslation_NextRecognition" xml:space="preserve"><value>下次识别时生成整句译文。</value></data>
+  <data name="Tab_About" xml:space="preserve"><value>关于</value></data>
+  <data name="About_Description" xml:space="preserve"><value>应用信息与软件更新。</value></data>
+  <data name="About_AppDescription" xml:space="preserve"><value>陪你阅读日语视觉小说的助手。</value></data>
+  <data name="About_CurrentVersion" xml:space="preserve"><value>当前版本：{0}</value></data>
+  <data name="About_LatestVersion" xml:space="preserve"><value>新版本：{0}</value></data>
+  <data name="About_Website" xml:space="preserve"><value>官方网站</value></data>
+  <data name="About_Feedback" xml:space="preserve"><value>问题反馈</value></data>
+  <data name="About_Updates" xml:space="preserve"><value>软件更新</value></data>
+  <data name="About_Check" xml:space="preserve"><value>检查更新</value></data>
+  <data name="About_NotChecked" xml:space="preserve"><value>打开此页时会自动检查更新。</value></data>
+  <data name="About_Checking" xml:space="preserve"><value>正在检查 GitHub 最新正式版…</value></data>
+  <data name="About_UpToDate" xml:space="preserve"><value>已是最新版。</value></data>
+  <data name="About_UpdateAvailable" xml:space="preserve"><value>发现新版本，可以下载安装包。</value></data>
+  <data name="About_NoReleaseNotes" xml:space="preserve"><value>此版本没有提供更新说明。</value></data>
+  <data name="About_PackageSize" xml:space="preserve"><value>安装包大小：{0:N1} MiB</value></data>
+  <data name="About_ReleaseNotes" xml:space="preserve"><value>更新说明</value></data>
+  <data name="About_Download" xml:space="preserve"><value>下载更新</value></data>
+  <data name="About_Downloading" xml:space="preserve"><value>正在下载更新…</value></data>
+  <data name="About_DownloadProgress" xml:space="preserve"><value>{0:N1} / {1:N1} MiB</value></data>
+  <data name="About_Cancel" xml:space="preserve"><value>取消下载</value></data>
+  <data name="About_Cancelled" xml:space="preserve"><value>已取消下载，可以重新下载。</value></data>
+  <data name="About_Verifying" xml:space="preserve"><value>正在校验安装包…</value></data>
+  <data name="About_Ready" xml:space="preserve"><value>安装包已校验，点击“更新并重启”即可安装。</value></data>
+  <data name="About_Install" xml:space="preserve"><value>更新并重启</value></data>
+  <data name="About_StartingInstaller" xml:space="preserve"><value>正在启动安装器，应用将关闭并在更新后重新打开。</value></data>
+  <data name="About_OpenRelease" xml:space="preserve"><value>查看发布页</value></data>
+  <data name="About_ManualInstall" xml:space="preserve"><value>当前运行版本不支持自动安装，请打开发布页手动安装新版。</value></data>
+  <data name="About_UpdateHint" xml:space="preserve"><value>下载和安装都由你点击触发。更新会保留设置和已安装词典。</value></data>
+  <data name="About_LinkFailed" xml:space="preserve"><value>无法打开浏览器，请重试。</value></data>
+  <data name="AppUpdateCheckFailed" xml:space="preserve"><value>无法检查更新，请检查网络后重试。</value></data>
+  <data name="AppUpdateRateLimited" xml:space="preserve"><value>GitHub 暂时限制了请求，请稍后重试。</value></data>
+  <data name="AppUpdateReleaseUnavailable" xml:space="preserve"><value>暂时没有可用且带完整校验信息的正式版安装包，请稍后重试或查看 GitHub。</value></data>
+  <data name="AppUpdateDownloadFailed" xml:space="preserve"><value>下载失败，请检查网络和磁盘剩余空间后重试。</value></data>
+  <data name="AppUpdateVerificationFailed" xml:space="preserve"><value>安装包校验失败，请重新下载更新。</value></data>
+  <data name="AppUpdateInstallFailed" xml:space="preserve"><value>无法启动安装器，请重新下载或打开发布页手动安装。</value></data>
+  <data name="AppUpdateInstallUnavailable" xml:space="preserve"><value>当前运行版本不支持自动安装，请打开发布页手动安装。</value></data>
+  <data name="AppUpdateTimedOut" xml:space="preserve"><value>更新请求超时，请重试。</value></data>
 </root>

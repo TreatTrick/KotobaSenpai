@@ -9,6 +9,35 @@ namespace KotobaSenpai.App.Resources;
 /// </summary>
 public static class ResourceKeys
 {
+    public const string Tab_About = nameof(Tab_About);
+    public const string About_Description = nameof(About_Description);
+    public const string About_AppDescription = nameof(About_AppDescription);
+    public const string About_CurrentVersion = nameof(About_CurrentVersion);
+    public const string About_LatestVersion = nameof(About_LatestVersion);
+    public const string About_Website = nameof(About_Website);
+    public const string About_Feedback = nameof(About_Feedback);
+    public const string About_Updates = nameof(About_Updates);
+    public const string About_Check = nameof(About_Check);
+    public const string About_NotChecked = nameof(About_NotChecked);
+    public const string About_Checking = nameof(About_Checking);
+    public const string About_UpToDate = nameof(About_UpToDate);
+    public const string About_UpdateAvailable = nameof(About_UpdateAvailable);
+    public const string About_NoReleaseNotes = nameof(About_NoReleaseNotes);
+    public const string About_PackageSize = nameof(About_PackageSize);
+    public const string About_ReleaseNotes = nameof(About_ReleaseNotes);
+    public const string About_Download = nameof(About_Download);
+    public const string About_Downloading = nameof(About_Downloading);
+    public const string About_DownloadProgress = nameof(About_DownloadProgress);
+    public const string About_Cancel = nameof(About_Cancel);
+    public const string About_Cancelled = nameof(About_Cancelled);
+    public const string About_Verifying = nameof(About_Verifying);
+    public const string About_Ready = nameof(About_Ready);
+    public const string About_Install = nameof(About_Install);
+    public const string About_StartingInstaller = nameof(About_StartingInstaller);
+    public const string About_OpenRelease = nameof(About_OpenRelease);
+    public const string About_ManualInstall = nameof(About_ManualInstall);
+    public const string About_UpdateHint = nameof(About_UpdateHint);
+    public const string About_LinkFailed = nameof(About_LinkFailed);
     public const string SentenceTranslation_Title = nameof(SentenceTranslation_Title);
     public const string SentenceTranslation_Description = nameof(SentenceTranslation_Description);
     public const string SentenceTranslation_Saved = nameof(SentenceTranslation_Saved);

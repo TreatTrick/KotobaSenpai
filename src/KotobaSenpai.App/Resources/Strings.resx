@@ -709,4 +709,41 @@ Meet your next word.</value>
   <data name="SentenceTranslation_Reference" xml:space="preserve"><value>AI reference translation</value></data>
   <data name="SentenceTranslation_Unavailable" xml:space="preserve"><value>No sentence translation is available. Run recognition again to retry.</value></data>
   <data name="SentenceTranslation_NextRecognition" xml:space="preserve"><value>A sentence translation will be generated on the next recognition.</value></data>
+  <data name="Tab_About" xml:space="preserve"><value>About</value></data>
+  <data name="About_Description" xml:space="preserve"><value>App information and software updates.</value></data>
+  <data name="About_AppDescription" xml:space="preserve"><value>A reading companion for Japanese visual novels.</value></data>
+  <data name="About_CurrentVersion" xml:space="preserve"><value>Current version: {0}</value></data>
+  <data name="About_LatestVersion" xml:space="preserve"><value>New version: {0}</value></data>
+  <data name="About_Website" xml:space="preserve"><value>Website</value></data>
+  <data name="About_Feedback" xml:space="preserve"><value>Report an issue</value></data>
+  <data name="About_Updates" xml:space="preserve"><value>Software updates</value></data>
+  <data name="About_Check" xml:space="preserve"><value>Check for updates</value></data>
+  <data name="About_NotChecked" xml:space="preserve"><value>Updates will be checked when you open this page.</value></data>
+  <data name="About_Checking" xml:space="preserve"><value>Checking GitHub for the latest stable release…</value></data>
+  <data name="About_UpToDate" xml:space="preserve"><value>You are using the latest version.</value></data>
+  <data name="About_UpdateAvailable" xml:space="preserve"><value>A new version is available. Download it when you are ready.</value></data>
+  <data name="About_NoReleaseNotes" xml:space="preserve"><value>No release notes were provided.</value></data>
+  <data name="About_PackageSize" xml:space="preserve"><value>Download size: {0:N1} MiB</value></data>
+  <data name="About_ReleaseNotes" xml:space="preserve"><value>What's new</value></data>
+  <data name="About_Download" xml:space="preserve"><value>Download update</value></data>
+  <data name="About_Downloading" xml:space="preserve"><value>Downloading the update…</value></data>
+  <data name="About_DownloadProgress" xml:space="preserve"><value>{0:N1} / {1:N1} MiB</value></data>
+  <data name="About_Cancel" xml:space="preserve"><value>Cancel download</value></data>
+  <data name="About_Cancelled" xml:space="preserve"><value>Download cancelled. You can download it again.</value></data>
+  <data name="About_Verifying" xml:space="preserve"><value>Verifying the downloaded installer…</value></data>
+  <data name="About_Ready" xml:space="preserve"><value>The update is ready. Choose Update and restart to install it.</value></data>
+  <data name="About_Install" xml:space="preserve"><value>Update and restart</value></data>
+  <data name="About_StartingInstaller" xml:space="preserve"><value>Starting the installer. The app will close and reopen after the update.</value></data>
+  <data name="About_OpenRelease" xml:space="preserve"><value>View release</value></data>
+  <data name="About_ManualInstall" xml:space="preserve"><value>Automatic installation is unavailable for this copy. Open the release page to install the new version manually.</value></data>
+  <data name="About_UpdateHint" xml:space="preserve"><value>Updates are downloaded and installed only when you choose. Your settings and installed dictionary are kept.</value></data>
+  <data name="About_LinkFailed" xml:space="preserve"><value>Could not open the browser. Please try again.</value></data>
+  <data name="AppUpdateCheckFailed" xml:space="preserve"><value>Could not check for updates. Check your connection and try again.</value></data>
+  <data name="AppUpdateRateLimited" xml:space="preserve"><value>GitHub is limiting requests. Please try again later.</value></data>
+  <data name="AppUpdateReleaseUnavailable" xml:space="preserve"><value>No supported stable installer with a valid checksum is available. Try again later or visit GitHub.</value></data>
+  <data name="AppUpdateDownloadFailed" xml:space="preserve"><value>Could not download the update. Check your connection and free disk space, then try again.</value></data>
+  <data name="AppUpdateVerificationFailed" xml:space="preserve"><value>The installer did not pass verification. Download the update again.</value></data>
+  <data name="AppUpdateInstallFailed" xml:space="preserve"><value>Could not start the installer. Download the update again or open the release page.</value></data>
+  <data name="AppUpdateInstallUnavailable" xml:space="preserve"><value>Automatic installation is unavailable for this copy. Open the release page to install manually.</value></data>
+  <data name="AppUpdateTimedOut" xml:space="preserve"><value>The update request timed out. Please try again.</value></data>
 </root>

@@ -97,6 +97,8 @@ KotobaSenpai is a Windows desktop app built with **.NET 10** and **WPF**. Its fo
 
 The complete installer includes the Japanese dictionary, which is prepared automatically without a download.
 
+Open **About** to check GitHub for the latest stable release. Download the update, then choose **Update and restart** to install it while keeping your settings and dictionary. See [update and release instructions](docs/app-updates.md).
+
 1. Configure your AI provider manually or ask a local Agent to do it with you.
 2. Select the game window.
 3. Start recognition and read.

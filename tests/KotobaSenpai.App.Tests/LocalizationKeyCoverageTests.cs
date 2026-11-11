@@ -67,6 +67,7 @@ public sealed partial class LocalizationKeyCoverageTests
     [InlineData("src/KotobaSenpai.App/MainWindow.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/RecognitionPage.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/SettingsPage.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/AboutPage.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/ModelSettingsView.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/OnboardingModelView.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/TargetSelectionView.xaml")]
@@ -97,6 +98,7 @@ public sealed partial class LocalizationKeyCoverageTests
     [Theory]
     [InlineData("Llm_")]
     [InlineData("WindowPicker_")]
+    [InlineData("About_")]
     public void Feature_keys_have_zh_cn_translations(string prefix)
     {
         var translated = Strings.GetResourceSet(CultureInfo.GetCultureInfo("zh-CN"), true, false);

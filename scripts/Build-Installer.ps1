@@ -22,8 +22,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\Build-Installer.ps1 -Version 
 [CmdletBinding()]
 param(
     [string]$Configuration = "Release",
-    [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string]$Version = (Get-Date -Format "yyyy.MM.dd"),
+    [string]$Version,
     [string]$OutputDirectory,
     [string]$InnoSetupCompiler,
     [string]$UniDicArchive
@@ -72,12 +71,17 @@ function Find-InnoSetupCompiler {
     throw "Inno Setup 6 or 7 was not found. Install Inno Setup or pass -InnoSetupCompiler with the path to ISCC.exe."
 }
 
-function ConvertTo-InnoString {
-    param([string]$Value)
-    return $Value.Replace('"', '""')
-}
-
 $script:RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+if (-not $Version) {
+    $buildProperties = [xml](Get-Content -LiteralPath (Join-Path $script:RepositoryRoot 'Directory.Build.props') -Raw)
+    $Version = [string]$buildProperties.Project.PropertyGroup.Version
+}
+$parsedVersion = $null
+if ($Version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$' -or
+    -not [System.Version]::TryParse($Version, [ref]$parsedVersion) -or
+    $parsedVersion.Major -gt 65534 -or $parsedVersion.Minor -gt 65534 -or $parsedVersion.Build -gt 65534) {
+    throw "The application version must contain three numbers between 0 and 65534, for example 1.0.2."
+}
 $project = Join-Path $script:RepositoryRoot "src\KotobaSenpai.App\KotobaSenpai.App.csproj"
 $modelsDirectory = Join-Path $script:RepositoryRoot "src\KotobaSenpai.Platform.Windows\Models"
 $requiredModels = @(
@@ -113,7 +117,7 @@ $installerName = "KotobaSenpai-$Version-win-x64-Setup.exe"
 $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $workDirectory = Join-Path $tempRoot ("KotobaSenpai-installer-" + [guid]::NewGuid().ToString("N"))
 $publishDirectory = Join-Path $workDirectory "publish"
-$scriptPath = Join-Path $workDirectory "KotobaSenpai.iss"
+$scriptPath = Join-Path $PSScriptRoot "KotobaSenpai.iss"
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 New-Item -ItemType Directory -Path $workDirectory -Force | Out-Null
@@ -149,59 +153,11 @@ try {
     }
     & (Join-Path $script:RepositoryRoot "tests\Check-AgentCli.ps1") -PublishDirectory $publishDirectory
 
-    $setupScript = @"
-#define PublishDir "$(ConvertTo-InnoString $publishDirectory)"
-#define NoticesFile "$(ConvertTo-InnoString $notices)"
-
-[Setup]
-AppId={{A32009BB-E6D3-49E5-A793-E0B1F2F51C11}
-AppName=KotobaSenpai
-AppVersion=$version
-AppPublisher=TreatTrick
-AppPublisherURL=https://github.com/TreatTrick/KotobaSenpai
-AppSupportURL=https://github.com/TreatTrick/KotobaSenpai/issues
-DefaultDirName={localappdata}\Programs\KotobaSenpai
-DefaultGroupName=KotobaSenpai
-PrivilegesRequired=lowest
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
-MinVersion=10.0.19041
-DisableProgramGroupPage=yes
-OutputDir=$(ConvertTo-InnoString $OutputDirectory)
-OutputBaseFilename=$([System.IO.Path]::GetFileNameWithoutExtension($installerName))
-SetupIconFile=$(ConvertTo-InnoString (Join-Path $script:RepositoryRoot "src\KotobaSenpai.App\Assets\Branding\app-icon.ico"))
-UninstallDisplayIcon={app}\KotobaSenpai.App.exe
-UninstallDisplayName=KotobaSenpai $Version
-Compression=lzma2/normal
-SolidCompression=yes
-WizardStyle=modern
-VersionInfoVersion=$version.0
-VersionInfoDescription=KotobaSenpai installer
-VersionInfoProductName=KotobaSenpai
-VersionInfoProductVersion=$version.0
-
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
-
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-
-[Files]
-Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#NoticesFile}"; DestDir: "{app}"; Flags: ignoreversion
-
-[Icons]
-Name: "{autoprograms}\KotobaSenpai"; Filename: "{app}\KotobaSenpai.App.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\KotobaSenpai"; Filename: "{app}\KotobaSenpai.App.exe"; WorkingDir: "{app}"; Tasks: desktopicon
-
-[Run]
-Filename: "{app}\KotobaSenpai.App.exe"; Description: "{cm:LaunchProgram,KotobaSenpai}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
-"@
-    Set-Content -LiteralPath $scriptPath -Value $setupScript -Encoding UTF8
-
     Write-Host "Compiling installer..."
-    & $compiler /Qp $scriptPath
+    $compilerArguments = @('/Qp', "/DPublishDir=$publishDirectory", "/DNoticesFile=$notices",
+        "/DAppIcon=$(Join-Path $script:RepositoryRoot 'src\KotobaSenpai.App\Assets\Branding\app-icon.ico')",
+        "/DAppVersion=$Version", "/DOutputDir=$OutputDirectory", $scriptPath)
+    & $compiler @compilerArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Inno Setup compilation failed with exit code $LASTEXITCODE."
     }

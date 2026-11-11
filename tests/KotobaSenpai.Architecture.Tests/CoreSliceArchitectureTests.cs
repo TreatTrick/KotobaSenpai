@@ -22,6 +22,7 @@ public sealed class CoreSliceArchitectureTests
         ["Logging", 0],
         ["Settings", 0],
         ["Shortcuts", 0],
+        ["Updates", 1],
         ["Llm", 1],
         ["TargetWindow", 1],
         ["Ocr", 2],

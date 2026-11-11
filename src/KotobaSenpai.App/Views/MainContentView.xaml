@@ -9,6 +9,7 @@
   <UserControl.Resources>
     <Style x:Key="NavigationTab" TargetType="TabItem">
       <Setter Property="controls:FluentLight.Kind" Value="Surface" />
+      <Setter Property="controls:FluentLight.CornerRadius" Value="4" />
       <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -114,6 +115,16 @@
           </StackPanel>
         </TabItem.Header>
         <views:SettingsPage x:Name="SettingsView" DataContext="{Binding Settings}" />
+      </TabItem>
+
+      <TabItem AutomationProperties.Name="{loc:Loc Key=Tab_About}">
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <Image Source="{StaticResource InfoColorIcon}" Width="24" Height="24" Margin="0,0,12,0" />
+            <TextBlock Text="{loc:Loc Key=Tab_About}" VerticalAlignment="Center" />
+          </StackPanel>
+        </TabItem.Header>
+        <views:AboutPage DataContext="{Binding About}" />
       </TabItem>
     </TabControl>
 

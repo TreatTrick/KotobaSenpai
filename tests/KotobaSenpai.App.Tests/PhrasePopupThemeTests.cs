@@ -97,6 +97,7 @@ public sealed partial class PhrasePopupThemeTests
                 CheckAgentSettingsPresentation(application);
                 CheckWindowSelectionPresentation(application);
                 CheckMainContentStartup(application);
+                CheckAboutPresentation(application);
                 CheckSupportPresentation(application);
                 CheckSuspendedOverlay();
                 CheckRegionSelectionOverlay();
@@ -131,10 +132,13 @@ public sealed partial class PhrasePopupThemeTests
         content.UpdateLayout();
         var navigation = Assert.IsType<TabControl>(content.FindName("MainNavigation"));
         Assert.NotNull(navigation.ItemContainerStyle);
-        Assert.Equal(2, navigation.Items.Count);
+        Assert.Equal(3, navigation.Items.Count);
         navigation.SelectedIndex = 1;
         content.UpdateLayout();
         Assert.IsType<SettingsPage>(navigation.SelectedContent);
+        navigation.SelectedIndex = 2;
+        content.UpdateLayout();
+        Assert.IsType<AboutPage>(navigation.SelectedContent);
     }
 
     private static void CheckWindowSelectionPresentation(Application application)
@@ -399,7 +403,7 @@ public sealed partial class PhrasePopupThemeTests
         using var onboarding = ViewModelDependencies.Onboarding(settings, localizer, () => readiness,
             _ => { preparations++; return preparation.Task; },
             () => throw new InvalidOperationException("Recognition must not start when switching languages."));
-        using var shell = new MainWindowViewModel(settingsViewModel, dictionary, onboarding, ViewModelDependencies.Support(), ViewModelDependencies.Guidance());
+        using var shell = new MainWindowViewModel(settingsViewModel, dictionary, onboarding, ViewModelDependencies.Support(), ViewModelDependencies.Guidance(), ViewModelDependencies.About());
         var initializing = onboarding.InitializeCommand.ExecuteAsync(null);
         var page = new OnboardingPage { DataContext = shell };
         var host = new Window

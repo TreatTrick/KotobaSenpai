@@ -7,6 +7,15 @@ namespace KotobaSenpai.Core.Errors;
 /// </summary>
 public static class ErrorCodes
 {
+    public const string AppUpdateCheckFailed = nameof(AppUpdateCheckFailed);
+    public const string AppUpdateRateLimited = nameof(AppUpdateRateLimited);
+    public const string AppUpdateReleaseUnavailable = nameof(AppUpdateReleaseUnavailable);
+    public const string AppUpdateDownloadFailed = nameof(AppUpdateDownloadFailed);
+    public const string AppUpdateVerificationFailed = nameof(AppUpdateVerificationFailed);
+    public const string AppUpdateInstallFailed = nameof(AppUpdateInstallFailed);
+    public const string AppUpdateInstallUnavailable = nameof(AppUpdateInstallUnavailable);
+    public const string AppUpdateTimedOut = nameof(AppUpdateTimedOut);
+
     /// <summary>The desktop window picker could not initialize or complete.</summary>
     public const string WindowSelectionFailed = nameof(WindowSelectionFailed);
 

@@ -7,7 +7,7 @@ namespace KotobaSenpai.App.ViewModels;
 
 /// <summary>Composes the main window's page state and coordinates its lifetime.</summary>
 public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, UniDicInstallController dictionary,
-    OnboardingViewModel onboarding, SupportService support, ContextualGuidance guidance) : ObservableObject, IDisposable
+    OnboardingViewModel onboarding, SupportService support, ContextualGuidance guidance, AboutPageViewModel about) : ObservableObject, IDisposable
 {
     private bool _disposed;
     public SettingsPageViewModel Settings { get; } = settings;
@@ -15,6 +15,7 @@ public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, 
     public OnboardingViewModel Onboarding { get; } = onboarding;
     public SupportService Support { get; } = support ?? throw new ArgumentNullException(nameof(support));
     public ContextualGuidance Guidance { get; } = guidance ?? throw new ArgumentNullException(nameof(guidance));
+    public AboutPageViewModel About { get; } = about;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(Selection))]
     private RecognitionPageViewModel? _recognition;
     public TargetSelectionViewModel? Selection => Recognition?.Selection;
@@ -28,6 +29,7 @@ public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, 
             Recognition?.RecognizeCommand.ExecutionTask, Settings.Llm.CheckConfigurationCommand.ExecutionTask,
             Recognition?.StopAsync(),
             Settings.Llm.FetchModelsCommand.ExecutionTask,
+            About.CheckCommand.ExecutionTask, About.DownloadCommand.ExecutionTask, About.InstallCommand.ExecutionTask,
         }.OfType<Task>().Where(task => !task.IsCompleted).ToArray();
         Dispose();
         await Task.WhenAll(operations);
@@ -37,6 +39,7 @@ public sealed partial class MainWindowViewModel(SettingsPageViewModel settings, 
     {
         if (_disposed) return;
         _disposed = true;
+        About.Dispose();
         Support?.Dispose();
         Onboarding.Dispose();
         Recognition?.Dispose();

@@ -49,11 +49,22 @@ public sealed class CompositionBoundaryTests
     [InlineData(typeof(RecognitionPageViewModel), typeof(KotobaSenpai.App.Reading.ReadingActions))]
     [InlineData(typeof(SettingsPageViewModel), typeof(CaptureBorderPreferences))]
     [InlineData(typeof(SettingsPageViewModel), typeof(SentenceTranslationPreferences))]
+    [InlineData(typeof(AboutPageViewModel), typeof(KotobaSenpai.Core.Updates.IAppUpdateSource))]
+    [InlineData(typeof(AboutPageViewModel), typeof(KotobaSenpai.Core.Updates.IAppUpdateInstaller))]
     public void Page_dependencies_are_required_constructor_parameters(Type page, Type dependency)
     {
         var parameter = Assert.Single(page.GetConstructors()).GetParameters().Single(value => value.ParameterType == dependency);
 
         Assert.False(parameter.IsOptional);
+    }
+
+    [Fact]
+    public void About_page_delegates_network_files_and_process_operations_to_core_ports()
+    {
+        var result = Types.InAssembly(typeof(AboutPageViewModel).Assembly).That().HaveName(nameof(AboutPageViewModel))
+            .ShouldNot().HaveDependencyOnAny("System.Net.Http", "System.IO", "System.Diagnostics.Process")
+            .GetResult();
+        Assert.True(result.IsSuccessful, "Update presentation must delegate technical operations to its Core ports.");
     }
 
     [Fact]

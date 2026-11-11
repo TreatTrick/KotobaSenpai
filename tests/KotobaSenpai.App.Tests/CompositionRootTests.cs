@@ -33,6 +33,7 @@ public sealed class CompositionRootTests
         Assert.Null(shell.Selection);
         Assert.Same(scoped.GetRequiredService<SettingsPageViewModel>(), shell.Settings);
         Assert.Same(scoped.GetRequiredService<OnboardingViewModel>(), shell.Onboarding);
+        Assert.Same(scoped.GetRequiredService<AboutPageViewModel>(), shell.About);
         Assert.Null(scoped.GetRequiredService<RecognitionStartup>().Current);
         shell.Dispose();
     }
@@ -53,6 +54,7 @@ public sealed class CompositionRootTests
         Assert.Same(firstShell, first.ServiceProvider.GetRequiredService<MainWindowViewModel>());
         Assert.NotSame(firstShell, secondShell);
         Assert.NotSame(firstShell.Onboarding, secondShell.Onboarding);
+        Assert.NotSame(firstShell.About, secondShell.About);
         Assert.NotSame(firstShell.Settings.Llm, secondShell.Settings.Llm);
         Assert.Same(first.ServiceProvider.GetRequiredService<SessionEpoch>(),
             first.ServiceProvider.GetRequiredService<PhraseAnalysisOrchestrator>().SessionEpoch);

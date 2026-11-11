@@ -12,6 +12,7 @@ using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.Shortcuts;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Threading;
+using KotobaSenpai.Core.Updates;
 
 namespace KotobaSenpai.App.Tests;
 
@@ -23,6 +24,11 @@ internal static class ViewModelDependencies
     public static ISettingsService Settings() => new MemorySettings();
     public static SupportService Support() => new(Settings(), Localizer(), Logger);
     public static ContextualGuidance Guidance() => new(Settings(), Logger);
+    public static AboutPageViewModel About()
+    {
+        var localizer = Localizer();
+        return new(new UpdateSource(), new UpdateInstaller(), localizer, new UserMessageResolver(localizer), Logger, new Version(1, 0, 1));
+    }
     public static ShortcutSettingsViewModel Shortcuts()
         => new(new ReadingShortcutCoordinator(Settings(), new Registrar()), Localizer());
     public static LlmConfigurationService Configuration(ISettingsService settings, ILlmModelCatalog catalog)
@@ -41,6 +47,19 @@ internal static class ViewModelDependencies
         public bool CheckAccess() => true;
         public void Post(Action action) => action();
         public T Invoke<T>(Func<T> action) => action();
+    }
+
+    private sealed class UpdateSource : IAppUpdateSource
+    {
+        public Task<AppRelease?> CheckAsync(Version currentVersion, CancellationToken cancellationToken) => Task.FromResult<AppRelease?>(null);
+        public Task<DownloadedAppUpdate> DownloadAsync(AppRelease release, IProgress<AppUpdateProgress> progress, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("No update is available in this fixture.");
+    }
+    private sealed class UpdateInstaller : IAppUpdateInstaller
+    {
+        public bool IsAvailable => false;
+        public Task LaunchAsync(DownloadedAppUpdate update, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("Installation must not run in this fixture.");
     }
 
     private sealed class MemorySettings : KotobaSenpai.TestSupport.SettingsStub

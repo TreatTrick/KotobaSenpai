@@ -43,6 +43,9 @@ using KotobaSenpai.App.Reading;
 using KotobaSenpai.Presentation.Wpf.Overlay;
 using KotobaSenpai.Presentation.Wpf.Capture;
 using KotobaSenpai.App.Startup;
+using KotobaSenpai.Core.Updates;
+using KotobaSenpai.Platform.Windows.Updates;
+using System.Net.Http;
 
 namespace KotobaSenpai.App.Composition;
 
@@ -241,6 +244,12 @@ internal sealed class DesktopComposition : IDisposable
         services.AddScoped<LlmSettingsViewModel>();
         services.AddScoped<OverlayAppearanceViewModel>();
         services.AddScoped<SettingsPageViewModel>();
+        services.AddScoped<IAppUpdateSource>(_ => new GitHubAppUpdateSource(new HttpClient(), Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KotobaSenpai", "updates")));
+        services.AddScoped<IAppUpdateInstaller>(_ => new InnoSetupUpdateInstaller(AppContext.BaseDirectory));
+        services.AddScoped(sp => new AboutPageViewModel(sp.GetRequiredService<IAppUpdateSource>(),
+            sp.GetRequiredService<IAppUpdateInstaller>(), sp.GetRequiredService<IStringLocalizer>(),
+            sp.GetRequiredService<IUserMessageResolver>(), sp.GetRequiredService<ILogger>(), typeof(App).Assembly.GetName().Version!));
         services.AddScoped(sp => new TargetSelectionViewModel(sp.GetRequiredService<IWindowPicker>(),
             sp.GetRequiredService<IStringLocalizer>(), sp.GetRequiredService<IUserMessageResolver>(),
             sp.GetRequiredService<ILogger>(), Controls.WindowPreviewFlight.CreateThumbnailFrame,

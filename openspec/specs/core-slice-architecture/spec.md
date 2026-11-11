@@ -29,45 +29,44 @@ The namespaces `KotobaSenpai.Core.Models`, `KotobaSenpai.Core.Services`, and `Ko
 
 ### Requirement: Slice dependencies follow a strict layer order
 
-Each Core capability slice SHALL be assigned a layer number. A slice MUST NOT depend on any other slice whose layer number is greater than or equal to its own. Slices sharing a layer number are therefore mutually forbidden from referencing each other, which enforces both acyclicity and the independence of sibling capabilities.
+每个 Core 能力必须（MUST）有明确的层号。它只能依赖层号更小的能力，不能依赖同层或更高层的能力。因此，同一层的能力必须互相独立，不能形成循环依赖。
 
-The layer assignment SHALL be:
+分层必须（MUST）如下，与现有架构测试保持一致：
 
-| Layer | Slices |
+| 层号 | 能力 |
 | --- | --- |
-| 0 | `Geometry`, `Japanese`, `Errors`, `Localization`, `Logging`, `Settings` |
-| 1 | `TargetWindow` |
+| 0 | `Geometry`、`Threading`、`Session`、`Japanese`、`Errors`、`Localization`、`Logging`、`Settings`、`Shortcuts` |
+| 1 | `Llm`、`TargetWindow`、`Updates` |
 | 2 | `Ocr` |
 | 3 | `Tokenization` |
 | 4 | `Dictionary` |
-| 5 | `WordGrouping`, `PhraseAnalysis` |
-| 6 | `Diagnostics`, `Overlay` |
+| 5 | `WordGrouping`、`PhraseAnalysis` |
+| 6 | `Diagnostics`、`Overlay` |
 | 7 | `Workflow` |
 
-#### Scenario: A slice referencing a higher layer fails the build
+#### Scenario: 依赖更高层时测试失败
+- **WHEN** 第 3 层的 `Tokenization` 依赖第 4 层的 `Dictionary`
+- **THEN** 架构测试必须失败，并指出违规类型。
 
-- **WHEN** a type in `KotobaSenpai.Core.Tokenization` acquires a dependency on `KotobaSenpai.Core.Dictionary`
-- **THEN** the layer-order architecture test MUST fail and name the offending type.
+#### Scenario: 同层能力不能互相依赖
+- **WHEN** 第 5 层的 `PhraseAnalysis` 依赖 `WordGrouping`，或者反过来依赖
+- **THEN** 架构测试必须失败。
 
-#### Scenario: Sibling slices on the same layer stay independent
+#### Scenario: 第零层没有对其他能力的依赖
+- **WHEN** 检查第 0 层的任何能力
+- **THEN** 它不得依赖其他 Core 能力。
 
-- **WHEN** a type in `KotobaSenpai.Core.PhraseAnalysis` acquires a dependency on `KotobaSenpai.Core.WordGrouping`, or vice versa
-- **THEN** the layer-order architecture test MUST fail, because both slices occupy layer 5.
+#### Scenario: 工作流仍是原有领域流程的入口
+- **WHEN** 检查 `Workflow` 之外的任何 Core 能力
+- **THEN** 它不得依赖 `Core.Workflow`，避免领域反过来调用上层应用流程。
 
-#### Scenario: Layer-0 slices have no outgoing slice dependencies
+#### Scenario: 合法的向下依赖不需要修改测试
+- **WHEN** 第 6 层的 `Overlay` 增加对第 2 层 `Ocr` 的依赖
+- **THEN** 现有架构测试应直接通过，不需要放宽规则。
 
-- **WHEN** the types in `Geometry`, `Japanese`, `Errors`, `Localization`, `Logging`, or `Settings` are checked
-- **THEN** none of them SHALL depend on any other Core capability slice.
-
-#### Scenario: The workflow slice is the sole domain entry point
-
-- **WHEN** any Core slice other than `Workflow` is checked
-- **THEN** it MUST NOT depend on `KotobaSenpai.Core.Workflow`, so the application-service entry point is never called back into from the domain.
-
-#### Scenario: Adding a legal downward dependency needs no test change
-
-- **WHEN** a type in `KotobaSenpai.Core.Overlay` (layer 6) starts depending on `KotobaSenpai.Core.Ocr` (layer 2)
-- **THEN** the layer-order architecture test MUST pass without modification.
+#### Scenario: 更新能力保持独立
+- **WHEN** 检查新增的 `Core.Updates`
+- **THEN** 它可以使用第 0 层的错误码，但不能依赖 `Llm`、`TargetWindow`、识别工作流、HTTP、文件系统或 WPF。
 
 ### Requirement: No general-purpose shared namespace
 
