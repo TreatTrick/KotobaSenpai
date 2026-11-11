@@ -10,7 +10,7 @@
 
 [English](README.md) · **简体中文**
 
-[官方网站](https://treattrick.github.io/KotobaSenpai/zh/) · [下载 v1.0.0](https://github.com/TreatTrick/KotobaSenpai/releases/tag/v1.0.0)
+[官方网站](https://treattrick.github.io/KotobaSenpai/zh/) · [下载最新版](https://github.com/TreatTrick/KotobaSenpai/releases/latest)
 
 [核心卖点](#-为什么选择-kotobasenpai) · [首次使用](#-上手只需几步) · [从源码构建](#-从源码构建)
 
