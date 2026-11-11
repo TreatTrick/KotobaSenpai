@@ -20,11 +20,7 @@ public sealed partial class UniDicInstallController : ObservableObject, IDisposa
     public Exception? Failure { get; private set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(StageText))]
     private DictionaryInstallStage _stage;
-    [ObservableProperty] private bool _isIndeterminate = true;
     public string StageText => _localizer?.Get("Install_" + Stage) ?? Stage.ToString();
-
-    [ObservableProperty]
-    private double _progress;
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBlocking))]
     private bool _isInstalling;
@@ -78,9 +74,8 @@ public sealed partial class UniDicInstallController : ObservableObject, IDisposa
         IsInstalling = true;
         Error = null;
         Failure = null;
-        Progress = 0;
         IsInstalled = false;
-        ReportStage(new(DictionaryInstallStage.Downloading));
+        ReportStage(new(DictionaryInstallStage.Validating));
         try
         {
             await _installer.EnsureInstalledAsync(ct: ct,
@@ -101,7 +96,7 @@ public sealed partial class UniDicInstallController : ObservableObject, IDisposa
         catch (Exception ex)
         {
             Failure = ex;
-            Error = _messageResolver.Resolve(ex, ErrorCodes.UniDicDownloadFailed);
+            Error = _messageResolver.Resolve(ex, ErrorCodes.UniDicInstallFailed);
         }
         finally
         {
@@ -109,20 +104,12 @@ public sealed partial class UniDicInstallController : ObservableObject, IDisposa
         }
     }
 
-    private void ReportStage(DictionaryInstallProgress value)
-    {
-        Stage = value.Stage;
-        IsIndeterminate = value.Stage == DictionaryInstallStage.Downloading && value.Fraction is null;
-        if (value.Fraction.HasValue)
-            Progress = value.Fraction.Value;
-        else if (value.Stage == DictionaryInstallStage.Ready)
-            Progress = 1;
-    }
+    private void ReportStage(DictionaryInstallProgress value) => Stage = value.Stage;
 
     private void OnCultureChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(StageText));
-        if (Failure is not null) Error = _messageResolver.Resolve(Failure, ErrorCodes.UniDicDownloadFailed);
+        if (Failure is not null) Error = _messageResolver.Resolve(Failure, ErrorCodes.UniDicInstallFailed);
     }
 
     public void Dispose()

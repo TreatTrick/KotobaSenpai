@@ -75,7 +75,7 @@ public sealed partial class LocalizationKeyCoverageTests
     [InlineData("src/KotobaSenpai.App/Views/Support/SupportCompanion.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/OnboardingPage.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingStepLayout.xaml")]
-    [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingDictionaryStep.xaml")]
+    [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingPreparationView.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingModelStep.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingWindowStep.xaml")]
     [InlineData("src/KotobaSenpai.App/Views/Onboarding/OnboardingReadyStep.xaml")]

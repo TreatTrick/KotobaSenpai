@@ -32,19 +32,20 @@ public sealed partial class OnboardingViewModel : ObservableObject, IDisposable
     public bool IsBusy => _flow.IsBusy;
     public bool IsMain => _flow.IsMain;
     public bool IsGuideVisible => _flow.IsGuideVisible;
-    public bool ShowBack => Step is OnboardingStep.Window or OnboardingStep.Ready;
+    public bool ShowBack => IsGuideVisible && Step is (OnboardingStep.Window or OnboardingStep.Ready);
     public bool ShowRetry => State.Phase is OnboardingPhase.PreparationFailed or OnboardingPhase.RepairFailed;
     public bool IsPreparingRuntime => _flow.IsPreparingRuntime;
+    public bool IsPreparingDictionary => _flow.IsPreparingDictionary;
     public bool HasError => State.ErrorKey is not null;
     public string Error => State.ErrorKey is null ? string.Empty : _localizer.Get(State.ErrorKey);
     public string HeroTitle => _localizer.Get(IsGuideVisible ? "Onboarding_Hero" + ((int)Step + 1) : "Onboarding_Preparing");
     public string Description => _localizer.Get(IsGuideVisible ? "Onboarding_Description" + ((int)Step + 1) : "Onboarding_PreparingDescription");
-    public string ProgressText => _localizer.Get("Onboarding_Progress", (int)Step + 1, 4);
+    public string ProgressText => _localizer.Get("Onboarding_Progress", (int)Step + 1, 3);
     public string PrimaryActionText => _localizer.Get(Step == OnboardingStep.Ready ? "Onboarding_Start" : "Onboarding_Next");
-    public IReadOnlyList<OnboardingProgressItem> Progress => Enumerable.Range(0, 4)
+    public IReadOnlyList<OnboardingProgressItem> Progress => Enumerable.Range(0, 3)
         .Select(index => new OnboardingProgressItem(_localizer.Get("Onboarding_Step" + (index + 1)),
             (int)Step > index ? "✓" : (index + 1).ToString(CultureInfo.InvariantCulture), (int)Step == index,
-            index > 0, index < 3)).ToArray();
+            index > 0, index < 2)).ToArray();
 
     private bool CanInitialize() => _flow.CanInitialize;
     [RelayCommand(CanExecute = nameof(CanInitialize))]
@@ -60,7 +61,7 @@ public sealed partial class OnboardingViewModel : ObservableObject, IDisposable
     private void NotifyPresentation()
     {
         foreach (var name in new[] { nameof(State), nameof(IsBusy), nameof(IsMain), nameof(IsGuideVisible),
-            nameof(ShowBack), nameof(ShowRetry), nameof(IsPreparingRuntime), nameof(HasError), nameof(Error),
+            nameof(ShowBack), nameof(ShowRetry), nameof(IsPreparingRuntime), nameof(IsPreparingDictionary), nameof(HasError), nameof(Error),
             nameof(HeroTitle), nameof(Description), nameof(ProgressText), nameof(PrimaryActionText), nameof(Progress) })
             OnPropertyChanged(name);
         if (_presentedStep != Step)

@@ -134,11 +134,9 @@ public static class ResourceKeys
     public const string Onboarding_Step1 = nameof(Onboarding_Step1);
     public const string Onboarding_Step2 = nameof(Onboarding_Step2);
     public const string Onboarding_Step3 = nameof(Onboarding_Step3);
-    public const string Onboarding_Step4 = nameof(Onboarding_Step4);
     public const string Onboarding_Description1 = nameof(Onboarding_Description1);
     public const string Onboarding_Description2 = nameof(Onboarding_Description2);
     public const string Onboarding_Description3 = nameof(Onboarding_Description3);
-    public const string Onboarding_Description4 = nameof(Onboarding_Description4);
     public const string Onboarding_Progress = nameof(Onboarding_Progress);
     public const string Onboarding_Back = nameof(Onboarding_Back);
     public const string Onboarding_Next = nameof(Onboarding_Next);
@@ -149,7 +147,6 @@ public static class ResourceKeys
     public const string Onboarding_SaveFailed = nameof(Onboarding_SaveFailed);
     public const string Onboarding_PreparationFailed = nameof(Onboarding_PreparationFailed);
     public const string Onboarding_RecognitionFailed = nameof(Onboarding_RecognitionFailed);
-    public const string Install_Downloading = nameof(Install_Downloading);
     public const string Install_Validating = nameof(Install_Validating);
     public const string Install_Extracting = nameof(Install_Extracting);
     public const string Install_Installing = nameof(Install_Installing);
@@ -157,10 +154,6 @@ public static class ResourceKeys
     public const string Onboarding_Hero1 = nameof(Onboarding_Hero1);
     public const string Onboarding_Hero2 = nameof(Onboarding_Hero2);
     public const string Onboarding_Hero3 = nameof(Onboarding_Hero3);
-    public const string Onboarding_Hero4 = nameof(Onboarding_Hero4);
-    public const string Onboarding_DictionaryDefinition = nameof(Onboarding_DictionaryDefinition);
-    public const string Onboarding_DictionarySource = nameof(Onboarding_DictionarySource);
-    public const string Onboarding_DictionaryHint = nameof(Onboarding_DictionaryHint);
     public const string Onboarding_DictionaryReady = nameof(Onboarding_DictionaryReady);
     public const string Onboarding_Manual = nameof(Onboarding_Manual);
     public const string Onboarding_Assistant = nameof(Onboarding_Assistant);

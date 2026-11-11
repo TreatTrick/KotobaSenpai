@@ -65,9 +65,38 @@ dotnet test tests/KotobaSenpai.Platform.Windows.Tests/KotobaSenpai.Platform.Wind
 dotnet test tests/KotobaSenpai.Presentation.Wpf.Tests/KotobaSenpai.Presentation.Wpf.Tests.csproj -c Release
 dotnet test tests/KotobaSenpai.App.Tests/KotobaSenpai.App.Tests.csproj -c Release --filter "FullyQualifiedName!~PhrasePopupThemeTests"
 
+./scripts/Prepare-UniDic.ps1
 dotnet publish src/KotobaSenpai.App/KotobaSenpai.App.csproj -c Release -o artifacts/publish
 ./tests/Check-AgentCli.ps1 -PublishDirectory ./artifacts/publish
 ```
+
+### Offline installer assets
+
+`scripts/Prepare-UniDic.ps1` prepares the original pinned archive under
+`src/KotobaSenpai.App/Assets/UniDic/` and verifies the SHA-256 recorded in
+`UniDicAssets.cs`. The large ZIP is excluded from Git. CI prepares it before
+publishing; normal builds and fixture-based tests do not require it.
+
+To use an existing local archive without downloading:
+
+```powershell
+./scripts/Prepare-UniDic.ps1 -ArchivePath C:\Assets\unidic-3.1.0.zip
+```
+
+To build the complete self-contained Windows installer (including the dictionary,
+OCR models, and .NET runtime):
+
+```powershell
+./scripts/Build-Installer.ps1 -UniDicArchive C:\Assets\unidic-3.1.0.zip
+```
+
+The archive parameter is optional when the asset has already been prepared. If
+neither a local asset nor an explicit archive exists, the installer build script
+downloads and verifies the pinned archive at build time. A corrupt archive fails
+the build. Direct `dotnet publish` requires the asset to have been prepared first.
+Dictionary setup on the user's machine only validates and extracts local files;
+it never contacts a download server. AI provider requests still require the
+configured provider connection.
 
 桌面验收（本地有真实桌面时才有意义）：
 

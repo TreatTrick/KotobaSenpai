@@ -1,28 +1,51 @@
-using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.IO.Compression;
-using System.Net.Http;
-using System.Net;
 using System.Security.Cryptography;
-using KotobaSenpai.Platform.Windows.Japanese;
+using KotobaSenpai.Core.Errors;
 using KotobaSenpai.Core.Japanese;
-using KotobaSenpai.Platform.Windows;
+using KotobaSenpai.Platform.Windows.Japanese;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 
-/// <summary>
-/// <see cref="UniDicDictionaryInstaller"/> tests: a small zip fixture covers offline install, SHA-256 verification,
-/// top-level directory detection, already-installed short-circuit, hash/file-set failures, cancellation and cleanup —
-/// no network, and no downloading of the real 502MB dictionary.
-/// </summary>
+/// <summary>Exercises bundled and imported archives, integrity checks, cancellation, and atomic cache installation.</summary>
 public sealed class UniDicDictionaryInstallerTests : IDisposable
 {
     private readonly List<string> _tempDirs = new();
 
+    [Fact]
+    public async Task First_run_installs_the_bundled_archive_without_network_access()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        var installer = CreateInstaller(cacheRoot, fixture);
+        var stages = new List<DictionaryInstallProgress>();
+
+        await installer.EnsureInstalledAsync(stages: new InlineProgress<DictionaryInstallProgress>(stages.Add));
+
+        Assert.True(installer.IsInstalled);
+        Assert.Equal(new[] { DictionaryInstallStage.Validating, DictionaryInstallStage.Extracting,
+            DictionaryInstallStage.Installing, DictionaryInstallStage.Ready }, stages.Select(item => item.Stage));
+        Assert.True(File.Exists(fixture.ZipPath));
+        Assert.True(File.Exists(Path.Combine(installer.DictionaryDirectory, "licenses", "BSD")));
+        Assert.Equal(installer.DictionaryDirectory, Assert.Single(Directory.EnumerateDirectories(cacheRoot)));
+    }
+
+    [Fact]
+    public async Task Missing_bundled_archive_reports_a_missing_dictionary()
+    {
+        var cacheRoot = NewDir();
+        var installer = new UniDicDictionaryInstaller(Path.Combine(cacheRoot, "missing.zip"), cacheRoot, Manifest("test"));
+
+        var exception = await Assert.ThrowsAsync<WindowsPlatformException>(() => installer.EnsureInstalledAsync());
+
+        Assert.Equal(ErrorCodes.UniDicDictionaryMissing, exception.ErrorCode);
+        Assert.False(installer.IsInstalled);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(cacheRoot));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task Explicit_dictionary_override_is_validated_without_downloading_a_default(bool valid)
+    public async Task Explicit_dictionary_override_is_validated_without_a_bundled_archive(bool valid)
     {
         var root = NewDir();
         if (valid)
@@ -31,20 +54,19 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
             File.WriteAllText(Path.Combine(root, UniDicAssets.DicrcFileName), UniDicAssets.Format);
         }
         var cacheRoot = Path.Combine(root, "default");
-        using var installer = new UniDicDictionaryInstaller(new HttpClient(ThrowingHandler.Instance),
-            cacheRoot, Manif(cacheRoot, "test"), dictionaryOverride: () => root);
-        IUniDicDictionaryInstaller port = installer;
+        IUniDicDictionaryInstaller installer = new UniDicDictionaryInstaller(Path.Combine(root, "missing.zip"),
+            cacheRoot, Manifest("test"), dictionaryOverride: () => root);
 
-        Assert.Equal(valid, port.IsInstalled);
+        Assert.Equal(valid, installer.IsInstalled);
         if (valid)
-            await port.EnsureInstalledAsync();
+            await installer.EnsureInstalledAsync();
         else
         {
-            var exception = await Assert.ThrowsAsync<WindowsPlatformException>(() => port.EnsureInstalledAsync());
+            var exception = await Assert.ThrowsAsync<WindowsPlatformException>(() => installer.EnsureInstalledAsync());
             Assert.Equal(ErrorCodes.UniDicDictionaryMissing, exception.ErrorCode);
         }
 
-        Assert.Equal(valid, port.IsInstalled);
+        Assert.Equal(valid, installer.IsInstalled);
         Assert.False(Directory.Exists(cacheRoot));
     }
 
@@ -52,7 +74,7 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
     public async Task Offline_install_reports_ready_only_after_validation_extraction_and_promotion()
     {
         var (cacheRoot, fixture) = CreateFixture(populate: true);
-        using var installer = CreateInstaller(cacheRoot, fixture.Sha);
+        var installer = CreateInstaller(cacheRoot, fixture);
         var stages = new List<DictionaryInstallStage>();
         var progress = new InlineProgress<DictionaryInstallProgress>(value =>
         {
@@ -66,274 +88,149 @@ public sealed class UniDicDictionaryInstallerTests : IDisposable
             DictionaryInstallStage.Installing, DictionaryInstallStage.Ready }, stages);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task Download_progress_distinguishes_known_lengths_from_indeterminate_downloads(bool knownLength)
-    {
-        var (cacheRoot, fixture) = CreateFixture(populate: true);
-        using var http = new HttpClient(new ArchiveHandler(File.ReadAllBytes(fixture.ZipPath), knownLength));
-        using var installer = new UniDicDictionaryInstaller(http, cacheRoot, Manif(cacheRoot, fixture.Sha));
-        var progress = new List<DictionaryInstallProgress>();
-        await installer.EnsureInstalledAsync(stages: new InlineProgress<DictionaryInstallProgress>(progress.Add));
-        Assert.Contains(progress, item => item.Stage == DictionaryInstallStage.Downloading
-            && (knownLength ? item.Fraction == 1 : item.Fraction is null));
-        Assert.Equal(DictionaryInstallStage.Ready, progress[^1].Stage);
-        Assert.True(installer.IsInstalled);
-    }
-
-    [Fact]
-    public async Task Known_length_download_coalesces_frequent_progress_reports()
-    {
-        var (cacheRoot, fixture) = CreateFixture(populate: true, payloadBytes: 512 * 1024);
-        using var http = new HttpClient(new ChunkedArchiveHandler(File.ReadAllBytes(fixture.ZipPath)));
-        using var installer = new UniDicDictionaryInstaller(http, cacheRoot, Manif(cacheRoot, fixture.Sha));
-        var progress = new List<DictionaryInstallProgress>();
-
-        await installer.EnsureInstalledAsync(stages: new InlineProgress<DictionaryInstallProgress>(progress.Add));
-
-        var downloadUpdates = progress.Where(item => item.Stage == DictionaryInstallStage.Downloading
-            && item.Fraction.HasValue).ToArray();
-        Assert.InRange(downloadUpdates.Length, 1, 32);
-        Assert.Equal(1, downloadUpdates[^1].Fraction);
-    }
-
-    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
-    {
-        public void Report(T value) => report(value);
-    }
-
-    private sealed class ArchiveHandler(byte[] bytes, bool knownLength) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-            {
-                Content = knownLength ? new ByteArrayContent(bytes) : new UnknownLengthContent(bytes),
-            });
-    }
-
-    private sealed class UnknownLengthContent(byte[] bytes) : HttpContent
-    {
-        protected override bool TryComputeLength(out long length) { length = 0; return false; }
-        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context)
-            => stream.WriteAsync(bytes).AsTask();
-    }
-
     [Fact]
     public async Task Offline_archive_installs_atomically_and_writes_manifest()
     {
-        var (cacheRoot, fixtureSha) = CreateFixture(populate: true);
-        var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        var installer = CreateInstaller(cacheRoot, fixture);
 
-        await installer.InstallFromArchiveAsync(fixtureSha.ZipPath);
+        await installer.InstallFromArchiveAsync(fixture.ZipPath);
 
         Assert.True(installer.IsInstalled);
-        foreach (var f in UniDicAssets.RequiredRuntimeFiles)
-            Assert.True(File.Exists(Path.Combine(installer.DictionaryDirectory, f)));
+        foreach (var file in UniDicAssets.RequiredRuntimeFiles)
+            Assert.True(File.Exists(Path.Combine(installer.DictionaryDirectory, file)));
         Assert.True(File.Exists(Path.Combine(installer.DictionaryDirectory, UniDicAssets.ManifestFileName)));
-
-        // No leftover staging/final half-products.
-        var leftovers = Directory.EnumerateDirectories(cacheRoot)
-            .Select(Path.GetFileName)
-            .Where(n => n != "dicdir");
-        Assert.Empty(leftovers);
+        Assert.Equal(installer.DictionaryDirectory, Assert.Single(Directory.EnumerateDirectories(cacheRoot)));
     }
 
     [Fact]
-    public async Task Already_installed_EnsureInstalledAsync_does_not_touch_network()
+    public async Task Already_installed_cache_does_not_need_the_bundled_archive()
     {
-        var (cacheRoot, fixtureSha) = CreateFixture(populate: true);
-        var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
-        await installer.InstallFromArchiveAsync(fixtureSha.ZipPath);
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        await CreateInstaller(cacheRoot, fixture).EnsureInstalledAsync();
+        File.Delete(fixture.ZipPath);
+        var installer = CreateInstaller(cacheRoot, fixture);
 
-        // Triggered again after install: short-circuits and never makes a network request.
-        var noNetwork = new UniDicDictionaryInstaller(new HttpClient(ThrowingHandler.Instance), cacheRoot, Manif(cacheRoot, fixtureSha.Sha));
-        await noNetwork.EnsureInstalledAsync();
-        Assert.True(noNetwork.IsInstalled);
-    }
-
-    [Fact]
-    public async Task Hash_mismatch_throws_unicdic_dictionary_invalid_and_does_not_install()
-    {
-        var (cacheRoot, fixtureSha) = CreateFixture(populate: true);
-        var wrongManifest = Manif(cacheRoot, new string('0', 64));
-        var installer = CreateInstaller(cacheRoot, wrongManifest.Sha256);
-
-        var ex = await Assert.ThrowsAsync<WindowsPlatformException>(
-            () => installer.InstallFromArchiveAsync(fixtureSha.ZipPath));
-
-        Assert.Equal(ErrorCodes.UniDicDictionaryInvalid, ex.ErrorCode);
-        Assert.False(installer.IsInstalled);
-        Assert.False(Directory.Exists(installer.DictionaryDirectory));
-    }
-
-    [Fact]
-    public async Task Archive_missing_runtime_files_throws_unicdic_dictionary_invalid()
-    {
-        var (cacheRoot, fixtureSha) = CreateFixture(populate: false); // missing char.bin etc.
-        var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
-
-        var ex = await Assert.ThrowsAsync<WindowsPlatformException>(
-            () => installer.InstallFromArchiveAsync(fixtureSha.ZipPath));
-
-        Assert.Equal(ErrorCodes.UniDicDictionaryInvalid, ex.ErrorCode);
-        Assert.False(installer.IsInstalled);
-    }
-
-    [Fact]
-    public async Task Cancelled_install_propagates_and_leaves_no_dicdir()
-    {
-        var (cacheRoot, fixtureSha) = CreateFixture(populate: true);
-        var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => installer.InstallFromArchiveAsync(fixtureSha.ZipPath, cts.Token));
-
-        Assert.False(Directory.Exists(installer.DictionaryDirectory));
-        Assert.Empty(Directory.EnumerateDirectories(cacheRoot)); // no leftovers
-    }
-
-    [Fact]
-    public async Task Concurrent_installs_never_expose_partial_dicdir()
-    {
-        var (cacheRoot, fixtureSha) = CreateFixture(populate: true);
-        var installer = CreateInstaller(cacheRoot, fixtureSha.Sha);
-
-        // Same installer triggered twice concurrently: the in-process lock serializes them, both succeed with no half-products.
-        var tasks = new[]
-        {
-            installer.InstallFromArchiveAsync(fixtureSha.ZipPath),
-            installer.InstallFromArchiveAsync(fixtureSha.ZipPath),
-        };
-        await Task.WhenAll(tasks);
+        await installer.EnsureInstalledAsync();
 
         Assert.True(installer.IsInstalled);
-        var leftovers = Directory.EnumerateDirectories(cacheRoot)
-            .Select(Path.GetFileName)
-            .Where(n => n != "dicdir");
-        Assert.Empty(leftovers);
     }
 
-    private UniDicDictionaryInstaller CreateInstaller(string cacheRoot, string sha)
-        => new(new HttpClient(), cacheRoot, Manif(cacheRoot, sha));
+    [Fact]
+    public async Task Corrupted_bundled_archive_is_rejected_before_installation()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        await File.AppendAllTextAsync(fixture.ZipPath, "corruption");
+        var installer = CreateInstaller(cacheRoot, fixture);
 
-    private static UniDicManifest Manif(string cacheRoot, string sha)
+        var exception = await Assert.ThrowsAsync<WindowsPlatformException>(() => installer.EnsureInstalledAsync());
+
+        Assert.Equal(ErrorCodes.UniDicDictionaryInvalid, exception.ErrorCode);
+        Assert.False(installer.IsInstalled);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(cacheRoot));
+    }
+
+    [Fact]
+    public async Task Hash_mismatch_throws_dictionary_invalid_and_does_not_install()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        var installer = new UniDicDictionaryInstaller(fixture.ZipPath, cacheRoot, Manifest(new string('0', 64)));
+
+        var exception = await Assert.ThrowsAsync<WindowsPlatformException>(
+            () => installer.InstallFromArchiveAsync(fixture.ZipPath));
+
+        Assert.Equal(ErrorCodes.UniDicDictionaryInvalid, exception.ErrorCode);
+        Assert.False(installer.IsInstalled);
+        Assert.False(Directory.Exists(installer.DictionaryDirectory));
+    }
+
+    [Fact]
+    public async Task Archive_missing_runtime_files_throws_dictionary_invalid()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: false);
+        var installer = CreateInstaller(cacheRoot, fixture);
+
+        var exception = await Assert.ThrowsAsync<WindowsPlatformException>(() => installer.EnsureInstalledAsync());
+
+        Assert.Equal(ErrorCodes.UniDicDictionaryInvalid, exception.ErrorCode);
+        Assert.False(installer.IsInstalled);
+    }
+
+    [Fact]
+    public async Task Cancelled_install_propagates_and_leaves_no_dictionary()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        var installer = CreateInstaller(cacheRoot, fixture);
+        using var cancellation = new CancellationTokenSource();
+        var progress = new InlineProgress<DictionaryInstallProgress>(_ => cancellation.Cancel());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => installer.EnsureInstalledAsync(
+            ct: cancellation.Token, stages: progress));
+
+        Assert.False(Directory.Exists(installer.DictionaryDirectory));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(cacheRoot));
+        Assert.True(File.Exists(fixture.ZipPath));
+    }
+
+    [Fact]
+    public async Task Concurrent_first_run_installs_never_expose_partial_dictionary()
+    {
+        var (cacheRoot, fixture) = CreateFixture(populate: true);
+        var installer = CreateInstaller(cacheRoot, fixture);
+
+        await Task.WhenAll(installer.EnsureInstalledAsync(), installer.EnsureInstalledAsync(), installer.EnsureInstalledAsync());
+
+        Assert.True(installer.IsInstalled);
+        Assert.Equal(installer.DictionaryDirectory, Assert.Single(Directory.EnumerateDirectories(cacheRoot)));
+    }
+
+    private static UniDicDictionaryInstaller CreateInstaller(string cacheRoot, (string ZipPath, string Sha) fixture)
+        => new(fixture.ZipPath, cacheRoot, Manifest(fixture.Sha));
+
+    private static UniDicManifest Manifest(string sha)
         => new(UniDicAssets.Version, "https://example.test/unidic.zip", sha, UniDicAssets.Format, UniDicAssets.RequiredRuntimeFiles);
 
-    /// <summary>Builds a zip fixture containing dicdir/ (four runtime files + version + dicrc); returns its path and SHA-256.</summary>
-    private (string CacheRoot, (string ZipPath, string Sha) Fixture) CreateFixture(bool populate, int payloadBytes = 0)
+    private (string CacheRoot, (string ZipPath, string Sha) Fixture) CreateFixture(bool populate)
     {
         var cacheRoot = NewDir();
         var buildDir = NewDir();
         var dicDir = Path.Combine(buildDir, "dicdir");
         Directory.CreateDirectory(dicDir);
-
         if (populate)
         {
-            foreach (var f in UniDicAssets.RequiredRuntimeFiles)
-            {
-                var path = Path.Combine(dicDir, f);
-                if (f == "char.bin" && payloadBytes > 0)
-                    File.WriteAllBytes(path, RandomNumberGenerator.GetBytes(payloadBytes));
-                else
-                    File.WriteAllText(path, $"{f}-data");
-            }
+            foreach (var file in UniDicAssets.RequiredRuntimeFiles)
+                File.WriteAllText(Path.Combine(dicDir, file), $"{file}-data");
             File.WriteAllText(Path.Combine(dicDir, UniDicAssets.DicrcFileName), $"output-format-type = {UniDicAssets.Format}");
+            var licenses = Directory.CreateDirectory(Path.Combine(dicDir, "licenses"));
+            File.WriteAllText(Path.Combine(licenses.FullName, "BSD"), "Fixture license notice.");
         }
 
-        // The zip target must be outside the directory being compressed (otherwise self-containment causes a file lock).
-        var zipPath = Path.Combine(Path.GetTempPath(), "ksfix_" + Guid.NewGuid().ToString("N") + ".zip");
+        var zipPath = Path.Combine(NewDir(), UniDicAssets.ArchiveFileName);
         ZipFile.CreateFromDirectory(buildDir, zipPath, CompressionLevel.Fastest, includeBaseDirectory: false);
-        return (cacheRoot, (zipPath, ComputeSha256(zipPath)));
+        using var stream = File.OpenRead(zipPath);
+        return (cacheRoot, (zipPath, Convert.ToHexStringLower(SHA256.HashData(stream))));
     }
 
     private string NewDir()
     {
-        var dir = Path.Combine(Path.GetTempPath(), "ksins_" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(dir);
-        _tempDirs.Add(dir);
-        return dir;
-    }
-
-    private static string ComputeSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        return Convert.ToHexStringLower(SHA256.HashData(stream));
+        var directory = Path.Combine(Path.GetTempPath(), "ksins_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        _tempDirs.Add(directory);
+        return directory;
     }
 
     public void Dispose()
     {
-        foreach (var dir in _tempDirs)
+        foreach (var directory in _tempDirs)
             try
             {
-                if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+                if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
             }
             catch (IOException) { }
     }
 
-    private sealed class ThrowingHandler : HttpMessageHandler
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
     {
-        public static readonly ThrowingHandler Instance = new();
-        private ThrowingHandler() { }
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => throw new InvalidOperationException("Network must not be contacted while dictionary is already installed.");
-    }
-
-    private sealed class ChunkedArchiveHandler(byte[] bytes) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-            {
-                Content = new ChunkedArchiveContent(bytes),
-            });
-    }
-
-    private sealed class ChunkedArchiveContent(byte[] bytes) : HttpContent
-    {
-        protected override bool TryComputeLength(out long length)
-        {
-            length = bytes.Length;
-            return true;
-        }
-
-        protected override Task<Stream> CreateContentReadStreamAsync()
-            => Task.FromResult<Stream>(new ChunkedReadStream(bytes, 1024));
-
-        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
-            => stream.WriteAsync(bytes).AsTask();
-    }
-
-    private sealed class ChunkedReadStream(byte[] bytes, int chunkSize) : Stream
-    {
-        private readonly MemoryStream _inner = new(bytes, writable: false);
-
-        public override bool CanRead => true;
-        public override bool CanSeek => false;
-        public override bool CanWrite => false;
-        public override long Length => _inner.Length;
-        public override long Position { get => _inner.Position; set => throw new NotSupportedException(); }
-
-        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
-        {
-            return await _inner.ReadAsync(buffer[..Math.Min(buffer.Length, chunkSize)], cancellationToken);
-        }
-
-        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-            => ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
-
-        public override int Read(byte[] buffer, int offset, int count)
-            => _inner.Read(buffer, offset, Math.Min(count, chunkSize));
-
-        public override void Flush() => throw new NotSupportedException();
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing) _inner.Dispose();
-            base.Dispose(disposing);
-        }
+        public void Report(T value) => report(value);
     }
 }

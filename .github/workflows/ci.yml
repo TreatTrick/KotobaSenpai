@@ -135,6 +135,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Prepare offline dictionary asset
+        shell: pwsh
+        run: ./scripts/Prepare-UniDic.ps1
       - name: Publish application
         run: dotnet publish src/KotobaSenpai.App/KotobaSenpai.App.csproj -c Release -o artifacts/publish --nologo
       # The CLI is the agent-facing entry point: capability discovery, input

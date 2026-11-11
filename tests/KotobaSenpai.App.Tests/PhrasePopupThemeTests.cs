@@ -411,7 +411,6 @@ public sealed partial class PhrasePopupThemeTests
         {
             host.Show();
             page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
-            VerifyRainbowProgressBorderAnimation(page);
             var selector = Assert.IsType<ComboBox>(page.FindName("OnboardingLanguageSelector"));
             Assert.Equal(language.AvailableCultures, selector.Items.Cast<CultureInfo>());
             Assert.Equal("NativeName", selector.DisplayMemberPath);
@@ -428,7 +427,7 @@ public sealed partial class PhrasePopupThemeTests
                 Dispatcher.PushFrame(settled);
                 var checkpoint = settings.GetValue(OnboardingViewModel.StateKey);
                 var attempts = preparations;
-                var expectedView = "Onboarding" + step + "Step";
+                var expectedView = onboarding.IsGuideVisible ? "Onboarding" + step + "Step" : nameof(OnboardingPreparationView);
                 var currentView = Assert.Single(Descendants(page).OfType<UserControl>(), control => control.GetType().Name == expectedView);
                 foreach (var culture in language.AvailableCultures)
                 {
@@ -443,15 +442,8 @@ public sealed partial class PhrasePopupThemeTests
                     Assert.Equal("French", language.CustomLanguage);
                     Assert.Equal(localizer.Get("Label_Language"), System.Windows.Automation.AutomationProperties.GetName(selector));
                     var layout = Assert.Single(Descendants(page).OfType<OnboardingStepLayout>());
-                    Assert.Equal(localizer.Get("Onboarding_Hero" + ((int)step + 1)),
+                    Assert.Equal(onboarding.HeroTitle,
                         Assert.IsType<System.Windows.Controls.TextBlock>(layout.FindName("StepHeading")).Text);
-                    if (step == OnboardingStep.Dictionary)
-                    {
-                        Assert.Equal(localizer.Get("Onboarding_DictionaryDefinition"),
-                            Assert.Single(Descendants(page).OfType<System.Windows.Controls.TextBlock>(), text => text.Tag as string == "DictionaryDefinition").Text);
-                        Assert.Equal(localizer.Get("Onboarding_DictionarySource"),
-                            Assert.Single(Descendants(page).OfType<System.Windows.Controls.TextBlock>(), text => text.Tag as string == "DictionarySource").Text);
-                    }
                     if (step == OnboardingStep.Ready)
                         Assert.Equal(localizer.Get("Onboarding_ReadyHint"),
                             Assert.Single(Descendants(page).OfType<System.Windows.Controls.TextBlock>(), text => text.Tag as string == "ReadyHint").Text);
@@ -463,7 +455,7 @@ public sealed partial class PhrasePopupThemeTests
                     Assert.True(footer.TranslatePoint(new Point(0, footer.ActualHeight), page).Y <= page.ActualHeight);
                     Assert.True(surface.ActualWidth <= page.ActualWidth);
                     Assert.True(themeSelector.IsEnabled);
-                    if (step == OnboardingStep.Model)
+                    if (onboarding.IsGuideVisible && step == OnboardingStep.Model)
                     {
                         var editor = Assert.Single(Descendants(page).OfType<OnboardingModelView>());
                         Assert.Same(settingsViewModel, editor.DataContext);
@@ -495,10 +487,13 @@ public sealed partial class PhrasePopupThemeTests
                         host.UpdateLayout();
                         Assert.Same(currentView, Assert.Single(Descendants(page).OfType<UserControl>(), control => control.GetType().Name == expectedView));
                         Assert.Same(application.FindResource("LayerFillColorDefaultBrush"), surface.Background);
-                        var badge = Assert.Single(Descendants(page).OfType<Border>(),
-                            border => border.Name == "ProgressBadge" && border.Tag is true);
-                        Assert.Same(application.FindResource("AccentFillColorDefaultBrush"), badge.Background);
-                        CheckOnboardingProgressConnectors(page);
+                        if (onboarding.IsGuideVisible)
+                        {
+                            var badge = Assert.Single(Descendants(page).OfType<Border>(),
+                                border => border.Name == "ProgressBadge" && border.Tag is true);
+                            Assert.Same(application.FindResource("AccentFillColorDefaultBrush"), badge.Background);
+                            CheckOnboardingProgressConnectors(page);
+                        }
                         Assert.True(footer.TranslatePoint(new Point(0, footer.ActualHeight), page).Y <= page.ActualHeight);
                         Assert.True(selector.TranslatePoint(new Point(selector.ActualWidth, 0), page).X <= page.ActualWidth);
                         var bitmap = new RenderTargetBitmap(width, (int)host.Height, 96, 96, PixelFormats.Pbgra32);
@@ -518,12 +513,12 @@ public sealed partial class PhrasePopupThemeTests
             }
 
             Assert.True(onboarding.IsBusy);
-            CheckLanguage(OnboardingStep.Dictionary);
+            CheckLanguage(OnboardingStep.Model);
             preparation.SetException(new InvalidOperationException("Preparation failed."));
             page.Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle);
             initializing.GetAwaiter().GetResult();
             Assert.True(onboarding.HasError);
-            CheckLanguage(OnboardingStep.Dictionary);
+            CheckLanguage(OnboardingStep.Model);
 
             readiness = new(true, true, true, true);
             preparation = new TaskCompletionSource();
@@ -562,7 +557,7 @@ public sealed partial class PhrasePopupThemeTests
     private static void CheckOnboardingProgressConnectors(OnboardingPage page)
     {
         var badges = Descendants(page).OfType<Border>().Where(border => border.Name == "ProgressBadge").ToArray();
-        Assert.Equal(4, badges.Length);
+        Assert.Equal(3, badges.Length);
 
         for (var index = 0; index < badges.Length; index++)
         {
@@ -590,34 +585,6 @@ public sealed partial class PhrasePopupThemeTests
                 Assert.InRange(Math.Abs(lineStart.Y - badgeEnd.Y), 0, 0.5);
             }
         }
-    }
-
-    private static void VerifyRainbowProgressBorderAnimation(OnboardingPage page)
-    {
-        if (!SystemParameters.ClientAreaAnimation || SystemParameters.HighContrast) return;
-
-        var step = Assert.Single(Descendants(page).OfType<OnboardingDictionaryStep>());
-        var border = Assert.Single(Descendants(step).OfType<Border>(), item => item.BorderThickness.Top == 1.5);
-        var before = CaptureBorder(border);
-        var frame = new DispatcherFrame();
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; };
-        timer.Start();
-        Dispatcher.PushFrame(frame);
-        var after = CaptureBorder(border);
-
-        Assert.False(before.SequenceEqual(after));
-    }
-
-    private static byte[] CaptureBorder(Border border)
-    {
-        var width = (int)Math.Ceiling(border.ActualWidth);
-        var height = (int)Math.Ceiling(border.ActualHeight);
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(border);
-        var pixels = new byte[width * height * 4];
-        bitmap.CopyPixels(pixels, width * 4, 0);
-        return pixels;
     }
 
     private static void CheckOverlayAppearancePresentation(Application application, SettingsPage page, Border frame,

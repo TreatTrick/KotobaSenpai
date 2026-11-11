@@ -58,19 +58,13 @@
     <value>Japanese OCR inference failed. See the log for details.</value>
   </data>
   <data name="UniDicDictionaryMissing" xml:space="preserve">
-    <value>The Japanese dictionary is not installed yet. It is downloading in the background on first run; retry in a moment, or import an offline UniDic archive.</value>
+    <value>The Japanese dictionary is not installed yet. Retry the bundled dictionary setup. If the local archive is missing, reinstall the complete application package.</value>
   </data>
   <data name="UniDicDictionaryInvalid" xml:space="preserve">
-    <value>The installed Japanese dictionary is invalid (wrong version, format, or integrity). Reinstall or import a valid UniDic 3.1.0 archive.</value>
+    <value>The Japanese dictionary is invalid (wrong version, format, or integrity). Reinstall the complete application package and retry dictionary setup.</value>
   </data>
-  <data name="UniDicDownloadFailed" xml:space="preserve">
-    <value>The Japanese dictionary download failed. Check your network and retry, or import an offline UniDic archive.</value>
-  </data>
-  <data name="Install_Title" xml:space="preserve">
-    <value>Installing Japanese dictionary</value>
-  </data>
-  <data name="Install_Progress" xml:space="preserve">
-    <value>First run downloads the dictionary. Please wait…</value>
+  <data name="UniDicInstallFailed" xml:space="preserve">
+    <value>The bundled Japanese dictionary could not be installed. Check available disk space and folder permissions, then retry or reinstall the complete application package.</value>
   </data>
   <data name="Install_Retry" xml:space="preserve">
     <value>Retry</value>
@@ -531,27 +525,21 @@ Preferred model (optional): &lt;enter a model name or leave blank for automatic 
     <value>Could not start window selection. Please try again.</value>
   </data>
   <data name="Onboarding_Step1" xml:space="preserve">
-    <value>Prepare dictionary</value>
-  </data>
-  <data name="Onboarding_Step2" xml:space="preserve">
     <value>Configure model</value>
   </data>
-  <data name="Onboarding_Step3" xml:space="preserve">
+  <data name="Onboarding_Step2" xml:space="preserve">
     <value>Select window</value>
   </data>
-  <data name="Onboarding_Step4" xml:space="preserve">
+  <data name="Onboarding_Step3" xml:space="preserve">
     <value>Start recognition</value>
   </data>
   <data name="Onboarding_Description1" xml:space="preserve">
-    <value>Let’s get your Japanese dictionary ready. Word segmentation, readings and word forms, available locally after this one-time download.</value>
-  </data>
-  <data name="Onboarding_Description2" xml:space="preserve">
     <value>Connect your preferred AI model to explore meaning, nuance and context. Check the connection before continuing.</value>
   </data>
-  <data name="Onboarding_Description3" xml:space="preserve">
+  <data name="Onboarding_Description2" xml:space="preserve">
     <value>A game, a video or a reader can be your Japanese classroom. Choose a window with Japanese text.</value>
   </data>
-  <data name="Onboarding_Description4" xml:space="preserve">
+  <data name="Onboarding_Description3" xml:space="preserve">
     <value>Your dictionary, model and window are ready. Start recognizing, and make the next sentence your own.</value>
   </data>
   <data name="Onboarding_Progress" xml:space="preserve">
@@ -570,7 +558,7 @@ Preferred model (optional): &lt;enter a model name or leave blank for automatic 
     <value>Getting ready</value>
   </data>
   <data name="Onboarding_PreparingDescription" xml:space="preserve">
-    <value>Preparing the resources needed for recognition. Your setup is already complete.</value>
+    <value>Preparing the bundled dictionary and local recognition resources. No dictionary download is needed.</value>
   </data>
   <data name="Onboarding_RuntimePreparing" xml:space="preserve">
     <value>Preparing recognition tools…</value>
@@ -583,9 +571,6 @@ Preferred model (optional): &lt;enter a model name or leave blank for automatic 
   </data>
   <data name="Onboarding_RecognitionFailed" xml:space="preserve">
     <value>Recognition could not start. Please try again from the recognition page.</value>
-  </data>
-  <data name="Install_Downloading" xml:space="preserve">
-    <value>Downloading dictionary…</value>
   </data>
   <data name="Install_Validating" xml:space="preserve">
     <value>Checking dictionary…</value>
@@ -600,29 +585,16 @@ Preferred model (optional): &lt;enter a model name or leave blank for automatic 
     <value>Dictionary ready</value>
   </data>
   <data name="Onboarding_Hero1" xml:space="preserve">
-    <value>Every word.
-A new beginning.</value>
-  </data>
-  <data name="Onboarding_Hero2" xml:space="preserve">
     <value>A little context.
 A lot more meaning.</value>
   </data>
-  <data name="Onboarding_Hero3" xml:space="preserve">
+  <data name="Onboarding_Hero2" xml:space="preserve">
     <value>One window.
 A world to discover.</value>
   </data>
-  <data name="Onboarding_Hero4" xml:space="preserve">
+  <data name="Onboarding_Hero3" xml:space="preserve">
     <value>You’re all set.
 Meet your next word.</value>
-  </data>
-  <data name="Onboarding_DictionaryDefinition" xml:space="preserve">
-    <value>Words; language. A way to connect with the world.</value>
-  </data>
-  <data name="Onboarding_DictionarySource" xml:space="preserve">
-    <value>Japanese morphology dictionary</value>
-  </data>
-  <data name="Onboarding_DictionaryHint" xml:space="preserve">
-    <value>Downloaded once. Available locally after installation.</value>
   </data>
   <data name="Onboarding_DictionaryReady" xml:space="preserve">
     <value>Dictionary installed, available offline</value>

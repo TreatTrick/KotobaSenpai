@@ -85,7 +85,7 @@ One real-use reference: about **US$0.075** for **30 minutes** of 魔法使いの
 
 ### 6. 🧭 A guided first run, without a maze of settings
 
-Onboarding walks you through the essentials: preparing the Japanese dictionary, configuring an AI model, and selecting the visual-novel window. The main controls stay focused on choosing a window, starting recognition, and enabling automatic recognition.
+The bundled dictionary is prepared automatically at startup. Onboarding guides you through configuring an AI model, selecting the visual-novel window, and starting recognition. The main controls stay focused on choosing a window, starting recognition, and enabling automatic recognition.
 
 <img src="docs/assets/first-run-onboarding-en.gif" width="760" alt="KotobaSenpai's guided first-run setup">
 
@@ -95,9 +95,11 @@ KotobaSenpai is a Windows desktop app built with **.NET 10** and **WPF**. Its fo
 
 ## 🚀 A simple first run
 
-1. Prepare the Japanese dictionary in onboarding.
-2. Configure your AI provider manually or ask a local Agent to do it with you.
-3. Select the game window and start reading.
+The complete installer includes the Japanese dictionary, which is prepared automatically without a download.
+
+1. Configure your AI provider manually or ask a local Agent to do it with you.
+2. Select the game window.
+3. Start recognition and read.
 
 ## 🐉 Thanks for reading
 

@@ -33,7 +33,7 @@ public sealed class UniDicInstallControllerTests
 
         Assert.True(controller.HasError);
         Assert.True(controller.IsBlocking);
-        Assert.Equal(ErrorCodes.UniDicDownloadFailed, controller.Error);
+        Assert.Equal(ErrorCodes.UniDicInstallFailed, controller.Error);
     }
 
     [Fact]
@@ -60,16 +60,17 @@ public sealed class UniDicInstallControllerTests
     }
 
     [Fact]
-    public void Validation_after_known_download_progress_keeps_progress_determinate()
+    public void Local_install_reports_preparation_stages()
     {
         using var controller = Create(_ => Task.CompletedTask);
         var reportStage = typeof(UniDicInstallController).GetMethod("ReportStage", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-        reportStage.Invoke(controller, [new DictionaryInstallProgress(DictionaryInstallStage.Downloading, 0.6)]);
         reportStage.Invoke(controller, [new DictionaryInstallProgress(DictionaryInstallStage.Validating)]);
-
-        Assert.Equal(0.6, controller.Progress);
-        Assert.False(controller.IsIndeterminate);
+        Assert.Equal(DictionaryInstallStage.Validating, controller.Stage);
+        reportStage.Invoke(controller, [new DictionaryInstallProgress(DictionaryInstallStage.Extracting)]);
+        Assert.Equal(DictionaryInstallStage.Extracting, controller.Stage);
+        reportStage.Invoke(controller, [new DictionaryInstallProgress(DictionaryInstallStage.Ready)]);
+        Assert.Equal(DictionaryInstallStage.Ready, controller.Stage);
     }
 
     private sealed class FakeLocalizer : IStringLocalizer

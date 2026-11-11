@@ -4,6 +4,8 @@ Builds a self-contained Windows installer for KotobaSenpai.
 
 .DESCRIPTION
 Requires the .NET 10 SDK, Inno Setup 6 or 7, and the two meikiocr ONNX models.
+Bundles the pinned UniDic archive so dictionary setup works offline. The archive
+is prepared at build time; pass -UniDicArchive to use an existing local ZIP.
 The installer is written to artifacts/installer. Build intermediates are removed
 from the system temporary directory when the script exits.
 
@@ -23,7 +25,8 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version = (Get-Date -Format "yyyy.MM.dd"),
     [string]$OutputDirectory,
-    [string]$InnoSetupCompiler
+    [string]$InnoSetupCompiler,
+    [string]$UniDicArchive
 )
 
 $ErrorActionPreference = "Stop"
@@ -105,6 +108,7 @@ if (-not (Get-Command "dotnet" -ErrorAction SilentlyContinue)) {
 }
 
 $compiler = Find-InnoSetupCompiler -ExplicitPath $InnoSetupCompiler
+$bundledArchive = & (Join-Path $PSScriptRoot "Prepare-UniDic.ps1") -ArchivePath $UniDicArchive
 $installerName = "KotobaSenpai-$Version-win-x64-Setup.exe"
 $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $workDirectory = Join-Path $tempRoot ("KotobaSenpai-installer-" + [guid]::NewGuid().ToString("N"))
@@ -134,6 +138,14 @@ try {
         if (-not (Test-Path -LiteralPath $publishedModel -PathType Leaf)) {
             throw "Required OCR model is missing from the published application: $publishedModel"
         }
+    }
+    $publishedArchive = Join-Path $publishDirectory ("Assets\UniDic\" + [System.IO.Path]::GetFileName($bundledArchive))
+    if (-not (Test-Path -LiteralPath $publishedArchive -PathType Leaf)) {
+        throw "Required offline UniDic archive is missing from the published application: $publishedArchive"
+    }
+    if ((Get-FileHash -LiteralPath $publishedArchive -Algorithm SHA256).Hash -ne
+        (Get-FileHash -LiteralPath $bundledArchive -Algorithm SHA256).Hash) {
+        throw "Published UniDic archive does not match the verified release asset."
     }
     & (Join-Path $script:RepositoryRoot "tests\Check-AgentCli.ps1") -PublishDirectory $publishDirectory
 

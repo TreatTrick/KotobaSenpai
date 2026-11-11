@@ -3,7 +3,7 @@ using KotobaSenpai.Core.Settings;
 
 namespace KotobaSenpai.App.Onboarding;
 
-public enum OnboardingStep { Dictionary, Model, Window, Ready, Main }
+public enum OnboardingStep { Model, Window, Ready, Main }
 public enum OnboardingPhase { NotStarted, Preparing, PreparationFailed, Repairing, RepairFailed, Active, Starting, Main, Closed }
 public enum OnboardingAction { Next, Back }
 
@@ -17,14 +17,14 @@ public sealed class OnboardingStateMachine(ISettingsService settings, Func<Onboa
     Func<CancellationToken, Task> prepare, Func<Task> start, Action? refreshTarget = null) : IDisposable
 {
     public const string CheckpointKey = "OnboardingState";
-    public OnboardingState State { get; private set; } = new(OnboardingPhase.NotStarted, OnboardingStep.Dictionary);
+    public OnboardingState State { get; private set; } = new(OnboardingPhase.NotStarted, OnboardingStep.Model);
     public event Action? Changed;
     public bool IsBusy => State.Phase is OnboardingPhase.Preparing or OnboardingPhase.Repairing or OnboardingPhase.Starting;
     public bool IsMain => State.Step == OnboardingStep.Main;
-    public bool IsGuideVisible => State.Phase is not (OnboardingPhase.Repairing or OnboardingPhase.RepairFailed
-        or OnboardingPhase.Starting or OnboardingPhase.Main or OnboardingPhase.Closed);
+    public bool IsGuideVisible => State.Phase == OnboardingPhase.Active;
     public bool CanInitialize => State.Phase is OnboardingPhase.NotStarted or OnboardingPhase.PreparationFailed or OnboardingPhase.RepairFailed;
     public bool IsPreparingRuntime => (State.Phase is OnboardingPhase.Preparing or OnboardingPhase.Repairing) && readiness().DictionaryReady;
+    public bool IsPreparingDictionary => (State.Phase is OnboardingPhase.Preparing or OnboardingPhase.Repairing) && !readiness().DictionaryReady;
     private bool IsClosed => State.Phase == OnboardingPhase.Closed;
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -40,7 +40,7 @@ public sealed class OnboardingStateMachine(ISettingsService settings, Func<Onboa
             var step = ResolveStartupStep(checkpoint, ready);
             if (!completed) SaveStep(step);
             SetState(new(completed ? OnboardingPhase.Repairing : OnboardingPhase.Preparing,
-                completed ? OnboardingStep.Dictionary : step));
+                completed ? OnboardingStep.Model : step));
             await prepare(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (IsClosed) return;
@@ -60,8 +60,7 @@ public sealed class OnboardingStateMachine(ISettingsService settings, Func<Onboa
     }
 
     private static OnboardingStep ResolveStartupStep(string? checkpoint, OnboardingReadiness ready)
-        => !ready.DictionaryReady ? OnboardingStep.Dictionary
-            : checkpoint == "window" && ready.ModelReady ? OnboardingStep.Window : OnboardingStep.Model;
+        => checkpoint == "window" && ready.ModelReady ? OnboardingStep.Window : OnboardingStep.Model;
 
     public bool CanHandle(OnboardingAction action)
         => (State.Phase is OnboardingPhase.Active or OnboardingPhase.PreparationFailed)
@@ -82,7 +81,6 @@ public sealed class OnboardingStateMachine(ISettingsService settings, Func<Onboa
         if (action != OnboardingAction.Next || State.Phase != OnboardingPhase.Active || !ready.DictionaryReady) return null;
         return State.Step switch
         {
-            OnboardingStep.Dictionary => OnboardingStep.Model,
             OnboardingStep.Model when ready.ModelReady && !ready.ModelBusy => OnboardingStep.Window,
             OnboardingStep.Window when CanUseTarget(ready) => OnboardingStep.Ready,
             OnboardingStep.Ready when CanUseTarget(ready) => OnboardingStep.Main,
@@ -142,7 +140,6 @@ public sealed class OnboardingStateMachine(ISettingsService settings, Func<Onboa
 
     private void SaveStep(OnboardingStep step) => settings.SetValue(CheckpointKey, step switch
     {
-        OnboardingStep.Dictionary => "dictionary",
         OnboardingStep.Model => "model",
         OnboardingStep.Window or OnboardingStep.Ready => "window",
         OnboardingStep.Main => "completed",
@@ -153,15 +150,8 @@ public sealed class OnboardingStateMachine(ISettingsService settings, Func<Onboa
     {
         if (IsClosed) return;
         var ready = readiness();
-        if (State.Phase == OnboardingPhase.Active && !ready.DictionaryReady && State.Step != OnboardingStep.Dictionary)
-        {
-            try
-            {
-                SaveStep(OnboardingStep.Dictionary);
-                SetState(new(OnboardingPhase.PreparationFailed, OnboardingStep.Dictionary, "Onboarding_PreparationFailed"));
-            }
-            catch (Exception) { FailPreparation("Onboarding_SaveFailed"); }
-        }
+        if (State.Phase == OnboardingPhase.Active && !ready.DictionaryReady)
+            FailPreparation("Onboarding_PreparationFailed");
         else if (State.Phase == OnboardingPhase.Active && State.Step == OnboardingStep.Ready && !ready.HasTarget)
             SetState(new(OnboardingPhase.Active, OnboardingStep.Window));
         else

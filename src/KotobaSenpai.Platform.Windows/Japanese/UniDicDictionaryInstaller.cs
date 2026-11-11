@@ -1,8 +1,6 @@
 using KotobaSenpai.Core.Errors;
 using System.IO;
 using System.IO.Compression;
-using System.Net.Http;
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using KotobaSenpai.Core.Japanese;
@@ -10,42 +8,43 @@ using KotobaSenpai.Core.Japanese;
 namespace KotobaSenpai.Platform.Windows.Japanese;
 
 /// <summary>
-/// UniDic dictionary installer (M1 distribution): on first run downloads from a fixed URL and atomically installs into the local cache directory,
-/// and also supports importing from a validated offline archive. After download/extraction it validates the SHA-256, version, <c>unidic22</c> format, and
+/// UniDic dictionary installer: on first run installs the bundled archive into the local cache without network access.
+/// It also supports importing another copy of the pinned archive. It validates the SHA-256, version, <c>unidic22</c> format, and
 /// the four runtime files, and only after all pass does it atomically replace <c>dicdir</c> and write an installed-manifest.
 /// Installation is cancellable, retryable, and never leaves a half-finished result; a named Mutex guarantees that only one process replaces the dictionary at a time.
 /// Failures throw <see cref="WindowsPlatformException"/>: hash/format mismatches throw <c>UniDicDictionaryInvalid</c>,
-/// network/extraction I/O failures throw <c>UniDicDownloadFailed</c>.
+/// extraction/installation I/O failures throw <c>UniDicInstallFailed</c>.
 /// </summary>
-public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDisposable
+public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller
 {
     private const string MutexName = @"Local\KotobaSenpai.UniDic.Install";
 
     private readonly string _cacheRoot;
     private readonly string _dicDir;
-    private readonly HttpClient _http;
+    private readonly string _archivePath;
     private readonly UniDicManifest _manifest;
     private readonly Func<string?> _dictionaryOverride;
     private readonly SemaphoreSlim _inProcessLock = new(1, 1);
-    private bool _disposed;
 
     /// <summary>The final dictionary directory (<c>&lt;cacheRoot&gt;/dicdir</c>).</summary>
     public string DictionaryDirectory => _dicDir;
 
     /// <summary>Uses the real cache root directory and the fixed asset manifest.</summary>
-    public UniDicDictionaryInstaller(HttpClient http)
-        : this(http, DefaultCacheRoot(), DefaultManifest(),
+    public UniDicDictionaryInstaller()
+        : this(Path.Combine(AppContext.BaseDirectory, "Assets", "UniDic", UniDicAssets.ArchiveFileName),
+            DefaultCacheRoot(), DefaultManifest(),
             () => Environment.GetEnvironmentVariable("KOTOBA_UNIDIC_DIR"))
     {
     }
 
     /// <summary>
-    /// <paramref name="cacheRoot"/> and <paramref name="manifest"/> can be injected (network-free unit tests use a temp directory and fixture hashes).
+    /// The archive path, cache root, and manifest can be injected for local assets and fixture-based tests.
     /// </summary>
-    public UniDicDictionaryInstaller(HttpClient http, string cacheRoot, UniDicManifest manifest,
+    public UniDicDictionaryInstaller(string archivePath, string cacheRoot, UniDicManifest manifest,
         Func<string?>? dictionaryOverride = null)
     {
-        _http = http ?? throw new ArgumentNullException(nameof(http));
+        ArgumentException.ThrowIfNullOrWhiteSpace(archivePath);
+        _archivePath = archivePath;
         _cacheRoot = cacheRoot ?? throw new ArgumentNullException(nameof(cacheRoot));
         _manifest = manifest;
         _dictionaryOverride = dictionaryOverride ?? (() => null);
@@ -80,8 +79,8 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
         }
     }
 
-    /// <summary>Returns immediately when already installed; otherwise downloads, validates, and atomically installs. Safe to trigger in parallel before installation.</summary>
-    public async Task EnsureInstalledAsync(IProgress<double>? progress = null, CancellationToken ct = default,
+    /// <summary>Returns immediately when installed; otherwise validates and atomically installs the bundled archive. Safe to trigger in parallel before installation.</summary>
+    public async Task EnsureInstalledAsync(CancellationToken ct = default,
         IProgress<DictionaryInstallProgress>? stages = null)
     {
         if (IsInstalled)
@@ -102,14 +101,16 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
             if (IsCacheInstalled)
                 return;
 
+            if (!File.Exists(_archivePath))
+                throw new WindowsPlatformException(ErrorCodes.UniDicDictionaryMissing,
+                    $"Bundled UniDic archive not found at '{_archivePath}'. Reinstall the complete application package.");
+
             var stagingRoot = Path.Combine(_cacheRoot, "staging-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(stagingRoot);
-            var zipPath = Path.Combine(stagingRoot, "unidic-3.1.0.zip");
             try
             {
-                await DownloadAsync(UniDicAssets.SourceUrl, zipPath, progress, ct, stages).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
-                await InstallFromArchiveCoreAsync(zipPath, stagingRoot, ct, stages).ConfigureAwait(false);
+                await InstallFromArchiveCoreAsync(_archivePath, stagingRoot, ct, stages).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -122,8 +123,8 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
             catch (Exception ex)
             {
                 throw new WindowsPlatformException(
-                    ErrorCodes.UniDicDownloadFailed,
-                    $"UniDic download/extraction failed from '{UniDicAssets.SourceUrl}'.",
+                    ErrorCodes.UniDicInstallFailed,
+                    $"UniDic installation failed from bundled archive '{_archivePath}'.",
                     ex);
             }
             finally
@@ -165,7 +166,7 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
         }
     }
 
-    /// <summary>The install core shared by online and offline paths: SHA-256 → extract → locate → version/format validation → write manifest → atomic replace.</summary>
+    /// <summary>The install core: SHA-256 → extract → locate → version/format validation → write manifest → atomic replace.</summary>
     private async Task InstallFromArchiveCoreAsync(string archivePath, string stagingRoot, CancellationToken ct,
         IProgress<DictionaryInstallProgress>? stages)
     {
@@ -207,7 +208,7 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
         try
         {
             if (!mutex.WaitOne(TimeSpan.FromSeconds(30)))
-                throw new WindowsPlatformException(ErrorCodes.UniDicDownloadFailed, "Timed out waiting for dictionary install lock.");
+                throw new WindowsPlatformException(ErrorCodes.UniDicInstallFailed, "Timed out waiting for dictionary install lock.");
         }
         catch (AbandonedMutexException)
         {
@@ -250,38 +251,6 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
         }
     }
 
-    private async Task DownloadAsync(string url, string destination, IProgress<double>? progress, CancellationToken ct,
-        IProgress<DictionaryInstallProgress>? stages)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        var total = response.Content.Headers.ContentLength;
-        stages?.Report(new(DictionaryInstallStage.Downloading, total is > 0 ? 0 : null));
-        await using var source = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-        await using var target = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true);
-
-        var buffer = new byte[1 << 16];
-        long received = 0;
-        var lastProgressReportAt = Stopwatch.GetTimestamp();
-        int read;
-        while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
-        {
-            await target.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
-            received += read;
-            if (total is > 0 && (received >= total.Value
-                || Stopwatch.GetElapsedTime(lastProgressReportAt) >= TimeSpan.FromMilliseconds(100)))
-            {
-                var fraction = (double)received / total.Value;
-                stages?.Report(new(DictionaryInstallStage.Downloading, fraction));
-                progress?.Report(fraction);
-                lastProgressReportAt = Stopwatch.GetTimestamp();
-            }
-        }
-        progress?.Report(1.0);
-    }
-
     private static async Task<string> ComputeSha256Async(string path, CancellationToken ct)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, useAsync: true);
@@ -306,7 +275,7 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
     private static bool VersionAndFormatValid(string dicDir)
     {
         // Empirically, cotonoha-dic's unidic-3.1.0.zip contains no version file (only dicrc/README/licenses);
-        // version and identity are already pinned by the fixed URL + SHA-256 validation, so here we only validate the unidic22 format marker carried by dicrc.
+        // Version and identity are pinned by SHA-256 validation, so here we only validate the unidic22 format marker carried by dicrc.
         return File.Exists(Path.Combine(dicDir, UniDicAssets.DicrcFileName))
             && File.ReadAllText(Path.Combine(dicDir, UniDicAssets.DicrcFileName))
                 .Contains(UniDicAssets.Format, StringComparison.Ordinal);
@@ -375,13 +344,4 @@ public sealed class UniDicDictionaryInstaller : IUniDicDictionaryInstaller, IDis
         UniDicAssets.Sha256,
         UniDicAssets.Format,
         UniDicAssets.RequiredRuntimeFiles);
-
-    public void Dispose()
-    {
-        if (_disposed)
-            return;
-        // In-flight operations still release this managed semaphore after cancellation; no wait handle is allocated.
-        _http.Dispose();
-        _disposed = true;
-    }
 }

@@ -26,6 +26,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\Support\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\UniDic\unidic-3.1.0.zip" Condition="Exists('Assets\UniDic\unidic-3.1.0.zip')"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\FluentIcons\LICENSE.txt"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
@@ -39,6 +41,10 @@
       <Generator>PublicResXFileCodeGenerator</Generator>
     </EmbeddedResource>
   </ItemGroup>
+  <Target Name="RequireBundledUniDic" BeforeTargets="PrepareForPublish">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\Assets\UniDic\unidic-3.1.0.zip')"
+           Text="The offline UniDic archive is required for publishing. Run scripts/Prepare-UniDic.ps1, optionally with -ArchivePath pointing to the pinned ZIP." />
+  </Target>
   <Target Name="GetAgentCliFiles">
     <MSBuild Projects="..\KotobaSenpai.Cli\KotobaSenpai.Cli.csproj" Targets="GetTargetPath"
              Properties="Configuration=$(Configuration)">

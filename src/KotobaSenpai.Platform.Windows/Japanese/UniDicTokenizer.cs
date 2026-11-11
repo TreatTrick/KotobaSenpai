@@ -14,7 +14,7 @@ namespace KotobaSenpai.Platform.Windows.Japanese;
 /// <summary>
 /// Japanese tokenizer loading the UniDic unidic22 dictionary via LibNMeCab's <see cref="MeCabUniDic22Tagger"/>. The
 /// dictionary directory is overridden with the <c>KOTOBA_UNIDIC_DIR</c> environment variable (development/testing);
-/// otherwise it falls back to <c>%LocalAppData%/KotobaSenpai/UniDic/dicdir</c> (where the first run downloads it). A
+/// otherwise it falls back to <c>%LocalAppData%/KotobaSenpai/UniDic/dicdir</c> (where first run installs the bundled archive). A
 /// directory can be injected at compile time to support offline tests (avoiding parallel tests mutating a
 /// process-level environment variable). Throws <see cref="WindowsPlatformException"/>
 /// (<see cref="ErrorCodes.UniDicDictionaryMissing"/>) when the dictionary is missing; throws

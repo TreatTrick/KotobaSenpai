@@ -46,6 +46,6 @@ public static class ErrorCodes
     /// <summary>UniDic dictionary present but its version/format/integrity is invalid (UniDicTokenizer / UniDicDictionaryInstaller).</summary>
     public const string UniDicDictionaryInvalid = nameof(UniDicDictionaryInvalid);
 
-    /// <summary>UniDic dictionary download/extraction failed (UniDicDictionaryInstaller).</summary>
-    public const string UniDicDownloadFailed = nameof(UniDicDownloadFailed);
+    /// <summary>UniDic dictionary extraction/installation failed (UniDicDictionaryInstaller).</summary>
+    public const string UniDicInstallFailed = nameof(UniDicInstallFailed);
 }

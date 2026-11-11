@@ -58,19 +58,13 @@
     <value>日语 OCR 推理失败，请查看日志了解详情。</value>
   </data>
   <data name="UniDicDictionaryMissing" xml:space="preserve">
-    <value>日语词典尚未安装。首次运行会在后台自动下载，请稍后重试，或导入离线 UniDic 压缩包。</value>
+    <value>日语词典尚未安装，请重试安装应用内置词典。如果本地词典包缺失，请重新安装完整应用。</value>
   </data>
   <data name="UniDicDictionaryInvalid" xml:space="preserve">
-    <value>已安装的日语词典无效（版本、格式或完整性不匹配）。请重新安装或导入有效的 UniDic 3.1.0 压缩包。</value>
+    <value>日语词典无效（版本、格式或完整性不匹配）。请重新安装完整应用后重试词典安装。</value>
   </data>
-  <data name="UniDicDownloadFailed" xml:space="preserve">
-    <value>日语词典下载失败。请检查网络后重试，或导入离线 UniDic 压缩包。</value>
-  </data>
-  <data name="Install_Title" xml:space="preserve">
-    <value>正在安装日语词典</value>
-  </data>
-  <data name="Install_Progress" xml:space="preserve">
-    <value>首次运行需下载词典，请稍候…</value>
+  <data name="UniDicInstallFailed" xml:space="preserve">
+    <value>内置日语词典安装失败。请检查磁盘空间和目录权限后重试，或重新安装完整应用。</value>
   </data>
   <data name="Install_Retry" xml:space="preserve">
     <value>重试</value>
@@ -531,27 +525,21 @@ API Key：YOUR_API_KEY
     <value>窗口选择失败，请重试。</value>
   </data>
   <data name="Onboarding_Step1" xml:space="preserve">
-    <value>准备词典</value>
-  </data>
-  <data name="Onboarding_Step2" xml:space="preserve">
     <value>配置大模型</value>
   </data>
-  <data name="Onboarding_Step3" xml:space="preserve">
+  <data name="Onboarding_Step2" xml:space="preserve">
     <value>选择窗口</value>
   </data>
-  <data name="Onboarding_Step4" xml:space="preserve">
+  <data name="Onboarding_Step3" xml:space="preserve">
     <value>开始识别</value>
   </data>
   <data name="Onboarding_Description1" xml:space="preserve">
-    <value>先准备好日语词典。分词、读音和词形分析，从这里开始。只需下载一次，之后即可在本地使用。</value>
-  </data>
-  <data name="Onboarding_Description2" xml:space="preserve">
     <value>连接你常用的大模型，为词句补上语境、含义与细微的表达。配置检测通过后，就可以继续。</value>
   </data>
-  <data name="Onboarding_Description3" xml:space="preserve">
+  <data name="Onboarding_Description2" xml:space="preserve">
     <value>游戏、视频或阅读器，都可以成为你的日语课堂。选择一个正在显示日语的窗口。</value>
   </data>
-  <data name="Onboarding_Description4" xml:space="preserve">
+  <data name="Onboarding_Description3" xml:space="preserve">
     <value>词典、模型和窗口都已就绪。点下开始，让文字变得可以理解。</value>
   </data>
   <data name="Onboarding_Progress" xml:space="preserve">
@@ -567,10 +555,10 @@ API Key：YOUR_API_KEY
     <value>开始识别</value>
   </data>
   <data name="Onboarding_Preparing" xml:space="preserve">
-    <value>准备就绪</value>
+    <value>正在准备</value>
   </data>
   <data name="Onboarding_PreparingDescription" xml:space="preserve">
-    <value>正在准备识别所需资源，已有引导完成状态将保留。</value>
+    <value>正在准备内置词典和本地识别资源，无需下载词典。</value>
   </data>
   <data name="Onboarding_RuntimePreparing" xml:space="preserve">
     <value>正在准备识别…</value>
@@ -583,9 +571,6 @@ API Key：YOUR_API_KEY
   </data>
   <data name="Onboarding_RecognitionFailed" xml:space="preserve">
     <value>未能开始识别，请在识别页面重试。</value>
-  </data>
-  <data name="Install_Downloading" xml:space="preserve">
-    <value>正在下载词典…</value>
   </data>
   <data name="Install_Validating" xml:space="preserve">
     <value>正在校验词典…</value>
@@ -600,29 +585,16 @@ API Key：YOUR_API_KEY
     <value>词典已就绪</value>
   </data>
   <data name="Onboarding_Hero1" xml:space="preserve">
-    <value>从每一个词，
-开始。</value>
-  </data>
-  <data name="Onboarding_Hero2" xml:space="preserve">
     <value>让 AI 帮你，
 读懂言外之意。</value>
   </data>
-  <data name="Onboarding_Hero3" xml:space="preserve">
+  <data name="Onboarding_Hero2" xml:space="preserve">
     <value>选一个窗口，
 看见更多。</value>
   </data>
-  <data name="Onboarding_Hero4" xml:space="preserve">
+  <data name="Onboarding_Hero3" xml:space="preserve">
     <value>准备好了。
 遇见下一句日语。</value>
-  </data>
-  <data name="Onboarding_DictionaryDefinition" xml:space="preserve">
-    <value>词语；语言。连接人与世界的方式。</value>
-  </data>
-  <data name="Onboarding_DictionarySource" xml:space="preserve">
-    <value>日语形态分析词典</value>
-  </data>
-  <data name="Onboarding_DictionaryHint" xml:space="preserve">
-    <value>只需下载一次，安装后即可在本地分词。</value>
   </data>
   <data name="Onboarding_DictionaryReady" xml:space="preserve">
     <value>词典已安装，可离线使用</value>

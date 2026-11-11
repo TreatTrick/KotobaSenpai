@@ -13,7 +13,6 @@ using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Llm;
 using KotobaSenpai.Core.TargetWindow;
 using System.IO;
-using System.Net.Http;
 using System.Windows;
 using KotobaSenpai.App.Diagnostics;
 using KotobaSenpai.App.Japanese;
@@ -140,14 +139,6 @@ internal sealed class DesktopComposition : IDisposable
         return new RecognitionRuntime(services.GetRequiredService<RecognitionPageViewModel>(), services.GetRequiredService<WpfOverlayRenderer>());
     }
 
-    /// <summary>HttpClient for the dictionary download: a 502MB archive download needs a long timeout to avoid failing mid-way on the default 100s.</summary>
-    private static HttpClient CreateDownloadHttpClient()
-    {
-        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("KotobaSenpai");
-        return client;
-    }
-
     /// <summary>Registers application-wide resources and window-scoped presentation and recognition state.</summary>
     internal static void ConfigureServices(IServiceCollection services)
     {
@@ -203,7 +194,7 @@ internal sealed class DesktopComposition : IDisposable
         // Japanese tokenization: the adapter is explicitly initialized during startup after the dictionary installer completes.
         services.AddSingleton<UniDicTokenizer>();
         services.AddSingleton<ITokenizer>(sp => sp.GetRequiredService<UniDicTokenizer>());
-        services.AddSingleton<IUniDicDictionaryInstaller>(_ => new UniDicDictionaryInstaller(CreateDownloadHttpClient()));
+        services.AddSingleton<IUniDicDictionaryInstaller>(_ => new UniDicDictionaryInstaller());
         // Install coordinator: drives the startup overlay (progress/error/retry).
         services.AddScoped<UniDicInstallController>();
         // Word grouping: first resolve token-boundary spans in a single batched OCR pass, then reuse the same result for both underlines and hover.

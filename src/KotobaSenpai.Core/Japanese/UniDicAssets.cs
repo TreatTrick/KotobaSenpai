@@ -11,8 +11,11 @@ public static class UniDicAssets
     /// <summary>Pinned version (aligned with the unidic-py build used by the Doki Windows release).</summary>
     public const string Version = "3.1.0+2021-08-31";
 
-    /// <summary>Pinned download URL (resolving latest aliases or unverified mirrors is forbidden).</summary>
+    /// <summary>Original source used to prepare release assets; the application installs the bundled archive offline.</summary>
     public const string SourceUrl = "https://cotonoha-dic.s3-ap-northeast-1.amazonaws.com/unidic-3.1.0.zip";
+
+    /// <summary>The pinned archive shipped under Assets/UniDic in the application directory.</summary>
+    public const string ArchiveFileName = "unidic-3.1.0.zip";
 
     /// <summary>SHA-256 of the compressed dictionary package (measured 2026-08-08, downloaded from <see cref="SourceUrl"/>).</summary>
     public const string Sha256 = "638718c4c63625ab300de4c92c67925d54c0e9e3830009eaa992f29819d59c43";

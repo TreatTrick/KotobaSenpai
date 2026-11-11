@@ -9,6 +9,48 @@ namespace KotobaSenpai.App.Tests;
 public sealed class OnboardingViewModelTests
 {
     [Fact]
+    public async Task First_run_prepares_dictionary_outside_the_three_step_guide()
+    {
+        var settings = new MemorySettings();
+        var ready = new OnboardingReadiness(false, false);
+        var pending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var vm = Create(settings, () => ready, async token =>
+        {
+            await pending.Task.WaitAsync(token);
+            ready = ready with { DictionaryReady = true };
+        });
+
+        var initializing = vm.InitializeCommand.ExecuteAsync(null);
+        Assert.False(vm.IsGuideVisible);
+        Assert.False(vm.NextCommand.CanExecute(null));
+        pending.SetResult();
+        await initializing;
+
+        Assert.Equal(OnboardingStep.Model, vm.Step);
+        Assert.True(vm.IsGuideVisible);
+        Assert.Equal(3, vm.Progress.Count);
+        Assert.Equal("model", settings.GetValue("OnboardingState"));
+    }
+
+    [Fact]
+    public async Task Legacy_dictionary_checkpoint_resumes_at_model_after_local_preparation()
+    {
+        var settings = new MemorySettings();
+        settings.SetValue("OnboardingState", "dictionary");
+        var ready = new OnboardingReadiness(false, false);
+        using var vm = Create(settings, () => ready, _ =>
+        {
+            ready = ready with { DictionaryReady = true };
+            return Task.CompletedTask;
+        });
+
+        await vm.InitializeCommand.ExecuteAsync(null);
+
+        Assert.Equal(OnboardingStep.Model, vm.Step);
+        Assert.Equal("model", settings.GetValue("OnboardingState"));
+    }
+
+    [Fact]
     public async Task An_active_step_ignores_duplicate_initialization()
     {
         var settings = new MemorySettings();
@@ -28,13 +70,13 @@ public sealed class OnboardingViewModelTests
     }
 
     [Theory]
-    [InlineData(null, false, false, OnboardingStep.Dictionary, "dictionary")]
+    [InlineData(null, false, false, OnboardingStep.Model, "model")]
     [InlineData(null, true, false, OnboardingStep.Model, "model")]
     [InlineData(null, true, true, OnboardingStep.Main, "completed")]
     [InlineData("model", true, true, OnboardingStep.Model, "model")]
     [InlineData("window", true, true, OnboardingStep.Window, "window")]
     [InlineData("window", true, false, OnboardingStep.Model, "model")]
-    [InlineData("window", false, true, OnboardingStep.Dictionary, "dictionary")]
+    [InlineData("window", false, true, OnboardingStep.Window, "window")]
     [InlineData("invalid", true, true, OnboardingStep.Model, "model")]
     [InlineData("completed", true, false, OnboardingStep.Main, "completed")]
     public async Task Startup_restores_only_valid_checkpoints(string? checkpoint, bool dictionary, bool model,
@@ -58,10 +100,12 @@ public sealed class OnboardingViewModelTests
     {
         var settings = new MemorySettings();
         var attempts = 0;
-        using var vm = Create(settings, () => new(false, false), _ =>
+        var dictionaryReady = false;
+        using var vm = Create(settings, () => new(dictionaryReady, false), _ =>
         {
-            Assert.Equal("dictionary", settings.GetValue("OnboardingState"));
+            Assert.Equal("model", settings.GetValue("OnboardingState"));
             if (++attempts == 1) throw new InvalidOperationException("Preparation failed.");
+            dictionaryReady = true;
             return Task.CompletedTask;
         });
 
@@ -207,7 +251,8 @@ public sealed class OnboardingViewModelTests
         await vm.InitializeCommand.ExecuteAsync(null);
         readiness = readiness with { DictionaryReady = false };
         vm.Refresh();
-        Assert.Equal(OnboardingStep.Dictionary, vm.Step);
+        Assert.Equal(OnboardingStep.Model, vm.Step);
+        Assert.False(vm.IsGuideVisible);
         Assert.True(vm.ShowRetry);
         Assert.False(vm.NextCommand.CanExecute(null));
     }

@@ -13,8 +13,8 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="/KotobaSenpai.App;component/Themes/OnboardingStyles.xaml" />
       </ResourceDictionary.MergedDictionaries>
-      <DataTemplate x:Key="DictionaryStep">
-        <steps:OnboardingDictionaryStep DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=views:OnboardingPage}}" />
+      <DataTemplate x:Key="PreparationView">
+        <steps:OnboardingPreparationView DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=views:OnboardingPage}}" />
       </DataTemplate>
       <DataTemplate x:Key="ModelStep">
         <steps:OnboardingModelStep DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=views:OnboardingPage}}" />
@@ -25,7 +25,7 @@
       <DataTemplate x:Key="ReadyStep">
         <steps:OnboardingReadyStep DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=views:OnboardingPage}}" />
       </DataTemplate>
-      <steps:OnboardingStepTemplateSelector x:Key="StepTemplates" Dictionary="{StaticResource DictionaryStep}" Model="{StaticResource ModelStep}" Window="{StaticResource WindowStep}" Ready="{StaticResource ReadyStep}" />
+      <steps:OnboardingStepTemplateSelector x:Key="StepTemplates" Model="{StaticResource ModelStep}" Window="{StaticResource WindowStep}" Ready="{StaticResource ReadyStep}" />
     </ResourceDictionary>
   </UserControl.Resources>
   <Grid Margin="30,0,30,24">
@@ -57,7 +57,7 @@
           <ItemsControl ItemsSource="{Binding Onboarding.Progress}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
-                <UniformGrid Columns="4" />
+                <UniformGrid Columns="3" />
               </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
@@ -108,7 +108,17 @@
             <Grid.RenderTransform>
               <TranslateTransform />
             </Grid.RenderTransform>
-            <ContentControl x:Name="StepContent" Content="{Binding Onboarding.Step}" ContentTemplateSelector="{StaticResource StepTemplates}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" />
+            <ContentControl x:Name="StepContent" Content="{Binding Onboarding.Step}" ContentTemplateSelector="{StaticResource StepTemplates}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center">
+              <ContentControl.Style>
+                <Style TargetType="ContentControl">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Onboarding.IsGuideVisible}" Value="False">
+                      <Setter Property="ContentTemplate" Value="{StaticResource PreparationView}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </ContentControl.Style>
+            </ContentControl>
           </Grid>
         </ScrollViewer>
         <Grid x:Name="OnboardingFooter" Grid.Row="2" Margin="42,0,42,0">

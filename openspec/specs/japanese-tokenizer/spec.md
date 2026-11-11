@@ -83,30 +83,35 @@ The system SHALL distinguish a missing dictionary from an installed dictionary w
 - **THEN** the tokenizer throws a user-facing exception carrying the `UniDicDictionaryInvalid` error code
 
 ### Requirement: Install a pinned dictionary asset
-The system SHALL install the Doki-compatible `unidic-py` dictionary build `3.1.0+2021-08-31` from a fixed URL or a local offline archive. Both paths SHALL verify the expected SHA-256 from the checked-in manifest before making the dictionary available.
+The system SHALL bundle the original pinned Doki-compatible `unidic-py` dictionary archive `3.1.0+2021-08-31` with the complete application installer. Runtime setup SHALL install from that local archive without network access and SHALL verify the expected SHA-256 from the checked-in asset inventory before making the dictionary available. The original source URL SHALL remain provenance and a build-time asset source only.
 
-#### Scenario: First online installation
-- **WHEN** the dictionary is not installed and a caller invokes online installation
-- **THEN** the installer downloads the fixed dictionary URL without resolving a `latest` alias
+#### Scenario: First offline installation
+- **WHEN** the dictionary is not installed and a caller invokes installation
+- **THEN** the installer reads the bundled `Assets/UniDic/unidic-3.1.0.zip` archive without contacting the network
 - **AND** it verifies SHA-256, version, `unidic22` format, and the four required runtime files before atomically installing the dictionary under the local cache directory
 
 #### Scenario: Application startup does not wait for installation
 - **WHEN** the application starts without an installed default dictionary
-- **THEN** the startup window remains responsive while installation runs through the first-run dictionary step, or through a separate preparation/repair surface for a user who has already completed onboarding
+- **THEN** the startup window remains responsive while local installation runs in a preparation/repair view outside the three-step onboarding guide
 - **AND** installation failure is logged without producing an unobserved task exception
 
 #### Scenario: Already installed
 - **WHEN** the expected runtime files and installed manifest are already valid
-- **THEN** the installer returns without downloading or replacing the dictionary
+- **THEN** the installer returns without reading the bundled archive or replacing the dictionary
 
 #### Scenario: Checksum or format mismatch
-- **WHEN** a downloaded or offline archive does not match the expected SHA-256, version, or `unidic22` format
+- **WHEN** a bundled or imported archive does not match the expected SHA-256, version, or `unidic22` format
 - **THEN** the installer throws a user-facing exception carrying the `UniDicDictionaryInvalid` error code
 - **AND** the invalid archive is not promoted to the active dictionary directory
 
-#### Scenario: Network or extraction failure
-- **WHEN** download or extraction fails for an I/O reason
-- **THEN** the installer throws a user-facing exception carrying the `UniDicDownloadFailed` error code
+#### Scenario: Bundled archive is missing
+- **WHEN** no valid dictionary is installed and the bundled archive is missing
+- **THEN** the installer reports `UniDicDictionaryMissing` and the UI instructs the user to reinstall the complete application package
+- **AND** it does not attempt a network download
+
+#### Scenario: Extraction or installation failure
+- **WHEN** local extraction or installation fails for an I/O reason
+- **THEN** the installer throws a user-facing exception carrying the `UniDicInstallFailed` error code
 - **AND** partial temporary files are cleaned up so a retry can succeed
 
 #### Scenario: Cancel installation
@@ -117,7 +122,7 @@ The system SHALL install the Doki-compatible `unidic-py` dictionary build `3.1.0
 
 #### Scenario: Install from an offline archive
 - **WHEN** a caller selects a local archive matching the pinned manifest
-- **THEN** the installer applies the same hash, version, format, file-set, staging, and atomic-promotion checks used by online installation
+- **THEN** the installer applies the same hash, version, format, file-set, staging, and atomic-promotion checks used by bundled installation
 - **AND** installation succeeds without network access
 
 #### Scenario: Concurrent installers
@@ -126,7 +131,7 @@ The system SHALL install the Doki-compatible `unidic-py` dictionary build `3.1.0
 - **AND** all processes observe either the previous valid installation or the completed new installation, never a partial directory
 
 #### Scenario: Do not construct the recognition runtime before dictionary readiness
-- **WHEN** a new installation is still downloading, validating or extracting the dictionary
+- **WHEN** a new installation is still validating or extracting the dictionary
 - **THEN** the application keeps the onboarding shell responsive without resolving the tokenizer-dependent recognition object graph
 - **AND** dictionary readiness alone does not bypass the remaining onboarding steps
 
@@ -151,16 +156,19 @@ The release process SHALL preserve separate provenance and license evidence for 
 - **THEN** it includes the pinned LibNMeCab version and package hash, dictionary version/source/hash manifest, applicable LibNMeCab GPL/LGPL license texts, and UniDic BSD notice
 - **AND** the release records the selected LGPL compliance path for single-file, trimming, AOT, or embedded-assembly packaging
 
+#### Scenario: Prepare the complete offline installer
+- **WHEN** the release installer is built
+- **THEN** the build prepares and verifies the pinned dictionary archive before publication and includes it with the application, OCR models, and .NET runtime
+- **AND** an existing local archive can be supplied without downloading the dictionary at build time
+- **AND** publication fails when the required archive is missing, and installer packaging fails when its SHA-256 does not match the pinned asset
+
 ### Requirement: Report dictionary installation phases accurately
-The installer SHALL expose stable downloading, validating, extracting, installing and ready phases. Percentage progress SHALL describe downloaded bytes only when a valid total length is known. Validation, extraction, installation and unknown-length downloads SHALL use indeterminate progress rather than report installation completion. The ready state SHALL be published only after the pinned asset checks and atomic promotion succeed. Heavy file work SHALL NOT block the UI message loop. Failure and cancellation SHALL preserve the existing cleanup, error-code and retry contracts; retries SHALL NOT claim byte-range resume support.
+The installer SHALL expose stable validating, extracting, installing and ready phases. Local preparation SHALL use indeterminate progress without a download percentage or byte-progress contract. The ready state SHALL be published only after the pinned asset checks and atomic promotion succeed. Heavy file work SHALL NOT block the UI message loop. Failure and cancellation SHALL preserve the cleanup, error-code and retry contracts.
 
-#### Scenario: Finish downloading an archive
-- **WHEN** all archive bytes have been received but checksum validation or extraction is still pending
-- **THEN** the UI switches to the appropriate preparation phase and does not treat a download fraction of 1 as installation success
-
-#### Scenario: Download without a known length
-- **WHEN** the server does not provide a usable content length
-- **THEN** the UI reports downloading with indeterminate progress rather than a fabricated percentage
+#### Scenario: Prepare a bundled archive
+- **WHEN** the local archive is being validated or extracted
+- **THEN** the UI reports the corresponding local preparation phase with indeterminate progress
+- **AND** it describes bundled installation without asking the user to download or import a dictionary
 
 #### Scenario: Complete atomic installation
 - **WHEN** validation, extraction and atomic promotion have succeeded
