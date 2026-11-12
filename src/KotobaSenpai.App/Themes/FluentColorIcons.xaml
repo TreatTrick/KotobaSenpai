@@ -71,6 +71,30 @@
       </DrawingGroup>
     </DrawingImage.Drawing>
   </DrawingImage>
+  <!-- Application-drawn upgrade indicator, shared by navigation and update actions. -->
+  <DrawingImage x:Key="UpdateAvailableColorIcon" options:Freeze="True">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <GeometryDrawing Brush="Transparent" Geometry="M0,0 H24 V24 H0 Z" />
+        <GeometryDrawing>
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry Center="12,12" RadiusX="10" RadiusY="10" />
+          </GeometryDrawing.Geometry>
+          <GeometryDrawing.Brush>
+            <LinearGradientBrush MappingMode="Absolute" StartPoint="4,2" EndPoint="20,22">
+              <GradientStop Color="#169545" Offset="0" />
+              <GradientStop Color="#087832" Offset="1" />
+            </LinearGradientBrush>
+          </GeometryDrawing.Brush>
+        </GeometryDrawing>
+        <GeometryDrawing Geometry="M12,17 V7 M8,11 L12,7 L16,11">
+          <GeometryDrawing.Pen>
+            <Pen Brush="White" Thickness="1.8" StartLineCap="Round" EndLineCap="Round" LineJoin="Round" />
+          </GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
   <DrawingImage x:Key="BookOpenColorIcon" options:Freeze="True">
     <DrawingImage.Drawing>
       <DrawingGroup>

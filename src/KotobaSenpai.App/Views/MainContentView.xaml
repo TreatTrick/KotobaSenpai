@@ -122,6 +122,11 @@
           <StackPanel Orientation="Horizontal">
             <Image Source="{StaticResource InfoColorIcon}" Width="24" Height="24" Margin="0,0,12,0" />
             <TextBlock Text="{loc:Loc Key=Tab_About}" VerticalAlignment="Center" />
+            <Image x:Name="AboutUpdateIndicator" Source="{StaticResource UpdateAvailableColorIcon}"
+                   Width="18" Height="18" Margin="8,0,0,0" VerticalAlignment="Center"
+                   Visibility="{Binding About.HasUpdate, Converter={StaticResource BoolToVisibility}}"
+                   ToolTip="{loc:Loc Key=About_UpdateAvailable}"
+                   AutomationProperties.Name="{loc:Loc Key=About_UpdateAvailable}" AutomationProperties.LiveSetting="Polite" />
           </StackPanel>
         </TabItem.Header>
         <views:AboutPage DataContext="{Binding About}" />

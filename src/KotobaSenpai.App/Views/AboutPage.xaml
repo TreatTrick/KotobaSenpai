@@ -62,13 +62,27 @@
               CornerRadius="8" controls:FluentLight.Kind="Surface" controls:FluentLight.CornerRadius="8"
               Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
         <StackPanel>
-          <TextBlock Text="{Binding LatestVersionText}" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding PackageSize}" Style="{StaticResource Description}" />
-          <TextBlock Text="{loc:Loc Key=About_ReleaseNotes}" Style="{StaticResource SectionTitle}" />
-          <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <TextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap" />
-          </ScrollViewer>
-          <StackPanel Margin="0,16,0,0" Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}">
+          <WrapPanel>
+            <TextBlock x:Name="LatestVersionLabel" Text="{Binding LatestVersionText}" FontWeight="SemiBold"
+                       VerticalAlignment="Center" Margin="0,0,12,4" />
+            <TextBlock Text="{Binding PackageSize}" Style="{StaticResource Description}"
+                       VerticalAlignment="Center" Margin="0,0,0,4" />
+          </WrapPanel>
+          <WrapPanel x:Name="UpdateActions" Margin="0,8,0,0">
+            <ui:Button x:Name="DownloadUpdateButton" Content="{loc:Loc Key=About_Download}" Command="{Binding DownloadCommand}" Appearance="Primary"
+                       Visibility="{Binding ShowDownload, Converter={StaticResource BoolToVisibility}}"
+                       Style="{StaticResource SettingsActionButton}" CornerRadius="4" controls:FluentLight.CornerRadius="4" Margin="0,0,8,8">
+              <ui:Button.Icon>
+                <ui:ImageIcon Source="{StaticResource UpdateAvailableColorIcon}" Width="20" Height="20" />
+              </ui:Button.Icon>
+            </ui:Button>
+            <ui:Button x:Name="InstallUpdateButton" Content="{loc:Loc Key=About_Install}" Command="{Binding InstallCommand}" Appearance="Primary"
+                       Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}"
+                       Style="{StaticResource SettingsActionButton}" CornerRadius="4" controls:FluentLight.CornerRadius="4" Margin="0,0,8,8" />
+            <ui:Button x:Name="OpenReleaseButton" Content="{loc:Loc Key=About_OpenRelease}" Tag="https://github.com/TreatTrick/KotobaSenpai/releases/latest" Click="OpenLink"
+                       Style="{StaticResource SettingsButton}" CornerRadius="4" controls:FluentLight.CornerRadius="4" Margin="0,0,8,8" />
+          </WrapPanel>
+          <StackPanel Margin="0,12,0,0" Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}">
             <ProgressBar Value="{Binding DownloadProgress}" Height="6" Minimum="0" Maximum="100"
                          AutomationProperties.Name="{loc:Loc Key=About_Download}" />
             <TextBlock Text="{Binding ProgressText}" Style="{StaticResource Description}" />
@@ -76,16 +90,10 @@
                        HorizontalAlignment="Left" Style="{StaticResource SettingsButton}"
                        CornerRadius="4" controls:FluentLight.CornerRadius="4" Margin="0,8,0,0" />
           </StackPanel>
-          <WrapPanel Margin="0,16,0,0">
-            <ui:Button Content="{loc:Loc Key=About_Download}" Command="{Binding DownloadCommand}" Appearance="Primary"
-                       Visibility="{Binding ShowDownload, Converter={StaticResource BoolToVisibility}}"
-                       Style="{StaticResource SettingsActionButton}" CornerRadius="4" controls:FluentLight.CornerRadius="4" Margin="0,0,8,8" />
-            <ui:Button Content="{loc:Loc Key=About_Install}" Command="{Binding InstallCommand}" Appearance="Primary"
-                       Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}"
-                       Style="{StaticResource SettingsActionButton}" CornerRadius="4" controls:FluentLight.CornerRadius="4" Margin="0,0,8,8" />
-            <ui:Button Content="{loc:Loc Key=About_OpenRelease}" Tag="https://github.com/TreatTrick/KotobaSenpai/releases/latest" Click="OpenLink"
-                       Style="{StaticResource SettingsButton}" CornerRadius="4" controls:FluentLight.CornerRadius="4" Margin="0,0,8,8" />
-          </WrapPanel>
+          <TextBlock x:Name="ReleaseNotesHeading" Text="{loc:Loc Key=About_ReleaseNotes}" Style="{StaticResource SectionTitle}" />
+          <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <TextBlock Text="{Binding ReleaseNotes}" TextWrapping="Wrap" />
+          </ScrollViewer>
         </StackPanel>
       </Border>
       <TextBlock Text="{loc:Loc Key=About_ManualInstall}" Style="{StaticResource Description}"

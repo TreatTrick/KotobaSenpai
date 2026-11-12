@@ -13,4 +13,6 @@ Pinned upstream commit: `463d58b8186f874ab2f51cf0a08b4ff5097c912f`.
 
 The original SVG files are retained here. `Themes/FluentColorIcons.xaml` translates their paths and absolute linear gradients to WPF DrawingImage resources. The transparent 24 x 24 drawing preserves the original viewport, and the resources remain vector-based at every DPI. The settings gear adds a blue center to match the Windows Settings visual style. The information icon uses the upstream filled geometry with a blue gradient and white information glyph matching the scan icon's palette.
 
+`UpdateAvailableColorIcon` is an application-drawn green circle with a white upward arrow, shared by the navigation update indicator and download action.
+
 The license is copied alongside the application when building and publishing.

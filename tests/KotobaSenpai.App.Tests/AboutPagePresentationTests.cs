@@ -26,18 +26,25 @@ public sealed partial class PhrasePopupThemeTests
             {
                 localizer.ApplyCulture(CultureInfo.GetCultureInfo(culture));
                 ApplicationThemeManager.Apply(theme, Wpf.Ui.Controls.WindowBackdropType.None, false);
-                using var state = new AboutPageViewModel(new AboutUpdateSource(), new AboutUpdateInstaller(), localizer,
+                var source = new AboutUpdateSource();
+                using var state = new AboutPageViewModel(source, new AboutUpdateInstaller(), localizer,
                     new UserMessageResolver(localizer), ViewModelDependencies.Logger, new(1, 0, 1));
-                state.EnsureCheckedAsync().GetAwaiter().GetResult();
-                var page = new AboutPage { DataContext = state };
-                var light = new FluentLightHost { Child = page };
+                var main = new MainContentView { DataContext = new { About = state } };
+                var navigation = Assert.IsType<TabControl>(main.FindName("MainNavigation"));
+                navigation.SelectedIndex = 2;
+                var page = Assert.IsType<AboutPage>(navigation.SelectedContent);
+                var indicator = Assert.IsType<Image>(main.FindName("AboutUpdateIndicator"));
+                var light = new FluentLightHost { Child = main };
                 var frame = new Border { Background = (Brush)application.FindResource("SolidBackgroundFillColorBaseBrush"), Child = light };
-                var window = new Window { Content = frame, Width = 676, Height = 752, WindowStyle = WindowStyle.None,
+                var window = new Window { Content = frame, Width = 900, Height = 752, WindowStyle = WindowStyle.None,
                     Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
                 try
                 {
                     window.Show();
+                    state.EnsureCheckedAsync().GetAwaiter().GetResult();
                     window.UpdateLayout();
+                    Assert.True(indicator.IsVisible);
+                    Assert.Same(application.FindResource("UpdateAvailableColorIcon"), indicator.Source);
                     foreach (var name in new[] { "AppInfoCard", "UpdateDetailsCard" })
                     {
                         var surface = Assert.IsType<Border>(page.FindName(name));
@@ -56,13 +63,33 @@ public sealed partial class PhrasePopupThemeTests
                     Assert.Contains(Descendants(page).OfType<TextBlock>(), text => text.Text == localizer.Get("Tab_About"));
                     Assert.Contains(Descendants(page).OfType<TextBlock>(), text => text.Text == state.CurrentVersionText);
                     Assert.Contains(Descendants(page).OfType<TextBlock>(), text => text.Text == state.Status);
+                    var version = Assert.IsType<TextBlock>(page.FindName("LatestVersionLabel"));
+                    var download = Assert.IsType<Wpf.Ui.Controls.Button>(page.FindName("DownloadUpdateButton"));
+                    var release = Assert.IsType<Wpf.Ui.Controls.Button>(page.FindName("OpenReleaseButton"));
+                    var notes = Assert.IsType<TextBlock>(page.FindName("ReleaseNotesHeading"));
+                    var updateIcon = Assert.IsType<Wpf.Ui.Controls.ImageIcon>(download.Icon);
+                    Assert.Same(indicator.Source, updateIcon.Source);
+                    Assert.True(version.TransformToAncestor(page).Transform(new Point(0, version.ActualHeight)).Y
+                        <= download.TransformToAncestor(page).Transform(new Point()).Y);
+                    Assert.True(download.TransformToAncestor(page).Transform(new Point(0, download.ActualHeight)).Y
+                        < notes.TransformToAncestor(page).Transform(new Point()).Y);
+                    Assert.Equal(download.TransformToAncestor(page).Transform(new Point()).Y,
+                        release.TransformToAncestor(page).Transform(new Point()).Y);
+                    Assert.True(download.TransformToAncestor(page).Transform(new Point(0, download.ActualHeight)).Y < page.ActualHeight,
+                        "The update action must remain visible above long release notes.");
                     SaveSupportPreview(frame, $"about-{theme}-{culture}");
                     state.DownloadCommand.ExecuteAsync(null).GetAwaiter().GetResult();
                     window.UpdateLayout();
                     var install = Assert.Single(Descendants(page).OfType<Wpf.Ui.Controls.Button>(), button => ReferenceEquals(button.Command, state.InstallCommand));
                     Assert.True(install.IsVisible);
                     Assert.True(install.IsEnabled);
+                    Assert.True(indicator.IsVisible);
                     SaveSupportPreview(frame, $"about-ready-{theme}-{culture}");
+                    source.Latest = null;
+                    state.CheckCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+                    window.UpdateLayout();
+                    Assert.Equal(Visibility.Collapsed, indicator.Visibility);
+                    Assert.Equal(Visibility.Collapsed, Assert.IsType<Border>(page.FindName("UpdateDetailsCard")).Visibility);
                 }
                 finally { window.Close(); }
             }
@@ -72,8 +99,11 @@ public sealed partial class PhrasePopupThemeTests
 
     private sealed class AboutUpdateSource : IAppUpdateSource
     {
+        public AppRelease? Latest { get; set; } = new("v1.0.2", new(1, 0, 2),
+            string.Join(Environment.NewLine, Enumerable.Repeat("Improved recognition and update support with preserved settings and offline dictionary preparation.", 30)),
+            new("https://example.com"), 117041768, "fixture");
         public Task<AppRelease?> CheckAsync(Version currentVersion, CancellationToken cancellationToken)
-            => Task.FromResult<AppRelease?>(new("v1.0.2", new(1, 0, 2), "Improved recognition and update support.", new("https://example.com"), 117041768, "fixture"));
+            => Task.FromResult(Latest);
         public Task<DownloadedAppUpdate> DownloadAsync(AppRelease release, IProgress<AppUpdateProgress> progress, CancellationToken cancellationToken)
             => Task.FromResult(new DownloadedAppUpdate(release, "fixture.exe"));
     }
