@@ -5,7 +5,7 @@
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import DemoPlayer from './DemoPlayer.svelte';
   import Mascot from './Mascot.svelte';
-  import { CONTENT, DOWNLOAD_URL, LANGUAGES, RELEASE_URL, REPOSITORY_URL, SITE_URL, type DemoName, type Locale } from './content';
+  import { CONTENT, DOWNLOAD_URL, INTRODUCTION_VIDEO_URL, LANGUAGES, RELEASE_URL, REPOSITORY_URL, SITE_URL, type DemoName, type Locale } from './content';
 
   let { locale }: { locale: Locale } = $props();
   const text = $derived(CONTENT[locale]);
@@ -139,7 +139,7 @@
       <p class="hero-intro">{text.intro}</p>
       <div class="hero-actions">
         <a class="button" href={DOWNLOAD_URL} onclick={celebrate}>{text.download}{@render downloadIcon()}</a>
-        <a class="text-link" href="#experience">{text.watch}<span class="circle-play" aria-hidden="true">▶</span></a>
+        <a class="text-link" href={locale === 'zh' ? INTRODUCTION_VIDEO_URL : '#experience'} target={locale === 'zh' ? '_blank' : undefined} rel={locale === 'zh' ? 'noopener noreferrer' : undefined}>{text.watch}<span class="circle-play" aria-hidden="true">▶</span></a>
       </div>
       <p class="hero-note">{text.heroNote}</p>
       <div class="hero-stage">

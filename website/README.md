@@ -33,6 +33,8 @@ Download buttons use GitHub's `/releases/latest/download/KotobaSenpai-win-x64-Se
 - `src/app.css`: responsive styling and OKLCH design tokens.
 - `static/media/`: optimized derivatives of the existing `../docs/assets` GIFs and screenshots. Original game demonstrations are retained in the repository.
 
+The Chinese homepage's hero video link opens the introduction on Bilibili in a new tab. Its URL is defined by `INTRODUCTION_VIDEO_URL` in `src/lib/content.ts`. The English homepage keeps its on-page experience link.
+
 To regenerate optimized media after updating the originals, install `Pillow==13.0.0` and `imageio-ffmpeg==0.8.1` in a Python environment and run `python scripts/prepare-media.py`. Ordinary pnpm builds need neither Python nor FFmpeg.
 
 ## Dragon maid

@@ -5,6 +5,7 @@ export const REPOSITORY_URL = 'https://github.com/TreatTrick/KotobaSenpai';
 export const RELEASE_URL = `${REPOSITORY_URL}/releases/latest`;
 export const DOWNLOAD_URL = `${RELEASE_URL}/download/KotobaSenpai-win-x64-Setup.exe`;
 export const SITE_URL = 'https://treattrick.github.io/KotobaSenpai';
+export const INTRODUCTION_VIDEO_URL = 'https://www.bilibili.com/video/BV1cdsV6zEcE/';
 
 export const LANGUAGES = [
   { id: 'en', name: 'English', sample: 'Stay in the story.' },
@@ -93,7 +94,7 @@ export const CONTENT = {
     hero: ['少按暂停。', '多看懂剧情。'],
     intro: '这一幕，这句话，这份只属于原文的心动。\n让理解跟上故事，让目光留在这里。',
     heroNote: 'Windows 10 / 11 · x64 · 自由选择 AI 服务商',
-    watch: '看看实际效果',
+    watch: '观看介绍视频（Bilibili）',
     demoTitle: '你的视觉小说，多了一位阅读搭档。',
     demoCaption: 'KotobaSenpai 实际演示 ·《魔法使之夜》',
     pause: '暂停演示',
