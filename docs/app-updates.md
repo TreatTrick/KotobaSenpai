@@ -22,16 +22,16 @@ pwsh -File scripts/Build-Installer.ps1
 也可以在本次打包时指定版本。脚本会把同一个版本传给应用和安装器：
 
 ```powershell
-pwsh -File scripts/Build-Installer.ps1 -Version 1.0.2
+pwsh -File scripts/Build-Installer.ps1 -Version 1.0.3
 ```
 
 发布 GitHub Release 时需要保持以下信息一致：
 
 | 项目 | 示例 |
 | --- | --- |
-| 构建版本 | `1.0.2` |
-| Release 标签 | `v1.0.2` 或 `1.0.2` |
-| 必须上传的安装包 | `KotobaSenpai-1.0.2-win-x64-Setup.exe` |
+| 构建版本 | `1.0.3` |
+| Release 标签 | `v1.0.3` 或 `1.0.3` |
+| 必须上传的安装包 | `KotobaSenpai-1.0.3-win-x64-Setup.exe` |
 | GitHub 资产摘要 | `digest` 字段为 `sha256:` 加 64 位十六进制摘要 |
 
 先上传全部资产再发布正式 Release。应用只检查 `/releases/latest`，不接收草稿和预览版。安装包缺失、名字不匹配或没有有效摘要时，会提示该版本暂不可用，禁止安装。

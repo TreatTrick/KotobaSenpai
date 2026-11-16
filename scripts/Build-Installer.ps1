@@ -80,7 +80,7 @@ $parsedVersion = $null
 if ($Version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$' -or
     -not [System.Version]::TryParse($Version, [ref]$parsedVersion) -or
     $parsedVersion.Major -gt 65534 -or $parsedVersion.Minor -gt 65534 -or $parsedVersion.Build -gt 65534) {
-    throw "The application version must contain three numbers between 0 and 65534, for example 1.0.2."
+    throw "The application version must contain three numbers between 0 and 65534, for example 1.0.3."
 }
 $project = Join-Path $script:RepositoryRoot "src\KotobaSenpai.App\KotobaSenpai.App.csproj"
 $modelsDirectory = Join-Path $script:RepositoryRoot "src\KotobaSenpai.Platform.Windows\Models"

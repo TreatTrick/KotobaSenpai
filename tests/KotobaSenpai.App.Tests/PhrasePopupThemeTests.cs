@@ -249,7 +249,8 @@ public sealed partial class PhrasePopupThemeTests
         shortcuts.Start();
         using var shortcutSettings = new ShortcutSettingsViewModel(shortcuts, localizer);
         using var viewModel = new SettingsPageViewModel(settings, new LocalAppDataThemePreferenceStore(settings), language, llm, localizer, language,
-            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings), shortcuts: shortcutSettings);
+            new OverlayAppearanceViewModel(settings, localizer), new CaptureBorderPreferences(settings), new SentenceTranslationPreferences(settings), shortcuts: shortcutSettings,
+            logger: ViewModelDependencies.Logger);
         try
         {
             foreach (var culture in new[] { "en", "zh-CN" })

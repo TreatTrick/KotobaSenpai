@@ -32,7 +32,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private readonly IExplanationLanguagePreferences _explanationPreferences;
     private readonly CaptureBorderPreferences _captureBorder;
     private readonly SentenceTranslationPreferences _sentenceTranslation;
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
     private bool _isExportingDiagnosticBundle;
     private string? _sentenceTranslationStatusKey;
     private string? _captureBorderErrorKey;
@@ -46,7 +46,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
         IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance,
         CaptureBorderPreferences captureBorder, SentenceTranslationPreferences sentenceTranslation,
-        ShortcutSettingsViewModel shortcuts, ILogger? logger = null)
+        ShortcutSettingsViewModel shortcuts, ILogger logger)
     {
         _settings = settings;
         Shortcuts = shortcuts ?? throw new ArgumentNullException(nameof(shortcuts));
@@ -55,7 +55,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         _explanationPreferences = explanationLanguage;
         _captureBorder = captureBorder ?? throw new ArgumentNullException(nameof(captureBorder));
         _sentenceTranslation = sentenceTranslation ?? throw new ArgumentNullException(nameof(sentenceTranslation));
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _explanationLanguage = explanationLanguage.CustomLanguage ?? string.Empty;
         Language = language;
         Llm = llm;
@@ -258,7 +258,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     }
 
     public void LogDiagnosticExportFailure(Exception exception)
-        => _logger?.LogError(exception, "Failed to export the diagnostic bundle.");
+        => _logger.LogError(exception, "Failed to export the diagnostic bundle.");
 
     partial void OnSelectedThemeChanged(AppThemeMode value) => _themePreferences.Save(value);
 
