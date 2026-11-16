@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.IO;
+using KotobaSenpai.App.Diagnostics;
 using KotobaSenpai.App.Localization;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.ViewModels;
@@ -51,9 +52,9 @@ public sealed class SettingsPageViewModelTests
     }
 
     [Theory]
-    [InlineData(null, LogLevel.Error)]
-    [InlineData("invalid", LogLevel.Error)]
-    [InlineData("999", LogLevel.Error)]
+    [InlineData(null, LogLevel.Debug)]
+    [InlineData("invalid", LogLevel.Debug)]
+    [InlineData("999", LogLevel.Debug)]
     [InlineData("trace", LogLevel.Trace)]
     [InlineData("Debug", LogLevel.Debug)]
     [InlineData("Information", LogLevel.Information)]
@@ -81,6 +82,7 @@ public sealed class SettingsPageViewModelTests
     {
         var settings = new RecordingSettings();
         settings.Values["Theme"] = "Dark";
+        settings.Values["MinimumLogLevel"] = LogLevel.Error.ToString();
         using var viewModel = Create(settings, new RecordingThemeStore());
         var changes = new List<string?>();
         viewModel.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
@@ -104,7 +106,7 @@ public sealed class SettingsPageViewModelTests
 
         viewModel.SelectedLogLevel = LogLevel.Trace;
 
-        Assert.Equal(LogLevel.Error, viewModel.SelectedLogLevel);
+        Assert.Equal(LogLevel.Debug, viewModel.SelectedLogLevel);
         Assert.Null(settings.GetValue("MinimumLogLevel"));
         Assert.NotEmpty(viewModel.LogLevelError);
 
@@ -120,6 +122,7 @@ public sealed class SettingsPageViewModelTests
     {
         var directory = Path.Combine(Path.GetTempPath(), "kslog_settings_" + Guid.NewGuid().ToString("N"));
         var settings = new RecordingSettings();
+        settings.Values["MinimumLogLevel"] = LogLevel.Error.ToString();
         using var viewModel = Create(settings, new RecordingThemeStore());
         try
         {
@@ -146,6 +149,38 @@ public sealed class SettingsPageViewModelTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public void Diagnostic_bundle_contents_are_localized_in_the_view_model()
+    {
+        var settings = new RecordingSettings();
+        using var viewModel = Create(settings, new RecordingThemeStore());
+        DiagnosticBundleFile[] files =
+        [
+            new("log.txt", "logs/kotobasenpai-2026-11-16.log"),
+            new("frame.png", "diag/frame-run.png"),
+            new("request.json", "diag/llm-req-run.json"),
+        ];
+
+        var contents = viewModel.BuildDiagnosticBundleContents(files);
+
+        Assert.Contains("Retained log files", contents);
+        Assert.Contains("Window screenshots: 1", contents);
+        Assert.Contains("LLM requests: 1", contents);
+        Assert.DoesNotContain("No diagnostic files found", contents);
+    }
+
+    [Fact]
+    public void Diagnostic_bundle_contents_report_missing_categories()
+    {
+        var settings = new RecordingSettings();
+        using var viewModel = Create(settings, new RecordingThemeStore());
+
+        var contents = viewModel.BuildDiagnosticBundleContents([]);
+
+        Assert.Contains("No log files found", contents);
+        Assert.Contains("No diagnostic files found", contents);
     }
 
     [Theory]

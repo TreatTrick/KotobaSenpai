@@ -6,14 +6,14 @@ namespace KotobaSenpai.App.Tests;
 
 /// <summary>
 /// <see cref="LogConfiguration"/> unit tests: via an in-memory fake <see cref="ISettingsService"/>, verify
-/// absent-field fallback to Error, parsing "Warning", and invalid-value fallback to Error. File I/O and fault tolerance are handled by the settings service; these tests do not touch the disk.
+/// absent-field fallback to Debug, parsing "Warning", and invalid-value fallback to Debug. File I/O and fault tolerance are handled by the settings service; these tests do not touch the disk.
 /// </summary>
 public sealed class LogConfigurationTests
 {
     [Fact]
-    public void Absent_field_defaults_to_error()
+    public void Absent_field_defaults_to_debug()
     {
-        Assert.Equal(LogLevel.Error, LogConfiguration.LoadMinimumLevel(new FakeSettings(null)));
+        Assert.Equal(LogLevel.Debug, LogConfiguration.LoadMinimumLevel(new FakeSettings(null)));
     }
 
     [Fact]
@@ -23,18 +23,18 @@ public sealed class LogConfigurationTests
     }
 
     [Fact]
-    public void Unparseable_value_falls_back_to_error()
+    public void Unparseable_value_falls_back_to_debug()
     {
-        Assert.Equal(LogLevel.Error, LogConfiguration.LoadMinimumLevel(new FakeSettings("Verbose")));
+        Assert.Equal(LogLevel.Debug, LogConfiguration.LoadMinimumLevel(new FakeSettings("Verbose")));
     }
 
     [Theory]
     [InlineData("-1")]
     [InlineData("6")]
     [InlineData("999")]
-    public void Undefined_numeric_levels_fall_back_to_error(string raw)
+    public void Undefined_numeric_levels_fall_back_to_debug(string raw)
     {
-        Assert.Equal(LogLevel.Error, LogConfiguration.LoadMinimumLevel(new FakeSettings(raw)));
+        Assert.Equal(LogLevel.Debug, LogConfiguration.LoadMinimumLevel(new FakeSettings(raw)));
     }
 
     private sealed class FakeSettings : KotobaSenpai.TestSupport.SettingsStub

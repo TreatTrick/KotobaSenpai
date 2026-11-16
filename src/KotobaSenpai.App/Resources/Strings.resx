@@ -671,6 +671,32 @@ Meet your next word.</value>
   <data name="Label_LogLevel" xml:space="preserve"><value>Log level</value></data>
   <data name="Description_LogLevel" xml:space="preserve"><value>Record messages at this level and above. Changes are saved and applied immediately.</value></data>
   <data name="LogLevel_SaveFailed" xml:space="preserve"><value>Could not save the log level. The previous level is still active.</value></data>
+  <data name="DiagnosticExport_Title" xml:space="preserve"><value>Diagnostic package</value></data>
+  <data name="DiagnosticExport_Description" xml:space="preserve"><value>Create a ZIP with retained logs and available diagnostic files. The exact contents are shown first.</value></data>
+  <data name="DiagnosticExport_Button" xml:space="preserve"><value>Create ZIP</value></data>
+  <data name="DiagnosticExport_ConfirmTitle" xml:space="preserve"><value>Confirm diagnostic package</value></data>
+  <data name="DiagnosticExport_ContentHeading" xml:space="preserve"><value>This ZIP will include:</value></data>
+  <data name="DiagnosticExport_LocalOnly" xml:space="preserve"><value>The ZIP will be created on this device and will not be uploaded automatically.</value></data>
+  <data name="DiagnosticExport_Continue" xml:space="preserve"><value>Continue creating the ZIP?</value></data>
+  <data name="DiagnosticExport_ConfirmButton" xml:space="preserve"><value>Continue</value></data>
+  <data name="DiagnosticExport_CancelButton" xml:space="preserve"><value>Cancel</value></data>
+  <data name="DiagnosticExport_Close" xml:space="preserve"><value>Close</value></data>
+  <data name="DiagnosticExport_LogFiles" xml:space="preserve"><value>Retained log files (up to 7 days; may contain OCR text, error details, and stack traces): {0}</value></data>
+  <data name="DiagnosticExport_Frames" xml:space="preserve"><value>Window screenshots: {0}</value></data>
+  <data name="DiagnosticExport_Ocr" xml:space="preserve"><value>OCR text: {0}</value></data>
+  <data name="DiagnosticExport_Tokens" xml:space="preserve"><value>Token analysis, including window title and words: {0}</value></data>
+  <data name="DiagnosticExport_Phrases" xml:space="preserve"><value>Phrase analysis: {0}</value></data>
+  <data name="DiagnosticExport_LlmRequests" xml:space="preserve"><value>LLM requests: {0}</value></data>
+  <data name="DiagnosticExport_LlmResponses" xml:space="preserve"><value>LLM responses: {0}</value></data>
+  <data name="DiagnosticExport_LlmGroups" xml:space="preserve"><value>LLM groups: {0}</value></data>
+  <data name="DiagnosticExport_LlmWords" xml:space="preserve"><value>LLM word results: {0}</value></data>
+  <data name="DiagnosticExport_NoLogs" xml:space="preserve"><value>No log files found.</value></data>
+  <data name="DiagnosticExport_NoDiagnostics" xml:space="preserve"><value>No diagnostic files found.</value></data>
+  <data name="DiagnosticExport_NoFiles" xml:space="preserve"><value>No log or diagnostic files are available to export.</value></data>
+  <data name="DiagnosticExport_SaveTitle" xml:space="preserve"><value>Save diagnostic package</value></data>
+  <data name="DiagnosticExport_FileFilter" xml:space="preserve"><value>ZIP archive (*.zip)|*.zip</value></data>
+  <data name="DiagnosticExport_Success" xml:space="preserve"><value>Diagnostic package created:&#xA;{0}</value></data>
+  <data name="DiagnosticExport_Failed" xml:space="preserve"><value>Could not create the diagnostic package. Check the selected location and try again.</value></data>
   <data name="Shortcut_Title" xml:space="preserve"><value>Keyboard shortcuts</value></data>
   <data name="Shortcut_Label" xml:space="preserve"><value>Shortcut</value></data>
   <data name="Shortcut_Description" xml:space="preserve"><value>Click a key to change it. Changes take effect immediately.</value></data>

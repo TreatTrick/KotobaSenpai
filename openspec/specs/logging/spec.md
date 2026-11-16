@@ -76,22 +76,22 @@ All log output SHALL be in English. Log messages, exception messages, stack trac
 
 ### Requirement: Configurable minimum log level
 
-The file logger SHALL filter out entries below a configurable minimum log level. The default minimum level SHALL be `Error`. The minimum level SHALL be configurable via the user settings file (`%LocalAppData%/KotobaSenpai/settings.json`, field `MinimumLogLevel`); an absent or unparseable value SHALL fall back to `Error`.
+The file logger SHALL filter out entries below a configurable minimum log level. The default minimum level SHALL be `Debug`. The minimum level SHALL be configurable via the user settings file (`%LocalAppData%/KotobaSenpai/settings.json`, field `MinimumLogLevel`); an absent or unparseable value SHALL fall back to `Debug`.
 
-#### Scenario: Default level is Error
+#### Scenario: Default level is Debug
 
 - **WHEN** the application starts with no `MinimumLogLevel` configured
-- **THEN** entries below `Error` (e.g., `Warning`, `Information`) MUST NOT be written to the log file, while `Error` and `Critical` entries MUST be written.
+- **THEN** `Trace` entries MUST NOT be written to the log file, while `Debug`, `Information`, `Warning`, `Error`, and `Critical` entries MUST be written.
 
 #### Scenario: Level is configurable
 
 - **WHEN** `MinimumLogLevel` is set to `Warning` in the settings file
 - **THEN** `Warning` and above MUST be written to the log file.
 
-#### Scenario: Invalid value falls back to Error
+#### Scenario: Invalid value falls back to Debug
 
 - **WHEN** `MinimumLogLevel` is set to a value that cannot be parsed as a `LogLevel`
-- **THEN** the logger MUST use `Error` as the minimum level and MUST NOT crash.
+- **THEN** the logger MUST use `Debug` as the minimum level and MUST NOT crash.
 
 ### Requirement: Seven-day retention with automatic cleanup
 

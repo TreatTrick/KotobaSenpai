@@ -671,6 +671,32 @@ API Key：YOUR_API_KEY
   <data name="Label_LogLevel" xml:space="preserve"><value>日志级别</value></data>
   <data name="Description_LogLevel" xml:space="preserve"><value>记录所选级别及以上的日志，修改后自动保存并立即生效。</value></data>
   <data name="LogLevel_SaveFailed" xml:space="preserve"><value>无法保存日志级别，仍使用之前的级别。</value></data>
+  <data name="DiagnosticExport_Title" xml:space="preserve"><value>诊断包</value></data>
+  <data name="DiagnosticExport_Description" xml:space="preserve"><value>将保留的日志和现有诊断文件生成 ZIP，生成前会显示具体内容。</value></data>
+  <data name="DiagnosticExport_Button" xml:space="preserve"><value>生成 ZIP</value></data>
+  <data name="DiagnosticExport_ConfirmTitle" xml:space="preserve"><value>确认诊断包内容</value></data>
+  <data name="DiagnosticExport_ContentHeading" xml:space="preserve"><value>本次 ZIP 将包含以下内容：</value></data>
+  <data name="DiagnosticExport_LocalOnly" xml:space="preserve"><value>ZIP 仅在本机生成，不会自动上传。</value></data>
+  <data name="DiagnosticExport_Continue" xml:space="preserve"><value>是否同意继续生成？</value></data>
+  <data name="DiagnosticExport_ConfirmButton" xml:space="preserve"><value>继续生成</value></data>
+  <data name="DiagnosticExport_CancelButton" xml:space="preserve"><value>取消</value></data>
+  <data name="DiagnosticExport_Close" xml:space="preserve"><value>关闭</value></data>
+  <data name="DiagnosticExport_LogFiles" xml:space="preserve"><value>保留的日志文件（最近 7 天；可能包含 OCR 识别文本、错误详情和堆栈）：{0} 个</value></data>
+  <data name="DiagnosticExport_Frames" xml:space="preserve"><value>窗口截图：{0} 个</value></data>
+  <data name="DiagnosticExport_Ocr" xml:space="preserve"><value>OCR 识别文本：{0} 个</value></data>
+  <data name="DiagnosticExport_Tokens" xml:space="preserve"><value>词语分析结果（含窗口标题和词语）：{0} 个</value></data>
+  <data name="DiagnosticExport_Phrases" xml:space="preserve"><value>短语分析结果：{0} 个</value></data>
+  <data name="DiagnosticExport_LlmRequests" xml:space="preserve"><value>LLM 请求：{0} 个</value></data>
+  <data name="DiagnosticExport_LlmResponses" xml:space="preserve"><value>LLM 响应：{0} 个</value></data>
+  <data name="DiagnosticExport_LlmGroups" xml:space="preserve"><value>LLM 分组结果：{0} 个</value></data>
+  <data name="DiagnosticExport_LlmWords" xml:space="preserve"><value>LLM 词语结果：{0} 个</value></data>
+  <data name="DiagnosticExport_NoLogs" xml:space="preserve"><value>未找到日志文件。</value></data>
+  <data name="DiagnosticExport_NoDiagnostics" xml:space="preserve"><value>未找到诊断文件。</value></data>
+  <data name="DiagnosticExport_NoFiles" xml:space="preserve"><value>没有可导出的日志或诊断文件。</value></data>
+  <data name="DiagnosticExport_SaveTitle" xml:space="preserve"><value>保存诊断包</value></data>
+  <data name="DiagnosticExport_FileFilter" xml:space="preserve"><value>ZIP 压缩包 (*.zip)|*.zip</value></data>
+  <data name="DiagnosticExport_Success" xml:space="preserve"><value>诊断包已生成：&#xA;{0}</value></data>
+  <data name="DiagnosticExport_Failed" xml:space="preserve"><value>无法生成诊断包。请检查所选位置后重试。</value></data>
   <data name="Shortcut_Title" xml:space="preserve"><value>键盘快捷键</value></data>
   <data name="Shortcut_Label" xml:space="preserve"><value>快捷键</value></data>
   <data name="Shortcut_Description" xml:space="preserve"><value>点击键位即可修改，保存后立即生效。</value></data>

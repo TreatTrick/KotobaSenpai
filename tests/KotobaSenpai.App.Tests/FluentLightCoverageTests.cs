@@ -156,12 +156,26 @@ public sealed class FluentLightCoverageTests
 
     [Theory]
     [InlineData("Views/Support/SupportWindow.xaml", "Window")]
+    [InlineData("Views/DiagnosticBundleDialog.xaml", "Window")]
     [InlineData("Controls/OverlayColorPicker.xaml", "Popup")]
     public void Separate_visual_roots_have_their_own_light_host(string path, string rootType)
     {
         var document = Source(path);
         var root = rootType == "Window" ? document.Root! : Assert.Single(document.Descendants(Presentation + rootType));
         Assert.Single(root.Elements(Controls + nameof(FluentLightHost)));
+    }
+
+    [Fact]
+    public void Diagnostic_bundle_dialog_uses_fluent_light_surfaces_and_matching_button_corners()
+    {
+        var dialog = Source("Views/DiagnosticBundleDialog.xaml");
+        var surface = Assert.Single(dialog.Descendants(Presentation + "Border"), element =>
+            (string?)element.Attribute(Controls + "FluentLight.Kind") == "Surface");
+        Assert.Equal("8", (string?)surface.Attribute(Controls + "FluentLight.CornerRadius"));
+
+        var buttons = dialog.Descendants().Where(element => element.Name.LocalName == "Button").ToArray();
+        Assert.Equal(3, buttons.Length);
+        Assert.All(buttons, button => Assert.Equal("4", (string?)button.Attribute(Controls + "FluentLight.CornerRadius")));
     }
 
     [Theory]

@@ -2,6 +2,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.IO;
+using KotobaSenpai.App.Diagnostics;
 using KotobaSenpai.App.Logging;
 using KotobaSenpai.App.Resources;
 using KotobaSenpai.Core.Localization;
@@ -31,6 +32,8 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private readonly IExplanationLanguagePreferences _explanationPreferences;
     private readonly CaptureBorderPreferences _captureBorder;
     private readonly SentenceTranslationPreferences _sentenceTranslation;
+    private readonly ILogger? _logger;
+    private bool _isExportingDiagnosticBundle;
     private string? _sentenceTranslationStatusKey;
     private string? _captureBorderErrorKey;
     private string? _logLevelErrorKey;
@@ -43,7 +46,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         ILanguagePreferences language, LlmSettingsViewModel llm, IStringLocalizer localizer,
         IExplanationLanguagePreferences explanationLanguage, OverlayAppearanceViewModel overlayAppearance,
         CaptureBorderPreferences captureBorder, SentenceTranslationPreferences sentenceTranslation,
-        ShortcutSettingsViewModel shortcuts)
+        ShortcutSettingsViewModel shortcuts, ILogger? logger = null)
     {
         _settings = settings;
         Shortcuts = shortcuts ?? throw new ArgumentNullException(nameof(shortcuts));
@@ -52,6 +55,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         _explanationPreferences = explanationLanguage;
         _captureBorder = captureBorder ?? throw new ArgumentNullException(nameof(captureBorder));
         _sentenceTranslation = sentenceTranslation ?? throw new ArgumentNullException(nameof(sentenceTranslation));
+        _logger = logger;
         _explanationLanguage = explanationLanguage.CustomLanguage ?? string.Empty;
         Language = language;
         Llm = llm;
@@ -188,6 +192,73 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     }
 
     public string LogLevelError => _logLevelErrorKey is null ? string.Empty : _localizer.Get(_logLevelErrorKey);
+
+    public bool IsExportingDiagnosticBundle
+    {
+        get => _isExportingDiagnosticBundle;
+        private set
+        {
+            if (!SetProperty(ref _isExportingDiagnosticBundle, value)) return;
+            OnPropertyChanged(nameof(CanExportDiagnosticBundle));
+        }
+    }
+
+    public bool CanExportDiagnosticBundle => !IsExportingDiagnosticBundle;
+
+    public IReadOnlyList<DiagnosticBundleFile> CollectDiagnosticBundleFiles()
+    {
+        var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KotobaSenpai");
+        return DiagnosticBundleExporter.Collect(Path.Combine(appData, "logs"), Path.Combine(appData, "diag"));
+    }
+
+    public string BuildDiagnosticBundleContents(IReadOnlyList<DiagnosticBundleFile> files)
+    {
+        var lines = new List<string>();
+        var logs = files.Count(file => file.EntryName.StartsWith("logs/", StringComparison.Ordinal));
+        lines.Add(_localizer.Get(logs > 0 ? ResourceKeys.DiagnosticExport_LogFiles : ResourceKeys.DiagnosticExport_NoLogs,
+            logs > 0 ? [logs] : []));
+
+        (string Prefix, string ResourceKey)[] categories =
+        [
+            ("frame-", ResourceKeys.DiagnosticExport_Frames),
+            ("ocr-", ResourceKeys.DiagnosticExport_Ocr),
+            ("tokens-", ResourceKeys.DiagnosticExport_Tokens),
+            ("phrase-", ResourceKeys.DiagnosticExport_Phrases),
+            ("llm-req-", ResourceKeys.DiagnosticExport_LlmRequests),
+            ("llm-resp-", ResourceKeys.DiagnosticExport_LlmResponses),
+            ("llm-groups-", ResourceKeys.DiagnosticExport_LlmGroups),
+            ("llm-words-", ResourceKeys.DiagnosticExport_LlmWords),
+        ];
+        foreach (var (prefix, key) in categories)
+        {
+            var count = files.Count(file => file.EntryName.StartsWith("diag/" + prefix, StringComparison.Ordinal));
+            if (count > 0) lines.Add(_localizer.Get(key, count));
+        }
+        if (!files.Any(file => file.EntryName.StartsWith("diag/", StringComparison.Ordinal)))
+            lines.Add(_localizer.Get(ResourceKeys.DiagnosticExport_NoDiagnostics));
+        return string.Join(Environment.NewLine, lines.Select(line => "- " + line));
+    }
+
+    public async Task<bool> ExportDiagnosticBundleAsync(IReadOnlyList<DiagnosticBundleFile> files, string destinationPath)
+    {
+        if (IsExportingDiagnosticBundle) return false;
+        IsExportingDiagnosticBundle = true;
+        try
+        {
+            await Task.Run(() => DiagnosticBundleExporter.Create(files, destinationPath));
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+            or InvalidOperationException or NotSupportedException)
+        {
+            LogDiagnosticExportFailure(ex);
+            return false;
+        }
+        finally { IsExportingDiagnosticBundle = false; }
+    }
+
+    public void LogDiagnosticExportFailure(Exception exception)
+        => _logger?.LogError(exception, "Failed to export the diagnostic bundle.");
 
     partial void OnSelectedThemeChanged(AppThemeMode value) => _themePreferences.Save(value);
 

@@ -17,6 +17,7 @@ using KotobaSenpai.App.Japanese;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using KotobaSenpai.Core.Llm;
+using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.Geometry;
@@ -257,6 +258,9 @@ public sealed partial class PhrasePopupThemeTests
             {
                 language.ChangeCulture(new CultureInfo(culture));
                 ApplicationThemeManager.Apply(theme, WindowBackdropType.Mica, true);
+                CheckDiagnosticBundleDialog(application, localizer, culture, theme);
+                if (culture == "en" && theme == ApplicationTheme.Light && !failed)
+                    CheckDiagnosticBundleDialogActions(localizer);
                 detector.Fail = failed;
                 llm.CheckConfigurationCommand.ExecuteAsync(null).GetAwaiter().GetResult();
                 var page = new SettingsPage { DataContext = viewModel };
@@ -387,6 +391,107 @@ public sealed partial class PhrasePopupThemeTests
         {
             if (previousLocalization is null) application.Resources.Remove(LocalizationHost.ResourceKey);
             else application.Resources[LocalizationHost.ResourceKey] = previousLocalization;
+        }
+    }
+
+    private static void CheckDiagnosticBundleDialog(Application application, IStringLocalizer localizer,
+        string culture, ApplicationTheme theme)
+    {
+        var dialog = new DiagnosticBundleDialog(null,
+            localizer.Get("DiagnosticExport_ConfirmTitle"),
+            localizer.Get("DiagnosticExport_ContentHeading"),
+            "- " + localizer.Get("DiagnosticExport_LogFiles", 3) + Environment.NewLine
+                + "- " + localizer.Get("DiagnosticExport_Frames", 2),
+            localizer.Get("DiagnosticExport_LocalOnly"),
+            localizer.Get("DiagnosticExport_Continue"),
+            localizer.Get("DiagnosticExport_ConfirmButton"),
+            localizer.Get("DiagnosticExport_CancelButton"),
+            isConfirmation: true)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -10000,
+            Top = -10000,
+            ShowActivated = false,
+        };
+        try
+        {
+            dialog.Show();
+            dialog.UpdateLayout();
+            var surface = Assert.IsType<Border>(dialog.FindName("DialogSurface"));
+            var host = Assert.Single(Descendants(dialog).OfType<FluentLightHost>());
+            Assert.True(host.IsAncestorOf(surface));
+            Assert.Equal(FluentLightKind.Surface, FluentLight.GetKind(surface));
+            Assert.Equal(new CornerRadius(8), surface.CornerRadius);
+            Assert.Same(application.FindResource("SolidBackgroundFillColorBaseBrush"), surface.Background);
+            Assert.Equal(localizer.Get("DiagnosticExport_ConfirmTitle"), Assert.IsType<System.Windows.Controls.TextBlock>(dialog.FindName("DialogTitle")).Text);
+            Assert.Contains(localizer.Get("DiagnosticExport_ContentHeading"), Assert.IsType<System.Windows.Controls.TextBlock>(dialog.FindName("MessageText")).Text);
+            Assert.True(Assert.IsType<SymbolIcon>(dialog.FindName("DialogIcon")).IsVisible);
+
+            var buttons = Descendants(dialog).OfType<Wpf.Ui.Controls.Button>().ToArray();
+            Assert.Equal(3, buttons.Length);
+            Assert.All(buttons, button =>
+            {
+                Assert.Equal(FluentLightKind.Button, FluentLight.GetKind(button));
+                Assert.Equal(new CornerRadius(4), button.CornerRadius);
+                Assert.Equal(4, FluentLight.GetCornerRadius(button));
+            });
+
+            var bitmap = new RenderTargetBitmap((int)Math.Ceiling(dialog.ActualWidth),
+                (int)Math.Ceiling(dialog.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(dialog);
+            var path = Path.Combine(AppContext.BaseDirectory, "previews", $"diagnostic-dialog-{culture}-{theme}.png");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using var file = File.Create(path);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            encoder.Save(file);
+        }
+        finally { dialog.Close(); }
+    }
+
+    private static void CheckDiagnosticBundleDialogActions(IStringLocalizer localizer)
+    {
+        Assert.False(ShowDialogAndClick(localizer, "CancelButton"));
+        Assert.True(ShowDialogAndClick(localizer, "PrimaryButton"));
+        Assert.False(ShowDialogAndClick(localizer, null));
+    }
+
+    private static bool ShowDialogAndClick(IStringLocalizer localizer, string? buttonName)
+    {
+        var dialog = new DiagnosticBundleDialog(null,
+            localizer.Get("DiagnosticExport_ConfirmTitle"),
+            localizer.Get("DiagnosticExport_ContentHeading"),
+            "- " + localizer.Get("DiagnosticExport_LogFiles", 1),
+            localizer.Get("DiagnosticExport_LocalOnly"),
+            localizer.Get("DiagnosticExport_Continue"),
+            localizer.Get("DiagnosticExport_ConfirmButton"),
+            localizer.Get("DiagnosticExport_CancelButton"),
+            isConfirmation: true)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = -10000,
+            Top = -10000,
+            ShowActivated = false,
+        };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (buttonName is null)
+                dialog.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(dialog), 0, Key.Escape)
+                    { RoutedEvent = Keyboard.KeyDownEvent });
+            else
+            {
+                var button = Assert.IsType<Wpf.Ui.Controls.Button>(dialog.FindName(buttonName));
+                button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            }
+        };
+        timer.Start();
+        try { return dialog.ShowDialog() == true; }
+        finally
+        {
+            timer.Stop();
+            dialog.Close();
         }
     }
 

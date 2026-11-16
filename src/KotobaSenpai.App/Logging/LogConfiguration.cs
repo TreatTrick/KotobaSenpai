@@ -5,8 +5,8 @@ namespace KotobaSenpai.App.Logging;
 
 /// <summary>
 /// Reads the minimum log level: through <see cref="ISettingsService"/> it takes the <c>MinimumLogLevel</c> field (e.g.
-/// "Error"/"Warning"/"Information") and parses it into a <see cref="LogLevel"/>; when the field is missing or parsing fails it falls back to
-/// <see cref="LogLevel.Error"/>. File I/O and fault tolerance are handled uniformly by the settings service; this class only parses strings to levels.
+/// "Debug"/"Warning"/"Information") and parses it into a <see cref="LogLevel"/>; when the field is missing or parsing fails it falls back to
+/// <see cref="LogLevel.Debug"/>. File I/O and fault tolerance are handled uniformly by the settings service; this class only parses strings to levels.
 /// </summary>
 public static class LogConfiguration
 {
@@ -19,6 +19,6 @@ public static class LogConfiguration
         if (raw is not null && Enum.TryParse(raw, ignoreCase: true, out LogLevel level) && Enum.IsDefined(level))
             return level;
 
-        return LogLevel.Error;
+        return LogLevel.Debug;
     }
 }
