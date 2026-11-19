@@ -31,10 +31,11 @@ pwsh -File scripts/Build-Installer.ps1 -Version 1.0.3
 | --- | --- |
 | 构建版本 | `1.0.3` |
 | Release 标签 | `v1.0.3` 或 `1.0.3` |
-| 必须上传的安装包 | `KotobaSenpai-1.0.3-win-x64-Setup.exe` |
+| 应用内更新安装包 | `KotobaSenpai-1.0.3-win-x64-Setup.exe` |
+| 官网下载安装包 | `KotobaSenpai-win-x64-Setup.exe` |
 | GitHub 资产摘要 | `digest` 字段为 `sha256:` 加 64 位十六进制摘要 |
 
-先上传全部资产再发布正式 Release。应用只检查 `/releases/latest`，不接收草稿和预览版。安装包缺失、名字不匹配或没有有效摘要时，会提示该版本暂不可用，禁止安装。
+发布正式 Release 前，先上传表中的两个安装包。发布后，从官网验证下载按钮能在未登录 GitHub 的情况下开始下载安装包。应用只检查 `/releases/latest`，不接收草稿和预览版。安装包缺失、名字不匹配或没有有效摘要时，会提示该版本暂不可用，禁止安装。
 
 脚本仍生成不带版本号的 `KotobaSenpai-win-x64-Setup.exe` 供网站链接使用。应用内更新使用带版本号的资产，避免下载到与检查结果不一致的版本。
 
