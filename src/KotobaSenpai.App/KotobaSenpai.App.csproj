@@ -25,6 +25,7 @@
     <ProjectReference Include="..\KotobaSenpai.Cli\KotobaSenpai.Cli.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="..\..\LICENSE" Link="LICENSE" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Support\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\UniDic\unidic-3.1.0.zip" Condition="Exists('Assets\UniDic\unidic-3.1.0.zip')"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

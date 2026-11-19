@@ -103,6 +103,10 @@ KotobaSenpai 是基于 **.NET 10** 和 **WPF** 开发的 Windows 桌面软件。
 2. 选择游戏窗口。
 3. 开始识别，进入阅读。
 
+## 许可证
+
+KotobaSenpai 的原创代码采用 [MIT 许可证](LICENSE)。第三方代码和资源适用各自的许可证，详见[第三方许可声明](THIRD-PARTY-NOTICES)。
+
 ## 🐉 谢谢你看到这里
 
 龙女仆已经开心地跳起来啦！

@@ -103,6 +103,11 @@ Open **About** to check GitHub for the latest stable release. Download the updat
 2. Select the game window.
 3. Start recognition and read.
 
+## License
+
+KotobaSenpai's original code is licensed under the [MIT License](LICENSE).
+Third-party code and assets are covered by their respective licenses. See [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES).
+
 ## 🐉 Thanks for reading
 
 The dragon maid is celebrating your next chapter.
