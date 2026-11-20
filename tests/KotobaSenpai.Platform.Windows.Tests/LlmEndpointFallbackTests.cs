@@ -103,6 +103,85 @@ public sealed class LlmEndpointFallbackTests
         });
     }
 
+    [Fact]
+    public async Task Prefers_the_working_responses_address_and_learns_a_replacement_after_a_routing_error()
+    {
+        var handler = new RecordingHandler((attempt, _) => attempt is 1 or 4 or 5
+            ? Response(HttpStatusCode.NotFound, "")
+            : Response(HttpStatusCode.OK, Envelope(LlmProtocolIds.OpenAiResponses)));
+        var analyzer = CreateAnalyzer("https://provider.example", LlmProtocolIds.OpenAiResponses, handler);
+
+        var first = await analyzer.AnalyzeAsync(Request());
+        var second = await analyzer.AnalyzeAsync(Request());
+        var third = await analyzer.AnalyzeAsync(Request());
+        var fourth = await analyzer.AnalyzeAsync(Request());
+
+        Assert.All(new[] { first, second, third, fourth }, result => Assert.True(result.Succeeded));
+        Assert.Equal("https://provider.example/v1/responses", first.Endpoint);
+        Assert.Equal(first.Endpoint, second.Endpoint);
+        Assert.Equal("https://provider.example/responses", third.Endpoint);
+        Assert.Equal(third.Endpoint, fourth.Endpoint);
+        Assert.Equal(["/", "/v1/responses", "/v1/responses", "/v1/responses", "/", "/responses", "/responses"],
+            handler.Requests.Select(request => request.Uri.AbsolutePath));
+    }
+
+    [Fact]
+    public async Task Discards_a_preferred_address_that_returns_method_not_allowed_even_when_fallback_fails()
+    {
+        var handler = new RecordingHandler((attempt, _) => attempt switch
+        {
+            1 => Response(HttpStatusCode.NotFound, ""),
+            3 => Response(HttpStatusCode.MethodNotAllowed, ""),
+            4 => Response(HttpStatusCode.Unauthorized, ""),
+            _ => Response(HttpStatusCode.OK, Envelope(LlmProtocolIds.OpenAiResponses)),
+        });
+        var analyzer = CreateAnalyzer("https://provider.example", LlmProtocolIds.OpenAiResponses, handler);
+
+        Assert.True((await analyzer.AnalyzeAsync(Request())).Succeeded);
+        var refused = await analyzer.AnalyzeAsync(Request());
+        Assert.Equal(PhraseAnalysisOutcome.Refused, refused.Outcome);
+        Assert.Equal(401, refused.ProviderStatusCode);
+        Assert.True((await analyzer.AnalyzeAsync(Request())).Succeeded);
+        Assert.Equal(["/", "/v1/responses", "/v1/responses", "/", "/"],
+            handler.Requests.Select(request => request.Uri.AbsolutePath));
+    }
+
+    [Theory]
+    [InlineData("https://provider.example?tenant=other", LlmProtocolIds.OpenAiResponses, false)]
+    [InlineData("https://provider.example?tenant=original", LlmProtocolIds.OpenAiChat, false)]
+    [InlineData("https://provider.example?tenant=original", LlmProtocolIds.OpenAiResponses, true)]
+    public async Task Starts_at_the_configured_address_for_another_route_or_a_single_endpoint_probe(
+        string endpoint, string protocol, bool singleEndpoint)
+    {
+        var handler = new RecordingHandler((attempt, _) => attempt == 1
+            ? Response(HttpStatusCode.NotFound, "")
+            : Response(HttpStatusCode.OK, Envelope(attempt == 2 ? LlmProtocolIds.OpenAiResponses : protocol)));
+        var analyzer = CreateAnalyzer("https://provider.example?tenant=original", LlmProtocolIds.OpenAiResponses, handler);
+
+        Assert.True((await analyzer.AnalyzeAsync(Request())).Succeeded);
+        var configuration = new LlmConfiguration(protocol, endpoint, "secret-api-key", "test-model");
+        Assert.True((await analyzer.AnalyzeAsync(Request(), configuration, singleEndpoint: singleEndpoint)).Succeeded);
+
+        var sent = Assert.Single(handler.Requests.Skip(2));
+        Assert.Equal(new Uri(endpoint).AbsoluteUri, sent.Uri.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task Does_not_prefer_a_fallback_address_that_returned_an_incompatible_response()
+    {
+        var handler = new RecordingHandler((attempt, _) => attempt switch
+        {
+            1 => Response(HttpStatusCode.NotFound, ""),
+            2 => Response(HttpStatusCode.OK, "not JSON"),
+            _ => Response(HttpStatusCode.OK, Envelope(LlmProtocolIds.OpenAiResponses)),
+        });
+        var analyzer = CreateAnalyzer("https://provider.example", LlmProtocolIds.OpenAiResponses, handler);
+
+        Assert.Equal(PhraseAnalysisOutcome.MalformedJson, (await analyzer.AnalyzeAsync(Request())).Outcome);
+        Assert.True((await analyzer.AnalyzeAsync(Request())).Succeeded);
+        Assert.Equal(["/", "/v1/responses", "/"], handler.Requests.Select(request => request.Uri.AbsolutePath));
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Unauthorized)]

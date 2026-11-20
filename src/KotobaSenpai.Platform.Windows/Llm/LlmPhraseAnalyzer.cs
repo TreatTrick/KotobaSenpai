@@ -1,5 +1,6 @@
 using KotobaSenpai.Core.Diagnostics;
 using KotobaSenpai.Core.PhraseAnalysis;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Text;
@@ -26,6 +27,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
     private readonly PhraseResponseParser _parser;
     private readonly IDiagnosticReporter? _diagnostics;
     private readonly ILogger? _logger;
+    private readonly ConcurrentDictionary<(string Endpoint, ILlmProtocol Protocol), string> _preferredEndpoints = new();
 
     public LlmPhraseAnalyzer(
         ISettingsService settings,
@@ -78,7 +80,12 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         }
 
         var body = protocol.BuildBody(systemPrompt, userContent, model, request.IncludeSentenceTranslation);
+        var route = (endpointUri.AbsoluteUri, protocol);
         var candidates = singleEndpoint ? [endpointUri] : LlmEndpointHelper.AnalysisCandidates(endpointUri, protocol.Path);
+        if (!singleEndpoint && _preferredEndpoints.TryGetValue(route, out var preferred)
+            && candidates[0].AbsoluteUri != preferred)
+            candidates = candidates.OrderByDescending(candidate => candidate.AbsoluteUri == preferred).ToArray();
+
         string? envelope = null;
         string? acceptedEndpoint = null;
         for (var index = 0; index < candidates.Count; index++)
@@ -118,9 +125,13 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
                     request.SegmentId, protocol.PromptProfile, (int)response.StatusCode,
                     candidate.GetLeftPart(UriPartial.Path), llmTimer.ElapsedMilliseconds);
 
-                if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed
-                    && index + 1 < candidates.Count)
-                    continue;
+                if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed)
+                {
+                    if (!singleEndpoint)
+                        _preferredEndpoints.TryRemove(new(route, candidate.AbsoluteUri));
+                    if (index + 1 < candidates.Count)
+                        continue;
+                }
 
                 return new PhraseAnalysisResult(PhraseAnalysisOutcome.Refused, [],
                     $"Provider refused with HTTP {(int)response.StatusCode} after trying {index + 1} endpoint(s).")
@@ -164,6 +175,9 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
             _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
             return new PhraseAnalysisResult(PhraseAnalysisOutcome.MalformedJson, [], ex.Message);
         }
+
+        if (!singleEndpoint && acceptedEndpoint is not null)
+            _preferredEndpoints[route] = acceptedEndpoint;
 
         // Capture the raw request/response and extracted arrays with one shared exchange stamp for offline inspection.
         _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
