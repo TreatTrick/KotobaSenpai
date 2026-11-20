@@ -34,6 +34,7 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
     private readonly SentenceTranslationPreferences _sentenceTranslation;
     private readonly ILogger _logger;
     private bool _isExportingDiagnosticBundle;
+    private bool _diagnosticRecordingSaveFailed;
     private string? _sentenceTranslationStatusKey;
     private string? _captureBorderErrorKey;
     private string? _logLevelErrorKey;
@@ -193,6 +194,29 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
 
     public string LogLevelError => _logLevelErrorKey is null ? string.Empty : _localizer.Get(_logLevelErrorKey);
 
+    public string DiagnosticRecordingAction => _localizer.Get(DiagnosticRecordingSettings.IsEnabled(_settings)
+        ? ResourceKeys.DiagnosticRecording_Disable : ResourceKeys.DiagnosticRecording_Enable);
+
+    public string DiagnosticRecordingError => _diagnosticRecordingSaveFailed
+        ? _localizer.Get(ResourceKeys.DiagnosticRecording_SaveFailed) : string.Empty;
+
+    [RelayCommand]
+    private void ToggleDiagnosticRecording()
+    {
+        var enabled = DiagnosticRecordingSettings.IsEnabled(_settings);
+        try
+        {
+            _settings.SetValue(DiagnosticRecordingSettings.EnabledKey, enabled ? "false" : "true");
+            _diagnosticRecordingSaveFailed = false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _diagnosticRecordingSaveFailed = true;
+        }
+        OnPropertyChanged(nameof(DiagnosticRecordingAction));
+        OnPropertyChanged(nameof(DiagnosticRecordingError));
+    }
+
     public bool IsExportingDiagnosticBundle
     {
         get => _isExportingDiagnosticBundle;
@@ -286,6 +310,8 @@ public sealed partial class SettingsPageViewModel : ObservableObject, IDisposabl
         OnPropertyChanged(nameof(CaptureBorderError));
         OnPropertyChanged(nameof(LogLevelError));
         OnPropertyChanged(nameof(SentenceTranslationStatus));
+        OnPropertyChanged(nameof(DiagnosticRecordingAction));
+        OnPropertyChanged(nameof(DiagnosticRecordingError));
     }
 
     public void Dispose()

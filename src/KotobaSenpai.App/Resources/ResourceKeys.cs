@@ -99,6 +99,11 @@ public static class ResourceKeys
     public const string Label_LogLevel = nameof(Label_LogLevel);
     public const string Description_LogLevel = nameof(Description_LogLevel);
     public const string LogLevel_SaveFailed = nameof(LogLevel_SaveFailed);
+    public const string DiagnosticRecording_Title = nameof(DiagnosticRecording_Title);
+    public const string DiagnosticRecording_Description = nameof(DiagnosticRecording_Description);
+    public const string DiagnosticRecording_Enable = nameof(DiagnosticRecording_Enable);
+    public const string DiagnosticRecording_Disable = nameof(DiagnosticRecording_Disable);
+    public const string DiagnosticRecording_SaveFailed = nameof(DiagnosticRecording_SaveFailed);
     public const string DiagnosticExport_Title = nameof(DiagnosticExport_Title);
     public const string DiagnosticExport_Description = nameof(DiagnosticExport_Description);
     public const string DiagnosticExport_Button = nameof(DiagnosticExport_Button);

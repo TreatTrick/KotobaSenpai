@@ -22,8 +22,6 @@ namespace KotobaSenpai.Platform.Windows.Ocr;
 /// </summary>
 public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer, IDisposable
 {
-    private const string DiagEnabledKey = "DiagEnabled";
-
     private readonly IWindowFrameCapture _capture;
     private readonly ISettingsService _settings;
     private readonly MeikiOcrEngine _engine;
@@ -72,7 +70,7 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer, IDisposable
                 ex);
         }
 
-        if (IsDiagEnabled())
+        if (DiagnosticRecordingSettings.IsEnabled(_settings))
             DumpDiagnostics(recognitionId, frame, lines, target);
 
         // Preserve line structure: one OcrLine per line, so the tokenizer service can re-assemble words line by line.
@@ -92,10 +90,6 @@ public sealed class MeikiOcrWordRecognizer : IWindowWordRecognizer, IDisposable
         // Report the full-window frame dimensions (the capture may have been region-sized) so downstream screen mapping stays correct.
         return new WordRecognitionResult(frameWidth, frameHeight, ocrLines);
     }
-
-    /// <summary>Toggle for writing diagnostics to disk: enabled when the setting <c>DiagEnabled</c> is "true" (off by default).</summary>
-    private bool IsDiagEnabled()
-        => string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Writes diagnostics to disk: saves the captured frame PNG and the OCR-recognized text to a fixed directory, so you can

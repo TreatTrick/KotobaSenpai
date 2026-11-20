@@ -18,8 +18,6 @@ namespace KotobaSenpai.App.Diagnostics;
 /// </summary>
 public sealed class FileDiagnosticReporter : IDiagnosticReporter
 {
-    private const string DiagEnabledKey = "DiagEnabled";
-
     private readonly ISettingsService _settings;
     private readonly string _diagnosticDirectory;
     private static int _seq;
@@ -34,7 +32,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
 
     public void RecordTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords)
     {
-        if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
+        if (!DiagnosticRecordingSettings.IsEnabled(_settings))
             return;
 
         var dir = _diagnosticDirectory;
@@ -60,7 +58,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
 
     public void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning)
     {
-        if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
+        if (!DiagnosticRecordingSettings.IsEnabled(_settings))
             return;
 
         var dir = _diagnosticDirectory;
@@ -81,7 +79,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         string groupsJson,
         string wordsJson)
     {
-        if (!string.Equals(_settings.GetValue(DiagEnabledKey), "true", StringComparison.OrdinalIgnoreCase))
+        if (!DiagnosticRecordingSettings.IsEnabled(_settings))
             return;
 
         var dir = _diagnosticDirectory;

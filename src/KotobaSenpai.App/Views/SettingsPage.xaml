@@ -183,6 +183,19 @@
                   ItemsSource="{Binding LogLevels}" SelectedItem="{Binding SelectedLogLevel, Mode=TwoWay}"
                   AutomationProperties.Name="{loc:Loc Key=Label_LogLevel}" />
       </controls:SettingsCard>
+      <controls:SettingsCard Header="{loc:Loc Key=DiagnosticRecording_Title}"
+                             Description="{loc:Loc Key=DiagnosticRecording_Description}"
+                             Icon="{ui:SymbolIcon Settings24}">
+        <controls:SettingsCard.DescriptionContent>
+          <TextBlock Text="{Binding DiagnosticRecordingError}" Style="{StaticResource ModelStatus}"
+                     Foreground="{DynamicResource SystemFillColorCriticalBrush}" AutomationProperties.LiveSetting="Polite" />
+        </controls:SettingsCard.DescriptionContent>
+        <ui:Button x:Name="DiagnosticRecordingButton" Content="{Binding DiagnosticRecordingAction}"
+                   Command="{Binding ToggleDiagnosticRecordingCommand}" Style="{StaticResource SettingsButton}"
+                   CornerRadius="4" controls:FluentLight.CornerRadius="4"
+                   AutomationProperties.Name="{Binding DiagnosticRecordingAction}"
+                   AutomationProperties.HelpText="{loc:Loc Key=DiagnosticRecording_Description}" />
+      </controls:SettingsCard>
       <controls:SettingsCard Header="{loc:Loc Key=DiagnosticExport_Title}"
                              Description="{loc:Loc Key=DiagnosticExport_Description}"
                              Icon="{ui:SymbolIcon Settings24}">

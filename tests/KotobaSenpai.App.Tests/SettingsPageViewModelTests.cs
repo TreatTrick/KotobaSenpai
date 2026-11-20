@@ -152,6 +152,64 @@ public sealed class SettingsPageViewModelTests
     }
 
     [Fact]
+    public void Diagnostic_recording_button_controls_the_active_reporter_and_restores_the_saved_choice()
+    {
+        var settings = new RecordingSettings();
+        using var viewModel = Create(settings, new RecordingThemeStore());
+        var directory = Directory.CreateTempSubdirectory("kotoba-diag-").FullName;
+        var reporter = new FileDiagnosticReporter(settings, directory);
+        try
+        {
+            Assert.Equal("Enable diagnostics", viewModel.DiagnosticRecordingAction);
+            Assert.Equal(0, settings.WriteCount);
+            reporter.RecordPhraseAnalysis(Guid.NewGuid(), PhraseAnalysisOutcome.Success, [], null);
+            Assert.Empty(Directory.GetFiles(directory));
+
+            viewModel.ToggleDiagnosticRecordingCommand.Execute(null);
+
+            Assert.Equal("true", settings.GetValue("DiagEnabled"));
+            Assert.Equal("Disable diagnostics", viewModel.DiagnosticRecordingAction);
+            using var restored = Create(settings, new RecordingThemeStore());
+            Assert.Equal("Disable diagnostics", restored.DiagnosticRecordingAction);
+            reporter.RecordPhraseAnalysis(Guid.NewGuid(), PhraseAnalysisOutcome.Success, [], null);
+            var recorded = Assert.Single(Directory.GetFiles(directory));
+
+            viewModel.ToggleDiagnosticRecordingCommand.Execute(null);
+
+            Assert.Equal("false", settings.GetValue("DiagEnabled"));
+            Assert.Equal("Enable diagnostics", viewModel.DiagnosticRecordingAction);
+            reporter.RecordPhraseAnalysis(Guid.NewGuid(), PhraseAnalysisOutcome.Success, [], null);
+            Assert.Equal(recorded, Assert.Single(Directory.GetFiles(directory)));
+        }
+        finally
+        {
+            foreach (var file in Directory.EnumerateFiles(directory)) File.Delete(file);
+            Directory.Delete(directory);
+        }
+    }
+
+    [Fact]
+    public void Failed_diagnostic_recording_save_preserves_the_active_choice_and_can_be_retried()
+    {
+        var settings = new RecordingSettings { FailWrites = true };
+        settings.Values["DiagEnabled"] = "TRUE";
+        using var viewModel = Create(settings, new RecordingThemeStore());
+
+        viewModel.ToggleDiagnosticRecordingCommand.Execute(null);
+
+        Assert.Equal("TRUE", settings.GetValue("DiagEnabled"));
+        Assert.Equal("Disable diagnostics", viewModel.DiagnosticRecordingAction);
+        Assert.NotEmpty(viewModel.DiagnosticRecordingError);
+
+        settings.FailWrites = false;
+        viewModel.ToggleDiagnosticRecordingCommand.Execute(null);
+
+        Assert.Equal("false", settings.GetValue("DiagEnabled"));
+        Assert.Equal("Enable diagnostics", viewModel.DiagnosticRecordingAction);
+        Assert.Empty(viewModel.DiagnosticRecordingError);
+    }
+
+    [Fact]
     public void Diagnostic_bundle_contents_are_localized_in_the_view_model()
     {
         var settings = new RecordingSettings();

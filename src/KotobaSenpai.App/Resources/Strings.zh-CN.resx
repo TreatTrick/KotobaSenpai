@@ -671,6 +671,11 @@ API Key：YOUR_API_KEY
   <data name="Label_LogLevel" xml:space="preserve"><value>日志级别</value></data>
   <data name="Description_LogLevel" xml:space="preserve"><value>记录所选级别及以上的日志，修改后自动保存并立即生效。</value></data>
   <data name="LogLevel_SaveFailed" xml:space="preserve"><value>无法保存日志级别，仍使用之前的级别。</value></data>
+  <data name="DiagnosticRecording_Title" xml:space="preserve"><value>诊断记录</value></data>
+  <data name="DiagnosticRecording_Description" xml:space="preserve"><value>开启后会在本机保存截图、识别文本以及模型请求和响应，用于排查识别与分析问题。可通过下方的诊断包将这些文件导出为 ZIP。</value></data>
+  <data name="DiagnosticRecording_Enable" xml:space="preserve"><value>开启诊断</value></data>
+  <data name="DiagnosticRecording_Disable" xml:space="preserve"><value>关闭诊断</value></data>
+  <data name="DiagnosticRecording_SaveFailed" xml:space="preserve"><value>无法保存诊断记录设置，请重试。</value></data>
   <data name="DiagnosticExport_Title" xml:space="preserve"><value>诊断包</value></data>
   <data name="DiagnosticExport_Description" xml:space="preserve"><value>将保留的日志和现有诊断文件生成 ZIP，生成前会显示具体内容。</value></data>
   <data name="DiagnosticExport_Button" xml:space="preserve"><value>生成 ZIP</value></data>
