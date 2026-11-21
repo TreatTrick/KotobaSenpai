@@ -3,6 +3,7 @@ using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Ocr;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.PhraseAnalysis;
 
 namespace KotobaSenpai.Core.Tests.WordGrouping;
 
@@ -132,12 +133,69 @@ public sealed class WordGroupingTests
         Assert.Equal("s0-0", Assert.Single(grouped).SegmentId);
     }
 
+    [Fact]
+    public void Grouped_words_and_local_summaries_share_span_order_and_effective_reading_in_each_segment()
+    {
+        var tokenizer = new StubTokenizer(new TokenSpec("頭", 0, "0", "アタマ"),
+            new TokenSpec("を", 1, "0", "ヲ"), new TokenSpec("垂れる", 2, "2", "タレル"),
+            new TokenSpec("彼", 5, "1", "カレ"));
+        var tokens = tokenizer.Tokenize("頭を垂れる彼");
+        var entry = new DictionaryEntry("頭を垂れる", "こうべをたれる", []);
+        var resolver = new StubSpanResolver(new LookupSpan(tokens.Take(3).ToArray(), entry.Headword, [entry], entry.Reading),
+            new LookupSpan([tokens[3]], "彼", []));
+        OcrLine[] lines = [Line("頭を垂れる彼"), Line("頭を垂れる彼", 30)];
+        SentenceSegment[] segments = [new([0]), new([1])];
+        var service = new WordGroupingService(tokenizer, new SentenceSegmenter(), resolver);
+        var builder = new SentenceTokenBuilder(tokenizer, resolver);
+
+        var words = service.Group(lines, segments);
+
+        Assert.Equal(4, words.Count);
+        foreach (var segment in segments)
+        {
+            var summaries = builder.Build(lines, segment).LocalSpans;
+            var segmentWords = words.Where(word => word.SegmentId == segment.SegmentId).ToArray();
+            Assert.Equal([0, 1], summaries.Select(span => span.SpanIndex));
+            Assert.Equal(summaries.Select(span => (span.SpanIndex, span.Surface, span.Reading)),
+                segmentWords.Select(word => (word.SegmentSpanIndex, word.Surface, word.Reading)));
+            Assert.Equal("こうべをたれる", segmentWords[0].Reading);
+            Assert.True(segmentWords[0].HasOverriddenReading);
+            Assert.Empty(segmentWords[0].PitchAccents);
+            Assert.Empty(summaries[0].PitchAccents);
+            Assert.False(segmentWords[1].HasOverriddenReading);
+            Assert.Equal(1, Assert.Single(segmentWords[1].PitchAccents).AccentPosition);
+        }
+
+        var original = words[0];
+        var updated = original.WithOverriddenReading("あたまをたれる");
+        Assert.Equal("こうべをたれる", original.Reading);
+        Assert.Equal("あたまをたれる", updated.Reading);
+        Assert.True(updated.HasOverriddenReading);
+        Assert.Empty(updated.PitchAccents);
+        Assert.Null(updated.Token.PitchAccentPosition);
+        Assert.Same(original.SourceTokens, updated.SourceTokens);
+        Assert.Same(original.SourceTokenLines, updated.SourceTokenLines);
+        Assert.Same(original.Rects, updated.Rects);
+        Assert.Same(original.Entries, updated.Entries);
+        Assert.Equal(original.LookupKey, updated.LookupKey);
+        Assert.Equal(original.Bounds, updated.Bounds);
+        Assert.True(updated.HasResolvedLookup);
+
+        var copied = updated.WithRects(updated.Rects, updated.SourceTokenLines).WithSegmentId("moved");
+        Assert.Equal(original.SegmentId, updated.SegmentId);
+        Assert.Equal("moved", copied.SegmentId);
+        Assert.Equal(0, copied.SegmentSpanIndex);
+        Assert.Equal(updated.Reading, copied.Reading);
+        Assert.True(copied.HasOverriddenReading);
+        Assert.Empty(copied.PitchAccents);
+    }
+
     private static Token Token(string surface, int start)
         => new(surface, surface, surface, surface, surface, surface,
             new PartsOfSpeech("", "", "", ""), "", "", "", start);
 }
 
-internal sealed record TokenSpec(string Surface, int StartOffset, string AType = "");
+internal sealed record TokenSpec(string Surface, int StartOffset, string AType = "", string? Reading = null);
 
 /// <summary>Splits on explicit spans so grouping tests can control the tokenization result precisely.</summary>
 internal sealed class StubTokenizer : ITokenizer
@@ -147,7 +205,7 @@ internal sealed class StubTokenizer : ITokenizer
 
     public IReadOnlyList<Token> Tokenize(string? text)
         => _specs.Select(s => new Token(
-            s.Surface, s.Surface, s.Surface, s.Surface, s.Surface, s.Surface,
+            s.Surface, s.Surface, s.Surface, s.Reading ?? s.Surface, s.Reading ?? s.Surface, s.Reading ?? s.Surface,
             new PartsOfSpeech("", "", "", ""), "", "", s.AType, s.StartOffset)).ToArray();
 }
 

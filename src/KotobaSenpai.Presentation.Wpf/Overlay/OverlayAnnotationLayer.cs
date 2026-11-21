@@ -122,6 +122,7 @@ internal sealed class OverlayAnnotationLayer
     private static bool Matches(RenderedWord previous, GroupedWord word, bool underlined, double scale, double fontScale)
         => previous.Underlined == underlined && previous.Scale == scale && previous.FontScale == fontScale
             && previous.Word.Surface == word.Surface && previous.Word.Reading == word.Reading
+            && previous.Word.HasOverriddenReading == word.HasOverriddenReading
             && previous.Word.Rects.SequenceEqual(word.Rects)
             && previous.Word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType))
                 .SequenceEqual(word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType)))
@@ -134,9 +135,9 @@ internal sealed class OverlayAnnotationLayer
     /// </summary>
     private void AddPitchAnnotations(GroupedWord word, double scale, double fontScale)
     {
-        if (word.PitchAccents.Count == 0)
+        if (word.HasOverriddenReading)
         {
-            AddMonochromeFurigana(word.Surface, word.Reading, 0, word, scale, fontScale);
+            AddMonochromeFurigana(word.Surface, word.Reading, null, word, scale, fontScale);
             return;
         }
 
@@ -198,7 +199,7 @@ internal sealed class OverlayAnnotationLayer
     private void AddMonochromeFurigana(
         string surface,
         string reading,
-        int sourceTokenIndex,
+        int? sourceTokenIndex,
         GroupedWord word,
         double scale,
         double fontScale)
@@ -210,7 +211,10 @@ internal sealed class OverlayAnnotationLayer
                 continue;
 
             var morae = PitchAccent.SplitMorae(Kana.ToHiragana(segment.Reading));
-            foreach (var part in FuriganaLayout.GetParts(word, sourceTokenIndex, segment.SurfaceStart, segment.SurfaceLength, morae.Count))
+            var parts = sourceTokenIndex is int tokenIndex
+                ? FuriganaLayout.GetParts(word, tokenIndex, segment.SurfaceStart, segment.SurfaceLength, morae.Count)
+                : FuriganaLayout.GetSpanParts(word, segment.SurfaceStart, segment.SurfaceLength, morae.Count);
+            foreach (var part in parts)
             {
                 var fontSize = (part.Bounds.Height / scale) * fontScale;
                 var text = OverlayAnnotation.CreateText(string.Concat(morae.Skip(part.MoraStart).Take(part.MoraCount)),

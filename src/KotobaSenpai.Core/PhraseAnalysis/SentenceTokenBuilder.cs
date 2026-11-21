@@ -67,7 +67,10 @@ public sealed class SentenceTokenBuilder
                     .ToArray();
                 if (spanIds.Length == 0)
                     continue;
-                localSpans.Add(new LocalSpanSummary(span.Surface, span.Reading, span.LookupKey, spanIds, span.PitchAccents));
+                localSpans.Add(new LocalSpanSummary(span.Surface, span.Reading, span.LookupKey, spanIds, span.PitchAccents)
+                {
+                    SpanIndex = localSpans.Count,
+                });
             }
         }
 

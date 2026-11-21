@@ -1,4 +1,6 @@
 using System.Windows.Controls;
+using KotobaSenpai.Core.Dictionary;
+using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Overlay;
 using KotobaSenpai.Core.TargetWindow;
@@ -51,5 +53,139 @@ public sealed class OverlayAnnotationLayerTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         await completion.Task;
+    }
+
+    [Theory]
+    [InlineData("頭", "アタマ", "垂れる", "タレル", "", "", "こうべをたれる", "こうべ", "た")]
+    [InlineData("頭", "アタマ", "垂れ", "タレ", "た", "タ", "こうべをたれた", "こうべ", "た")]
+    [InlineData("踵", "カカト", "返し", "カエシ", "て", "テ", "きびすをかえして", "きびす", "かえ")]
+    public Task Overridden_phrase_draws_readings_above_kanji_without_pitch_markers(
+        string first, string firstKana, string verb, string verbKana, string suffix, string suffixKana,
+        string reading, string firstFurigana, string verbFurigana) => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var target = Target();
+        List<Token> tokens = [Token(first, firstKana), Token("を", "ヲ", 1), Token(verb, verbKana, 2)];
+        List<IReadOnlyList<SourceTokenLineGeometry>> geometry =
+        [
+            [new(0, 0, 1, new ScreenRect(220, 160, 34, 36))],
+            [new(0, 0, 1, new ScreenRect(260, 160, 29, 36))],
+            [new(0, 0, verb.Length, new ScreenRect(300, 160, 50 * verb.Length, 36))],
+        ];
+        var width = 80 + 50 * verb.Length;
+        if (suffix.Length > 0)
+        {
+            tokens.Add(Token(suffix, suffixKana, 2 + verb.Length));
+            geometry.Add([new(0, 0, suffix.Length, new ScreenRect(220 + width, 160, 26, 36))]);
+            width += 26;
+        }
+        var word = new GroupedWord(new LookupSpan(tokens, first + "を" + verb + suffix, [], reading),
+            [new ScreenRect(220, 160, width, 36)], geometry);
+
+        layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        Assert.Equal(2, annotations.Length);
+        AssertFurigana(annotations[0], firstFurigana, new ScreenRect(220, 160, 34, 36), target);
+        AssertFurigana(annotations[1], verbFurigana, new ScreenRect(300, 160, 50, 36), target);
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Overridden_kanji_run_uses_the_combined_token_bounds_on_each_line(bool wrapped) => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var target = Target();
+        var first = new ScreenRect(280, 160, 34, 36);
+        var second = wrapped ? new ScreenRect(220, 220, 94, 30) : new ScreenRect(320, 160, 94, 36);
+        var combined = new ScreenRect(280, 160, 134, 36);
+        var word = new GroupedWord(new LookupSpan([Token("一", "イチ"), Token("週間", "シュウカン", 1)],
+            "一週間", [], "いっしゅうかん"), wrapped ? [first, second] : [combined],
+            [[new(0, 0, 1, first)], [new(wrapped ? 1 : 0, 0, 2, second)]]);
+
+        layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        if (wrapped)
+        {
+            Assert.Equal(2, annotations.Length);
+            AssertFurigana(annotations[0], "いっ", first, target);
+            AssertFurigana(annotations[1], "しゅうかん", second, target);
+        }
+        else
+        {
+            AssertFurigana(Assert.Single(annotations), "いっしゅうかん", combined, target);
+        }
+    });
+
+    [Fact]
+    public Task Refresh_replaces_only_annotations_for_the_word_whose_override_reading_or_underline_changed() => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var target = Target();
+        var fixedWord = new GroupedWord(Token("僕", "ボク"), new ScreenRect(220, 160, 35, 36)).WithSegmentId("s0-0");
+        var word = new GroupedWord(Token("額", "ガク"), new ScreenRect(220, 220, 39, 36)).WithSegmentId("s1-1");
+        layer.Render(WordOverlaySession.Start(target, [fixedWord], underlineSegmentIds: ["s0-0"]), 1, 1d / 3);
+        var fixedElements = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        var original = Render(word, ["s0-0"]);
+        Assert.Contains(original, element => element.Role == OverlayColorRole.Heiban);
+
+        var overridden = word.WithOverriddenReading(word.Reading);
+        var monochrome = Render(overridden, ["s0-0"], original);
+        AssertFurigana(Assert.Single(monochrome), "がく", word.Bounds, target);
+        Assert.Same(monochrome[0], Assert.Single(Render(overridden, ["s0-0"])));
+
+        var corrected = overridden.WithOverriddenReading("ひたい");
+        var changed = Render(corrected, ["s0-0"], monochrome);
+        AssertFurigana(Assert.Single(changed), "ひたい", word.Bounds, target);
+
+        var underlined = Render(corrected, ["s0-0", "s1-1"], changed);
+        Assert.Contains(underlined, element => element.Role == OverlayColorRole.Underline);
+        AssertFurigana(Assert.Single(underlined, element => element.Glyph is not null), "ひたい", word.Bounds, target);
+
+        OverlayAnnotation[] Render(GroupedWord current, string[] underlinedSegments, OverlayAnnotation[]? old = null)
+        {
+            layer.Render(WordOverlaySession.Start(target, [fixedWord, current], underlineSegmentIds: underlinedSegments), 1, 1d / 3);
+            var all = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+            Assert.All(fixedElements, element => Assert.Contains(element, all));
+            if (old is not null)
+                Assert.All(old, element => Assert.DoesNotContain(element, all));
+            return all.Except(fixedElements).ToArray();
+        }
+    });
+
+    private static void AssertFurigana(OverlayAnnotation annotation, string reading, ScreenRect bounds, WindowTarget target)
+    {
+        var fontSize = bounds.Height / 3d;
+        var expected = OverlayAnnotation.CreateText(reading, fontSize, OverlayColorRole.Furigana,
+            new OverlayAnnotationStyle(OverlayAppearanceSettings.Default));
+        Assert.Equal(expected.Role, annotation.Role);
+        Assert.Equal(expected.Glyph!.ToString(), annotation.Glyph?.ToString());
+        Assert.Equal(bounds.X - target.Bounds.X + bounds.Width / 2d,
+            Canvas.GetLeft(annotation) + annotation.DesiredSize.Width / 2d, precision: 6);
+        Assert.Equal(bounds.Y - target.Bounds.Y - fontSize - 2, Canvas.GetTop(annotation), precision: 6);
+    }
+
+    private static WindowTarget Target() => new((nint)42, "Target", new ScreenRect(100, 100, 700, 400));
+
+    private static Token Token(string surface, string reading, int start = 0)
+        => new(surface, surface, surface, reading, reading, reading, new("noun", "", "", ""), "", "", "0", start);
+
+    private static Task RunOnSta(Action action)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+                completion.SetResult();
+            }
+            catch (Exception exception) { completion.SetException(exception); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return completion.Task;
     }
 }

@@ -82,6 +82,24 @@ public class FuriganaSettingsTests
         Assert.Equal(kanjiReading, trimmed);
     }
 
+    [Theory]
+    [InlineData("頭を垂れる", "こうべをたれる", "こうべ", "た", 2)]
+    [InlineData("頭を垂れた", "こうべをたれた", "こうべ", "た", 2)]
+    [InlineData("踵を返して", "きびすをかえして", "きびす", "かえ", 2)]
+    public void Aligns_whole_span_readings_to_kanji_and_omits_okurigana(
+        string surface, string reading, string firstReading, string secondReading, int trailingKanaLength)
+    {
+        Assert.Equal(
+            [new FuriganaSegment(0, 1, firstReading, false), new FuriganaSegment(1, 1, "", true),
+             new FuriganaSegment(2, 1, secondReading, false), new FuriganaSegment(3, trailingKanaLength, "", true)],
+            FuriganaSettings.GetFuriganaSegments(surface, reading));
+    }
+
+    [Fact]
+    public void Keeps_adjacent_kanji_in_one_furigana_segment()
+        => Assert.Equal([new FuriganaSegment(0, 3, "いっしゅうかん", false)],
+            FuriganaSettings.GetFuriganaSegments("一週間", "いっしゅうかん"));
+
     [Fact]
     public void Distributes_interleaved_kanji_and_kana_reading_without_merging_segments()
     {

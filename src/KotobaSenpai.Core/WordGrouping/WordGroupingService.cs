@@ -36,6 +36,7 @@ public sealed class WordGroupingService : IOcrWordGroupingService
 
             var tokens = splitTokens.Select(st => st.Token).ToArray();
             var byToken = splitTokens.ToDictionary(st => st.Token);
+            var spanIndex = 0;
             foreach (var span in _spanResolver.Resolve(tokens))
             {
                 var rects = LineBlockTokenizer.RectsForTokens(splitTokens, span.Tokens);
@@ -50,7 +51,7 @@ public sealed class WordGroupingService : IOcrWordGroupingService
                             Union(line.Boxes)))
                         .ToArray())
                     .ToArray();
-                result.Add(new GroupedWord(span, rects, sourceTokenLines).WithSegmentId(segment.SegmentId));
+                result.Add(new GroupedWord(span, rects, sourceTokenLines).WithSegment(segment.SegmentId, spanIndex++));
             }
         }
         return result;

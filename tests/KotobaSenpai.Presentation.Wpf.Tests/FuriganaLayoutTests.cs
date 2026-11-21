@@ -76,6 +76,53 @@ public sealed class FuriganaLayoutTests
             FuriganaLayout.GetParts(word, 0, 2, 1, 1));
     }
 
+    [Fact]
+    public void Span_furigana_unions_unequal_source_boxes_on_the_same_line()
+    {
+        var first = new ScreenRect(220, 160, 32, 36);
+        var second = new ScreenRect(257, 158, 94, 40);
+        var union = new ScreenRect(220, 158, 131, 40);
+        var word = new GroupedWord(new LookupSpan([Token("一", "イチ"), Token("週間", "シュウカン", 1)],
+            "一週間", [], "いっしゅうかん"), [union],
+            [[new(0, 0, 1, first)], [new(0, 0, 2, second)]]);
+
+        var morae = PitchAccent.SplitMorae(word.Reading);
+        Assert.Equal([new FuriganaLinePart(union, 0, morae.Count)],
+            FuriganaLayout.GetSpanParts(word, 0, 3, morae.Count));
+    }
+
+    [Fact]
+    public void Span_furigana_splits_whole_morae_at_the_ocr_line_break_inside_a_source_token()
+    {
+        var first = new ScreenRect(780, 100, 34, 39);
+        var second = new ScreenRect(819, 100, 53, 39);
+        var third = new ScreenRect(100, 171, 46, 32);
+        var firstLine = new ScreenRect(780, 100, 92, 39);
+        var word = new GroupedWord(new LookupSpan([Token("一", "イチ"), Token("週間", "シュウカン", 1)],
+            "一週間", [], "いっしゅうかん"), [firstLine, third],
+            [[new(0, 0, 1, first)], [new(0, 0, 1, second), new(1, 1, 1, third)]]);
+
+        var morae = PitchAccent.SplitMorae(word.Reading);
+        var parts = FuriganaLayout.GetSpanParts(word, 0, 3, morae.Count);
+
+        Assert.Equal([new FuriganaLinePart(firstLine, 0, 4), new FuriganaLinePart(third, 4, 2)], parts);
+        Assert.Equal(["いっしゅう", "かん"],
+            parts.Select(part => string.Concat(morae.Skip(part.MoraStart).Take(part.MoraCount))));
+    }
+
+    [Fact]
+    public void Span_furigana_slices_a_partial_later_token_using_its_own_bounds()
+    {
+        var word = new GroupedWord(new LookupSpan([Token("頭", "アタマ"), Token("を", "ヲ", 1), Token("垂れ", "タレ", 2)],
+            "頭を垂れる", [], "こうべをたれ"), [new ScreenRect(210, 160, 184, 36)],
+            [[new(0, 0, 1, new ScreenRect(210, 160, 32, 36))],
+             [new(0, 0, 1, new ScreenRect(260, 160, 30, 36))],
+             [new(0, 0, 2, new ScreenRect(302, 161, 92, 35))]]);
+
+        Assert.Equal([new FuriganaLinePart(new ScreenRect(302, 161, 46, 35), 0, 1)],
+            FuriganaLayout.GetSpanParts(word, 2, 1, 1));
+    }
+
     private static GroupedWord Word(string surface, string reading, ScreenRect first, ScreenRect second, int firstSurfaceLength)
         => new(new LookupSpan([Token(surface, reading)], surface, []), [first, second],
             [[new SourceTokenLineGeometry(0, 0, firstSurfaceLength, first),

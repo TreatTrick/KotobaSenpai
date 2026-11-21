@@ -47,6 +47,7 @@ public sealed record GroupedWord
         LookupKey = span.LookupKey;
         Entries = span.Entries;
         HasResolvedLookup = true;
+        HasOverriddenReading = span.HasOverriddenReading;
         SourceTokenLines = sourceTokenLines is null
             ? CreateFallbackSourceTokenLines(SourceTokens, Rects, Bounds)
             : ValidateSourceTokenLines(sourceTokenLines, SourceTokens.Count);
@@ -60,23 +61,29 @@ public sealed record GroupedWord
     /// <summary>The original UniDic tokens that make up the merged word group; defaults to the current token when constructed by legacy callers.</summary>
     public IReadOnlyList<Token> SourceTokens { get; }
 
-    public Token Token { get; }
+    public Token Token { get; private init; }
 
     /// <summary>One rect per line the word spans; a single-line word has exactly one.</summary>
-    public IReadOnlyList<ScreenRect> Rects { get; }
+    public IReadOnlyList<ScreenRect> Rects { get; private init; }
 
     /// <summary>Per-source-token line ranges retained for rendering annotations on wrapped words.</summary>
-    public IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> SourceTokenLines { get; }
+    public IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> SourceTokenLines { get; private init; }
 
     /// <summary>The sentence segment that produced this word, when available.</summary>
-    public string? SegmentId { get; }
+    public string? SegmentId { get; private init; }
+
+    /// <summary>The zero-based order within the sentence segment, when produced by word grouping.</summary>
+    public int? SegmentSpanIndex { get; private init; }
 
     /// <summary>The union of <see cref="Rects"/> for coarse bounds; precise hit testing must use the per-line rects.</summary>
-    public ScreenRect Bounds { get; }
+    public ScreenRect Bounds { get; private init; }
 
     public string Surface => Token.Surface;
 
     public string Reading => Token.Reading;
+
+    /// <summary>Whether the display reading was overridden and source pitch data must be suppressed.</summary>
+    public bool HasOverriddenReading { get; private init; }
 
     public string LookupKey { get; }
 
@@ -85,9 +92,9 @@ public sealed record GroupedWord
     /// <summary>Distinguishes "pre-resolved but not matched" from legacy callers that haven't performed pre-resolution.</summary>
     public bool HasResolvedLookup { get; }
 
-    /// <summary>Pitch data for the original source tokens, in merged-word surface order.</summary>
+    /// <summary>Pitch data in source-token order, or empty when the display reading was overridden.</summary>
     public IReadOnlyList<PitchAccentSummary> PitchAccents
-        => BuildPitchAccents(SourceTokens);
+        => HasOverriddenReading ? [] : BuildPitchAccents(SourceTokens);
 
     /// <summary>Returns the screen bounds for one source token, split by OCR line.</summary>
     public IReadOnlyList<ScreenRect> GetSourceTokenBounds(int sourceTokenIndex)
@@ -101,30 +108,36 @@ public sealed record GroupedWord
     public GroupedWord WithRects(
         IReadOnlyList<ScreenRect> rects,
         IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>>? sourceTokenLines = null)
-        => new(Token, rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, SegmentId,
-            sourceTokenLines ?? CreateFallbackSourceTokenLines(SourceTokens, rects, Union(rects)));
+    {
+        var copiedRects = rects.ToArray();
+        if (copiedRects.Length == 0)
+            throw new ArgumentException("A grouped word must have at least one rect.", nameof(rects));
+        var bounds = Union(copiedRects);
+        return this with
+        {
+            Rects = copiedRects,
+            Bounds = bounds,
+            SourceTokenLines = sourceTokenLines is null
+                ? CreateFallbackSourceTokenLines(SourceTokens, copiedRects, bounds)
+                : ValidateSourceTokenLines(sourceTokenLines, SourceTokens.Count),
+        };
+    }
 
     /// <summary>Associates the word with its sentence segment for staged overlay publication.</summary>
     public GroupedWord WithSegmentId(string? segmentId)
-        => new(Token, Rects, SourceTokens, LookupKey, Entries, HasResolvedLookup, segmentId, SourceTokenLines);
+        => this with { SegmentId = segmentId };
 
-    private GroupedWord(
-        Token token,
-        IReadOnlyList<ScreenRect> rects,
-        IReadOnlyList<Token> sourceTokens,
-        string lookupKey,
-        IReadOnlyList<DictionaryEntry> entries,
-        bool hasResolvedLookup,
-        string? segmentId,
-        IReadOnlyList<IReadOnlyList<SourceTokenLineGeometry>> sourceTokenLines)
-        : this(token, rects)
+    internal GroupedWord WithSegment(string segmentId, int spanIndex)
+        => this with { SegmentId = segmentId, SegmentSpanIndex = spanIndex };
+
+    /// <summary>Uses an effective reading without carrying the original token's pitch into the display token.</summary>
+    public GroupedWord WithOverriddenReading(string reading)
     {
-        SourceTokens = sourceTokens;
-        LookupKey = lookupKey;
-        Entries = entries;
-        HasResolvedLookup = hasResolvedLookup;
-        SegmentId = segmentId;
-        SourceTokenLines = ValidateSourceTokenLines(sourceTokenLines, SourceTokens.Count);
+        ArgumentException.ThrowIfNullOrEmpty(reading);
+        var displayToken = new Token(Token.Surface, Token.Lemma, Token.OrthBase, reading,
+            Token.BaseReading, Token.Pronunciation, Token.PartsOfSpeech, Token.ConjugationType,
+            Token.ConjugationForm, string.Empty, Token.StartOffset);
+        return this with { Token = displayToken, HasOverriddenReading = true };
     }
 
     /// <summary>The added pre-resolution metadata does not change the token+union-bounds value-equality semantics.</summary>
