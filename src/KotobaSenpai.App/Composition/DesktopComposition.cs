@@ -197,6 +197,7 @@ internal sealed class DesktopComposition : IDisposable
         // Japanese tokenization: the adapter is explicitly initialized during startup after the dictionary installer completes.
         services.AddSingleton<UniDicTokenizer>();
         services.AddSingleton<ITokenizer>(sp => sp.GetRequiredService<UniDicTokenizer>());
+        services.AddSingleton<IWordPitchLookup>(sp => sp.GetRequiredService<UniDicTokenizer>());
         services.AddSingleton<IUniDicDictionaryInstaller>(_ => new UniDicDictionaryInstaller());
         // Install coordinator: drives the startup overlay (progress/error/retry).
         services.AddScoped<UniDicInstallController>();

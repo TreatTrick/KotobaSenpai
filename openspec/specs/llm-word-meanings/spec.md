@@ -60,7 +60,7 @@ TBD - created by archiving change keep-jmdic-merge-add-llm-meanings. Update Purp
 
 ### Requirement: 悬停弹窗显示目标语言词义
 
-系统 SHALL 在悬停本地合并词时，展示词头、词性、有效读音（以及对应罗马音）、可用音调及可用的目标语言释义和语法说明。有效读音 SHALL 按“经校验的 LLM 语境纠偏 > JMdict 多词唯一命中回流 > UniDic 原读音”的优先级确定；当读音未发生覆盖时，音调继续来自本地 UniDic 并使用既有统一记法（例如 `[2] LH↓L`）；当读音已被 JMdict 或 LLM 覆盖时，音调 MUST 视为未知并显示未知音调回退，不得展示过期 UniDic 音调。悬停查找 SHALL 优先按 `(SegmentId, SpanIndex)` 匹配对应出现次序的模型词项，以正确区分同句同表记多处出现。释义 SHALL 仅在对应句段完整 AI 分析成功并完成最终覆盖层刷新后可用。弹窗标题 SHALL 按界面语言显示。没有有效释义时 SHALL 展示本地词头、本地有效读音、已知音调和按界面语言显示的“无释义”提示；未知音调不得伪造。弹窗位置 SHALL 在词的包围盒下方且不遮挡词，并继续遵守 `phrase-popup-presentation` 的鼠标停留、10 DIP 离开距离及窗口内输入不透传规则。
+系统 SHALL 在悬停本地合并词时，展示词头、词性、有效读音（以及对应罗马音）、可用音调及可用的目标语言释义和语法说明。有效读音 SHALL 按“经校验的 LLM 语境纠偏 > JMdict 多词唯一命中回流 > UniDic 原读音”的优先级确定；当读音未发生覆盖时，音调继续来自本地 UniDic 并使用既有统一记法（例如 `[2] LH↓L`）；当读音已被 JMdict 或 LLM 覆盖时，整组音调 MUST 视为未知。若 `pitch-accent-display` 的 UniDic 回查规则得到新读音的词级音调，弹窗 SHALL 单独显示该参考音调，否则显示未知音调回退。悬停查找 SHALL 优先按 `(SegmentId, SpanIndex)` 匹配对应出现次序的模型词项，以正确区分同句同表记多处出现。释义 SHALL 仅在对应句段完整 AI 分析成功并完成最终覆盖层刷新后可用。弹窗标题 SHALL 按界面语言显示。没有有效释义时 SHALL 展示本地词头、本地有效读音、已知音调和按界面语言显示的“无释义”提示；未知音调不得伪造。弹窗位置 SHALL 在词的包围盒下方且不遮挡词，并继续遵守 `phrase-popup-presentation` 的鼠标停留、10 DIP 离开距离及窗口内输入不透传规则。
 
 #### Scenario: 成功后显示目标语言解释
 - **WHEN** 法语分析成功并发布后，光标悬停在有词级记录、保留 UniDic 原读音且音调已知的本地词上
@@ -68,7 +68,7 @@ TBD - created by archiving change keep-jmdic-merge-add-llm-meanings. Update Purp
 
 #### Scenario: 成功后显示目标语言解释与纠偏读音
 - **WHEN** 分析成功并发布后，光标悬停在被 LLM 纠偏为 `ひたい` 的 `額` 上
-- **THEN** 弹窗展示目标语言释义和语法说明，读音与罗马音显示为 `ひたい | hitai`，音调显示未知而不显示旧 `がく` 的平板音调
+- **THEN** 弹窗展示目标语言释义和语法说明，读音与罗马音显示为 `ひたい | hitai`，音调按纠音后的 UniDic 词级回查结果展示，缺少匹配时提示未知
 
 #### Scenario: 同句重复词悬停各自显示独立读音与词义
 - **WHEN** 同一句先后出现两个 `額`（分别代表“额头”和“金额”），用户先后悬停两处

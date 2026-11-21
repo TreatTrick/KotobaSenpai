@@ -200,6 +200,9 @@
   <data name="Llm.WordPitchLabel" xml:space="preserve">
     <value>音调</value>
   </data>
+  <data name="Llm.UniDicWordPitchLabel" xml:space="preserve">
+    <value>UniDic 单词音调</value>
+  </data>
   <data name="Llm.WordPitchUnknown" xml:space="preserve">
     <value>音调未知</value>
   </data>

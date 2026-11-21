@@ -95,6 +95,19 @@ internal sealed class PhrasePopupViewModel
             ? localizer?.Get("Llm.WordPitchUnknown") ?? "pitch unknown"
             : $"{localizer?.Get("Llm.WordPitchLabel") ?? "Pitch"} "
                 + string.Join(" | ", patterns.Select(pattern => pattern.Notation[(pattern.Notation.IndexOf(']') + 2)..]));
+        if (word.HasOverriddenReading && word.WordPitch is { } reference)
+        {
+            var variants = reference.Positions
+                .Select(position => PitchAccent.CreatePattern(reference.Reading, position))
+                .OfType<PitchAccentPattern>()
+                .Select(pattern => pattern.Notation)
+                .ToArray();
+            if (variants.Length > 0)
+            {
+                var label = localizer?.Get("Llm.UniDicWordPitchLabel") ?? "UniDic word pitch";
+                pitchText = $"{label} {reference.Surface}（{reference.Reading}） {string.Join(" / ", variants)}";
+            }
+        }
         return new(word.Headword, reading, Kana.ToRomaji(reading), marker, pitchText, word.Pos, word.Meaning);
     }
 

@@ -200,6 +200,9 @@
   <data name="Llm.WordPitchLabel" xml:space="preserve">
     <value>Pitch</value>
   </data>
+  <data name="Llm.UniDicWordPitchLabel" xml:space="preserve">
+    <value>UniDic word pitch</value>
+  </data>
   <data name="Llm.WordPitchUnknown" xml:space="preserve">
     <value>pitch unknown</value>
   </data>

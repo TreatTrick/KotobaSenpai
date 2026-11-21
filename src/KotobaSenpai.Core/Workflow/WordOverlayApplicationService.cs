@@ -9,6 +9,7 @@ using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.Settings;
 using KotobaSenpai.Core.Session;
+using KotobaSenpai.Core.Tokenization;
 
 namespace KotobaSenpai.Core.Workflow;
 
@@ -28,6 +29,7 @@ public sealed class WordOverlayApplicationService : IDisposable
     private readonly IExplanationLanguagePreferences? _explanationLanguage;
     private readonly SentenceTranslationPreferences? _sentenceTranslation;
     private readonly SessionEpoch _sessionEpoch;
+    private readonly IWordPitchLookup? _wordPitchLookup;
     private string? _lastRecognizedText;
     private readonly object _publicationGate = new();
     private QueuedPublication? _pendingPublication;
@@ -47,7 +49,8 @@ public sealed class WordOverlayApplicationService : IDisposable
         ISettingsService? settings = null,
         ITargetWindowTracker? tracker = null,
         IExplanationLanguagePreferences? explanationLanguage = null,
-        SentenceTranslationPreferences? sentenceTranslation = null)
+        SentenceTranslationPreferences? sentenceTranslation = null,
+        IWordPitchLookup? wordPitchLookup = null)
     {
         _recognizer = recognizer;
         _grouping = grouping;
@@ -59,6 +62,7 @@ public sealed class WordOverlayApplicationService : IDisposable
         _tracker = tracker;
         _explanationLanguage = explanationLanguage;
         _sentenceTranslation = sentenceTranslation;
+        _wordPitchLookup = wordPitchLookup;
         if (_sentenceTranslation is not null)
             _sentenceTranslation.Changed += OnSentenceTranslationChanged;
         if (_explanationLanguage is not null)
@@ -242,7 +246,7 @@ public sealed class WordOverlayApplicationService : IDisposable
                         .Select(line => line with { Bounds = map(line.Bounds) })
                         .ToArray())
                     .ToArray();
-                return word.WithRects(rects, sourceTokenLines);
+                return WithDictionaryWordPitch(word.WithRects(rects, sourceTokenLines));
             })
             .ToArray();
 
@@ -301,7 +305,7 @@ public sealed class WordOverlayApplicationService : IDisposable
             phraseRun.Sentences), CanRender);
     }
 
-    private static IReadOnlyList<GroupedWord> ApplyReadingOverrides(IReadOnlyList<GroupedWord> words, PhraseAnalysisRun run)
+    private IReadOnlyList<GroupedWord> ApplyReadingOverrides(IReadOnlyList<GroupedWord> words, PhraseAnalysisRun run)
     {
         var overrides = new Dictionary<(string SegmentId, int SpanIndex), WordMeaningView>();
         foreach (var meaning in run.Words)
@@ -322,10 +326,16 @@ public sealed class WordOverlayApplicationService : IDisposable
                 || meaning.Headword != word.Surface || meaning.Reading == word.Reading)
                 continue;
             corrected ??= words.ToArray();
-            corrected[i] = word.WithOverriddenReading(meaning.Reading);
+            corrected[i] = WithDictionaryWordPitch(word.WithOverriddenReading(meaning.Reading));
         }
         return corrected ?? words;
     }
+
+    private GroupedWord WithDictionaryWordPitch(GroupedWord word)
+        => word.HasOverriddenReading && _wordPitchLookup is { } lookup
+            && CorrectedWordPitch.Find(word, lookup) is { } pitch
+            ? word with { WordPitch = pitch }
+            : word;
 
     public void Hide()
     {

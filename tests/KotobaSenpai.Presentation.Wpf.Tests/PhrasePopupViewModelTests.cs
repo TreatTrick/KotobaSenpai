@@ -8,6 +8,26 @@ namespace KotobaSenpai.Presentation.Wpf.Tests;
 public sealed class PhrasePopupViewModelTests
 {
     [Fact]
+    public void Corrected_word_shows_dictionary_pitch_variants_without_a_phrase_marker()
+    {
+        var word = new WordMeaningView("頭を垂れる", "こうべをたれる", "", "To bow", "")
+        {
+            HasOverriddenReading = true,
+            WordPitch = new("頭", "こうべ", [0, 3]),
+        };
+        var localizer = new TestLocalizer();
+        var popup = PhrasePopupViewModel.ForWord(word, localizer);
+        var fallback = PhrasePopupViewModel.ForWord(word, localizer, showMeaning: false);
+        var phrase = PhrasePopupViewModel.ForPhrase("Phrase", "", "", [word], localizer);
+
+        Assert.Equal("Localized:Llm.UniDicWordPitchLabel 頭（こうべ） [0] LHH / [3] LHH↓", popup.Pitch);
+        Assert.Equal(popup.Pitch, fallback.Pitch);
+        Assert.Equal(popup.Pitch, Assert.Single(phrase.Words).Pitch);
+        Assert.Empty(popup.PitchMarker);
+        Assert.Empty(phrase.Words[0].PitchMarker);
+    }
+
+    [Fact]
     public void Phrase_members_preserve_order_and_detach_from_mutable_input()
     {
         var pitches = new List<PitchAccentSummary> { new("学校", "ガッコウ", 0, 0, "[0] LHHH") };

@@ -407,7 +407,7 @@ public sealed class AutoRecognitionWorkflowTests
         var overlay = new RecordingOverlay();
         var recognizer = new SequencedRecognizer([Line(original)], [Line(added), Line(original, 60)]);
         var analyzer = new ContextualReadingAnalyzer(original, release);
-        using var service = CreateService(recognizer, overlay, analyzer);
+        using var service = CreateService(recognizer, overlay, analyzer, wordPitchLookup: new ForeheadPitchLookup());
 
         await service.RecognizeAndShowAsync(Target());
         Assert.Equal(2, overlay.ShowCount);
@@ -437,6 +437,11 @@ public sealed class AutoRecognitionWorkflowTests
             Assert.Equal(["ひたい", "ガク"], amounts.Select(word => word.Reading));
             Assert.True(amounts[0].HasOverriddenReading);
             Assert.Empty(amounts[0].PitchAccents);
+            var pitch = Assert.IsType<WordPitchReference>(session.TryGetMeaning(amounts[0])?.WordPitch);
+            Assert.Equal("額", pitch.Surface);
+            Assert.Equal("ひたい", pitch.Reading);
+            Assert.Equal([0], pitch.Positions);
+            Assert.Null(session.TryGetMeaning(amounts[1])?.WordPitch);
             Assert.False(amounts[1].HasOverriddenReading);
             Assert.Equal(0, Assert.Single(amounts[1].PitchAccents).AccentPosition);
             Assert.Equal(["forehead", "amount"], amounts.Select(word => session.TryGetMeaning(word)?.Meaning));
@@ -549,19 +554,26 @@ public sealed class AutoRecognitionWorkflowTests
         }
     }
 
+    private sealed class ForeheadPitchLookup : IWordPitchLookup
+    {
+        public IReadOnlyList<int> FindWordPitch(Token source, string reading)
+            => source.Surface == "額" && reading == "ひたい" ? [0] : [];
+    }
+
     private static WordOverlayApplicationService CreateService(
         IWindowWordRecognizer recognizer,
         IOverlayRenderer overlay,
         ILlmPhraseAnalyzer analyzer,
         IExplanationLanguagePreferences? language = null,
-        SentenceTranslationPreferences? translation = null)
+        SentenceTranslationPreferences? translation = null,
+        IWordPitchLookup? wordPitchLookup = null)
         => new(
             recognizer,
             new WordGroupingService(new CharTokenizer(), new SentenceSegmenter(), new IdentitySpanResolver()),
             overlay,
             phraseOrchestrator: new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(),
                 new SentenceTokenBuilder(new CharTokenizer(), new IdentitySpanResolver()), language, sentenceTranslation: translation),
-            explanationLanguage: language, sentenceTranslation: translation);
+            explanationLanguage: language, sentenceTranslation: translation, wordPitchLookup: wordPitchLookup);
 
     private static WindowTarget Target() => new((nint)42, "VN", new ScreenRect(0, 0, 1000, 500));
 

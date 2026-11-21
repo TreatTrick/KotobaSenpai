@@ -85,6 +85,8 @@ public sealed record GroupedWord
     /// <summary>Whether the display reading was overridden and source pitch data must be suppressed.</summary>
     public bool HasOverriddenReading { get; private init; }
 
+    internal WordPitchReference? WordPitch { get; init; }
+
     public string LookupKey { get; }
 
     public IReadOnlyList<DictionaryEntry> Entries { get; }
@@ -137,7 +139,7 @@ public sealed record GroupedWord
         var displayToken = new Token(Token.Surface, Token.Lemma, Token.OrthBase, reading,
             Token.BaseReading, Token.Pronunciation, Token.PartsOfSpeech, Token.ConjugationType,
             Token.ConjugationForm, string.Empty, Token.StartOffset);
-        return this with { Token = displayToken, HasOverriddenReading = true };
+        return this with { Token = displayToken, HasOverriddenReading = true, WordPitch = null };
     }
 
     /// <summary>The added pre-resolution metadata does not change the token+union-bounds value-equality semantics.</summary>

@@ -15,6 +15,7 @@ public sealed record WordMeaningView(
     public string? SegmentId { get; init; }
     public int? SpanIndex { get; init; }
     public bool HasOverriddenReading { get; init; }
+    public WordPitchReference? WordPitch { get; init; }
 
     public string PitchAccentText
         => HasOverriddenReading ? string.Empty : string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())

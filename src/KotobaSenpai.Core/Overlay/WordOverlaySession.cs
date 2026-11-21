@@ -131,9 +131,16 @@ public sealed class WordOverlaySession
     {
         if (word.SegmentId is { } segmentId && word.SegmentSpanIndex is { } spanIndex
             && _meaningBySpan.TryGetValue((segmentId, spanIndex), out var meaning) && meaning.Headword == word.Surface)
-            return meaning;
-        return _legacyMeaningByWord.GetValueOrDefault((word.Surface, word.Reading));
+            return WithWordPitch(word, meaning);
+        return _legacyMeaningByWord.TryGetValue((word.Surface, word.Reading), out var legacyMeaning)
+            ? WithWordPitch(word, legacyMeaning)
+            : null;
     }
+
+    private static WordMeaningView WithWordPitch(GroupedWord word, WordMeaningView meaning)
+        => word.WordPitch is { } pitch && meaning.Reading == word.Reading
+            ? meaning with { WordPitch = pitch, HasOverriddenReading = true }
+            : meaning;
 
     public WordMeaningView GetMeaningOrDefault(GroupedWord word)
         => TryGetMeaning(word) ?? FromWord(word);
@@ -237,6 +244,7 @@ public sealed class WordOverlaySession
             SegmentId = word.SegmentId,
             SpanIndex = word.SegmentSpanIndex,
             HasOverriddenReading = word.HasOverriddenReading,
+            WordPitch = word.WordPitch,
         };
     }
 }

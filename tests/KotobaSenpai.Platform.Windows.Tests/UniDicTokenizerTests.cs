@@ -24,6 +24,21 @@ namespace KotobaSenpai.Platform.Windows.Tests;
 public sealed class UniDicTokenizerTests
 {
     [Theory]
+    [InlineData("頭を垂れる", "こうべ", new[] { 0, 3 })]
+    [InlineData("踵を返す", "きびす", new[] { 0 })]
+    public void Finds_pitch_for_a_reading_outside_the_best_tokenization(string text, string reading, int[] expected)
+    {
+        var dict = TryResolveDictionary();
+        if (dict is null) return;
+        using var tokenizer = new UniDicTokenizer(Logger, dict);
+        var token = tokenizer.Tokenize(text)[0];
+
+        Assert.NotEqual(reading, Kana.ToHiragana(token.Reading));
+        Assert.Equal(expected, tokenizer.FindWordPitch(token, reading));
+        Assert.Empty(tokenizer.FindWordPitch(token, "ほげ"));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Completed_block_plan_keeps_real_UniDic_grouping_and_provider_requests_aligned_after_reflow(bool sameLine)

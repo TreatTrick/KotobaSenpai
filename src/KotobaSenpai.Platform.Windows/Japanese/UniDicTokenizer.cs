@@ -20,7 +20,7 @@ namespace KotobaSenpai.Platform.Windows.Japanese;
 /// (<see cref="ErrorCodes.UniDicDictionaryMissing"/>) when the dictionary is missing; throws
 /// <see cref="ErrorCodes.UniDicDictionaryInvalid"/> when present but with an invalid version/format/manifest.
 /// </summary>
-public sealed class UniDicTokenizer : ITokenizer, IDisposable
+public sealed class UniDicTokenizer : ITokenizer, IWordPitchLookup, IDisposable
 {
     private readonly ILogger _logger;
     private readonly string _dictionaryDirectory;
@@ -92,6 +92,37 @@ public sealed class UniDicTokenizer : ITokenizer, IDisposable
                 _logger.Log(LogLevel.Warning, ex, "UniDicTokenizer: MeCab failed to parse '{0}' (skipping line)", Truncate(text));
                 return Array.Empty<Token>();
             }
+        }
+    }
+
+    public IReadOnlyList<int> FindWordPitch(Token source, string reading)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var normalizedReading = Kana.ToHiragana(reading);
+        if (normalizedReading.Length == 0)
+            return [];
+
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var lattice = _tagger.ParseToLattice(source.Surface, new MeCabParam());
+            var positions = new List<int>();
+            for (var node = lattice.BeginNodeList[0]; node is not null; node = node.BNext)
+            {
+                if (node.Stat != MeCabNodeStat.Nor || node.Surface != source.Surface
+                    || Kana.ToHiragana(node.Kana) != normalizedReading
+                    || node.Pos1 != source.PartsOfSpeech.Pos1
+                    || node.CType != source.ConjugationType || node.CForm != source.ConjugationForm)
+                    continue;
+
+                foreach (var variant in node.AType.Split(','))
+                {
+                    if (PitchAccent.ParsePosition(variant, normalizedReading) is { } position
+                        && !positions.Contains(position))
+                        positions.Add(position);
+                }
+            }
+            return positions.AsReadOnly();
         }
     }
 
