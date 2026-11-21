@@ -62,6 +62,18 @@ internal static class MeikiOcrPreprocessor
             if (width <= 0 || height <= 0)
                 continue;
 
+            // Keep room for narrow leading strokes clipped by the detector, without pulling in a neighboring text box.
+            var left = Math.Max(0, box.X1 - height);
+            foreach (var neighbor in boxes)
+            {
+                if (neighbor.X1 >= box.X1 || neighbor.X2 <= left || neighbor.Y1 >= box.Y2 || neighbor.Y2 <= box.Y1)
+                    continue;
+
+                left = Math.Min(box.X1, neighbor.X2);
+            }
+            box = box with { X1 = left };
+            width = box.X2 - box.X1;
+
             // Horizontal: scale to height 32, width up to 960, then pad to (960,32).
             int newHeight = InputRecHeight;
             float scale = (float)newHeight / height;

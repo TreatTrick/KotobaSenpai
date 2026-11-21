@@ -8,7 +8,7 @@ namespace KotobaSenpai.Platform.Windows.Ocr.MeikiOcr;
 /// C# port of the meikiocr local ONNX engine. A faithful reproduction of rtr46/meikiocr's <c>meikiocr/ocr.py</c>
 /// (Apache-2.0): text detection → horizontal recognition → per-character NMS → punctuation factor → swapped-pair fixes.
 /// Phase one only handles horizontal text (boxes with width &gt;= height); vertical text is a later change. The focus is
-/// fidelity, not improvement — any change may alter character-box coordinates and break word-picking accuracy.
+/// fidelity; horizontal recognition crops also include limited left context to recover clipped leading strokes.
 /// <para>
 /// This type is the orchestrator only: tensor preparation lives in <see cref="MeikiOcrPreprocessor"/>, model ownership
 /// and inference in <see cref="MeikiOcrInferenceSession"/>, and decoding in <see cref="MeikiOcrResultDecoder"/>.

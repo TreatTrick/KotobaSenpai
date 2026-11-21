@@ -123,6 +123,7 @@ internal sealed class OverlayAnnotationLayer
         => previous.Underlined == underlined && previous.Scale == scale && previous.FontScale == fontScale
             && previous.Word.Surface == word.Surface && previous.Word.Reading == word.Reading
             && previous.Word.HasOverriddenReading == word.HasOverriddenReading
+            && previous.Word.WordPitch?.Positions[0] == word.WordPitch?.Positions[0]
             && previous.Word.Rects.SequenceEqual(word.Rects)
             && previous.Word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType))
                 .SequenceEqual(word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType)))
@@ -135,64 +136,66 @@ internal sealed class OverlayAnnotationLayer
     /// </summary>
     private void AddPitchAnnotations(GroupedWord word, double scale, double fontScale)
     {
-        if (word.HasOverriddenReading)
+        var segments = word.HasOverriddenReading ? word.GetCorrectedTokenPitchAccents() : word.PitchAccents;
+        if (word.HasOverriddenReading && !segments.Any(segment => segment.AccentPosition.HasValue))
         {
             AddMonochromeFurigana(word.Surface, word.Reading, null, word, scale, fontScale);
             return;
         }
 
-        foreach (var (segment, sourceTokenIndex) in word.PitchAccents.Select((segment, index) => (segment, index)))
+        for (var index = 0; index < segments.Count; index++)
+            AddTokenPitchAnnotations(segments[index], index, word, scale, fontScale);
+    }
+
+    private void AddTokenPitchAnnotations(
+        PitchAccentSummary segment, int sourceTokenIndex, GroupedWord word, double scale, double fontScale)
+    {
+        var pattern = PitchAccent.CreatePattern(Kana.ToHiragana(segment.Reading), segment.AccentPosition);
+        if (pattern is null)
         {
-            var pattern = PitchAccent.CreatePattern(Kana.ToHiragana(segment.Reading), segment.AccentPosition);
-            if (pattern is null)
-            {
-                AddMonochromeFurigana(segment.Surface, segment.Reading, sourceTokenIndex, word, scale, fontScale);
+            AddMonochromeFurigana(segment.Surface, segment.Reading, sourceTokenIndex, word, scale, fontScale);
+            return;
+        }
+
+        var furiganaSegments = FuriganaSettings.GetFuriganaSegments(segment.Surface, segment.Reading);
+        var moraOffset = 0;
+        for (var furiganaSegmentIndex = 0; furiganaSegmentIndex < furiganaSegments.Count; furiganaSegmentIndex++)
+        {
+            var furiganaSegment = furiganaSegments[furiganaSegmentIndex];
+            var surface = segment.Surface.Substring(furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength);
+            var reading = furiganaSegment.IsKana ? surface : furiganaSegment.Reading;
+            var moraCount = PitchAccent.SplitMorae(Kana.ToHiragana(reading)).Count;
+            if (moraCount == 0)
                 continue;
-            }
 
-            var furiganaSegments = FuriganaSettings.GetFuriganaSegments(segment.Surface, segment.Reading);
-            var moraOffset = 0;
-            for (var furiganaSegmentIndex = 0; furiganaSegmentIndex < furiganaSegments.Count; furiganaSegmentIndex++)
+            if (furiganaSegment.IsKana)
             {
-                var furiganaSegment = furiganaSegments[furiganaSegmentIndex];
-                var surface = segment.Surface.Substring(furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength);
-                var reading = furiganaSegment.IsKana ? surface : furiganaSegment.Reading;
-                var moraCount = PitchAccent.SplitMorae(Kana.ToHiragana(reading)).Count;
-                if (moraCount == 0)
-                    continue;
-
-                if (furiganaSegment.IsKana)
-                {
-                    AddPitchDots(
-                        segment,
-                        furiganaSegment,
-                        pattern,
-                        moraOffset,
-                        moraCount,
-                        sourceTokenIndex,
-                        word,
-                        scale,
-                        fontScale);
-                }
-                else if (FuriganaSettings.ContainsKanji(surface) && !string.IsNullOrEmpty(furiganaSegment.Reading))
-                {
-                    AddColoredFurigana(
-                        furiganaSegment,
-                        pattern,
-                        moraOffset,
-                        moraCount,
-                        sourceTokenIndex,
-                        word,
-                        scale,
-                        fontScale,
-                        addHeibanMarker: furiganaSegmentIndex == furiganaSegments.Count - 1);
-                }
-
-                moraOffset += moraCount;
+                AddPitchDots(
+                    segment,
+                    furiganaSegment,
+                    pattern,
+                    moraOffset,
+                    moraCount,
+                    sourceTokenIndex,
+                    word,
+                    scale,
+                    fontScale);
+            }
+            else if (FuriganaSettings.ContainsKanji(surface) && !string.IsNullOrEmpty(furiganaSegment.Reading))
+            {
+                AddColoredFurigana(
+                    furiganaSegment,
+                    pattern,
+                    moraOffset,
+                    moraCount,
+                    sourceTokenIndex,
+                    word,
+                    scale,
+                    fontScale,
+                    addHeibanMarker: furiganaSegmentIndex == furiganaSegments.Count - 1);
             }
 
-            // A malformed or ambiguous distribution can produce no kana segment; the colored furigana path
-            // adds the heiban marker for an all-kanji token, while kana segments add it after their final dots.
+            moraOffset += moraCount;
         }
     }
 

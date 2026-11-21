@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\src\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="Fixtures\meikiocr-leading-stroke.png" CopyToOutputDirectory="PreserveNewest" />
     <Using Include="Xunit" />
     <Compile Include="..\Shared\SettingsStub.cs" Link="SettingsStub.cs" />
   </ItemGroup>

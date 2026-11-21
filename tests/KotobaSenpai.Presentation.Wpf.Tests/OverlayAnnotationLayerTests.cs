@@ -65,7 +65,7 @@ public sealed class OverlayAnnotationLayerTests
     {
         var layer = new OverlayAnnotationLayer();
         var target = Target();
-        List<Token> tokens = [Token(first, firstKana), Token("を", "ヲ", 1), Token(verb, verbKana, 2)];
+        List<Token> tokens = [Token(first, firstKana), Token("を", "ヲ", 1, "*"), Token(verb, verbKana, 2, "*")];
         List<IReadOnlyList<SourceTokenLineGeometry>> geometry =
         [
             [new(0, 0, 1, new ScreenRect(220, 160, 34, 36))],
@@ -75,7 +75,7 @@ public sealed class OverlayAnnotationLayerTests
         var width = 80 + 50 * verb.Length;
         if (suffix.Length > 0)
         {
-            tokens.Add(Token(suffix, suffixKana, 2 + verb.Length));
+            tokens.Add(Token(suffix, suffixKana, 2 + verb.Length, "*"));
             geometry.Add([new(0, 0, suffix.Length, new ScreenRect(220 + width, 160, 26, 36))]);
             width += 26;
         }
@@ -91,6 +91,91 @@ public sealed class OverlayAnnotationLayerTests
     });
 
     [Theory]
+    [InlineData("頭", "アタマ", "こうべをたれる", "垂れる", "タレル", "2", new[] { 0, 3 })]
+    [InlineData("踵", "カカト", "きびすをかえす", "返す", "カエス", "1", new[] { 0 })]
+    public Task Corrected_phrase_renders_unchanged_verb_pitch_and_refreshes_the_corrected_noun(
+        string noun, string originalReading, string phraseReading, string verb, string verbReading,
+        string verbAccent, int[] positions) => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var target = Target();
+        var nounBounds = new ScreenRect(220, 160, 50, 36);
+        var verbBounds = new ScreenRect(320, 160, 60, 36);
+        var word = new GroupedWord(new LookupSpan(
+            [Token(noun, originalReading), Token("を", "ヲ", 1, "*"), Token(verb, verbReading, 2, verbAccent)],
+            noun + "を" + verb, [], phraseReading), [new ScreenRect(220, 160, 160, 36)],
+            [[new(0, 0, 1, nounBounds)], [new(0, 0, 1, new ScreenRect(270, 160, 50, 36))],
+             [new(0, 0, verb.Length, verbBounds)]]);
+
+        layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
+        var verbRoles = verbAccent == "2"
+            ? new[] { OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.Low }
+            : new[] { OverlayColorRole.High, OverlayColorRole.Low, OverlayColorRole.Low };
+        Assert.Equal([OverlayColorRole.Furigana, .. verbRoles], RenderedRoles(layer));
+
+        var withPitch = word.WithDictionaryWordPitch(new StubWordPitchLookup(positions));
+        layer.Render(WordOverlaySession.Start(target, [withPitch], underlineSegmentIds: []), 1, 1d / 3);
+
+        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        Assert.Equal([OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High, OverlayColorRole.Heiban,
+            .. verbRoles], annotations.Select(annotation => annotation.Role));
+        Assert.All(annotations.Take(3), element =>
+        {
+            Assert.NotNull(element.Glyph);
+            Assert.InRange(Canvas.GetLeft(element), nounBounds.X - target.Bounds.X, nounBounds.Right - target.Bounds.X);
+        });
+        Assert.Null(annotations[^1].Glyph);
+        Assert.All(annotations.Skip(4), element => Assert.True(Canvas.GetLeft(element) >= verbBounds.X - target.Bounds.X));
+        Assert.Empty(withPitch.PitchAccents);
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task Corrected_week_reading_preserves_the_unchanged_suffix_pitch(bool hasCorrectedPitch) => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var first = new ScreenRect(220, 160, 36, 36);
+        var suffix = new ScreenRect(256, 160, 72, 36);
+        var word = new GroupedWord(new LookupSpan([Token("一", "イチ", 0, "2"), Token("週間", "シュウカン", 1)],
+            "一週間", [], "いっしゅうかん"), [new ScreenRect(220, 160, 108, 36)],
+            [[new(0, 0, 1, first)], [new(0, 0, 2, suffix)]]);
+        if (hasCorrectedPitch)
+            word = word.WithDictionaryWordPitch(new StubWordPitchLookup([0]));
+
+        layer.Render(WordOverlaySession.Start(Target(), [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        OverlayColorRole[] suffixRoles = [OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High,
+            OverlayColorRole.High, OverlayColorRole.Heiban];
+        var roles = RenderedRoles(layer);
+        Assert.Equal(suffixRoles, roles.TakeLast(suffixRoles.Length));
+        if (!hasCorrectedPitch)
+            Assert.Equal(OverlayColorRole.Furigana, Assert.Single(roles.SkipLast(suffixRoles.Length)));
+    });
+
+    [Fact]
+    public Task Ambiguous_correction_keeps_the_whole_reading_in_one_uncolored_annotation() => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var target = Target();
+        var bounds = new ScreenRect(220, 160, 72, 36);
+        var word = new GroupedWord(new LookupSpan([Token("阿", "ア"), Token("亜", "ア", 1)], "阿亜", [], "あああ"), bounds)
+            .WithDictionaryWordPitch(new StubWordPitchLookup([0]));
+
+        layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        AssertFurigana(Assert.Single(layer.Canvas.Children.OfType<OverlayAnnotation>()), "あああ", bounds, target);
+    });
+
+    private static OverlayColorRole[] RenderedRoles(OverlayAnnotationLayer layer)
+        => layer.Canvas.Children.OfType<OverlayAnnotation>().Select(annotation => annotation.Role).ToArray();
+
+    private sealed class StubWordPitchLookup(int[] positions) : IWordPitchLookup
+    {
+        public IReadOnlyList<int> FindWordPitch(Token source, string reading) => positions;
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public Task Overridden_kanji_run_uses_the_combined_token_bounds_on_each_line(bool wrapped) => RunOnSta(() =>
@@ -100,7 +185,7 @@ public sealed class OverlayAnnotationLayerTests
         var first = new ScreenRect(280, 160, 34, 36);
         var second = wrapped ? new ScreenRect(220, 220, 94, 30) : new ScreenRect(320, 160, 94, 36);
         var combined = new ScreenRect(280, 160, 134, 36);
-        var word = new GroupedWord(new LookupSpan([Token("一", "イチ"), Token("週間", "シュウカン", 1)],
+        var word = new GroupedWord(new LookupSpan([Token("一", "イチ"), Token("週間", "シュウカン", 1, "*")],
             "一週間", [], "いっしゅうかん"), wrapped ? [first, second] : [combined],
             [[new(0, 0, 1, first)], [new(wrapped ? 1 : 0, 0, 2, second)]]);
 
@@ -169,8 +254,8 @@ public sealed class OverlayAnnotationLayerTests
 
     private static WindowTarget Target() => new((nint)42, "Target", new ScreenRect(100, 100, 700, 400));
 
-    private static Token Token(string surface, string reading, int start = 0)
-        => new(surface, surface, surface, reading, reading, reading, new("noun", "", "", ""), "", "", "0", start);
+    private static Token Token(string surface, string reading, int start = 0, string aType = "0")
+        => new(surface, surface, surface, reading, reading, reading, new("noun", "", "", ""), "", "", aType, start);
 
     private static Task RunOnSta(Action action)
     {

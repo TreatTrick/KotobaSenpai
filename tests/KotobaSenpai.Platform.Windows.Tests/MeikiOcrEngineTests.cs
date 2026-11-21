@@ -119,6 +119,29 @@ public sealed class MeikiOcrEngineTests
         Assert.Equal(Snapshot(singleItemResult), Snapshot(batchedResult));
     }
 
+    [Fact]
+    public void Narrow_leading_stroke_is_recognized_with_the_rest_of_the_line()
+    {
+        var modelDir = Environment.GetEnvironmentVariable("KOTOBA_MEIKIOCR_MODEL_DIR");
+        if (string.IsNullOrWhiteSpace(modelDir))
+        {
+            modelDir = Path.Combine(AppContext.BaseDirectory, "Models");
+            if (!File.Exists(Path.Combine(modelDir, "meiki.text.detect.v0.1.960x544.onnx"))
+                || !File.Exists(Path.Combine(modelDir, "meiki.text.rec.v0.960x32.onnx")))
+                return; // The ONNX models are optional in CI.
+        }
+
+        var samplePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "meikiocr-leading-stroke.png");
+        var (bgra, width, height) = LoadBgra(samplePath);
+        using var engine = new MeikiOcrEngine(modelDir);
+
+        var lines = engine.RunOcr(bgra, width, height);
+
+        Assert.Equal(["金額", "頭を垂れる", "踵を返す", "目の当たり", "一週間"], lines.Select(line => line.Text));
+        Assert.Equal('一', lines[^1].Chars[0].Char);
+        Assert.InRange(lines[^1].Chars[0].X1, 0, 25);
+    }
+
     private static string[] Snapshot(IReadOnlyList<MeikiLine> lines)
         => lines.Select(line => string.Join(
             '|',

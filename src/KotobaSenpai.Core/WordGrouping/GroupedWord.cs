@@ -1,6 +1,7 @@
 using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.Japanese;
 namespace KotobaSenpai.Core.WordGrouping;
 
 /// <summary>Geometry for one contiguous source-token range on one OCR line.</summary>
@@ -85,7 +86,14 @@ public sealed record GroupedWord
     /// <summary>Whether the display reading was overridden and source pitch data must be suppressed.</summary>
     public bool HasOverriddenReading { get; private init; }
 
-    internal WordPitchReference? WordPitch { get; init; }
+    public WordPitchReference? WordPitch { get; private init; }
+
+    /// <summary>Associates verified word-level pitch with the corrected reading, when the alignment is unique.</summary>
+    public GroupedWord WithDictionaryWordPitch(IWordPitchLookup lookup)
+    {
+        ArgumentNullException.ThrowIfNull(lookup);
+        return HasOverriddenReading ? this with { WordPitch = CorrectedWordPitch.Find(this, lookup) } : this;
+    }
 
     public string LookupKey { get; }
 
@@ -97,6 +105,25 @@ public sealed record GroupedWord
     /// <summary>Pitch data in source-token order, or empty when the display reading was overridden.</summary>
     public IReadOnlyList<PitchAccentSummary> PitchAccents
         => HasOverriddenReading ? [] : BuildPitchAccents(SourceTokens);
+
+    /// <summary>Returns lexical pitch by source token when a corrected reading can be uniquely aligned.</summary>
+    public IReadOnlyList<PitchAccentSummary> GetCorrectedTokenPitchAccents()
+    {
+        if (!HasOverriddenReading || CorrectedWordPitch.FindChangedToken(this) is not { } correction)
+            return [];
+
+        var segments = BuildPitchAccents(SourceTokens).ToArray();
+        var changed = segments[correction.TokenIndex];
+        var position = WordPitch?.Positions[0];
+        var pattern = PitchAccent.CreatePattern(correction.Reading, position);
+        segments[correction.TokenIndex] = changed with
+        {
+            Reading = correction.Reading,
+            AccentPosition = pattern?.AccentPosition,
+            Notation = pattern?.Notation,
+        };
+        return segments;
+    }
 
     /// <summary>Returns the screen bounds for one source token, split by OCR line.</summary>
     public IReadOnlyList<ScreenRect> GetSourceTokenBounds(int sourceTokenIndex)

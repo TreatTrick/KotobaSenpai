@@ -332,10 +332,7 @@ public sealed class WordOverlayApplicationService : IDisposable
     }
 
     private GroupedWord WithDictionaryWordPitch(GroupedWord word)
-        => word.HasOverriddenReading && _wordPitchLookup is { } lookup
-            && CorrectedWordPitch.Find(word, lookup) is { } pitch
-            ? word with { WordPitch = pitch }
-            : word;
+        => _wordPitchLookup is { } lookup ? word.WithDictionaryWordPitch(lookup) : word;
 
     public void Hide()
     {
