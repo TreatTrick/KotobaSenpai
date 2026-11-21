@@ -67,3 +67,8 @@ SOFTWARE.
 - 压缩包 SHA-256：`638718c4c63625ab300de4c92c67925d54c0e9e3830009eaa992f29819d59c43`（与 `src/KotobaSenpai.Core/Japanese/UniDicAssets.cs` 的 `Sha256` 常量一致，单一事实来源）
 - 许可：BSD 3-Clause（NINJAL 多许可分发，BSD 是否可商用）
 - Distribution: the original pinned archive is bundled with the complete offline installer. First run verifies SHA-256 and installs it into the user cache without network access. All upstream license files are retained in the archive and installed dictionary directory.
+
+## JMdict English dictionary data
+
+- The bundled SQLite index is derived from the EDRDG JMdict data distributed by jmdict-simplified.
+- License and attribution are included in `Assets/Dictionary/JMdict-NOTICE.txt` and `Assets/Dictionary/JMdict-LICENSE.txt`.

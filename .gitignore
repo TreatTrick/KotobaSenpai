@@ -24,3 +24,7 @@ src/KotobaSenpai.Platform.Windows/Models/*.onnx
 # UniDic release asset (prepared locally and bundled with installers)
 src/KotobaSenpai.App/Assets/UniDic/*.zip
 src/KotobaSenpai.App/Assets/UniDic/*.partial
+
+# JMdict release asset (prepared locally and bundled with installers)
+src/KotobaSenpai.App/Assets/Dictionary/jmdict.db
+src/KotobaSenpai.App/Assets/Dictionary/jmdict.db.*.partial

@@ -1,20 +1,25 @@
+using System.IO.Compression;
 using System.Text.Json;
-using KotobaSenpai.Core.Models;
+using KotobaSenpai.Core.Dictionary;
 using Microsoft.Data.Sqlite;
 
 // Build tool: jmdict-simplified JSON → the SQLite dictionary index used by KotobaSenpai.
 // Usage: JmdictIndexBuilder [jsonPath] [dbOut]
+//        JmdictIndexBuilder --output <dbOut>
 //   When jsonPath is omitted, downloads JMdict_e.json from the latest jmdict-simplified release.
 //   dbOut defaults to ./jmdict.db.
 // Output schema matches JmdictSqliteRepository: the entries / kanji / reading tables.
 
-var jsonPath = args.Length > 0 ? args[0] : null;
+if (args is ["--output"])
+    throw new ArgumentException("Specify a database path after --output.");
+
+var downloadToPath = args is ["--output", _];
+var jsonPath = args.Length > 0 && !downloadToPath ? args[0] : null;
 var dbOut = args.Length > 1 ? args[1] : "jmdict.db";
 
-if (jsonPath is null)
-    jsonPath = await DownloadLatestEnglishJsonAsync();
-
-using var doc = JsonDocument.Parse(File.OpenRead(jsonPath));
+using var doc = jsonPath is null
+    ? await DownloadLatestEnglishJsonAsync()
+    : await ReadJsonAsync(jsonPath);
 var root = doc.RootElement;
 var words = root.TryGetProperty("words", out var w) ? w : root;
 
@@ -146,7 +151,13 @@ static void CreateSchema(SqliteConnection conn)
     cmd.ExecuteNonQuery();
 }
 
-static async Task<string> DownloadLatestEnglishJsonAsync()
+static async Task<JsonDocument> ReadJsonAsync(string path)
+{
+    using var source = File.OpenRead(path);
+    return await JsonDocument.ParseAsync(source);
+}
+
+static async Task<JsonDocument> DownloadLatestEnglishJsonAsync()
 {
     using var client = new HttpClient();
     client.DefaultRequestHeaders.UserAgent.ParseAdd("KotobaSenpai-JmdictIndexBuilder");
@@ -168,16 +179,10 @@ static async Task<string> DownloadLatestEnglishJsonAsync()
         throw new InvalidOperationException("No English JMdict asset found in latest release.");
 
     Console.WriteLine($"Downloading {url} ...");
-    var zipPath = Path.Combine(Path.GetTempPath(), "jmdict-eng.zip");
-    using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
-    {
-        response.EnsureSuccessStatusCode();
-        await using var source = await response.Content.ReadAsStreamAsync();
-        await using var target = File.Create(zipPath);
-        await source.CopyToAsync(target);
-    }
-
-    var extractDir = Path.Combine(Path.GetTempPath(), "jmdict-eng-" + Guid.NewGuid().ToString("N"));
-    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, extractDir);
-    return Directory.GetFiles(extractDir, "*.json")[0];
+    using var zipStream = await client.GetStreamAsync(url);
+    using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+    var jsonEntry = archive.Entries.FirstOrDefault(entry => Path.GetExtension(entry.Name) == ".json")
+        ?? throw new InvalidOperationException("The English JMdict archive does not contain a JSON file.");
+    using var jsonStream = jsonEntry.Open();
+    return await JsonDocument.ParseAsync(jsonStream);
 }

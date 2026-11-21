@@ -1,0 +1,22 @@
+JMdict English dictionary data
+
+Copyright James William Breen and the Electronic Dictionary Research and Development Group (EDRDG).
+
+KotobaSenpai uses the JMdict English data for offline word lookup and reading
+selection. JmdictIndexBuilder converts the English JSON from jmdict-simplified
+into a SQLite index of written forms, readings, and senses. The resulting
+jmdict.db is distributed under Creative Commons Attribution-ShareAlike 4.0
+International (CC BY-SA 4.0).
+
+JMdict project and documentation
+https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project
+
+English JSON distribution
+https://github.com/scriptin/jmdict-simplified
+
+EDRDG license statement
+https://www.edrdg.org/edrdg/licence.html
+
+CC BY-SA 4.0 International license
+Assets/Dictionary/JMdict-LICENSE.txt
+https://creativecommons.org/licenses/by-sa/4.0/

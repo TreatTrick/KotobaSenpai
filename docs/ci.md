@@ -66,6 +66,7 @@ dotnet test tests/KotobaSenpai.Presentation.Wpf.Tests/KotobaSenpai.Presentation.
 dotnet test tests/KotobaSenpai.App.Tests/KotobaSenpai.App.Tests.csproj -c Release --filter "FullyQualifiedName!~PhrasePopupThemeTests"
 
 ./scripts/Prepare-UniDic.ps1
+./scripts/Prepare-Jmdict.ps1
 dotnet publish src/KotobaSenpai.App/KotobaSenpai.App.csproj -c Release -o artifacts/publish
 ./tests/Check-AgentCli.ps1 -PublishDirectory ./artifacts/publish
 ```
@@ -75,28 +76,32 @@ dotnet publish src/KotobaSenpai.App/KotobaSenpai.App.csproj -c Release -o artifa
 `scripts/Prepare-UniDic.ps1` prepares the original pinned archive under
 `src/KotobaSenpai.App/Assets/UniDic/` and verifies the SHA-256 recorded in
 `UniDicAssets.cs`. The large ZIP is excluded from Git. CI prepares it before
-publishing; normal builds and fixture-based tests do not require it.
+publishing. Normal builds and fixture-based tests can run without it.
 
-To use an existing local archive without downloading:
+`scripts/Prepare-Jmdict.ps1` reuses or builds `jmdict.db` under
+`src/KotobaSenpai.App/Assets/Dictionary/`. Git ignores the database. The
+preparation script can build it from the English JMdict data, and publishing
+places it in the application root.
+
+Both scripts accept existing local assets.
 
 ```powershell
 ./scripts/Prepare-UniDic.ps1 -ArchivePath C:\Assets\unidic-3.1.0.zip
+./scripts/Prepare-Jmdict.ps1 -DatabasePath C:\Assets\jmdict.db
 ```
 
-To build the complete self-contained Windows installer (including the dictionary,
-OCR models, and .NET runtime):
+The self-contained Windows installer includes both dictionaries, the OCR models,
+and the .NET runtime.
 
 ```powershell
-./scripts/Build-Installer.ps1 -UniDicArchive C:\Assets\unidic-3.1.0.zip
+./scripts/Build-Installer.ps1 -UniDicArchive C:\Assets\unidic-3.1.0.zip -JmdictDatabase C:\Assets\jmdict.db
 ```
 
-The archive parameter is optional when the asset has already been prepared. If
-neither a local asset nor an explicit archive exists, the installer build script
-downloads and verifies the pinned archive at build time. A corrupt archive fails
-the build. Direct `dotnet publish` requires the asset to have been prepared first.
-Dictionary setup on the user's machine only validates and extracts local files;
-it never contacts a download server. AI provider requests still require the
-configured provider connection.
+Both parameters are optional. The installer script prepares missing assets before
+publishing and verifies that both dictionaries exist in the publish directory.
+For direct `dotnet publish`, run both preparation scripts first. The installed
+application uses local dictionary files, while AI requests use the configured
+provider connection.
 
 桌面验收（本地有真实桌面时才有意义）：
 
@@ -170,4 +175,4 @@ gh pr checks <PR编号>     # 应看到 Gate 为 required
 - 断言里不要读取**全局桌面状态**（前台窗口、焦点、其他进程窗口）；这类断言只能表达环境，
   不能表达产品行为，会持续产生假红。
 - 新增第三方包时确认 `THIRD-PARTY-NOTICES` 与之一致（当前缺 WPF-UI、CommunityToolkit.Mvvm、
-  Microsoft.Data.Sqlite、SQLitePCLRaw、FluentIcons、JMdict 的署名）。
+  Microsoft.Data.Sqlite、SQLitePCLRaw、FluentIcons 的署名）。

@@ -1,6 +1,7 @@
-using KotobaSenpai.Core.Tokenization;
 using System.Globalization;
+using System.Text;
 using KotobaSenpai.Core.Japanese;
+using KotobaSenpai.Core.Tokenization;
 
 namespace KotobaSenpai.Core.Dictionary;
 
@@ -81,14 +82,39 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
 
         for (int start = 0; start < segment.Count; start++)
         {
-            var surface = string.Empty;
-            for (int end = start; end < segment.Count; end++)
+            foreach (var form in EnumerateCompoundForms(segment, start))
+                forms.Add(form.LookupKey);
+        }
+    }
+
+    private static IEnumerable<CompoundForm> EnumerateCompoundForms(IReadOnlyList<Token> segment, int start)
+    {
+        var surface = segment[start].Surface;
+        var hasKanji = ContainsKanji(surface);
+        for (int end = start + 1; end < segment.Count; end++)
+        {
+            var token = segment[end];
+            var prefix = surface;
+            surface += token.Surface;
+            if (surface.Length > MaxCandidateCharacters)
+                yield break;
+
+            yield return new CompoundForm(surface, end, surface.Length, IsInflected: false);
+
+            var prefixHasKanji = hasKanji;
+            hasKanji |= ContainsKanji(token.Surface);
+            if (!hasKanji || token.PartsOfSpeech.Pos1 is not ("動詞" or "形容詞"))
+                continue;
+
+            // Prefer the base spelling before trying the lexical lemma.
+            foreach (var baseForm in new[] { token.OrthBase, token.Lemma }.Distinct(StringComparer.Ordinal))
             {
-                surface += segment[end].Surface;
-                if (surface.Length > MaxCandidateCharacters)
-                    break;
-                if (end > start)
-                    forms.Add(surface);
+                if (string.IsNullOrEmpty(baseForm) || baseForm == token.Surface
+                    || prefix.Length + baseForm.Length > MaxCandidateCharacters
+                    || (!prefixHasKanji && !ContainsKanji(baseForm)))
+                    continue;
+
+                yield return new CompoundForm(prefix + baseForm, end, surface.Length, IsInflected: true);
             }
         }
     }
@@ -106,7 +132,10 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             var source = segment.Skip(start).Take(end - start).ToArray();
             var lookupKey = best?.LookupKey ?? source[0].Lemma;
             var entries = best?.Entries ?? Array.Empty<DictionaryEntry>();
-            output.Add(new LookupSpan(source, lookupKey, entries));
+            var reading = best is { IsCompound: true }
+                ? GetCompoundReading(source, entries, best.InflectingTokenIndex - start)
+                : null;
+            output.Add(new LookupSpan(source, lookupKey, entries, reading));
             start = end;
         }
     }
@@ -118,22 +147,25 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
     {
         Candidate? best = null;
 
-        // Direct-surface candidates: only allowed to end at a complete token boundary.
-        var surface = string.Empty;
-        for (int end = start; end < segment.Count; end++)
+        foreach (var form in EnumerateCompoundForms(segment, start))
         {
-            surface += segment[end].Surface;
-            if (surface.Length > MaxCandidateCharacters)
-                break;
-            if (end == start)
+            if (!TryGetEntries(matches, form.LookupKey, out var entries))
                 continue;
 
-            if (TryGetEntries(matches, surface, out var entries))
+            var lastTokenIndex = form.LastTokenIndex;
+            var end = lastTokenIndex + 1;
+            if (form.IsInflected)
             {
-                var candidate = new Candidate(end + 1, surface, entries, Priority: 1, surface.Length);
-                if (IsBetter(candidate, best))
-                    best = candidate;
+                var prefixLength = form.SurfaceLength - segment[lastTokenIndex].Surface.Length;
+                end = FindInflectionEnd(segment, lastTokenIndex, prefixLength);
             }
+
+            var last = segment[end - 1];
+            var surfaceLength = last.StartOffset + last.Surface.Length - segment[start].StartOffset;
+            var candidate = new Candidate(end, form.LookupKey, entries, Priority: form.IsInflected ? 2 : 1,
+                surfaceLength, IsCompound: true, InflectingTokenIndex: form.IsInflected ? lastTokenIndex : null);
+            if (IsBetter(candidate, best))
+                best = candidate;
         }
 
         // A single-token lemma hit is the common basis for both inflection extension and the single-token fallback.
@@ -203,13 +235,13 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
         return null;
     }
 
-    private static int FindInflectionEnd(IReadOnlyList<Token> segment, int start)
+    private static int FindInflectionEnd(IReadOnlyList<Token> segment, int start, int prefixLength = 0)
     {
         if (!IsInflectingBase(segment[start]))
             return start + 1;
 
         int end = start + 1;
-        int characters = segment[start].Surface.Length;
+        int characters = prefixLength + segment[start].Surface.Length;
         while (end < segment.Count
             && characters + segment[end].Surface.Length <= MaxCandidateCharacters
             && IsContiguous(segment[end - 1], segment[end])
@@ -220,6 +252,47 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
         }
         return end;
     }
+
+    private static string? GetCompoundReading(
+        IReadOnlyList<Token> tokens,
+        IReadOnlyList<DictionaryEntry> entries,
+        int? inflectingTokenIndex)
+    {
+        if (!tokens.Any(token => ContainsKanji(token.Surface)))
+            return null;
+
+        var readings = entries.Select(entry => entry.Reading)
+            .Where(reading => !string.IsNullOrWhiteSpace(reading))
+            .Select(Kana.ToHiragana)
+            .Distinct(StringComparer.Ordinal)
+            .Take(2)
+            .ToArray();
+        if (readings.Length != 1 || !IsKanaReading(readings[0]))
+            return null;
+
+        var reading = readings[0];
+        if (inflectingTokenIndex is not int baseIndex)
+            return reading;
+
+        var baseReading = Kana.ToHiragana(tokens[baseIndex].BaseReading);
+        if (!IsKanaReading(baseReading) || reading.Length <= baseReading.Length
+            || !reading.EndsWith(baseReading, StringComparison.Ordinal))
+            return null;
+
+        var occurringReadings = tokens.Skip(baseIndex).Select(token => Kana.ToHiragana(token.Reading)).ToArray();
+        if (!occurringReadings.All(IsKanaReading))
+            return null;
+
+        return reading[..^baseReading.Length] + string.Concat(occurringReadings);
+    }
+
+    private static bool ContainsKanji(string text)
+        => text.EnumerateRunes().Any(rune => rune.Value is >= 0x3400 and <= 0x4DBF
+            or >= 0x4E00 and <= 0x9FFF or >= 0xF900 and <= 0xFAFF
+            or >= 0x20000 and <= 0x2FA1F or >= 0x30000 and <= 0x323AF);
+
+    private static bool IsKanaReading(string reading)
+        => reading.Length > 0 && reading.All(character => character is >= 'ぁ' and <= 'ゖ' or 'ゝ' or 'ゞ' or 'ー');
 
     private static IEnumerable<string> TokenLookupKeys(Token token)
     {
@@ -276,12 +349,16 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             _ => false,
         };
 
+    private readonly record struct CompoundForm(string LookupKey, int LastTokenIndex, int SurfaceLength, bool IsInflected);
+
     private sealed record Candidate(
         int EndExclusive,
         string LookupKey,
         IReadOnlyList<DictionaryEntry> Entries,
         int Priority,
-        int SurfaceLength);
+        int SurfaceLength,
+        bool IsCompound = false,
+        int? InflectingTokenIndex = null);
 
     private sealed record TokenMatch(
         string LookupKey,

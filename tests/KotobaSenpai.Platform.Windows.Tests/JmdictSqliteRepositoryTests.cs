@@ -1,6 +1,7 @@
 using System.IO;
 using KotobaSenpai.Platform.Windows.Dictionary;
 using Microsoft.Data.Sqlite;
+using KotobaSenpai.Core.Logging;
 
 namespace KotobaSenpai.Platform.Windows.Tests;
 
@@ -44,12 +45,24 @@ public sealed class JmdictSqliteRepositoryTests
         }
     }
 
-    [Fact]
-    public void Missing_db_returns_empty_without_throwing()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Missing_db_returns_empty_and_logs_once(bool batchFirst)
     {
-        var repo = new JmdictSqliteRepository(
-            Path.Combine(Path.GetTempPath(), "nope-" + Guid.NewGuid().ToString("N") + ".db"));
+        var path = Path.Combine(Path.GetTempPath(), "nope-" + Guid.NewGuid().ToString("N") + ".db");
+        var logger = new RecordingLogger();
+        var repo = new JmdictSqliteRepository(path, logger);
+
+        if (batchFirst)
+            Assert.Empty(repo.FindByForms(["受ける"]));
         Assert.Empty(repo.FindByKanji("受ける"));
+        Assert.Empty(repo.FindByKana("うける"));
+        Assert.Empty(repo.FindByForms(["受ける"]));
+
+        var warning = Assert.Single(logger.Warnings);
+        Assert.Contains("JMdict index is missing", warning);
+        Assert.Contains(path, warning);
     }
 
     [Fact]
@@ -117,6 +130,17 @@ public sealed class JmdictSqliteRepositoryTests
             """;
         cmd.ExecuteNonQuery();
         return path;
+    }
+
+    private sealed class RecordingLogger : ILogger
+    {
+        public List<string> Warnings { get; } = [];
+
+        public void Log(LogLevel level, Exception? exception, string message, params object[] args)
+        {
+            if (level == LogLevel.Warning)
+                Warnings.Add(string.Format(message, args));
+        }
     }
 
     private static void AddDuplicateReadingIndex(string path)

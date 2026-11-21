@@ -1,4 +1,6 @@
+using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Tokenization;
+
 namespace KotobaSenpai.Core.Dictionary;
 
 /// <summary>
@@ -14,7 +16,8 @@ public sealed record LookupSpan
     public LookupSpan(
         IReadOnlyList<Token> tokens,
         string lookupKey,
-        IReadOnlyList<DictionaryEntry> entries)
+        IReadOnlyList<DictionaryEntry> entries,
+        string? overriddenReading = null)
     {
         ArgumentNullException.ThrowIfNull(tokens);
         ArgumentNullException.ThrowIfNull(lookupKey);
@@ -26,11 +29,16 @@ public sealed record LookupSpan
         LookupKey = lookupKey;
         Entries = entries.ToArray();
         Surface = string.Concat(Tokens.Select(token => token.Surface));
-        Reading = string.Concat(Tokens.Select(token => token.Reading));
+        var sourceReading = string.Concat(Tokens.Select(token => token.Reading));
+        Reading = !string.IsNullOrEmpty(overriddenReading)
+            && !string.Equals(Kana.ToHiragana(overriddenReading), Kana.ToHiragana(sourceReading), StringComparison.Ordinal)
+            ? overriddenReading
+            : sourceReading;
+        HasOverriddenReading = Reading != sourceReading;
         StartOffset = Tokens[0].StartOffset;
         EndOffset = Tokens[^1].StartOffset + Tokens[^1].Surface.Length;
-        Token = CreateDisplayToken(Tokens, lookupKey, Surface, Reading);
-        PitchAccents = BuildPitchAccents(Tokens);
+        Token = CreateDisplayToken(Tokens, lookupKey, Surface, Reading, HasOverriddenReading);
+        PitchAccents = HasOverriddenReading ? [] : BuildPitchAccents(Tokens);
     }
 
     /// <summary>The original UniDic tokens composing this span, in input order.</summary>
@@ -42,8 +50,11 @@ public sealed record LookupSpan
     /// <summary>The actual OCR text covered.</summary>
     public string Surface { get; }
 
-    /// <summary>The concatenated occurring readings of the constituent tokens.</summary>
+    /// <summary>The effective reading, falling back to the concatenated readings of the source tokens.</summary>
     public string Reading { get; }
+
+    /// <summary>Whether the effective reading differs from the original UniDic reading.</summary>
+    public bool HasOverriddenReading { get; }
 
     /// <summary>The key used for the dictionary hit (the direct surface or the base token lemma).</summary>
     public string LookupKey { get; }
@@ -75,7 +86,8 @@ public sealed record LookupSpan
         IReadOnlyList<Token> tokens,
         string lookupKey,
         string surface,
-        string reading)
+        string reading,
+        bool hasOverriddenReading)
     {
         var first = tokens[0];
         return new Token(
@@ -88,7 +100,7 @@ public sealed record LookupSpan
             first.PartsOfSpeech,
             first.ConjugationType,
             first.ConjugationForm,
-            first.AType,
+            hasOverriddenReading ? string.Empty : first.AType,
             first.StartOffset);
     }
 }

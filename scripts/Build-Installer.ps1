@@ -4,8 +4,8 @@ Builds a self-contained Windows installer for KotobaSenpai.
 
 .DESCRIPTION
 Requires the .NET 10 SDK, Inno Setup 6 or 7, and the two meikiocr ONNX models.
-Bundles the pinned UniDic archive so dictionary setup works offline. The archive
-is prepared at build time; pass -UniDicArchive to use an existing local ZIP.
+Bundles UniDic and JMdict for offline dictionary support. Pass -UniDicArchive
+to use the pinned local ZIP or -JmdictDatabase to use an existing JMdict index.
 The installer is written to artifacts/installer. Build intermediates are removed
 from the system temporary directory when the script exits.
 
@@ -25,7 +25,8 @@ param(
     [string]$Version,
     [string]$OutputDirectory,
     [string]$InnoSetupCompiler,
-    [string]$UniDicArchive
+    [string]$UniDicArchive,
+    [string]$JmdictDatabase
 )
 
 $ErrorActionPreference = "Stop"
@@ -113,6 +114,7 @@ if (-not (Get-Command "dotnet" -ErrorAction SilentlyContinue)) {
 
 $compiler = Find-InnoSetupCompiler -ExplicitPath $InnoSetupCompiler
 $bundledArchive = & (Join-Path $PSScriptRoot "Prepare-UniDic.ps1") -ArchivePath $UniDicArchive
+$null = & (Join-Path $PSScriptRoot "Prepare-Jmdict.ps1") -DatabasePath $JmdictDatabase
 $installerName = "KotobaSenpai-$Version-win-x64-Setup.exe"
 $tempRoot = [System.IO.Path]::GetFullPath([System.IO.Path]::GetTempPath())
 $workDirectory = Join-Path $tempRoot ("KotobaSenpai-installer-" + [guid]::NewGuid().ToString("N"))
@@ -150,6 +152,10 @@ try {
     if ((Get-FileHash -LiteralPath $publishedArchive -Algorithm SHA256).Hash -ne
         (Get-FileHash -LiteralPath $bundledArchive -Algorithm SHA256).Hash) {
         throw "Published UniDic archive does not match the verified release asset."
+    }
+    $publishedDictionary = Join-Path $publishDirectory "jmdict.db"
+    if (-not (Test-Path -LiteralPath $publishedDictionary -PathType Leaf)) {
+        throw "Required offline JMdict index is missing from the published application: $publishedDictionary"
     }
     & (Join-Path $script:RepositoryRoot "tests\Check-AgentCli.ps1") -PublishDirectory $publishDirectory
 

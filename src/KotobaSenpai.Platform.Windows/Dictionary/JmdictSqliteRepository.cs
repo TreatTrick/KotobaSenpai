@@ -1,4 +1,4 @@
-using KotobaSenpai.Core.Japanese;
+using KotobaSenpai.Core.Logging;
 using KotobaSenpai.Core.Dictionary;
 using System.IO;
 using System.Text.Json;
@@ -15,10 +15,13 @@ public sealed class JmdictSqliteRepository : IJmdictRepository
 {
     private const int BatchParameterChunkSize = 400;
     private readonly string _dbPath;
+    private readonly ILogger? _logger;
+    private int _missingIndexLogged;
 
-    public JmdictSqliteRepository(string dbPath)
+    public JmdictSqliteRepository(string dbPath, ILogger? logger = null)
     {
         _dbPath = dbPath ?? throw new ArgumentNullException(nameof(dbPath));
+        _logger = logger;
     }
 
     public IReadOnlyList<DictionaryEntry> FindByKanji(string kanji) => Query("kanji", kanji);
@@ -33,7 +36,7 @@ public sealed class JmdictSqliteRepository : IJmdictRepository
             .Where(form => !string.IsNullOrEmpty(form))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        if (requested.Length == 0 || !File.Exists(_dbPath))
+        if (requested.Length == 0 || !HasIndex())
             return new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal);
 
         try
@@ -92,9 +95,19 @@ public sealed class JmdictSqliteRepository : IJmdictRepository
         }
     }
 
+    private bool HasIndex()
+    {
+        if (File.Exists(_dbPath))
+            return true;
+
+        if (_logger is not null && Interlocked.Exchange(ref _missingIndexLogged, 1) == 0)
+            _logger.LogWarning("JMdict index is missing at {0}. Dictionary lookups will return no results until it is available.", _dbPath);
+        return false;
+    }
+
     private IReadOnlyList<DictionaryEntry> Query(string table, string form)
     {
-        if (string.IsNullOrEmpty(form) || !File.Exists(_dbPath))
+        if (string.IsNullOrEmpty(form) || !HasIndex())
             return Array.Empty<DictionaryEntry>();
 
         try

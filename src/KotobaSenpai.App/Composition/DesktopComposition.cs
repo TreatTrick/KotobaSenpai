@@ -188,7 +188,7 @@ internal sealed class DesktopComposition : IDisposable
         // Local Japanese-English dictionary: the JMdict .db is bundled with the release in the program directory; the same lookup instance provides both single and batch ports,
         // so one recognition runs a single round of candidate lookups and shares its cache.
         var jmdictDbPath = Path.Combine(AppContext.BaseDirectory, "jmdict.db");
-        services.AddSingleton<IJmdictRepository>(_ => new JmdictSqliteRepository(jmdictDbPath));
+        services.AddSingleton<IJmdictRepository>(sp => new JmdictSqliteRepository(jmdictDbPath, sp.GetRequiredService<ILogger>()));
         services.AddSingleton<JmdictLookupService>();
         services.AddSingleton<IDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
         services.AddSingleton<IBatchDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
