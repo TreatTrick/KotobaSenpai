@@ -9,23 +9,62 @@ namespace KotobaSenpai.Presentation.Wpf.Tests;
 public sealed class PhrasePopupViewModelTests
 {
     [Fact]
-    public void Corrected_word_shows_dictionary_pitch_variants_without_a_phrase_marker()
+    public void Corrected_idiom_lists_each_component_word_pitch_under_words_section_without_header_pitch()
     {
-        var word = new WordMeaningView("頭を垂れる", "こうべをたれる", "", "To bow", "")
+        var word = new WordMeaningView("頭を垂れる", "こうべをたれる", "Idiom", "To bow", "")
         {
             HasOverriddenReading = true,
             WordPitch = new("頭", "こうべ", [0, 3]),
+            CorrectedPitchAccents =
+            [
+                new("頭", "こうべ", 0, 0, "[0] LHH"),
+                new("を", "ヲ", 1, null, null),
+                new("垂れる", "タレル", 2, 2, "[2] LH↓L"),
+            ],
         };
         var localizer = new TestLocalizer();
         var popup = PhrasePopupViewModel.ForWord(word, localizer);
         var fallback = PhrasePopupViewModel.ForWord(word, localizer, showMeaning: false);
         var phrase = PhrasePopupViewModel.ForPhrase("Phrase", "", "", [word], localizer);
 
-        Assert.Equal("Localized:Llm.UniDicWordPitchLabel 頭（こうべ） [0] LHH / [3] LHH↓", popup.Pitch);
-        Assert.Equal(popup.Pitch, fallback.Pitch);
-        Assert.Equal(popup.Pitch, Assert.Single(phrase.Words).Pitch);
         Assert.Empty(popup.PitchMarker);
-        Assert.Empty(phrase.Words[0].PitchMarker);
+        Assert.Empty(popup.Pitch);
+        Assert.Equal("Localized:Llm.WordsLabel", popup.WordsLabel);
+        Assert.Collection(popup.Words,
+            noun =>
+            {
+                Assert.Equal("頭", noun.Headword);
+                Assert.Equal("⓪", noun.PitchMarker);
+                Assert.Equal("こうべ  |  koube", noun.Pronunciation);
+                Assert.Equal("Localized:Llm.WordPitchLabel LHH / LHH↓", noun.Pitch);
+            },
+            verb =>
+            {
+                Assert.Equal("垂れる", verb.Headword);
+                Assert.Equal("②", verb.PitchMarker);
+                Assert.Equal("たれる  |  tareru", verb.Pronunciation);
+                Assert.Equal("Localized:Llm.WordPitchLabel LH↓L", verb.Pitch);
+            });
+        Assert.Equal(popup.Words.Select(item => (item.Headword, item.PitchMarker, item.Pitch)),
+            fallback.Words.Select(item => (item.Headword, item.PitchMarker, item.Pitch)));
+        Assert.Equal("⓪②", Assert.Single(phrase.Words).PitchMarker);
+        Assert.Equal("Localized:Llm.WordPitchLabel LHH / LHH↓ | LH↓L", Assert.Single(phrase.Words).Pitch);
+    }
+
+    [Fact]
+    public void Single_token_corrected_word_without_span_pitch_shows_pitch_directly_on_header()
+    {
+        var word = new WordMeaningView("額", "ひたい", "Noun", "Forehead", "")
+        {
+            HasOverriddenReading = true,
+            WordPitch = new("額", "ひたい", [0]),
+            CorrectedPitchAccents = [new("額", "ひたい", 0, 0, "[0] LHH")],
+        };
+        var popup = PhrasePopupViewModel.ForWord(word, new TestLocalizer());
+
+        Assert.Equal("⓪", popup.PitchMarker);
+        Assert.Equal("Localized:Llm.WordPitchLabel LHH", popup.Pitch);
+        Assert.Empty(popup.Words);
     }
 
     [Fact]

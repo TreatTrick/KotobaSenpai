@@ -18,13 +18,18 @@ public sealed record WordMeaningView(
     public bool HasOverriddenReading { get; init; }
     public SpanPitch? SpanPitch { get; init; }
     public WordPitchReference? WordPitch { get; init; }
+    public IReadOnlyList<PitchAccentSummary> CorrectedPitchAccents { get; init; } = Array.Empty<PitchAccentSummary>();
 
     public string PitchAccentText
         => SpanPitch is { } pitch ? string.Join(" / ", pitch.Positions
             .Select(position => PitchAccent.CreatePattern(pitch.Reading, position)?.Notation)
             .OfType<string>())
-            : HasOverriddenReading ? string.Empty : string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())
-            .Where(pitch => !string.IsNullOrEmpty(pitch.Notation))
-            .Select(pitch => pitch.Notation));
+            : HasOverriddenReading
+                ? string.Join(" | ", CorrectedPitchAccents
+                    .Where(pitch => !string.IsNullOrEmpty(pitch.Notation))
+                    .Select(pitch => pitch.Notation))
+                : string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())
+                    .Where(pitch => !string.IsNullOrEmpty(pitch.Notation))
+                    .Select(pitch => pitch.Notation));
 
 }

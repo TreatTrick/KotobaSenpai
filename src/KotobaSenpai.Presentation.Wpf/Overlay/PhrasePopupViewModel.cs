@@ -61,6 +61,9 @@ internal sealed class PhrasePopupViewModel
     public static PhrasePopupViewModel ForWord(
         WordMeaningView word, IStringLocalizer? localizer = null, bool showMeaning = true, SentenceTranslation? sentence = null)
     {
+        var memberWords = BuildCorrectedMemberWords(word, localizer);
+        var showAsComponentWords = memberWords.Length > 1
+            || (memberWords.Length == 1 && !string.Equals(memberWords[0].Headword, word.Headword, StringComparison.Ordinal));
         var entry = CreateWord(word, localizer);
         return new()
         {
@@ -69,13 +72,15 @@ internal sealed class PhrasePopupViewModel
             Localizer = localizer,
             Reading = entry.Reading,
             Romanization = entry.Romanization,
-            PitchMarker = entry.PitchMarker,
+            PitchMarker = showAsComponentWords ? "" : entry.PitchMarker,
             Pos = showMeaning ? entry.Pos : "",
-            Pitch = entry.Pitch,
+            Pitch = showAsComponentWords ? "" : entry.Pitch,
             Meaning = showMeaning ? word.Meaning : "",
             Grammar = showMeaning ? word.Grammar : "",
             MeaningLabel = localizer?.Get("Llm.WordMeaningLabel") ?? "Meaning",
             GrammarLabel = localizer?.Get("Llm.GrammarLabel") ?? "Grammar",
+            WordsLabel = localizer?.Get("Llm.WordsLabel") ?? "Words",
+            Words = showAsComponentWords ? Array.AsReadOnly(memberWords) : Array.Empty<PhrasePopupWordViewModel>(),
             NoMeaningHint = showMeaning ? "" : localizer?.Get("Llm.WordNoMeaning") ?? "no meaning",
         };
     }
@@ -87,6 +92,26 @@ internal sealed class PhrasePopupViewModel
     private static PhrasePopupWordViewModel CreateWord(WordMeaningView word, IStringLocalizer? localizer)
     {
         var reading = Kana.ToHiragana(word.Reading);
+        var pitchLabel = localizer?.Get("Llm.WordPitchLabel") ?? "Pitch";
+        if (word.SpanPitch is null && word.HasOverriddenReading)
+        {
+            var correctedMembers = BuildCorrectedMemberWords(word, localizer);
+            if (correctedMembers.Length > 0)
+            {
+                var correctedMarker = string.Concat(correctedMembers.Select(member => member.PitchMarker));
+                var correctedContours = correctedMembers
+                    .Select(member => member.Pitch.StartsWith(pitchLabel + " ", StringComparison.Ordinal)
+                        ? member.Pitch[(pitchLabel.Length + 1)..]
+                        : member.Pitch)
+                    .Where(text => !string.IsNullOrEmpty(text))
+                    .ToArray();
+                var correctedPitch = correctedContours.Length == 0
+                    ? localizer?.Get("Llm.WordPitchUnknown") ?? "pitch unknown"
+                    : $"{pitchLabel} {string.Join(" | ", correctedContours)}";
+                return new(word.Headword, reading, Kana.ToRomaji(reading), correctedMarker, correctedPitch, word.Pos, word.Meaning);
+            }
+        }
+
         var patterns = word.SpanPitch is { Positions.Count: > 0 } spanPitch
             ? spanPitch.Positions.Select(position => PitchAccent.CreatePattern(spanPitch.Reading, position))
                 .OfType<PitchAccentPattern>().ToArray()
@@ -97,23 +122,81 @@ internal sealed class PhrasePopupViewModel
             .Select(pattern => CircledNumber(pattern.AccentPosition)));
         var pitchText = patterns.Length == 0
             ? localizer?.Get("Llm.WordPitchUnknown") ?? "pitch unknown"
-            : $"{localizer?.Get("Llm.WordPitchLabel") ?? "Pitch"} "
-                + string.Join(word.SpanPitch is null ? " | " : " / ", patterns.Select(pattern => pattern.Notation[(pattern.Notation.IndexOf(']') + 2)..]));
-        if (word.SpanPitch is null && word.HasOverriddenReading && word.WordPitch is { } reference)
-        {
-            var variants = reference.Positions
-                .Select(position => PitchAccent.CreatePattern(reference.Reading, position))
-                .OfType<PitchAccentPattern>()
-                .Select(pattern => pattern.Notation)
-                .ToArray();
-            if (variants.Length > 0)
-            {
-                var label = localizer?.Get("Llm.UniDicWordPitchLabel") ?? "UniDic word pitch";
-                pitchText = $"{label} {reference.Surface}（{reference.Reading}） {string.Join(" / ", variants)}";
-            }
-        }
+            : $"{pitchLabel} "
+                + string.Join(word.SpanPitch is null ? " | " : " / ", patterns.Select(ContourText));
         return new(word.Headword, reading, Kana.ToRomaji(reading), marker, pitchText, word.Pos, word.Meaning);
     }
+
+    private static PhrasePopupWordViewModel[] BuildCorrectedMemberWords(WordMeaningView word, IStringLocalizer? localizer)
+    {
+        if (word.SpanPitch is not null || !word.HasOverriddenReading)
+            return [];
+
+        var pitchLabel = localizer?.Get("Llm.WordPitchLabel") ?? "Pitch";
+        var reference = word.WordPitch;
+        if (word.CorrectedPitchAccents is { Count: > 0 } segments)
+        {
+            var members = new List<PhrasePopupWordViewModel>(segments.Count);
+            foreach (var segment in segments)
+            {
+                if (segment.AccentPosition is not int primary)
+                    continue;
+
+                var segmentReading = Kana.ToHiragana(segment.Reading);
+                var positions = reference is not null
+                    && string.Equals(reference.Surface, segment.Surface, StringComparison.Ordinal)
+                    && string.Equals(Kana.ToHiragana(reference.Reading), segmentReading, StringComparison.Ordinal)
+                    ? reference.Positions
+                    : [primary];
+                var patterns = positions
+                    .Select(position => PitchAccent.CreatePattern(segmentReading, position))
+                    .OfType<PitchAccentPattern>()
+                    .ToArray();
+                if (patterns.Length == 0)
+                    continue;
+
+                members.Add(new PhrasePopupWordViewModel(
+                    segment.Surface,
+                    segmentReading,
+                    Kana.ToRomaji(segmentReading),
+                    CircledNumber(patterns[0].AccentPosition),
+                    $"{pitchLabel} {string.Join(" / ", patterns.Select(ContourText))}",
+                    "",
+                    ""));
+            }
+
+            if (members.Count > 0)
+                return members.ToArray();
+        }
+
+        if (reference is not null)
+        {
+            var refReading = Kana.ToHiragana(reference.Reading);
+            var patterns = reference.Positions
+                .Select(position => PitchAccent.CreatePattern(refReading, position))
+                .OfType<PitchAccentPattern>()
+                .ToArray();
+            if (patterns.Length > 0)
+            {
+                return
+                [
+                    new PhrasePopupWordViewModel(
+                        reference.Surface,
+                        refReading,
+                        Kana.ToRomaji(refReading),
+                        CircledNumber(patterns[0].AccentPosition),
+                        $"{pitchLabel} {string.Join(" / ", patterns.Select(ContourText))}",
+                        "",
+                        ""),
+                ];
+            }
+        }
+
+        return [];
+    }
+
+    private static string ContourText(PitchAccentPattern pattern)
+        => pattern.Notation[(pattern.Notation.IndexOf(']') + 2)..];
 
     private static string CircledNumber(int position) => position switch
     {

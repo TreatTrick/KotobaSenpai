@@ -153,6 +153,9 @@ public sealed class WordOverlaySession
             {
                 SpanPitch = word.SpanPitch ?? meaning.SpanPitch,
                 WordPitch = word.SpanPitch is null ? word.WordPitch ?? meaning.WordPitch : null,
+                CorrectedPitchAccents = word.SpanPitch is null
+                    ? (word.CorrectedPitchAccents.Count > 0 ? word.CorrectedPitchAccents : meaning.CorrectedPitchAccents)
+                    : [],
                 HasOverriddenReading = word.HasOverriddenReading || meaning.HasOverriddenReading,
             }
             : meaning;
