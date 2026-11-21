@@ -7,7 +7,7 @@ namespace KotobaSenpai.Platform.Windows.Llm;
 /// <summary>OpenAI Chat Completions protocol with JSON object output and a prompt-level output example.</summary>
 public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
 {
-    private const string OutputExample = """{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0","l0:t1"]],"label":"example","meaning":"example","grammar":"example"}],"words":[{"headword":"example","pos":"example","meaning":"example","grammar":"example"}]}""";
+    private const string OutputExample = """{"groups":[{"modelGroupId":"g1","type":"grammar","parts":[["l0:t0","l0:t1"]],"label":"example","meaning":"example","grammar":"example"}],"words":[{"headword":"example","reading":"","pos":"example","meaning":"example","grammar":"example"}]}""";
 
     public LlmPromptProfile PromptProfile => LlmPromptProfile.OpenAiChatCompletions;
 
@@ -39,15 +39,26 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
     }
 
     public JsonElement ExtractGroupsJson(string envelopeJson)
-        => ExtractContentRoot(envelopeJson).GetProperty("groups").Clone();
+        => ExtractContentRoot(envelopeJson, out _).GetProperty("groups");
 
     public JsonElement ExtractWordsJson(string envelopeJson)
-        => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+        => GetWords(ExtractContentRoot(envelopeJson, out _));
 
     public string? ExtractTranslation(string envelopeJson)
-        => PhraseResponseParser.ParseTranslation(ExtractContentRoot(envelopeJson));
+        => PhraseResponseParser.ParseTranslation(ExtractContentRoot(envelopeJson, out _));
 
-    private static JsonElement ExtractContentRoot(string envelopeJson)
+    public (JsonElement Groups, JsonElement Words, string? Translation, string? RecoveryNote) ExtractPayload(
+        string envelopeJson, bool includeSentenceTranslation)
+    {
+        var root = ExtractContentRoot(envelopeJson, out var recoveryNote);
+        return (root.GetProperty("groups"), GetWords(root),
+            includeSentenceTranslation ? PhraseResponseParser.ParseTranslation(root) : null, recoveryNote);
+    }
+
+    private static JsonElement GetWords(JsonElement root)
+        => root.TryGetProperty("words", out var words) ? words : JsonSerializer.SerializeToElement(Array.Empty<object>());
+
+    private static JsonElement ExtractContentRoot(string envelopeJson, out string? recoveryNote)
     {
         using var doc = JsonDocument.Parse(envelopeJson);
         var choices = doc.RootElement.GetProperty("choices");
@@ -56,9 +67,7 @@ public sealed class OpenAiChatCompletionsProtocol : ILlmProtocol
         var content = choices[0]
             .GetProperty("message").GetProperty("content").GetString()
             ?? throw new PhraseResponseException("Assistant content is empty.");
-        using var contentDoc = JsonDocument.Parse(content);
-        return contentDoc.RootElement.Clone();
+        return LlmJsonExtractor.ExtractObject(content, out recoveryNote);
     }
 
-    private static JsonElement EmptyArray() => JsonDocument.Parse("[]").RootElement.Clone();
 }

@@ -63,11 +63,12 @@ public static class PhraseGroupSchema
                     ["properties"] = new JsonObject
                     {
                         ["headword"] = new JsonObject { ["type"] = "string" },
+                        ["reading"] = new JsonObject { ["type"] = "string" },
                         ["pos"] = new JsonObject { ["type"] = "string" },
                         ["meaning"] = new JsonObject { ["type"] = "string" },
                         ["grammar"] = new JsonObject { ["type"] = "string" },
                     },
-                    ["required"] = new JsonArray("headword", "pos", "meaning", "grammar"),
+                    ["required"] = new JsonArray("headword", "reading", "pos", "meaning", "grammar"),
                     ["additionalProperties"] = false,
                 },
             },

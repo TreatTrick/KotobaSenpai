@@ -31,6 +31,12 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
     }
 
     public void RecordTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords)
+        => WriteTokens(recognitionId, target, groupedWords, "local");
+
+    public void RecordPublishedTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords)
+        => WriteTokens(recognitionId, target, groupedWords, "published");
+
+    private void WriteTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords, string stage)
     {
         if (!DiagnosticRecordingSettings.IsEnabled(_settings))
             return;
@@ -41,7 +47,7 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
         var lines = new List<string>
         {
             $"target={target.Title} bounds={target.Bounds}",
-            $"tokens={groupedWords.Count} spans={groupedWords.Count}",
+            $"tokens={groupedWords.Count} spans={groupedWords.Count} stage={stage}",
             "",
             "## word lookup results",
         };
@@ -50,7 +56,8 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
             var word = groupedWords[i];
             var token = word.Token;
             var source = string.Join("+", word.SourceTokens.Select(sourceToken => sourceToken.Surface));
-            lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={token.Reading} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}");
+            var sourceReading = string.Concat(word.SourceTokens.Select(sourceToken => sourceToken.Reading));
+            lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={word.Reading} | sourceReading={sourceReading} | readingOverridden={word.HasOverriddenReading} | segment={word.SegmentId} | spanIndex={word.SegmentSpanIndex} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}");
         }
         File.WriteAllLines(Path.Combine(dir, $"tokens-{recognitionId:N}.txt"), lines, Utf8Bom);
         PruneToLatest(dir, "tokens-");

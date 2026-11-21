@@ -65,7 +65,7 @@ internal sealed class PhraseRunAssembler
 
             var wordValidation = WordMeaningValidator.ValidateAndBuild(result.Words, requests[i].LocalSpans);
             warnings.AddRange(wordValidation.Warnings);
-            wordMeanings.AddRange(wordValidation.ValidWords);
+            wordMeanings.AddRange(wordValidation.ValidWords.Select(word => word with { SegmentId = request.SegmentId }));
         }
 
         // As long as any (processable) sentence succeeds, the overall outcome is Success; only when all fail is the first failure category taken.

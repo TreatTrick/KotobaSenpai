@@ -55,7 +55,9 @@ public sealed class PhraseResponseParser
             var pos = Str(element, "pos");
             var meaning = Str(element, "meaning");
             var grammar = Str(element, "grammar");
-            result.Add(new ParsedWordMeaning(headword, pos, meaning, grammar));
+            var reading = element.TryGetProperty("reading", out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString() : null;
+            result.Add(new ParsedWordMeaning(headword, pos, meaning, grammar, reading));
         }
         return result;
     }

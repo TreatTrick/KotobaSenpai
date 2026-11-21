@@ -213,6 +213,19 @@ public sealed class PhraseResponseParserTests
             """[{"headword":"学校","pos":"名詞","meaning":"学校"}]""")));
     }
 
+    [Theory]
+    [InlineData("", null)]
+    [InlineData(",\"reading\":123", null)]
+    [InlineData(",\"reading\":\"\"", "")]
+    [InlineData(",\"reading\":\"ひたい\"", "ひたい")]
+    public void Reads_optional_contextual_reading_without_dropping_the_meaning(string field, string? expected)
+    {
+        using var json = JsonDocument.Parse("""[{"headword":"額","pos":"noun","meaning":"forehead","grammar":"noun" """ + field + "}]");
+        var word = Assert.Single(new PhraseResponseParser().ParseWords(json.RootElement));
+        Assert.Equal(expected, word.Reading);
+        Assert.Equal("forehead", word.Meaning);
+    }
+
     [Fact]
     public void Rejects_word_missing_headword()
     {
@@ -252,7 +265,7 @@ public sealed class LlmProtocolTests
         Assert.Contains("JSON", system);
         using var example = JsonDocument.Parse(system[system.IndexOf('{')..]);
         Assert.Single(new PhraseResponseParser().ParseGroups(example.RootElement.GetProperty("groups")));
-        Assert.Single(new PhraseResponseParser().ParseWords(example.RootElement.GetProperty("words")));
+        Assert.Equal("", Assert.Single(new PhraseResponseParser().ParseWords(example.RootElement.GetProperty("words"))).Reading);
         Assert.Equal("low", root.GetProperty("reasoning_effort").GetString());
         Assert.Equal("disabled", root.GetProperty("thinking").GetProperty("type").GetString());
     }
@@ -302,7 +315,7 @@ public sealed class LlmProtocolTests
         Assert.True(root.TryGetProperty("tools", out var tools));
         var tool = tools[0];
         Assert.Equal("return_groups", tool.GetProperty("name").GetString());
-        Assert.Equal(JsonValueKind.Object, tool.GetProperty("input_schema").ValueKind);
+        AssertRequiredReadingField(tool.GetProperty("input_schema"));
         Assert.True(root.TryGetProperty("tool_choice", out var toolChoice));
         Assert.Equal("tool", toolChoice.GetProperty("type").GetString());
         Assert.Equal("return_groups", toolChoice.GetProperty("name").GetString());
@@ -352,6 +365,7 @@ public sealed class LlmProtocolTests
         using var request = JsonDocument.Parse(body);
         Assert.Equal(4096, request.RootElement.GetProperty("max_output_tokens").GetInt32());
         Assert.Equal("none", request.RootElement.GetProperty("reasoning").GetProperty("effort").GetString());
+        AssertRequiredReadingField(request.RootElement.GetProperty("text").GetProperty("format").GetProperty("schema"));
 
         var envelope = "{\"output\":[{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":"
             + JsonSerializer.Serialize(Group) + "}]}]}";
@@ -364,6 +378,13 @@ public sealed class LlmProtocolTests
     {
         var protocol = new AnthropicMessagesProtocol();
         Assert.Throws<PhraseResponseException>(() => protocol.ExtractGroupsJson("""{"content":[{"type":"text","text":"{}"}]}"""));
+    }
+
+    private static void AssertRequiredReadingField(JsonElement schema)
+    {
+        var word = schema.GetProperty("properties").GetProperty("words").GetProperty("items");
+        Assert.Equal("string", word.GetProperty("properties").GetProperty("reading").GetProperty("type").GetString());
+        Assert.Contains("reading", word.GetProperty("required").EnumerateArray().Select(field => field.GetString()));
     }
 
     private static int GetArrayLength(JsonElement array)

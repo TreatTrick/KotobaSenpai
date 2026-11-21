@@ -15,7 +15,9 @@ public sealed class WordOverlaySession
 {
     private readonly List<GroupedWord> _words;
     private readonly List<PhraseGroupView> _phraseGroups;
-    private readonly IReadOnlyDictionary<(string Surface, string Reading), WordMeaningView> _meaningByWord;
+    private readonly IReadOnlyList<WordMeaningView> _wordMeanings;
+    private readonly Dictionary<(string SegmentId, int SpanIndex), WordMeaningView> _meaningBySpan = new();
+    private readonly Dictionary<(string Surface, string Reading), WordMeaningView> _legacyMeaningByWord = new();
     private readonly IReadOnlySet<string>? _underlineSegmentIds;
     private readonly IReadOnlyList<NormalizedWordGeometry> _wordGeometry;
     private readonly IReadOnlyList<NormalizedPhraseGroupGeometry> _phraseGeometry;
@@ -42,11 +44,14 @@ public sealed class WordOverlaySession
         _wordGeometry = wordGeometry;
         _phraseGeometry = phraseGeometry;
         _sentences = sentences.ToDictionary(sentence => sentence.SegmentId, StringComparer.Ordinal);
-        // ponytail: keyed by merged surface+reading — both come from the same span resolver, so this matches reliably. A word can appear multiple times (same surface+reading); keep the first rather than throwing on a duplicate.
-        var meaningByWord = new Dictionary<(string Surface, string Reading), WordMeaningView>();
-        foreach (var meaning in wordMeanings)
-            meaningByWord.TryAdd((meaning.Headword, meaning.Reading), meaning);
-        _meaningByWord = meaningByWord;
+        _wordMeanings = wordMeanings.ToArray();
+        foreach (var meaning in _wordMeanings)
+        {
+            if (meaning.SegmentId is { } segmentId && meaning.SpanIndex is { } spanIndex)
+                _meaningBySpan.TryAdd((segmentId, spanIndex), meaning);
+            else
+                _legacyMeaningByWord.TryAdd((meaning.Headword, meaning.Reading), meaning);
+        }
     }
 
     public Guid Id { get; }
@@ -65,7 +70,7 @@ public sealed class WordOverlaySession
     public IReadOnlySet<string>? UnderlineSegmentIds => _underlineSegmentIds;
 
     /// <summary>All validated word meanings, for diagnostics and group-detail rendering.</summary>
-    public IReadOnlyList<WordMeaningView> WordMeanings => _meaningByWord.Values.ToArray();
+    public IReadOnlyList<WordMeaningView> WordMeanings => _wordMeanings;
 
     public SentenceTranslation? GetSentenceTranslation(string? segmentId)
         => segmentId is not null && _sentences.TryGetValue(segmentId, out var sentence) ? sentence : null;
@@ -114,16 +119,21 @@ public sealed class WordOverlaySession
             words,
             phraseGroups,
             PhraseWarning,
-            _meaningByWord.Values.ToArray(),
+            _wordMeanings,
             _underlineSegmentIds,
             _wordGeometry,
             _phraseGeometry,
             _sentences.Values);
     }
 
-    /// <summary>Looks up the LLM meaning for a local merged word (by its merged surface+reading), or null when none was returned.</summary>
+    /// <summary>Finds the meaning for this occurrence, falling back to surface and reading for legacy meanings.</summary>
     public WordMeaningView? TryGetMeaning(GroupedWord word)
-        => _meaningByWord.TryGetValue((word.Surface, word.Reading), out var meaning) ? meaning : null;
+    {
+        if (word.SegmentId is { } segmentId && word.SegmentSpanIndex is { } spanIndex
+            && _meaningBySpan.TryGetValue((segmentId, spanIndex), out var meaning) && meaning.Headword == word.Surface)
+            return meaning;
+        return _legacyMeaningByWord.GetValueOrDefault((word.Surface, word.Reading));
+    }
 
     public WordMeaningView GetMeaningOrDefault(GroupedWord word)
         => TryGetMeaning(word) ?? FromWord(word);
@@ -222,6 +232,11 @@ public sealed class WordOverlaySession
     private static WordMeaningView FromWord(GroupedWord word)
     {
         ArgumentNullException.ThrowIfNull(word);
-        return new(word.Surface, word.Reading, string.Empty, string.Empty, string.Empty, word.PitchAccents);
+        return new(word.Surface, word.Reading, string.Empty, string.Empty, string.Empty, word.PitchAccents)
+        {
+            SegmentId = word.SegmentId,
+            SpanIndex = word.SegmentSpanIndex,
+            HasOverriddenReading = word.HasOverriddenReading,
+        };
     }
 }

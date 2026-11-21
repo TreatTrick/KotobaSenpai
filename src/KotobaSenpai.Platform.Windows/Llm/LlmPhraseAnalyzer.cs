@@ -27,7 +27,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
     private readonly PhraseResponseParser _parser;
     private readonly IDiagnosticReporter? _diagnostics;
     private readonly ILogger? _logger;
-    private readonly ConcurrentDictionary<(string Endpoint, ILlmProtocol Protocol), string> _preferredEndpoints = new();
+    private readonly ConcurrentDictionary<(string ProtocolId, string ConfiguredEndpoint), Uri> _preferredEndpoints = new();
 
     public LlmPhraseAnalyzer(
         ISettingsService settings,
@@ -80,14 +80,14 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         }
 
         var body = protocol.BuildBody(systemPrompt, userContent, model, request.IncludeSentenceTranslation);
-        var route = (endpointUri.AbsoluteUri, protocol);
+        var route = (LlmProtocolIds.Normalize(protocolId), endpoint);
         var candidates = singleEndpoint ? [endpointUri] : LlmEndpointHelper.AnalysisCandidates(endpointUri, protocol.Path);
         if (!singleEndpoint && _preferredEndpoints.TryGetValue(route, out var preferred)
-            && candidates[0].AbsoluteUri != preferred)
-            candidates = candidates.OrderByDescending(candidate => candidate.AbsoluteUri == preferred).ToArray();
+            && candidates.Contains(preferred) && candidates[0] != preferred)
+            candidates = [preferred, .. candidates.Where(candidate => candidate != preferred)];
 
         string? envelope = null;
-        string? acceptedEndpoint = null;
+        Uri? acceptedEndpoint = null;
         for (var index = 0; index < candidates.Count; index++)
         {
             var candidate = candidates[index];
@@ -112,7 +112,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
                 if (response.IsSuccessStatusCode)
                 {
                     envelope = responseBody;
-                    acceptedEndpoint = candidate.AbsoluteUri;
+                    acceptedEndpoint = candidate;
                     _logger?.LogInformation("LLM {0} ({1}) returned {2} from {3} in {4} ms",
                         request.SegmentId, protocol.PromptProfile, (int)response.StatusCode,
                         candidate.GetLeftPart(UriPartial.Path), llmTimer.ElapsedMilliseconds);
@@ -128,7 +128,7 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
                 if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed)
                 {
                     if (!singleEndpoint)
-                        _preferredEndpoints.TryRemove(new(route, candidate.AbsoluteUri));
+                        _preferredEndpoints.TryRemove(new(route, candidate));
                     if (index + 1 < candidates.Count)
                         continue;
                 }
@@ -161,15 +161,17 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
         string? translation;
         try
         {
-            var groupsPayload = protocol.ExtractGroupsJson(envelope);
-            groupsJson = groupsPayload.GetRawText();
-            var wordsPayload = protocol.ExtractWordsJson(envelope);
-            wordsJson = wordsPayload.GetRawText();
-            groups = _parser.ParseGroups(groupsPayload);
-            words = _parser.ParseWords(wordsPayload);
-            translation = request.IncludeSentenceTranslation ? protocol.ExtractTranslation(envelope) : null;
+            var payload = protocol.ExtractPayload(envelope, request.IncludeSentenceTranslation);
+            if (payload.RecoveryNote is not null)
+                _logger?.LogWarning("LLM {0} ({1}) recovered assistant JSON: {2}",
+                    request.SegmentId, protocol.PromptProfile, payload.RecoveryNote);
+            groupsJson = payload.Groups.GetRawText();
+            wordsJson = payload.Words.GetRawText();
+            groups = _parser.ParseGroups(payload.Groups);
+            words = _parser.ParseWords(payload.Words);
+            translation = payload.Translation;
         }
-        catch (Exception ex) when (ex is PhraseResponseException or JsonException or KeyNotFoundException or ArgumentNullException)
+        catch (Exception ex) when (ex is PhraseResponseException or JsonException or KeyNotFoundException or InvalidOperationException or ArgumentNullException)
         {
             // Protocol envelope or group structure mismatch (missing field / null text / non-JSON) → retryable warning, not thrown through the recognition flow.
             _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
@@ -181,6 +183,6 @@ public sealed class LlmPhraseAnalyzer : ILlmPhraseAnalyzer
 
         // Capture the raw request/response and extracted arrays with one shared exchange stamp for offline inspection.
         _diagnostics?.RecordLlmExchange(request.RecognitionId, request.SegmentId, body, envelope, groupsJson, wordsJson);
-        return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words, Translation = translation, Endpoint = acceptedEndpoint };
+        return new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, groups, null) { Words = words, Translation = translation, Endpoint = acceptedEndpoint?.AbsoluteUri };
     }
 }

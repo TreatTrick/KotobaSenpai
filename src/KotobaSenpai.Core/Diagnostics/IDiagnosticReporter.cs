@@ -15,6 +15,9 @@ public interface IDiagnosticReporter
     /// <summary>Records the tokenization result of one recognition (token details + bounding boxes).</summary>
     void RecordTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords);
 
+    /// <summary>Records the effective readings in the published word overlay.</summary>
+    void RecordPublishedTokens(Guid recognitionId, WindowTarget target, IReadOnlyList<GroupedWord> groupedWords) { }
+
     /// <summary>Records one phrase analysis run: segment/group counts, provider results, and validation warnings. It does not record screenshots, API keys, or window titles.</summary>
     void RecordPhraseAnalysis(Guid recognitionId, PhraseAnalysisOutcome outcome, IReadOnlyList<PhraseGroupView> groups, string? warning);
 

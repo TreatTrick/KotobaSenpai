@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using KotobaSenpai.Core.Diagnostics;
 using KotobaSenpai.Core.Llm;
 using KotobaSenpai.Core.Logging;
@@ -287,6 +288,92 @@ public sealed class LlmEndpointFallbackTests
         Assert.Contains(logger.Messages, entry => entry.Message.Contains("/v1/chat/completions", StringComparison.Ordinal));
         Assert.All(logger.Messages, entry => Assert.DoesNotContain("secret-api-key", entry.Message));
     }
+
+    [Fact]
+    public async Task Recovers_the_recorded_responses_payload_for_manotari_and_warns_once()
+    {
+        // Assistant text from the recorded response, without its transport metadata.
+        const string content = """{"groups":[],"words":[{"headword":"目の当たり","pos":"名詞","meaning":"right before one's eyes; firsthand; directly witnessing","grammar":"Noun (often used as 目の当たりにする 'to witness firsthand' or 目の当たりに 'before one's very eyes'); here it appears alone as a noun phrase."}],"translation":"right before one's eyes; firsthand"}}""";
+        var logger = new RecordingLogger();
+        using var handler = new RecordingHandler((_, _) => Response(HttpStatusCode.OK, TextEnvelope(LlmProtocolIds.OpenAiResponses, content)));
+        var analyzer = CreateAnalyzer("https://provider.example", LlmProtocolIds.OpenAiResponses, handler, logger: logger);
+
+        var result = await analyzer.AnalyzeAsync(Request());
+
+        Assert.True(result.Succeeded);
+        var word = Assert.Single(result.Words);
+        Assert.Equal("目の当たり", word.Headword);
+        Assert.Null(word.Reading);
+        Assert.Equal("right before one's eyes; firsthand", result.Translation);
+        var warning = Assert.Single(logger.Messages, entry => entry.Level == LogLevel.Warning);
+        Assert.Contains("Removed 1 extra closing brace(s)", warning.Message);
+    }
+
+    [Theory]
+    [InlineData(LlmProtocolIds.OpenAiChat, "```json\r\n", "\r\n```", "Removed a Markdown code fence.")]
+    [InlineData(LlmProtocolIds.OpenAiResponses, "```\n", "} }\n```", "Removed 2 extra closing brace(s)")]
+    [InlineData(LlmProtocolIds.OpenAiResponses, "", "", null)]
+    [InlineData(LlmProtocolIds.Anthropic, "", "", null)]
+    public async Task Reads_contextual_words_and_recovers_supported_text_wrappers(
+        string protocol, string prefix, string suffix, string? warningText)
+    {
+        const string payload = """{"groups":[],"words":[{"headword":"額","reading":"ひたい","pos":"noun","meaning":"forehead","grammar":"noun } used with に"}],"translation":"Sweat beads on the forehead."}""";
+        var logger = new RecordingLogger();
+        using var handler = new RecordingHandler((_, _) => Response(HttpStatusCode.OK, TextEnvelope(protocol, prefix + payload + suffix)));
+        var analyzer = CreateAnalyzer("https://provider.example", protocol, handler, logger: logger);
+
+        var result = await analyzer.AnalyzeAsync(Request());
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("ひたい", Assert.Single(result.Words).Reading);
+        Assert.Equal("Sweat beads on the forehead.", result.Translation);
+        if (warningText is null)
+            Assert.DoesNotContain(logger.Messages, entry => entry.Level == LogLevel.Warning);
+        else
+            Assert.Contains(warningText, Assert.Single(logger.Messages, entry => entry.Level == LogLevel.Warning).Message);
+    }
+
+    [Theory]
+    [InlineData("{\"groups\": [")]
+    [InlineData("{\"groups\":[],}")]
+    [InlineData("{\"groups\":[]} {}")]
+    [InlineData("{\"groups\":[]}} extra")]
+    [InlineData("extra {\"groups\":[]}}")]
+    [InlineData("```json\n{\"groups\":[]}\n```\n```\n{}\n```")]
+    [InlineData("[]}")]
+    public async Task Rejects_truncated_invalid_or_additional_content(string content)
+    {
+        using var handler = new RecordingHandler((_, _) => Response(HttpStatusCode.OK, TextEnvelope(LlmProtocolIds.OpenAiChat, content)));
+        var result = await CreateAnalyzer("https://provider.example", LlmProtocolIds.OpenAiChat, handler).AnalyzeAsync(Request());
+
+        Assert.Equal(PhraseAnalysisOutcome.MalformedJson, result.Outcome);
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task Single_endpoint_success_does_not_replace_the_cached_fallback()
+    {
+        const string endpoint = "https://provider.example";
+        const string protocol = LlmProtocolIds.OpenAiResponses;
+        using var handler = new RecordingHandler((attempt, _) => attempt == 1
+            ? Response(HttpStatusCode.NotFound, "")
+            : Response(HttpStatusCode.OK, Envelope(protocol)));
+        var analyzer = CreateAnalyzer(endpoint, protocol, handler);
+
+        Assert.True((await analyzer.AnalyzeAsync(Request())).Succeeded);
+        Assert.True((await analyzer.AnalyzeAsync(Request(), new(protocol, endpoint, "test-key", "test-model"), singleEndpoint: true)).Succeeded);
+        Assert.True((await analyzer.AnalyzeAsync(Request())).Succeeded);
+
+        Assert.Equal(["/", "/v1/responses", "/", "/v1/responses"], handler.Requests.Select(request => request.Uri.AbsolutePath));
+    }
+
+    private static string TextEnvelope(string protocol, string content) => protocol switch
+    {
+        LlmProtocolIds.OpenAiResponses => """{"output":[{"type":"message","content":[{"type":"output_text","text": """
+            + JsonSerializer.Serialize(content) + "}]}]}",
+        LlmProtocolIds.Anthropic => """{"content":[{"type":"tool_use","name":"return_groups","input": """ + content + "}]}",
+        _ => JsonSerializer.Serialize(new { choices = new[] { new { message = new { content } } } }),
+    };
 
     private static LlmPhraseAnalyzer CreateAnalyzer(string endpoint, string protocol, RecordingHandler handler,
         IDiagnosticReporter? reporter = null, ILogger? logger = null)

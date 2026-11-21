@@ -87,7 +87,7 @@ internal sealed class PhrasePopupViewModel
     private static PhrasePopupWordViewModel CreateWord(WordMeaningView word, IStringLocalizer? localizer)
     {
         var reading = Kana.ToHiragana(word.Reading);
-        var patterns = (word.PitchAccents ?? [])
+        var patterns = (word.HasOverriddenReading ? [] : word.PitchAccents ?? [])
             .Select(pitch => PitchAccent.CreatePattern(pitch.Reading, pitch.AccentPosition))
             .OfType<PitchAccentPattern>().ToArray();
         var marker = string.Concat(patterns.Select(pattern => CircledNumber(pattern.AccentPosition)));

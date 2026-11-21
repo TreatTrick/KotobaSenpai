@@ -162,6 +162,79 @@ public sealed class WordMeaningValidatorTests
         Assert.Equal("は", word.Headword);
     }
 
+    [Theory]
+    [InlineData("額")]
+    [InlineData("hitai")]
+    [InlineData("ひ たい")]
+    [InlineData(" ")]
+    [InlineData("ひたい。")]
+    [InlineData("ひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたいひたい")]
+    public void Invalid_readings_warn_without_dropping_meaning_or_local_pitch(string reading)
+    {
+        var pitch = new PitchAccentSummary("額", "ガク", 0, 0, "[0] LH");
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [new("額", "noun", "amount", "noun", reading)],
+            [new("額", "ガク", "額", [SentenceTokenId.Parse("l0:t0")], [pitch])]);
+
+        var word = Assert.Single(result.ValidWords);
+        Assert.Equal("ガク", word.Reading);
+        Assert.Equal("amount", word.Meaning);
+        Assert.Equal("noun", word.Pos);
+        Assert.Equal("noun", word.Grammar);
+        Assert.Equal([pitch], word.PitchAccents);
+        Assert.False(word.HasOverriddenReading);
+        Assert.Equal(0, result.DroppedCount);
+        Assert.Contains("Ignoring invalid reading", Assert.Single(result.Warnings));
+    }
+
+    [Theory]
+    [InlineData("は", "ハ", "わ")]
+    [InlineData("額", "ガク", "がく")]
+    [InlineData("額", "ガク", "")]
+    [InlineData("額", "ガク", null)]
+    public void Keeps_local_reading_and_pitch_when_correction_is_unneeded(string surface, string reading, string? suggested)
+    {
+        var pitch = new PitchAccentSummary(surface, reading, 0, 0, "[0] LH");
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [new(surface, "noun", "meaning", "grammar", suggested)],
+            [new(surface, reading, surface, [SentenceTokenId.Parse("l0:t0")], [pitch])]);
+
+        var word = Assert.Single(result.ValidWords);
+        Assert.Empty(result.Warnings);
+        Assert.Equal(reading, word.Reading);
+        Assert.Equal([pitch], word.PitchAccents);
+        Assert.False(word.HasOverriddenReading);
+    }
+
+    [Fact]
+    public void Matches_repeated_headwords_in_order_and_drops_only_excess_occurrences()
+    {
+        var id = SentenceTokenId.Parse("l0:t0");
+        var result = WordMeaningValidator.ValidateAndBuild(
+            [new("額", "noun", "forehead", "noun", "ヒタイ"), new("額", "noun", "amount", "noun", ""),
+             new("額", "noun", "extra", "noun", "ひたい")],
+            [new LocalSpanSummary("額", "ガク", "額", [id]) { SpanIndex = 0 },
+             new LocalSpanSummary("額", "ガク", "額", [SentenceTokenId.Parse("l0:t5")]) { SpanIndex = 5 }]);
+
+        Assert.Equal(1, result.DroppedCount);
+        Assert.Collection(result.ValidWords,
+            first =>
+            {
+                Assert.Equal(0, first.SpanIndex);
+                Assert.Equal("ひたい", first.Reading);
+                Assert.Equal("forehead", first.Meaning);
+                Assert.True(first.HasOverriddenReading);
+                Assert.Empty(first.PitchAccents!);
+            },
+            second =>
+            {
+                Assert.Equal(5, second.SpanIndex);
+                Assert.Equal("ガク", second.Reading);
+                Assert.Equal("amount", second.Meaning);
+                Assert.False(second.HasOverriddenReading);
+            });
+    }
+
     private static ParsedWordMeaning Word(string headword, string pos, string meaning, string grammar)
         => new(headword, pos, meaning, grammar);
 }

@@ -90,7 +90,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
     private static IEnumerable<CompoundForm> EnumerateCompoundForms(IReadOnlyList<Token> segment, int start)
     {
         var surface = segment[start].Surface;
-        var hasKanji = ContainsKanji(surface);
+        var hasKanji = JapaneseText.ContainsKanji(surface);
         for (int end = start + 1; end < segment.Count; end++)
         {
             var token = segment[end];
@@ -102,7 +102,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             yield return new CompoundForm(surface, end, surface.Length, IsInflected: false);
 
             var prefixHasKanji = hasKanji;
-            hasKanji |= ContainsKanji(token.Surface);
+            hasKanji |= JapaneseText.ContainsKanji(token.Surface);
             if (!hasKanji || token.PartsOfSpeech.Pos1 is not ("動詞" or "形容詞"))
                 continue;
 
@@ -111,7 +111,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             {
                 if (string.IsNullOrEmpty(baseForm) || baseForm == token.Surface
                     || prefix.Length + baseForm.Length > MaxCandidateCharacters
-                    || (!prefixHasKanji && !ContainsKanji(baseForm)))
+                    || (!prefixHasKanji && !JapaneseText.ContainsKanji(baseForm)))
                     continue;
 
                 yield return new CompoundForm(prefix + baseForm, end, surface.Length, IsInflected: true);
@@ -258,7 +258,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
         IReadOnlyList<DictionaryEntry> entries,
         int? inflectingTokenIndex)
     {
-        if (!tokens.Any(token => ContainsKanji(token.Surface)))
+        if (!tokens.Any(token => JapaneseText.ContainsKanji(token.Surface)))
             return null;
 
         var readings = entries.Select(entry => entry.Reading)
@@ -267,7 +267,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             .Distinct(StringComparer.Ordinal)
             .Take(2)
             .ToArray();
-        if (readings.Length != 1 || !IsKanaReading(readings[0]))
+        if (readings.Length != 1 || !JapaneseText.IsHiraganaReading(readings[0]))
             return null;
 
         var reading = readings[0];
@@ -275,24 +275,16 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             return reading;
 
         var baseReading = Kana.ToHiragana(tokens[baseIndex].BaseReading);
-        if (!IsKanaReading(baseReading) || reading.Length <= baseReading.Length
+        if (!JapaneseText.IsHiraganaReading(baseReading) || reading.Length <= baseReading.Length
             || !reading.EndsWith(baseReading, StringComparison.Ordinal))
             return null;
 
         var occurringReadings = tokens.Skip(baseIndex).Select(token => Kana.ToHiragana(token.Reading)).ToArray();
-        if (!occurringReadings.All(IsKanaReading))
+        if (!occurringReadings.All(JapaneseText.IsHiraganaReading))
             return null;
 
         return reading[..^baseReading.Length] + string.Concat(occurringReadings);
     }
-
-    private static bool ContainsKanji(string text)
-        => text.EnumerateRunes().Any(rune => rune.Value is >= 0x3400 and <= 0x4DBF
-            or >= 0x4E00 and <= 0x9FFF or >= 0xF900 and <= 0xFAFF
-            or >= 0x20000 and <= 0x2FA1F or >= 0x30000 and <= 0x323AF);
-
-    private static bool IsKanaReading(string reading)
-        => reading.Length > 0 && reading.All(character => character is >= 'ぁ' and <= 'ゖ' or 'ゝ' or 'ゞ' or 'ー');
 
     private static IEnumerable<string> TokenLookupKeys(Token token)
     {

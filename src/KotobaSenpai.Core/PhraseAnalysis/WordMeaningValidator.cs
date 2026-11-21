@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Japanese;
 
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
@@ -21,14 +22,11 @@ public static class WordMeaningValidator
         ArgumentNullException.ThrowIfNull(parsedWords);
         ArgumentNullException.ThrowIfNull(localSpans);
 
-        // A word can appear multiple times in a sentence (same surface across separate spans), so key by surface but keep the first occurrence rather than throwing on a duplicate.
-        var bySurface = new Dictionary<string, LocalSpanSummary>(StringComparer.Ordinal);
-        foreach (var span in localSpans)
-            bySurface.TryAdd(span.Surface, span);
+        var bySurface = localSpans.GroupBy(span => span.Surface, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => new Queue<LocalSpanSummary>(group), StringComparer.Ordinal);
         var valid = new List<WordMeaningView>();
         var warnings = new List<string>();
         var dropped = 0;
-        var matchedSurfaces = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var parsed in parsedWords)
         {
@@ -38,7 +36,11 @@ public static class WordMeaningValidator
                 dropped++;
                 continue;
             }
-            var reason = FirstInvalidReason(parsed, bySurface, matchedSurfaces);
+            // Consume a matching occurrence even if its annotation is invalid, so later annotations stay aligned.
+            LocalSpanSummary? span = null;
+            if (bySurface.TryGetValue(parsed.Headword, out var occurrences))
+                occurrences.TryDequeue(out span);
+            var reason = FirstInvalidReason(parsed, span);
             if (reason is not null)
             {
                 warnings.Add($"Dropping word '{parsed.Headword}': {reason}");
@@ -46,28 +48,43 @@ public static class WordMeaningValidator
                 continue;
             }
 
-            matchedSurfaces.Add(parsed.Headword);
-            var span = bySurface[parsed.Headword];
-            valid.Add(new WordMeaningView(
-                span.Surface, span.Reading, parsed.Pos, parsed.Meaning, parsed.Grammar, span.PitchAccents));
+            var local = span!;
+            var overrideReading = GetReadingOverride(parsed, local, warnings);
+            var pitchUnknown = local.HasOverriddenReading || overrideReading is not null;
+            valid.Add(new WordMeaningView(local.Surface, overrideReading ?? local.Reading,
+                parsed.Pos, parsed.Meaning, parsed.Grammar, pitchUnknown ? [] : local.PitchAccents)
+            {
+                SpanIndex = local.SpanIndex,
+                HasOverriddenReading = pitchUnknown,
+            });
         }
 
         return new ValidationResult(valid, dropped, warnings);
     }
 
-    private static string? FirstInvalidReason(
-        ParsedWordMeaning word,
-        IReadOnlyDictionary<string, LocalSpanSummary> bySurface,
-        HashSet<string> matchedSurfaces)
+    private static string? GetReadingOverride(ParsedWordMeaning parsed, LocalSpanSummary span, List<string> warnings)
+    {
+        if (string.IsNullOrEmpty(parsed.Reading))
+            return null;
+        var reading = Kana.ToHiragana(parsed.Reading);
+        if (reading.Length > ParsedWordMeaning.MaxReadingLength || !JapaneseText.IsHiraganaReading(reading))
+        {
+            warnings.Add($"Ignoring invalid reading for word '{span.Surface}': expected 1–64 kana characters.");
+            return null;
+        }
+        if (!JapaneseText.ContainsKanji(span.Surface) || reading == Kana.ToHiragana(span.Reading))
+            return null;
+        return reading;
+    }
+
+    private static string? FirstInvalidReason(ParsedWordMeaning word, LocalSpanSummary? span)
     {
         if (string.IsNullOrWhiteSpace(word.Headword))
             return "missing headword";
         if (word.Headword.Length > ParsedWordMeaning.MaxHeadwordLength)
             return "headword too long";
-        if (!bySurface.TryGetValue(word.Headword, out _))
-            return $"no local span with surface '{word.Headword}'";
-        if (!matchedSurfaces.Add(word.Headword))
-            return $"headword '{word.Headword}' annotated more than once";
+        if (span is null)
+            return "no remaining local span for this headword";
         if (string.IsNullOrWhiteSpace(word.Pos))
             return "missing pos";
         if (string.IsNullOrWhiteSpace(word.Meaning))

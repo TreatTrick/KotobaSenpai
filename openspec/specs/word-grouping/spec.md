@@ -49,7 +49,7 @@ TBD - created by archiving change group-ocr-words-by-tokenizer. Update Purpose a
 - **THEN** 该词只产生一条横线，横线宽度等于词包围盒宽度，而不是每个字符一条线
 
 ### Requirement: Token-boundary dictionary spans
-系统 SHALL 在 UniDic 输出的完整 token 边界上生成连续候选词块，不得从 token 中间开始或结束；候选 SHALL 在一次识别内批量查询词典，并按从左到右的最长覆盖选择非重叠 span。
+系统 SHALL 在 UniDic 输出的完整 token 边界上生成连续候选词块，不得从 token 中间开始或结束；候选 SHALL 在一次识别内批量查询词典，并按从左到右的最长覆盖选择非重叠 span。对于包含至少一个汉字的多 token 候选，除精确拼接各 token `Surface` 外，当末尾 token 为可活用动词或形容词且其 `Surface` 与辞书形（`OrthBase`/`Lemma`）不同时，系统 SHALL 额外生成“前缀 `Surface` + 末尾 token 辞书形”作为词典候选；命中后 SHALL 按既有活用延续规则吸收紧随其后的助动词及接续助词 `て`/`で`，使单个 span 覆盖完整出现形，并以命中的辞书形作为 `LookupKey`。纯假名多 token 序列 SHALL 不触发末尾辞书形归一化匹配，以避免误合并普通助词与活用短串。
 
 #### Scenario: Prevent a cross-token false match
 - **WHEN** token 序列为 `も`、`ちゃんと`，且词典存在 `もち` 但不存在 `もちゃんと`
@@ -58,6 +58,14 @@ TBD - created by archiving change group-ocr-words-by-tokenizer. Update Purpose a
 #### Scenario: Merge a dictionary word across UniDic tokens
 - **WHEN** token 序列为 `で`、`も`，且词典存在 `でも`
 - **THEN** 系统生成一个覆盖两个 token 的 `でも` span，不同时生成重叠的 `で` span
+
+#### Scenario: Merge a conjugated multi-token idiom with trailing lemma normalization
+- **WHEN** token 序列为 `踵`、`を`、`返し`（`OrthBase=返す`）、`て`，且词典存在 `踵を返す`
+- **THEN** 系统生成一个覆盖全部 4 个 token 的 `踵を返して` span，其 `LookupKey` 为 `踵を返す`，不将其拆成独立片段；`頭を垂れた` 命中 `頭を垂れる` 同理
+
+#### Scenario: Pure-kana tokens do not trigger conjugated multi-token normalization
+- **WHEN** 连续纯假名 token 序列（如 `に`、`し`、`た`）中末尾 token 发生活用变形
+- **THEN** 系统不为该纯假名序列生成末尾辞书形多词候选，避免误命中无关假名词条
 
 #### Scenario: Share the resolved span with lookup and underline
 - **WHEN** 一个候选 span 在识别阶段已命中或确认未命中词典

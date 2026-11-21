@@ -1,3 +1,5 @@
+using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Geometry;
@@ -55,6 +57,26 @@ public sealed class FileDiagnosticReporterTests
         using var wordsDocument = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, words)));
         Assert.Equal("g1", groupsDocument.RootElement[0].GetProperty("modelGroupId").GetString());
         Assert.Equal("学校", wordsDocument.RootElement[0].GetProperty("headword").GetString());
+    }
+
+    [Fact]
+    public void Records_the_published_reading_and_original_source_reading()
+    {
+        var dir = NewTempDir();
+        var recognitionId = Guid.NewGuid();
+        var reporter = new FileDiagnosticReporter(new FakeSettings(true), dir);
+        var target = new WindowTarget((nint)1, "VN", new ScreenRect(0, 0, 100, 100));
+        var token = new Token("額", "額", "額", "ガク", "ガク", "ガク", new("noun", "", "", ""), "", "", "0", 0);
+        var word = new GroupedWord(token, new ScreenRect(5, 5, 20, 20)).WithSegmentId("s0-0");
+        var path = Path.Combine(dir, $"tokens-{recognitionId:N}.txt");
+
+        reporter.RecordTokens(recognitionId, target, [word]);
+        Assert.Contains("reading=ガク | sourceReading=ガク | readingOverridden=False", File.ReadAllText(path));
+        reporter.RecordPublishedTokens(recognitionId, target, [word.WithOverriddenReading("ひたい")]);
+
+        var published = File.ReadAllText(path);
+        Assert.Contains("stage=published", published);
+        Assert.Contains("reading=ひたい | sourceReading=ガク | readingOverridden=True | segment=s0-0", published);
     }
 
     [Fact]

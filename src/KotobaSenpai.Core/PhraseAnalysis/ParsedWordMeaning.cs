@@ -10,6 +10,7 @@ public sealed record ParsedWordMeaning
     public const int MaxWordsPerSegment = 32;
     public const int MaxHeadwordLength = 64;
     public const int MaxPosLength = 32;
+    public const int MaxReadingLength = 64;
     public const int MaxMeaningLength = 256;
     public const int MaxGrammarLength = 512;
 
@@ -17,7 +18,8 @@ public sealed record ParsedWordMeaning
         string headword,
         string pos,
         string meaning,
-        string grammar)
+        string grammar,
+        string? reading = null)
     {
         ArgumentNullException.ThrowIfNull(headword);
         ArgumentNullException.ThrowIfNull(pos);
@@ -28,6 +30,7 @@ public sealed record ParsedWordMeaning
         Pos = pos;
         Meaning = meaning;
         Grammar = grammar;
+        Reading = reading;
     }
 
     /// <summary>The merged surface the model copied from the request's local-chunk table (the local span it annotates).</summary>
@@ -35,6 +38,9 @@ public sealed record ParsedWordMeaning
 
     /// <summary>Contextual part of speech (e.g. 自動・カ変, 他動・五段, 名詞).</summary>
     public string Pos { get; }
+
+    /// <summary>A provider-proposed contextual reading, or null or empty when none was supplied.</summary>
+    public string? Reading { get; }
 
     public string Meaning { get; }
 

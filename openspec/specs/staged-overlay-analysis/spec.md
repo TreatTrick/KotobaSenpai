@@ -4,46 +4,50 @@
 TBD - created by archiving change defer-overlay-underlines-until-ai. Update Purpose after archive.
 ## Requirements
 ### Requirement: Stage local furigana before cloud analysis
-After stable local recognition and grouping, the application SHALL publish UniDic-resolved words and furigana without waiting for provider I/O. Cached successful segments SHALL retain their underlines, groups, meanings, and corresponding translations. Segments without successful analysis SHALL have local annotations only. Historical enable settings SHALL NOT bypass cloud analysis. Publication SHALL update the saved session while target visibility rules determine whether it is displayed; temporary hiding due to target invisibility, minimization, or an occlusion union strictly greater than 30% of the full client area SHALL retain the latest completed result for restoration.
+After stable local recognition and grouping, the application SHALL publish locally resolved words and furigana（使用“JMdict 多词唯一命中回流读音 > UniDic 原读音”的本地有效读音）without waiting for provider I/O. Cached successful segments SHALL retain their underlines, groups, meanings, validated LLM reading overrides, and corresponding translations. Segments without successful analysis SHALL have local annotations only. Historical enable settings SHALL NOT bypass cloud analysis. Publication SHALL update the saved session while target visibility rules determine whether it is displayed; temporary hiding due to target invisibility, minimization, or an occlusion union strictly greater than 30% of the full client area SHALL retain the latest completed result for restoration.
 
 #### Scenario: Initial overlay appears before a slow provider
 - **WHEN** initial or full-change local recognition and grouping finish, the provider has not returned yet, and the target is renderable
-- **THEN** the overlay is visible with furigana for eligible words and without word underlines or LLM meanings
+- **THEN** the overlay is visible immediately with locally resolved furigana for eligible words and without word underlines or LLM meanings. When JMdict supplies a local reading override, the preview already shows that reading, such as `こうべ` above `頭` and `た` above `垂` in `頭を垂れる`, or `いっしゅうかん` above `一週間`
 
 #### Scenario: Historical disabled-analysis setting does not bypass analysis
 - **WHEN** a historical setting disables phrase analysis
 - **THEN** the application still enters cloud analysis and publishes only local furigana while waiting, without successful-analysis underlines
 
-#### Scenario: Incremental recognition preserves prior overlay during analysis
-- **WHEN** incremental recognition is in progress (some segments reuse cached LLM results, others need fresh analysis)
-- **THEN** the prior overlay session SHALL NOT be cleared; unchanged word underlines, phrase groups, and word meanings SHALL remain visible while the target is renderable until the incremental cycle completes
+#### Scenario: Incremental recognition preserves prior overlay and cached reading overrides during analysis
+- **WHEN** incremental recognition is in progress (some segments reuse cached LLM results, and others need fresh analysis)
+- **THEN** the prior overlay session SHALL NOT be cleared; unchanged word underlines, phrase groups, word meanings, and any cached reading overrides SHALL remain visible while the target is renderable until the incremental cycle completes
 
 #### Scenario: Incremental cycle completion adds the fresh annotations
 - **WHEN** all incremental segments (both cached and fresh) are processed
 - **THEN** the application SHALL issue one post-analysis publication containing the merged result and reuse unchanged annotation elements from the local preview
 
 #### Scenario: A second sentence preserves existing drawing elements
-- **WHEN** a stable new sentence is appended while previous words keep the same text, reading, geometry, underline eligibility, and font scale
+- **WHEN** a stable new sentence is appended while previous words keep the same text, effective reading, override state, geometry, underline eligibility, and font scale
 - **THEN** existing furigana, pitch markers, and underlines remain the same drawing elements; the renderer adds or replaces only affected word annotations
 
 ### Requirement: Publish one post-analysis overlay refresh
-After all sentence requests in an analysis batch complete, the application SHALL replace the staged overlay exactly once. The replacement SHALL add underlines and validated meanings for successful sentence segments, preserve furigana for every local word, and retain a warning for failed segments. 在增量模式下，替换 SHALL 保留上一轮缓存命中段的下划线和短语组，仅新增或更新有变化的段。
+After all sentence requests in an analysis batch complete, the application SHALL replace the staged overlay exactly once. The replacement SHALL add underlines, validated meanings, and validated LLM contextual reading overrides for successful sentence segments, preserve local furigana for words without reading overrides or from failed segments, and retain a warning for failed segments. 在增量模式下，替换 SHALL 保留上一轮缓存命中段的下划线、短语组和已校验读音纠偏，仅新增或更新有变化的段。
 
 #### Scenario: All requests succeed
-- **WHEN** every sentence request completes successfully
-- **THEN** one replacement overlay contains furigana, underlines, phrase groups, and validated word meanings
+- **WHEN** every sentence request completes successfully and no word has a validated LLM reading override
+- **THEN** one replacement overlay preserves local furigana and adds underlines, phrase groups, and validated word meanings
+
+#### Scenario: All requests succeed with contextual reading override
+- **WHEN** every sentence request completes successfully and at least one word carries a validated LLM reading override（例如 `額` 由 `がく` 纠偏为 `ひたい`）
+- **THEN** one replacement overlay atomically updates that word's furigana and popup reading to `ひたい`（suppressing stale pitch markers）, while adding underlines, phrase groups, and validated word meanings without triggering a second refresh
 
 #### Scenario: Some requests fail
 - **WHEN** at least one sentence request succeeds and another fails
-- **THEN** one replacement overlay underlines and annotates only words from successful segments, leaves failed-segment words with furigana only, and exposes a retryable warning
+- **THEN** one replacement overlay underlines, annotates, and applies reading overrides only for words from successful segments, leaves failed-segment words with local furigana only, and exposes a retryable warning
 
 #### Scenario: Every request fails
 - **WHEN** all sentence requests fail, time out, are refused, or return malformed data
-- **THEN** the overlay remains furigana-only and exposes a retryable warning without rendering invalid groups or meanings
+- **THEN** the overlay remains local-furigana-only and exposes a retryable warning without rendering invalid groups, meanings, or reading overrides
 
-#### Scenario: Incremental merge preserves cached segments
+#### Scenario: Incremental merge preserves cached segments and reading overrides
 - **WHEN** incremental analysis produces fresh results for some segments and reuses cached results for others
-- **THEN** the replacement overlay SHALL contain underlines/groups from both fresh and cached segments, SHALL NOT clear the cached segments
+- **THEN** the replacement overlay SHALL retain the cached segments and contain underlines, groups, and validated word meanings from both fresh and cached segments. It SHALL apply validated reading overrides wherever present and preserve local furigana for words without an override
 
 ### Requirement: Superseded recognition cannot publish
 系统 SHALL 在较新的识别、目标切换、用户明确停止或主动隐藏并暂停后，拒绝旧任务返回的本地或云端结果。停止操作 SHALL 清除可恢复结果，主动隐藏并暂停 SHALL 保留已完成结果及有效缓存；两者都 SHALL 取消未完成任务并阻止后续模型请求和重试。只有目标因原有隐藏、最小化、遮挡规则暂时不能显示、且用户没有主动隐藏时，系统才 SHALL 允许当前有效任务更新保存结果。用户主动恢复阅读时 SHALL 检查当前画面，优先使用有效缓存，仅对缺少分析的句段请求模型；窗口自身恢复显示仍沿用原有不主动发起识别的规则。

@@ -70,6 +70,7 @@ public sealed class SentenceTokenBuilder
                 localSpans.Add(new LocalSpanSummary(span.Surface, span.Reading, span.LookupKey, spanIds, span.PitchAccents)
                 {
                     SpanIndex = localSpans.Count,
+                    HasOverriddenReading = span.HasOverriddenReading,
                 });
             }
         }

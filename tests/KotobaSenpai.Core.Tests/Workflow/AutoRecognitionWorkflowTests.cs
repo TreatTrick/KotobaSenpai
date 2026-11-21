@@ -399,6 +399,65 @@ public sealed class AutoRecognitionWorkflowTests
     }
 
     [Fact]
+    public async Task Contextual_readings_survive_a_cached_segment_move_and_do_not_leak_to_a_failed_sentence()
+    {
+        const string original = "額に汗をかくが支払う額。";
+        const string added = "支払う額。";
+        var release = new TaskCompletionSource<PhraseAnalysisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var overlay = new RecordingOverlay();
+        var recognizer = new SequencedRecognizer([Line(original)], [Line(added), Line(original, 60)]);
+        var analyzer = new ContextualReadingAnalyzer(original, release);
+        using var service = CreateService(recognizer, overlay, analyzer);
+
+        await service.RecognizeAndShowAsync(Target());
+        Assert.Equal(2, overlay.ShowCount);
+        AssertContextualWords(overlay.LastSession!, "s0-0");
+
+        var pending = service.RecognizeChangedAndShowAsync(Target());
+        try
+        {
+            Assert.False(pending.IsCompleted);
+            AssertContextualWords(overlay.LastSession!, "s1-1");
+            AssertUnanalyzedAmount(overlay.LastSession!);
+        }
+        finally
+        {
+            release.SetResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.MalformedJson, []));
+            await pending;
+        }
+
+        Assert.Equal(4, overlay.ShowCount);
+        Assert.Equal([original, added], analyzer.Requests);
+        AssertContextualWords(overlay.LastSession!, "s1-1");
+        AssertUnanalyzedAmount(overlay.LastSession!);
+
+        static void AssertContextualWords(WordOverlaySession session, string segmentId)
+        {
+            var amounts = session.Words.Where(word => word.SegmentId == segmentId && word.Surface == "額").ToArray();
+            Assert.Equal(["ひたい", "ガク"], amounts.Select(word => word.Reading));
+            Assert.True(amounts[0].HasOverriddenReading);
+            Assert.Empty(amounts[0].PitchAccents);
+            Assert.False(amounts[1].HasOverriddenReading);
+            Assert.Equal(0, Assert.Single(amounts[1].PitchAccents).AccentPosition);
+            Assert.Equal(["forehead", "amount"], amounts.Select(word => session.TryGetMeaning(word)?.Meaning));
+            Assert.All(amounts, word => Assert.Equal(segmentId, session.TryGetMeaning(word)?.SegmentId));
+            Assert.Contains(segmentId, session.UnderlineSegmentIds!);
+            var reprojected = session.Reproject(session.Target);
+            Assert.Equal(["forehead", "amount"], reprojected.Words
+                .Where(word => word.SegmentId == segmentId && word.Surface == "額")
+                .Select(word => reprojected.TryGetMeaning(word)?.Meaning));
+        }
+
+        static void AssertUnanalyzedAmount(WordOverlaySession session)
+        {
+            var amount = Assert.Single(session.Words, word => word.SegmentId == "s0-0" && word.Surface == "額");
+            Assert.Equal("ガク", amount.Reading);
+            Assert.Null(session.TryGetMeaning(amount));
+            Assert.DoesNotContain("s0-0", session.UnderlineSegmentIds!);
+        }
+    }
+
+    [Fact]
     public async Task Removing_a_sentence_reuses_the_remaining_sentence()
     {
         var overlay = new RecordingOverlay();
@@ -560,6 +619,22 @@ public sealed class AutoRecognitionWorkflowTests
                 : _release.Task;
     }
 
+    private sealed class ContextualReadingAnalyzer(string completed, TaskCompletionSource<PhraseAnalysisResult> release) : ILlmPhraseAnalyzer
+    {
+        public List<string> Requests { get; } = [];
+
+        public Task<PhraseAnalysisResult> AnalyzeAsync(PhraseAnalysisRequest request, CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request.SegmentText);
+            if (request.SegmentText != completed)
+                return release.Task;
+            return Task.FromResult(new PhraseAnalysisResult(PhraseAnalysisOutcome.Success, [])
+            {
+                Words = [new("額", "noun", "forehead", "noun", "ひたい"), new("額", "noun", "amount", "noun", "")],
+            });
+        }
+    }
+
     private sealed class CountingAnalyzer : ILlmPhraseAnalyzer
     {
         public int CallCount { get; private set; }
@@ -610,9 +685,13 @@ public sealed class AutoRecognitionWorkflowTests
     {
         public IReadOnlyList<Token> Tokenize(string? text)
             => (text ?? string.Empty)
-                .Select((character, index) => new Token(
-                    character.ToString(), character.ToString(), character.ToString(), character.ToString(), character.ToString(), character.ToString(),
-                    new PartsOfSpeech("", "", "", ""), "", "", "", index))
+                .Select((character, index) =>
+                {
+                    var surface = character.ToString();
+                    var reading = character == '額' ? "ガク" : surface;
+                    return new Token(surface, surface, surface, reading, reading, reading,
+                        new PartsOfSpeech("", "", "", ""), "", "", character == '額' ? "0" : "", index);
+                })
                 .ToArray();
     }
 

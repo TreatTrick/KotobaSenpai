@@ -252,15 +252,18 @@ public sealed class WordOverlayApplicationService : IDisposable
 
     private void ShowPreview(PreparedPublication prepared, CancellationToken cancellationToken)
     {
-        var (_, epoch, activeTarget, result, screenWords, analysis) = prepared;
+        var (recognitionId, epoch, activeTarget, result, screenWords, analysis) = prepared;
         bool CanRender() => !cancellationToken.IsCancellationRequested && IsCurrent(epoch);
         // Reproject cached annotations immediately; an OCR correction in one segment must not erase the others.
         if (!IsCurrent(epoch))
             return;
         var cachedRun = _phraseOrchestrator.GetCachedAnalysis(analysis);
+        var effectiveWords = ApplyReadingOverrides(screenWords, cachedRun);
+        if (!ReferenceEquals(effectiveWords, screenWords))
+            _diagnostics?.RecordPublishedTokens(recognitionId, activeTarget, effectiveWords);
         _overlay.Show(WordOverlaySession.Start(
             activeTarget,
-            screenWords,
+            effectiveWords,
             cachedRun.Groups.Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds)).ToArray(),
             cachedRun.Warning,
             cachedRun.Words,
@@ -285,15 +288,43 @@ public sealed class WordOverlayApplicationService : IDisposable
         var phraseGroups = phraseRun.Groups
             .Select(group => ToScreen(group, result.FrameWidth, result.FrameHeight, activeTarget.Bounds))
             .ToArray();
+        var effectiveWords = ApplyReadingOverrides(screenWords, phraseRun);
         _diagnostics?.RecordPhraseAnalysis(recognitionId, phraseRun.Outcome, phraseRun.Groups, phraseRun.Warning);
+        _diagnostics?.RecordPublishedTokens(recognitionId, activeTarget, effectiveWords);
         _overlay.Show(WordOverlaySession.Start(
             activeTarget,
-            screenWords,
+            effectiveWords,
             phraseGroups,
             phraseRun.Warning,
             phraseRun.Words,
             phraseRun.SuccessfulSegmentIds,
             phraseRun.Sentences), CanRender);
+    }
+
+    private static IReadOnlyList<GroupedWord> ApplyReadingOverrides(IReadOnlyList<GroupedWord> words, PhraseAnalysisRun run)
+    {
+        var overrides = new Dictionary<(string SegmentId, int SpanIndex), WordMeaningView>();
+        foreach (var meaning in run.Words)
+        {
+            if (meaning.HasOverriddenReading && meaning.SegmentId is { } segmentId
+                && meaning.SpanIndex is { } spanIndex && run.SuccessfulSegmentIds.Contains(segmentId))
+                overrides.TryAdd((segmentId, spanIndex), meaning);
+        }
+        if (overrides.Count == 0)
+            return words;
+
+        GroupedWord[]? corrected = null;
+        for (var i = 0; i < words.Count; i++)
+        {
+            var word = words[i];
+            if (word.SegmentId is not { } segmentId || word.SegmentSpanIndex is not { } spanIndex
+                || !overrides.TryGetValue((segmentId, spanIndex), out var meaning)
+                || meaning.Headword != word.Surface || meaning.Reading == word.Reading)
+                continue;
+            corrected ??= words.ToArray();
+            corrected[i] = word.WithOverriddenReading(meaning.Reading);
+        }
+        return corrected ?? words;
     }
 
     public void Hide()

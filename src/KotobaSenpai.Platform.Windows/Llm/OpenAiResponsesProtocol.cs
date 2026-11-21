@@ -42,15 +42,26 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
     }
 
     public JsonElement ExtractGroupsJson(string envelopeJson)
-        => ExtractContentRoot(envelopeJson).GetProperty("groups").Clone();
+        => ExtractContentRoot(envelopeJson, out _).GetProperty("groups");
 
     public JsonElement ExtractWordsJson(string envelopeJson)
-        => ExtractContentRoot(envelopeJson).TryGetProperty("words", out var words) ? words.Clone() : EmptyArray();
+        => GetWords(ExtractContentRoot(envelopeJson, out _));
 
     public string? ExtractTranslation(string envelopeJson)
-        => PhraseResponseParser.ParseTranslation(ExtractContentRoot(envelopeJson));
+        => PhraseResponseParser.ParseTranslation(ExtractContentRoot(envelopeJson, out _));
 
-    private static JsonElement ExtractContentRoot(string envelopeJson)
+    public (JsonElement Groups, JsonElement Words, string? Translation, string? RecoveryNote) ExtractPayload(
+        string envelopeJson, bool includeSentenceTranslation)
+    {
+        var root = ExtractContentRoot(envelopeJson, out var recoveryNote);
+        return (root.GetProperty("groups"), GetWords(root),
+            includeSentenceTranslation ? PhraseResponseParser.ParseTranslation(root) : null, recoveryNote);
+    }
+
+    private static JsonElement GetWords(JsonElement root)
+        => root.TryGetProperty("words", out var words) ? words : JsonSerializer.SerializeToElement(Array.Empty<object>());
+
+    private static JsonElement ExtractContentRoot(string envelopeJson, out string? recoveryNote)
     {
         using var doc = JsonDocument.Parse(envelopeJson);
         foreach (var item in doc.RootElement.GetProperty("output").EnumerateArray())
@@ -61,13 +72,13 @@ public sealed class OpenAiResponsesProtocol : ILlmProtocol
             {
                 if (block.TryGetProperty("type", out var blockType) && blockType.GetString() == "output_text")
                 {
-                    using var textDoc = JsonDocument.Parse(block.GetProperty("text").GetString()!);
-                    return textDoc.RootElement.Clone();
+                    var text = block.GetProperty("text").GetString()
+                        ?? throw new PhraseResponseException("Assistant content is empty.");
+                    return LlmJsonExtractor.ExtractObject(text, out recoveryNote);
                 }
             }
         }
         throw new PhraseResponseException("Response lacks an output_text block with group data.");
     }
 
-    private static JsonElement EmptyArray() => JsonDocument.Parse("[]").RootElement.Clone();
 }

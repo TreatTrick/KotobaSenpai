@@ -21,6 +21,8 @@ public sealed record LocalSpanSummary
     /// <summary>The zero-based order within the sentence segment, when produced by the sentence tokenizer.</summary>
     public int? SpanIndex { get; init; }
 
+    public bool HasOverriddenReading { get; init; }
+
     public string Surface { get; }
     public string Reading { get; }
     public string LookupKey { get; }

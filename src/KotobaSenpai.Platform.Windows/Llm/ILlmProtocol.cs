@@ -49,6 +49,12 @@ public interface ILlmProtocol
     JsonElement ExtractWordsJson(string envelopeJson);
 
     string? ExtractTranslation(string envelopeJson);
+
+    /// <summary>Extracts the analysis payload and any recovery note from the provider response.</summary>
+    (JsonElement Groups, JsonElement Words, string? Translation, string? RecoveryNote) ExtractPayload(
+        string envelopeJson, bool includeSentenceTranslation)
+        => (ExtractGroupsJson(envelopeJson), ExtractWordsJson(envelopeJson),
+            includeSentenceTranslation ? ExtractTranslation(envelopeJson) : null, null);
 }
 
 /// <summary>Prompt variants whose tool/structured-output instructions match each protocol.</summary>

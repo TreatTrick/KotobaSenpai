@@ -35,15 +35,17 @@ public sealed class PhrasePromptBuilder
         Do not use the UI language, the English instruction language, the Japanese source language, or the example language instead.
         Do not add bilingual explanations or silently fall back to English or Chinese.
         Necessary Japanese quotations or examples may stay Japanese; explain them in the target language.
-        Keep JSON field names, token and group IDs, Japanese headwords, labels, readings, and Japanese POS notation unchanged.
+        Preserve JSON field names and token and group IDs. Do not translate Japanese headwords, labels, readings, or POS notation.
         Structure examples illustrate shape only: replace their values with actual analysis in the target language.
         Do not add language metadata fields or explanations outside the required result structure.
         """;
 
     private const string WordsInstruction = """
         Populate `words` with exactly one entry for every local word chunk listed above, including particles and auxiliaries, in table order.
-        Each entry must contain only `headword`, `pos`, `meaning`, and `grammar`.
-        Copy `headword` exactly from the chunk's surface; do not add a `surface` field or invent a surface, token ID, or reading.
+        Each entry must contain only `headword`, `reading`, `pos`, `meaning`, and `grammar`.
+        Copy `headword` exactly from the chunk's surface. Keep entries for repeated headwords in the same order as their occurrences in the table.
+        Set `reading` to the empty string "" when the local reading is correct in context or the surface has no kanji.
+        If a chunk contains kanji and its local reading is wrong in context, set `reading` to the full corrected reading in hiragana, including any okurigana.
         Set `pos` to contextual Japanese part-of-speech notation, `meaning` to the single best contextual meaning, and `grammar` to a concise grammar explanation.
         Both explanation fields must use the target explanation language. Do not omit chunks or add entries for anything not in the table.
         """;

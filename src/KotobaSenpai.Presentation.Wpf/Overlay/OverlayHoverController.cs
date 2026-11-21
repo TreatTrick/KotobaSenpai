@@ -172,10 +172,10 @@ internal sealed class OverlayHoverController
 
         var word = session.Words[hit];
         var anchor = word.Rects.First(rect => Contains(rect, cursorX, cursorY));
-        var meaning = session.TryGetMeaning(word);
-        if (meaning is not null)
-            _phrasePopup.ShowWordMeaning(meaning, anchor, session.GetSentenceTranslation(word.SegmentId));
+        var sentence = session.GetSentenceTranslation(word.SegmentId);
+        if (session.TryGetMeaning(word) is { } meaning)
+            _phrasePopup.ShowWordMeaning(meaning, anchor, sentence);
         else
-            _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), anchor, session.GetSentenceTranslation(word.SegmentId));
+            _phrasePopup.ShowWordWithoutMeaning(session.GetMeaningOrDefault(word), anchor, sentence);
     }
 }

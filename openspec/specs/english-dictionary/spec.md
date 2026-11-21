@@ -4,14 +4,18 @@
 TBD - created by archiving change add-english-dictionary. Update Purpose after archive.
 ## Requirements
 ### Requirement: Dictionary index loading
-系统 SHALL 从随发布捆绑的 JMdict 索引文件加载本地日英词典，运行时不依赖网络。索引 SHALL 提供汉字表（表记 → 条目）与读音表（读音 → 条目）两种查找入口。
+系统 SHALL 从随发布捆绑的 JMdict 索引文件 `jmdict.db` 加载本地日英词典，运行时不依赖网络。发布构建与安装包生成流程 MUST 将 `jmdict.db` 随应用输出至程序根目录并在发布阶段校验其存在性，确保正式安装版本具备本地词典合并与读音回流能力。索引 SHALL 提供汉字表（表记 → 条目）与读音表（读音 → 条目）两种查找入口。
 
 #### Scenario: Load bundled index
 - **WHEN** 应用启动且捆绑的 JMdict 索引文件存在
 - **THEN** 系统加载索引，可按表记或读音查词，加载失败不阻塞其他功能
 
+#### Scenario: 发布构建强制校验捆绑索引
+- **WHEN** 执行发布构建或生成 Windows 安装包
+- **THEN** 发布输出目录与安装包内容包含程序根目录的 `jmdict.db`；若缺少该文件则发布校验失败并给出准备指引
+
 #### Scenario: Index file missing
-- **WHEN** 捆绑的 JMdict 索引文件缺失
+- **WHEN** 非发布运行环境中捆绑的 JMdict 索引文件缺失
 - **THEN** 系统不崩溃，查词返回空结果并记录日志
 
 ### Requirement: Lookup words by token
@@ -31,15 +35,15 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 
 ### Requirement: 词典悬停弹窗使用模型目标语言释义
 
-系统 SHALL 在覆盖层悬停本地合并词时展示词头、词性、读音、模型最佳释义和语法说明，并将弹窗定位在词的包围盒下方且不遮挡词。词头、读音和活用型 SHALL 继续由本地 JMdict 与 UniDic 提供；语境词性、释义及语法 SHALL 遵守 `llm-word-meanings` 的约定，其中解释字段使用对应请求的目标语言。JMdict 的英文释义 SHALL 不重新成为弹窗的解释来源。
+系统 SHALL 在覆盖层悬停本地合并词时展示词头、词性、有效读音、模型最佳释义和语法说明，并将弹窗定位在词的包围盒下方且不遮挡词。有效读音 SHALL 按“经校验的 LLM 语境纠偏读音 > JMdict 多词唯一命中回流读音 > UniDic 原读音”的优先级确定；词头与活用型继续由本地词块提供；语境词性、释义及语法 SHALL 遵守 `llm-word-meanings` 的约定，其中解释字段使用对应请求的目标语言。JMdict 的英文释义 SHALL 不重新成为弹窗的解释来源。
 
-#### Scenario: 悬停后显示目标语言解释
+#### Scenario: 悬停后显示目标语言解释与最终有效读音
 - **WHEN** 鼠标悬停在已有本地合并结果和有效模型词项的词上
-- **THEN** 弹窗显示词头、语境词性、读音及模型返回的目标语言释义和语法说明
+- **THEN** 弹窗显示词头、语境词性、最终有效读音（包含 JMdict 回流或 LLM 语境纠偏读音）及模型返回的目标语言释义和语法说明
 
 #### Scenario: 无有效词项时保留最小内容
-- **WHEN** 悬停词缺少词典条目或模型词项
-- **THEN** 弹窗按现有回退规则显示本地读音及界面语言的“未收录／无释义”提示，不为空白或崩溃，也不改用本地英文释义
+- **WHEN** 悬停词缺少模型词项
+- **THEN** 弹窗按现有回退规则显示本地有效读音（含 JMdict 回流读音）及界面语言的“未收录／无释义”提示，不为空白或崩溃，也不改用本地英文释义
 
 ### Requirement: Precomputed span lookup
 系统 SHALL 使用识别阶段生成的完整词块 span 和词典结果进行悬停查词。已确认未命中的 span 也 SHALL 直接显示未收录，不得再次按鼠标所在字符发起单字符最长匹配。
@@ -62,3 +66,22 @@ TBD - created by archiving change add-english-dictionary. Update Purpose after a
 #### Scenario: Update on word switch
 - **WHEN** 悬停切换到另一个词
 - **THEN** 弹窗内容更新为新词的释义，不残留旧词内容
+
+### Requirement: 多词 JMdict 唯一命中读音回流
+系统 SHALL 在含汉字的多 token 词块（`Tokens.Count > 1`）通过本地 JMdict 命中词条，且命中条目经平假名归一后仅存在唯一非空读音时，以该词典读音推导词块的有效读音（直配词块直接使用词典读音；经末尾词元辞书形命中的活用词块将词典读音末尾的辞书形读音替换为实际出现形读音并拼接后续活用尾假名）。当推导出的有效读音与 UniDic 源 token 拼接读音不同时，系统 SHALL 采用该词典有效读音覆盖 `LookupSpan` 读音，并标记该词块的读音已被覆盖。单 token 词块、不含汉字的纯假名词块、多读音歧义命中或无法对齐末尾词元辞书形读音的不规则活用词块，SHALL 保持原有 UniDic 读音不变。
+
+#### Scenario: 固定惯用句原型回流词典读音
+- **WHEN** `頭`、`を`、`垂れる` 合并为多词词块 `頭を垂れる`，且 JMdict 仅命中唯一读音 `こうべをたれる`（与 UniDic 拼接读音 `あたまをたれる` 不同）
+- **THEN** `LookupSpan` 采用有效读音 `こうべをたれる` 并标记读音已覆盖，`踵を返す`（`きびすをかえす`）与 `一週間`（`いっしゅうかん`）遵循相同规则
+
+#### Scenario: 活用形惯用句保留词尾活用读音
+- **WHEN** `頭`、`を`、`垂れ`、`た` 经末尾词元辞书形 `垂れる` 命中 JMdict 词条 `頭を垂れる`（唯一读音 `こうべをたれる`），且 `垂れ` 的辞书形读音为 `たれる`、出现形读音为 `たれ`
+- **THEN** `LookupSpan` 推导出发生形有效读音 `こうべをたれた` 并标记读音已覆盖；`踵を返して` 同理推导出 `きびすをかえして`
+
+#### Scenario: 多读音歧义词不盲目覆盖
+- **WHEN** 词块在 JMdict 中命中多个不同读音（如 `額` 同时对应 `がく` 与 `ひたい`），或词块仅由单个 UniDic token 构成
+- **THEN** 系统不以 JMdict 读音覆盖 UniDic 原读音，保留原读音供本地展示与后续 LLM 语境消歧
+
+#### Scenario: 无法安全对齐末尾活用读音时回退本地读音
+- **WHEN** 活用多词词块命中 JMdict 唯一读音，但该词典读音不以末尾活用词元的 `BaseReading` 结尾
+- **THEN** 系统不拼接残缺读音，回退保留 UniDic 源 token 拼接读音且不标记读音覆盖

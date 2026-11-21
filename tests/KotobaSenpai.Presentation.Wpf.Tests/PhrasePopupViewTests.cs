@@ -330,6 +330,40 @@ public sealed class PhrasePopupViewTests(ITestOutputHelper output)
         finally { overlay.Close(); target.Close(); }
     });
 
+    [Fact]
+    public Task Contextual_reading_and_pitch_are_displayed_in_the_word_popup_and_phrase_member_list() => RunSta(() =>
+    {
+        var popup = new PhrasePopup();
+        try
+        {
+            var anchor = new ScreenRect(100, 100, 100, 30);
+            var stale = new PitchAccentSummary("額", "ガク", 0, 0, "[0] LH");
+            var forehead = new WordMeaningView("額", "ひたい", "noun", "forehead", "noun", [stale])
+            {
+                HasOverriddenReading = true,
+            };
+            var amount = new WordMeaningView("額", "ガク", "noun", "amount", "noun", [stale]);
+
+            popup.ShowWordMeaning(forehead, anchor);
+            popup.UpdateLayout();
+            var word = Assert.IsType<PhrasePopupViewModel>(popup.DataContext);
+            Assert.Contains("ひたい  |  hitai", VisibleText(popup));
+            Assert.Equal("pitch unknown", word.Pitch);
+            Assert.Empty(word.PitchMarker);
+
+            popup.ShowResult("Phrase", "Meaning", "Grammar", anchor, [forehead, amount]);
+            popup.UpdateLayout();
+            var phrase = Assert.IsType<PhrasePopupViewModel>(popup.DataContext);
+            Assert.Equal(["ひたい  |  hitai", "がく  |  gaku"], phrase.Words.Select(member => member.Pronunciation));
+            Assert.Contains("ひたい  |  hitai", VisibleText(popup));
+            Assert.Contains("がく  |  gaku", VisibleText(popup));
+            Assert.Equal("pitch unknown", phrase.Words[0].Pitch);
+            Assert.Empty(phrase.Words[0].PitchMarker);
+            Assert.Equal("⓪", phrase.Words[1].PitchMarker);
+        }
+        finally { popup.Close(); }
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

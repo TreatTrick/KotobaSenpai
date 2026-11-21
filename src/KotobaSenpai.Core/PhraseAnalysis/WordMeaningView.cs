@@ -2,8 +2,7 @@ using KotobaSenpai.Core.Tokenization;
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
 /// <summary>
-/// Overlay-visible word meaning: the local merged word's headword/reading (from the request's local span) plus the
-/// provider's contextual pos/meaning/grammar. Matched by its merged surface+reading.
+/// Overlay-visible word meaning with the effective reading and the identity of its local span when available.
 /// </summary>
 public sealed record WordMeaningView(
     string Headword,
@@ -13,8 +12,12 @@ public sealed record WordMeaningView(
     string Grammar,
     IReadOnlyList<PitchAccentSummary>? PitchAccents = null)
 {
+    public string? SegmentId { get; init; }
+    public int? SpanIndex { get; init; }
+    public bool HasOverriddenReading { get; init; }
+
     public string PitchAccentText
-        => string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())
+        => HasOverriddenReading ? string.Empty : string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())
             .Where(pitch => !string.IsNullOrEmpty(pitch.Notation))
             .Select(pitch => pitch.Notation));
 
