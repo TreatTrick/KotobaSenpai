@@ -304,6 +304,37 @@ public sealed class OverlayAnnotationLayerTests
         }
     });
 
+    [Fact]
+    public Task MorphologicalSpanPitchRendersUnifiedContourAcrossConjugatedTokens() => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var stem = new ScreenRect(220, 160, 60, 36);
+        var te = new ScreenRect(280, 160, 30, 36);
+        var word = new GroupedWord(
+            new LookupSpan(
+                [
+                    new Token("食べ", "食べる", "食べる", "タベ", "タベル", "タベ",
+                        new("動詞", "一般", "", ""), "下一段-バ行", "連用形-一般", "2", 0, "C1", "M4@1"),
+                    new Token("て", "て", "て", "テ", "テ", "テ",
+                        new("助詞", "接続助詞", "", ""), "*", "*", "*", 2, "動詞%F1,形容詞%F2@-1", "*"),
+                ],
+                "食べる",
+                []),
+            [new ScreenRect(220, 160, 90, 36)],
+            [[new(0, 0, 2, stem)], [new(0, 0, 1, te)]])
+        {
+            SpanPitch = new("たべて", [1], SpanPitchSource.MorphologicalRule),
+        };
+
+        layer.Render(WordOverlaySession.Start(Target(), [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        Assert.Equal([OverlayColorRole.High, OverlayColorRole.Low, OverlayColorRole.Low], RenderedRoles(layer));
+        Assert.NotNull(annotations[0].Glyph);
+        Assert.Null(annotations[1].Glyph);
+        Assert.Null(annotations[2].Glyph);
+    });
+
     private static void AssertFurigana(OverlayAnnotation annotation, string reading, ScreenRect bounds, WindowTarget target)
     {
         var fontSize = bounds.Height / 3d;

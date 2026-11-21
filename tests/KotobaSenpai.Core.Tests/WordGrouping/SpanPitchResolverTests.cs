@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Tokenization;
@@ -80,6 +81,59 @@ public sealed class SpanPitchResolverTests
         Assert.Equal([1], results[0]!.Positions);
         Assert.Equal([3], results[1]!.Positions);
         Assert.Equal(0, dictionary.CallCount);
+    }
+
+    [Fact]
+    public void FallsBackToMorphologicalRulesOnlyWhenDictionaryMissesAndReadingIsNotOverridden()
+    {
+        var dictionary = new AccentDictionary
+        {
+            Entries =
+            {
+                [("食べる", "たべて")] = [2],
+                [("論理的", "ろんりてき")] = [0],
+            },
+        };
+        var tabete = new GroupedWord(
+            new LookupSpan(
+                [
+                    new Token("食べ", "食べる", "食べる", "タベ", "タベル", "タベ",
+                        new("動詞", "一般", "", ""), "下一段-バ行", "連用形-一般", "2", 0, "C1", "M4@1"),
+                    new Token("て", "て", "て", "テ", "テ", "テ",
+                        new("助詞", "接続助詞", "", ""), "*", "*", "*", 2, "動詞%F1,形容詞%F2@-1", "*"),
+                ],
+                "食べる",
+                []),
+            new ScreenRect(0, 0, 30, 10));
+        var overriddenTabete = tabete.WithOverriddenReading("たべて");
+        var ronriteki = new GroupedWord(
+            new LookupSpan(
+                [
+                    new Token("論理", "論理", "論理", "ロンリ", "ロンリ", "ロンリ",
+                        new("名詞", "普通名詞", "", ""), "*", "*", "1", 0, "C1", "*"),
+                    new Token("的", "的", "的", "テキ", "テキ", "テキ",
+                        new("接尾辞", "形状詞的", "", ""), "*", "*", "*", 2, "C4", "*"),
+                ],
+                "論理的",
+                []),
+            new ScreenRect(0, 0, 30, 10));
+        var tabeyou = new GroupedWord(
+            new Token("食べよう", "食べる", "食べる", "タベヨウ", "タベル", "タベヨー",
+                new("動詞", "一般", "", ""), "下一段-バ行", "意志推量形", "2", 0, "C1", "M1@1"),
+            new ScreenRect(0, 0, 40, 10));
+        var plainNoun = Word("桜", "さくら");
+
+        var results = new SpanPitchResolver(dictionary)
+            .Resolve([tabete, overriddenTabete, ronriteki, tabeyou, plainNoun]);
+
+        Assert.Equal(SpanPitchSource.MorphologicalRule, results[0]!.Source);
+        Assert.Equal([1], results[0]!.Positions);
+        Assert.Null(results[1]);
+        Assert.Equal(SpanPitchSource.Dictionary, results[2]!.Source);
+        Assert.Equal([0], results[2]!.Positions);
+        Assert.Equal(SpanPitchSource.MorphologicalRule, results[3]!.Source);
+        Assert.Equal([3], results[3]!.Positions);
+        Assert.Null(results[4]);
     }
 
     private static GroupedWord Word(string surface, string reading, string? lemma = null)

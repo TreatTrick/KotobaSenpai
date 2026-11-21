@@ -49,9 +49,14 @@ public sealed class SpanPitchResolver : ISpanPitchResolver
         {
             results[index] = Find(entries, surface, reading, SpanPitchSource.Dictionary)
                 ?? (surface != normalized ? Find(entries, normalized, reading, SpanPitchSource.Dictionary) : null);
+            var moraCount = PitchAccent.SplitMorae(reading).Count;
             if (results[index] is null && WhitelistedCounterPitchRules.ResolvePosition(surface, reading) is int position
-                && position <= PitchAccent.SplitMorae(reading).Count)
+                && position <= moraCount)
                 results[index] = new SpanPitch(reading, [position], SpanPitchSource.CounterRule);
+            if (results[index] is null && !words[index].HasOverriddenReading
+                && MorphologicalPitchRules.ResolvePosition(words[index].SourceTokens) is int morphologicalPosition
+                && morphologicalPosition <= moraCount)
+                results[index] = new SpanPitch(reading, [morphologicalPosition], SpanPitchSource.MorphologicalRule);
         }
         return results;
     }

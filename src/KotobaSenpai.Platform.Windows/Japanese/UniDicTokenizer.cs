@@ -76,7 +76,9 @@ public sealed class UniDicTokenizer : ITokenizer, IWordPitchLookup, IDisposable
                         node.CForm,
                         node.AType,
                         /* UTF-16 code-unit start: preserves leading spaces/newlines before the word, instead of summing prior surface lengths. */
-                        node.BPos + (node.RLength - node.Length)));
+                        node.BPos + (node.RLength - node.Length),
+                        node.AConType,
+                        node.AModType));
                 }
                 return result;
             }

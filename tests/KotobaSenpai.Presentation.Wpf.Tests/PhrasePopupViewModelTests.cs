@@ -200,6 +200,18 @@ public sealed class PhrasePopupViewModelTests
         Assert.Equal(model.Pitch, member.Pitch);
     }
 
+    [Fact]
+    public void MorphologicalSpanPitchDisplaysSingleConjugatedMarkerAndContour()
+    {
+        var word = new WordMeaningView("食べて", "たべて", "Verb", "Eat", "")
+        {
+            SpanPitch = new("たべて", [1], SpanPitchSource.MorphologicalRule),
+        };
+        var model = PhrasePopupViewModel.ForWord(word, new TestLocalizer());
+        Assert.Equal("①", model.PitchMarker);
+        Assert.Equal("Localized:Llm.WordPitchLabel H↓LL", model.Pitch);
+    }
+
     private sealed class TestLocalizer : IStringLocalizer
     {
         public string Prefix { get; set; } = "Localized";

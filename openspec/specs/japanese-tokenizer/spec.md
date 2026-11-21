@@ -5,7 +5,7 @@ TBD - created by archiving change add-japanese-tokenizer. Update Purpose after a
 ## Requirements
 
 ### Requirement: Tokenize Japanese text
-系统 SHALL 将日语文本分词为 token 序列。每个 token SHALL 暴露 surface、UniDic lemma、书写基本形 `orthBase`、表面形读音 `kana`、基本形读音 `kanaBase`、发音 `pron`、四级词性、活用类型、活用形、原始 UniDic `aType`、可选的规范化音调核以及原始输入中的起始偏移。规范化音调核 SHALL 使用 `0` 表示平板型、`1` 表示头高型、`N` 表示第 N 拍后下降；原始值缺失或无效时 SHALL 为空。
+系统 SHALL 将日语文本分词为 token 序列。每个 token SHALL 暴露 surface、UniDic lemma、书写基本形 `orthBase`、表面形读音 `kana`、基本形读音 `kanaBase`、发音 `pron`、四级词性、活用类型、活用形、原始 UniDic `aType`、原始 UniDic `aConType`（アクセント結合型）、原始 UniDic `aModType`（アクセント修飾型）、可选的规范化音调核以及原始输入中的起始偏移。规范化音调核 SHALL 使用 `0` 表示平板型、`1` 表示头高型、`N` 表示第 N 拍后下降；原始 `aType` 缺失或无效时 SHALL 为空。当调用方未提供 `aConType`/`aModType`（例如手工构造测试 token）时，二者 SHALL 默认为空字符串以保持兼容。
 
 #### Scenario: 分词简单句
 - **WHEN** 调用方使用日语文本 `日本語の解析テストです。` 调用 tokenizer
@@ -26,6 +26,10 @@ TBD - created by archiving change add-japanese-tokenizer. Update Purpose after a
 - **WHEN** tokenizer 处理 `aType` 为 `2` 这样的有效 UniDic token
 - **THEN** token 暴露原始 `aType` `2` 和规范化音调核 `2`
 
+#### Scenario: 分词结果保留 UniDic 结合型与变形型字段
+- **WHEN** tokenizer 处理 `食べて`、`食べよう` 或 `論理的`
+- **THEN** `食べ` 暴露 `AConType = "C1"` 与 `AModType = "M4@1"`，`て` 暴露包含 `動詞%F1` 的 `AConType`，`食べよう` 暴露 `AModType = "M1@1"`，`的` 暴露 `AConType = "C4"`
+
 #### Scenario: 保留多值音调字段
 - **WHEN** UniDic 节点的 `aType` 由带引号的 CSV 或多个逗号分隔候选值表示
 - **THEN** token 将完整解码后的 `aType` 作为一个原始字段暴露
@@ -36,8 +40,8 @@ TBD - created by archiving change add-japanese-tokenizer. Update Purpose after a
 - **THEN** token 保留原始字段，但不暴露规范化音调核
 
 #### Scenario: 原始音调不是最终音调结果
-- **WHEN** token 暴露原始 UniDic `aType`
-- **THEN** tokenizer 不得声称该值包含 Doki 人工覆盖、Kanjium 数据或最终音调选择规则
+- **WHEN** token 暴露原始 UniDic `aType`、`aConType` 与 `aModType`
+- **THEN** tokenizer 不得声称这些原始字段已包含人工覆盖、Kanjium 数据或最终音调选择结果
 
 #### Scenario: 保留固定词典的分词结果
 - **WHEN** tokenizer 使用固定的 `unidic-py` `3.1.0+2021-08-31` 资源处理 `アルミホイルを買った`

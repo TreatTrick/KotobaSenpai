@@ -281,6 +281,61 @@ public sealed class UniDicTokenizerTests
     }
 
     [Fact]
+    public void Exposes_UniDic_accent_connection_and_modification_types_and_resolves_conjugations()
+    {
+        var dict = TryResolveDictionary();
+        if (dict is null) return;
+
+        using var tokenizer = new UniDicTokenizer(Logger, dict);
+        var tabeteTokens = tokenizer.Tokenize("食べて");
+        Assert.Equal("C1", tabeteTokens[0].AConType);
+        Assert.Equal("M4@1", tabeteTokens[0].AModType);
+        Assert.Contains("動詞%F1", tabeteTokens[1].AConType);
+
+        var tabeyou = Assert.Single(tokenizer.Tokenize("食べよう"));
+        Assert.Equal("M1@1", tabeyou.AModType);
+
+        var resolver = new SpanPitchResolver(new EmptyAccentDictionary());
+        var cases = new (string Input, int Expected)[]
+        {
+            ("食べて", 1),
+            ("食べなかった", 2),
+            ("行かなかった", 3),
+            ("食べませんでした", 4),
+            ("食べさせられた", 5),
+            ("行きます", 3),
+            ("行った", 0),
+            ("高かった", 2),
+            ("赤かった", 2),
+            ("つけて", 2),
+            ("助けて", 3),
+            ("食べよう", 3),
+            ("行こう", 2),
+            ("論理的", 0),
+            ("物理学", 3),
+            ("食べやすい", 4),
+            ("食べすぎる", 4),
+        };
+        foreach (var (input, expected) in cases)
+        {
+            var tokens = tokenizer.Tokenize(input);
+            var span = new LookupSpan(tokens, tokens[0].Lemma, []);
+            var word = new GroupedWord(span, new ScreenRect(0, 0, 40, 20));
+            var pitch = Assert.Single(resolver.Resolve([word]));
+            Assert.NotNull(pitch);
+            Assert.Equal(SpanPitchSource.MorphologicalRule, pitch.Source);
+            Assert.Equal([expected], pitch.Positions);
+        }
+    }
+
+    private sealed class EmptyAccentDictionary : IPitchAccentDictionary
+    {
+        public IReadOnlyDictionary<(string Surface, string Reading), IReadOnlyList<int>> FindByKeys(
+            IReadOnlyCollection<(string Surface, string Reading)> keys)
+            => new Dictionary<(string Surface, string Reading), IReadOnlyList<int>>();
+    }
+
+    [Fact]
     public void Whitespace_offsets_are_utf16_code_units()
     {
         var dict = TryResolveDictionary();

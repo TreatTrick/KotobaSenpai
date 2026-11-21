@@ -6,6 +6,15 @@ public static class PitchAccent
     private static readonly HashSet<char> SmallKana =
         "ゃゅょぁぃぅぇぉゎャュョァィゥェォヮ".ToHashSet();
 
+    private static readonly HashSet<char> DevoicableSingleKana =
+        "きくしすちつひふぴぷ".ToHashSet();
+
+    private static readonly HashSet<char> VoicelessInitialKana =
+        "かきくけこさしすせそたちつてとはひふへほぱぴぷぺぽっ".ToHashSet();
+
+    private static readonly HashSet<char> DevoicableYoonInitials =
+        "きしちひぴふてと".ToHashSet();
+
     public static int? ParsePosition(string? raw, string? reading = null)
     {
         if (string.IsNullOrWhiteSpace(raw) || raw.Trim() == "*")
@@ -86,6 +95,30 @@ public static class PitchAccent
             morae,
             pattern,
             Format(accentPosition.Value, pattern));
+    }
+
+    /// <summary>True when a mora is a geminate, syllabic nasal, or prolonged sound mark that avoids carrying an accent nucleus.</summary>
+    public static bool IsSpecialMora(string? mora)
+        => mora is "っ" or "ん" or "ー" or "ッ" or "ン";
+
+    /// <summary>True when the mora at <paramref name="moraIndex"/> contains a standard Tokyo devoiced high vowel before a voiceless consonant.</summary>
+    public static bool IsDevoicedVowel(IReadOnlyList<string> morae, int moraIndex)
+    {
+        ArgumentNullException.ThrowIfNull(morae);
+        if (moraIndex < 0 || moraIndex + 1 >= morae.Count)
+            return false;
+
+        var current = Kana.ToHiragana(morae[moraIndex]);
+        var next = Kana.ToHiragana(morae[moraIndex + 1]);
+        if (current.Length == 0 || next.Length == 0 || !VoicelessInitialKana.Contains(next[0]))
+            return false;
+
+        if (current.Length == 1)
+            return DevoicableSingleKana.Contains(current[0]);
+
+        return current.Length == 2
+            && DevoicableYoonInitials.Contains(current[0])
+            && current[1] is 'ゅ' or 'ぃ' or 'ぅ';
     }
 }
 

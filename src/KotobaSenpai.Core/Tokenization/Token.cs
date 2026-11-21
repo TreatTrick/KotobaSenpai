@@ -36,7 +36,9 @@ public sealed record Token
         string conjugationType,
         string conjugationForm,
         string aType,
-        int startOffset)
+        int startOffset,
+        string aConType = "",
+        string aModType = "")
     {
         if (string.IsNullOrEmpty(surface))
             throw new ArgumentException("Token surface must not be empty.", nameof(surface));
@@ -53,6 +55,8 @@ public sealed record Token
         ConjugationType = conjugationType;
         ConjugationForm = conjugationForm;
         AType = aType;
+        AConType = aConType ?? string.Empty;
+        AModType = aModType ?? string.Empty;
         PitchAccentPosition = PitchAccent.ParsePosition(aType, reading);
         StartOffset = startOffset;
     }
@@ -86,6 +90,12 @@ public sealed record Token
 
     /// <summary>UniDic's raw pitch-accent field (aType), not the final pitch.</summary>
     public string AType { get; }
+
+    /// <summary>UniDic's raw accent connection type field (aConType).</summary>
+    public string AConType { get; }
+
+    /// <summary>UniDic's raw accent modification type field (aModType).</summary>
+    public string AModType { get; }
 
     /// <summary>Normalized UniDic pitch nucleus: 0=heiban, 1=atamadaka, N=drop after mora N.</summary>
     public int? PitchAccentPosition { get; }
