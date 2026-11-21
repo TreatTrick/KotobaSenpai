@@ -203,6 +203,101 @@ public sealed class TokenSpanResolverTests
         Assert.False(new GroupedWord(token, bounds).HasResolvedLookup);
     }
 
+    [Theory]
+    [InlineData("1", "週間", "一週間", "いっしゅうかん")]
+    [InlineData("１", "週間", "一週間", "いっしゅうかん")]
+    [InlineData("21", "週間", "二十一週間", "にじゅういっしゅうかん")]
+    public void NormalizesNumericLookupWithoutChangingTheSurface(string number, string counter, string key, string reading)
+    {
+        var lookup = new FakeLookup(new DictionaryEntry(key, reading, [])) { MaxCalls = 1 };
+        var resolver = new TokenBoundarySpanResolver(lookup);
+        var span = Assert.Single(resolver.Resolve([Token(number, 0, ""), Token(counter, number.Length, "シュウカン")]));
+        Assert.Equal(number + counter, span.Surface);
+        Assert.Equal(key, span.LookupKey);
+        Assert.Equal(reading, span.Reading);
+        Assert.Contains(key, lookup.RequestedForms);
+    }
+
+    [Theory]
+    [InlineData("三", "週間", "さんしゅうかん")]
+    [InlineData("六", "ヶ月", "ろっかげつ")]
+    [InlineData("3", "ヶ月", "さんかげつ")]
+    [InlineData("４", "時間", "よじかん")]
+    [InlineData("十九", "時間", "じゅうくじかん")]
+    [InlineData("四", "年生", "よねんせい")]
+    [InlineData("火", "曜日", "かようび")]
+    [InlineData("何", "曜日", "なんようび")]
+    public void GroupsWhitelistedCountersWithoutDictionaryEntries(string prefix, string counter, string reading)
+    {
+        var resolver = new TokenBoundarySpanResolver(new FakeLookup(Entry(counter)));
+        var span = Assert.Single(resolver.Resolve([Token(prefix, 0, ""), Token(counter, prefix.Length, "")]));
+        Assert.Equal(prefix + counter, span.Surface);
+        Assert.Equal(reading, span.Reading);
+        Assert.Empty(span.Entries);
+        Assert.True(span.HasOverriddenReading);
+    }
+
+    [Theory]
+    [InlineData("百", "一", "度", "いちど")]
+    [InlineData("三十", "八", "度", "はちど")]
+    [InlineData("一", "十", "分", "じゅうぶん")]
+    public void MatchesExactDictionaryCompoundsAtNumericContinuations(
+        string prefix, string start, string end, string reading)
+    {
+        var key = start + end;
+        var entry = new DictionaryEntry(key, reading, []);
+        var lookup = new FakeLookup(entry);
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var spans = resolver.Resolve([Token(prefix, 0, ""), Token(start, prefix.Length, ""),
+            Token(end, prefix.Length + start.Length, "")]);
+
+        Assert.Contains(key, lookup.RequestedForms);
+        Assert.Equal(new[] { prefix, key }, spans.Select(span => span.Surface));
+        Assert.Same(entry, Assert.Single(spans[1].Entries));
+        Assert.Equal(reading, spans[1].Reading);
+    }
+
+    [Fact]
+    public void DoesNotNormalizeACompoundStartingAtTheFractionalPart()
+    {
+        var lookup = new FakeLookup(new DictionaryEntry("五週間", "ごしゅうかん", []));
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var spans = resolver.Resolve([Token("1", 0, ""), Token(".", 1, ""),
+            Token("5", 2, ""), Token("週間", 3, "")]);
+
+        Assert.DoesNotContain("五週間", lookup.RequestedForms);
+        Assert.Equal(new[] { "1", "5", "週間" }, spans.Select(span => span.Surface));
+    }
+
+    [Fact]
+    public void DoesNotMergeUnsupportedNumbersOrAcrossBoundaries()
+    {
+        var resolver = new TokenBoundarySpanResolver(new FakeLookup());
+        Assert.Equal(2, resolver.Resolve([Token("三", 0, ""), Token("冊", 1, "")]).Count);
+        Assert.Equal(2, resolver.Resolve([Token("100", 0, ""), Token("週間", 3, "")]).Count);
+        Assert.Equal(3, resolver.Resolve([Token("10", 0, ""), Token("1", 2, ""), Token("週間", 3, "")]).Count);
+        Assert.Equal(3, resolver.Resolve([Token("百", 0, ""), Token("三", 1, ""), Token("週間", 2, "")]).Count);
+        Assert.Equal(3, resolver.Resolve([Token("1", 0, ""), Token(".", 1, ""), Token("5", 2, ""), Token("週間", 3, "")]).Count);
+        Assert.Equal(2, resolver.Resolve([Token("三", 0, ""), Token("週間", 2, "")]).Count);
+    }
+
+    [Theory]
+    [InlineData("01")]
+    [InlineData("０１")]
+    [InlineData("0１")]
+    public void PreservesLeadingZerosWithoutInferringACounterReading(string number)
+    {
+        var lookup = new FakeLookup(new DictionaryEntry("一週間", "いっしゅうかん", []));
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var spans = resolver.Resolve([Token(number, 0, ""), Token("週間", number.Length, "シュウカン")]);
+
+        Assert.Equal(new[] { number, "週間" }, spans.Select(span => span.Surface));
+        Assert.DoesNotContain("一週間", lookup.RequestedForms);
+    }
+
     private static Token Token(
         string surface,
         int start,

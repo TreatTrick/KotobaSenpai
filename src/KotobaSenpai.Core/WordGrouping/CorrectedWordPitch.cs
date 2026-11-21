@@ -20,7 +20,7 @@ internal static class CorrectedWordPitch
             : new(token.Surface, correction.Reading, positions);
     }
 
-    internal static (int TokenIndex, string Reading)? FindChangedToken(GroupedWord word)
+    private static (int TokenIndex, string Reading)? FindChangedToken(GroupedWord word)
     {
         var readings = word.SourceTokens.Select(token => Kana.ToHiragana(token.Reading)).ToArray();
         var effectiveReading = Kana.ToHiragana(word.Reading);

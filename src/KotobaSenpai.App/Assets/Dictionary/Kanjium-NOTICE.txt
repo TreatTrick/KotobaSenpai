@@ -1,0 +1,13 @@
+Kanjium Japanese pitch accent data
+
+Pitch accent annotations were provided by Uros O. through Kanjium.
+Source: https://github.com/mifunetoshiro/kanjium
+Revision: 9ebca4589565c696e7c39e089e2e928ad65f678c
+Source file: data/source_files/raw/accents.txt
+License: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+See Kanjium-LICENSE.txt for the full license and the upstream README for credits.
+
+KotobaSenpai converts the annotations to a SQLite index, normalizes readings,
+filters invalid positions, and merges duplicate keys. The derived database is
+available under the same CC BY-SA 4.0 license.

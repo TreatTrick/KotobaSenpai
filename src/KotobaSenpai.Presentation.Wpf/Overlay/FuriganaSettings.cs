@@ -49,10 +49,6 @@ public static class FuriganaSettings
     /// </summary>
     public static IReadOnlyList<FuriganaSegment> GetFuriganaSegments(string surface, string reading)
     {
-        if (surface == "受け入れ")
-        {
-            Console.WriteLine($"Surface: {surface}, Reading: {reading}");
-        }
         ArgumentNullException.ThrowIfNull(surface);
         ArgumentNullException.ThrowIfNull(reading);
         if (surface.Length == 0)

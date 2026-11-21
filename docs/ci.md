@@ -83,23 +83,30 @@ publishing. Normal builds and fixture-based tests can run without it.
 preparation script can build it from the English JMdict data, and publishing
 places it in the application root.
 
-Both scripts accept existing local assets.
+`scripts/Prepare-PitchAccent.ps1` prepares the Kanjium `pitch-accent.db` in the
+same directory. The builder verifies the pinned source download. A local
+`-SourcePath` can supply `accents.txt`, and `-DatabasePath` can import an
+existing index. Publishing includes the index and Kanjium attribution and
+license files in the application root.
+
+All three scripts accept existing local assets.
 
 ```powershell
 ./scripts/Prepare-UniDic.ps1 -ArchivePath C:\Assets\unidic-3.1.0.zip
 ./scripts/Prepare-Jmdict.ps1 -DatabasePath C:\Assets\jmdict.db
+./scripts/Prepare-PitchAccent.ps1 -DatabasePath C:\Assets\pitch-accent.db
 ```
 
-The self-contained Windows installer includes both dictionaries, the OCR models,
+The self-contained Windows installer includes the offline dictionary assets, the OCR models,
 and the .NET runtime.
 
 ```powershell
-./scripts/Build-Installer.ps1 -UniDicArchive C:\Assets\unidic-3.1.0.zip -JmdictDatabase C:\Assets\jmdict.db
+./scripts/Build-Installer.ps1 -UniDicArchive C:\Assets\unidic-3.1.0.zip -JmdictDatabase C:\Assets\jmdict.db -PitchAccentDatabase C:\Assets\pitch-accent.db
 ```
 
-Both parameters are optional. The installer script prepares missing assets before
-publishing and verifies that both dictionaries exist in the publish directory.
-For direct `dotnet publish`, run both preparation scripts first. The installed
+All dictionary parameters are optional. The installer script prepares missing assets before
+publishing and verifies that the dictionaries exist in the publish directory.
+For direct `dotnet publish`, run all three preparation scripts first. The installed
 application uses local dictionary files, while AI requests use the configured
 provider connection.
 

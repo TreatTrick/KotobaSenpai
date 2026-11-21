@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Geometry;
 using KotobaSenpai.Core.Ocr;
@@ -407,7 +408,8 @@ public sealed class AutoRecognitionWorkflowTests
         var overlay = new RecordingOverlay();
         var recognizer = new SequencedRecognizer([Line(original)], [Line(added), Line(original, 60)]);
         var analyzer = new ContextualReadingAnalyzer(original, release);
-        using var service = CreateService(recognizer, overlay, analyzer, wordPitchLookup: new ForeheadPitchLookup());
+        using var service = CreateService(recognizer, overlay, analyzer,
+            pitchResolver: new WordPitchResolver(new SpanPitchResolver(new RecordingAccentDictionary(includeEntries: false)), new ForeheadPitchLookup()));
 
         await service.RecognizeAndShowAsync(Target());
         Assert.Equal(2, overlay.ShowCount);
@@ -554,6 +556,44 @@ public sealed class AutoRecognitionWorkflowTests
         }
     }
 
+    [Fact]
+    public async Task RequeriesOnlyCorrectedWordsAndPublishesTheirExactSpanPitch()
+    {
+        const string text = "額に汗をかくが支払う額。";
+        var overlay = new RecordingOverlay();
+        var dictionary = new RecordingAccentDictionary();
+        var analyzer = new ContextualReadingAnalyzer(text, new TaskCompletionSource<PhraseAnalysisResult>());
+        using var service = CreateService(new SequencedRecognizer([Line(text)]), overlay, analyzer,
+            pitchResolver: new WordPitchResolver(new SpanPitchResolver(dictionary), new ForeheadPitchLookup()));
+
+        await service.RecognizeAndShowAsync(Target());
+
+        Assert.Equal(2, dictionary.Batches.Count);
+        Assert.Contains(("額", "がく"), dictionary.Batches[0]);
+        Assert.Equal([("額", "ひたい")], dictionary.Batches[1]);
+        var session = Assert.IsType<WordOverlaySession>(overlay.LastSession);
+        var amountWords = session.Words.Where(word => word.Surface == "額").ToArray();
+        Assert.Equal([0], amountWords[0].SpanPitch!.Positions);
+        Assert.Equal([0, 2], amountWords[1].SpanPitch!.Positions);
+        Assert.Null(amountWords[0].WordPitch);
+        Assert.Equal(amountWords[0].SpanPitch, session.TryGetMeaning(amountWords[0])?.SpanPitch);
+        Assert.Equal(amountWords[1].SpanPitch, session.TryGetMeaning(amountWords[1])?.SpanPitch);
+        Assert.Equal(amountWords[0].SpanPitch, session.WordMeanings[0].SpanPitch);
+    }
+
+    private sealed class RecordingAccentDictionary(bool includeEntries = true) : IPitchAccentDictionary
+    {
+        public List<IReadOnlyCollection<(string, string)>> Batches { get; } = [];
+
+        public IReadOnlyDictionary<(string Surface, string Reading), IReadOnlyList<int>> FindByKeys(
+            IReadOnlyCollection<(string Surface, string Reading)> keys)
+        {
+            Batches.Add(keys);
+            return keys.Where(key => includeEntries && key is ("額", "がく" or "ひたい"))
+                .ToDictionary(key => key, key => (IReadOnlyList<int>)(key.Reading == "ひたい" ? [0] : new[] { 0, 2 }));
+        }
+    }
+
     private sealed class ForeheadPitchLookup : IWordPitchLookup
     {
         public IReadOnlyList<int> FindWordPitch(Token source, string reading)
@@ -566,14 +606,14 @@ public sealed class AutoRecognitionWorkflowTests
         ILlmPhraseAnalyzer analyzer,
         IExplanationLanguagePreferences? language = null,
         SentenceTranslationPreferences? translation = null,
-        IWordPitchLookup? wordPitchLookup = null)
+        WordPitchResolver? pitchResolver = null)
         => new(
             recognizer,
             new WordGroupingService(new CharTokenizer(), new SentenceSegmenter(), new IdentitySpanResolver()),
             overlay,
             phraseOrchestrator: new PhraseAnalysisOrchestrator(analyzer, new SentenceSegmenter(),
                 new SentenceTokenBuilder(new CharTokenizer(), new IdentitySpanResolver()), language, sentenceTranslation: translation),
-            explanationLanguage: language, sentenceTranslation: translation, wordPitchLookup: wordPitchLookup);
+            explanationLanguage: language, sentenceTranslation: translation, pitchResolver: pitchResolver);
 
     private static WindowTarget Target() => new((nint)42, "VN", new ScreenRect(0, 0, 1000, 500));
 

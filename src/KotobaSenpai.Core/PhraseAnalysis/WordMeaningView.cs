@@ -1,4 +1,5 @@
 using KotobaSenpai.Core.Tokenization;
+using KotobaSenpai.Core.Japanese;
 namespace KotobaSenpai.Core.PhraseAnalysis;
 
 /// <summary>
@@ -15,10 +16,14 @@ public sealed record WordMeaningView(
     public string? SegmentId { get; init; }
     public int? SpanIndex { get; init; }
     public bool HasOverriddenReading { get; init; }
+    public SpanPitch? SpanPitch { get; init; }
     public WordPitchReference? WordPitch { get; init; }
 
     public string PitchAccentText
-        => HasOverriddenReading ? string.Empty : string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())
+        => SpanPitch is { } pitch ? string.Join(" / ", pitch.Positions
+            .Select(position => PitchAccent.CreatePattern(pitch.Reading, position)?.Notation)
+            .OfType<string>())
+            : HasOverriddenReading ? string.Empty : string.Join(" | ", (PitchAccents ?? Array.Empty<PitchAccentSummary>())
             .Where(pitch => !string.IsNullOrEmpty(pitch.Notation))
             .Select(pitch => pitch.Notation));
 

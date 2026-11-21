@@ -34,6 +34,11 @@
     <Content Include="Assets\Dictionary\JMdict-NOTICE.txt;Assets\Dictionary\JMdict-LICENSE.txt"
              Condition="Exists('Assets\Dictionary\jmdict.db')"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Dictionary\pitch-accent.db" Condition="Exists('Assets\Dictionary\pitch-accent.db')"
+             TargetPath="pitch-accent.db" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Dictionary\Kanjium-NOTICE.txt;Assets\Dictionary\Kanjium-LICENSE.txt"
+             Condition="Exists('Assets\Dictionary\pitch-accent.db')"
+             TargetPath="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\FluentIcons\LICENSE.txt"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
@@ -54,6 +59,10 @@
   <Target Name="RequireBundledJmdict" BeforeTargets="PrepareForPublish">
     <Error Condition="!Exists('$(MSBuildProjectDirectory)\Assets\Dictionary\jmdict.db')"
            Text="The offline JMdict index is required for publishing. Run scripts/Prepare-Jmdict.ps1, optionally with -DatabasePath pointing to an existing jmdict.db." />
+  </Target>
+  <Target Name="RequireBundledPitchAccent" BeforeTargets="PrepareForPublish">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\Assets\Dictionary\pitch-accent.db')"
+           Text="The offline pitch accent index is required for publishing. Run scripts/Prepare-PitchAccent.ps1." />
   </Target>
   <Target Name="GetAgentCliFiles">
     <MSBuild Projects="..\KotobaSenpai.Cli\KotobaSenpai.Cli.csproj" Targets="GetTargetPath"

@@ -3,6 +3,7 @@
 ## Purpose
 TBD - created by archiving change group-ocr-words-by-tokenizer. Update Purpose after archive.
 ## Requirements
+
 ### Requirement: Group OCR characters into tokenizer words
 系统 SHALL 将 OCR 识别出的字符（按阅读顺序、含字符框）组合为句级 token 序列，并为每个 token 分配包含源 OCR 行身份的稳定分析 ID。每个 token 及每个连续本地词块 SHALL 映射回其成员字符框；跨越被本地句段划分判定为连续的 OCR 行时，系统 SHALL 保留跨行 token/词块关系，而不是把每行 offset 当作全局身份。
 
@@ -51,6 +52,8 @@ TBD - created by archiving change group-ocr-words-by-tokenizer. Update Purpose a
 ### Requirement: Token-boundary dictionary spans
 系统 SHALL 在 UniDic 输出的完整 token 边界上生成连续候选词块，不得从 token 中间开始或结束；候选 SHALL 在一次识别内批量查询词典，并按从左到右的最长覆盖选择非重叠 span。对于包含至少一个汉字的多 token 候选，除精确拼接各 token `Surface` 外，当末尾 token 为可活用动词或形容词且其 `Surface` 与辞书形（`OrthBase`/`Lemma`）不同时，系统 SHALL 额外生成“前缀 `Surface` + 末尾 token 辞书形”作为词典候选；命中后 SHALL 按既有活用延续规则吸收紧随其后的助动词及接续助词 `て`/`で`，使单个 span 覆盖完整出现形，并以命中的辞书形作为 `LookupKey`。纯假名多 token 序列 SHALL 不触发末尾辞书形归一化匹配，以避免误合并普通助词与活用短串。
 
+对于紧邻汉字词元的可规范化阿拉伯数字片段（半角 `0-9` 或全角 `０-９` 构成的无前导零的 1–99 整数），系统 SHALL 额外生成将数字片段规范化为汉数字的词典查词候选（例如为 `1週間` 生成 `一週間` 查词键），并在命中唯一词典读音时保留原始 OCR `Surface`（`1週間`）同时采用命中的有效读音（`いっしゅうかん`）。当连续 token 序列未在 JMdict 命中整词，但严格匹配 `[合法前部（1–99 汉数字/半角/全角数字或「何」；「曜日」对应「月/火/水/木/金/土/日/何」）] + [首批白名单助数词（週間/時間/年生/ヶ月/か月/ヵ月/カ月/箇月/曜日）]` 时，系统 SHALL 将其合并为单个连续 span，并依据标准音变表（含促音化及 `よ/く` 特殊读音）推导其有效读音（如 `三週間` → `さんしゅうかん`、`四時間` → `よじかん`、`六ヶ月` → `ろっかげつ`）；超出可确定范围的数字或非白名单助数词 SHALL 不强行合并或编造读音。
+
 #### Scenario: Prevent a cross-token false match
 - **WHEN** token 序列为 `も`、`ちゃんと`，且词典存在 `もち` 但不存在 `もちゃんと`
 - **THEN** 系统不得生成 `もち` span；`も` 与 `ちゃんと` 各自保持为独立 span
@@ -78,6 +81,18 @@ TBD - created by archiving change group-ocr-words-by-tokenizer. Update Purpose a
 #### Scenario: Hard boundaries
 - **WHEN** 候选 token 之间存在标点、空白或非连续字符偏移
 - **THEN** 系统不得跨越该边界合并词块
+
+#### Scenario: 半角数字加助数词通过数字规范化命中词典
+- **WHEN** token 序列为 `1`、`週間`，JMdict 收录 `一週間`（唯一读音 `いっしゅうかん`）而未收录 `1週間`
+- **THEN** 系统生成一个覆盖 `1週間` 的 span，保留 `Surface = "1週間"`，并将有效读音设为 `いっしゅうかん`
+
+#### Scenario: JMdict 缺整词条目时合并白名单助数词并推导有效读音
+- **WHEN** token 序列为 `三`、`週間`（或 `3`、`ヶ月`），且 JMdict 中没有对应整词记录
+- **THEN** 系统将其合并为单个 span `三週間`（或 `3ヶ月`），并推导出有效读音 `さんしゅうかん`（或 `さんかげつ`）
+
+#### Scenario: 数词续接位置仍参与普通词典匹配
+- **WHEN** token 序列为 `百`、`一`、`度`，且 JMdict 仅命中 `一度`
+- **THEN** `一度` 仍参与普通复合词匹配。从数词续接位置开始的候选不使用数字归一化或白名单助数词推导
 
 ### Requirement: Build multi-part phrase geometry
 系统 SHALL 根据已验证的 phrase group token 引用生成一个或多个 phrase part 几何。每个 part SHALL 只覆盖其引用 token 的字符框；group 之间的间隔 token 不得被并入 phrase 几何。
@@ -108,4 +123,3 @@ TBD - created by archiving change group-ocr-words-by-tokenizer. Update Purpose a
 #### Scenario: Token offset maps back to the correct line's boxes
 - **WHEN** 一个 token 的 offset 落在合并文本的某一行区间内
 - **THEN** 系统从该行取字符框,不越界到其他行
-

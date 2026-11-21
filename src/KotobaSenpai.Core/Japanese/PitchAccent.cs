@@ -77,7 +77,7 @@ public static class PitchAccent
     public static PitchAccentPattern? CreatePattern(string? reading, int? accentPosition)
     {
         var morae = SplitMorae(reading);
-        if (accentPosition is null || morae.Count == 0 || accentPosition > morae.Count)
+        if (accentPosition is null or < 0 || morae.Count == 0 || accentPosition > morae.Count)
             return null;
 
         var pattern = BuildPattern(accentPosition.Value, morae.Count);

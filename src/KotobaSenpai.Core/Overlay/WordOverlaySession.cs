@@ -44,7 +44,17 @@ public sealed class WordOverlaySession
         _wordGeometry = wordGeometry;
         _phraseGeometry = phraseGeometry;
         _sentences = sentences.ToDictionary(sentence => sentence.SegmentId, StringComparer.Ordinal);
-        _wordMeanings = wordMeanings.ToArray();
+        var wordsBySpan = new Dictionary<(string, int), GroupedWord>();
+        foreach (var word in _words)
+        {
+            if (word.SegmentId is { } segmentId && word.SegmentSpanIndex is int spanIndex)
+                wordsBySpan.TryAdd((segmentId, spanIndex), word);
+        }
+        _wordMeanings = wordMeanings.Select(meaning =>
+            meaning.SegmentId is { } segmentId && meaning.SpanIndex is int spanIndex
+                && wordsBySpan.TryGetValue((segmentId, spanIndex), out var word)
+                ? WithLocalPitch(word, meaning)
+                : meaning).ToArray();
         foreach (var meaning in _wordMeanings)
         {
             if (meaning.SegmentId is { } segmentId && meaning.SpanIndex is { } spanIndex)
@@ -131,15 +141,20 @@ public sealed class WordOverlaySession
     {
         if (word.SegmentId is { } segmentId && word.SegmentSpanIndex is { } spanIndex
             && _meaningBySpan.TryGetValue((segmentId, spanIndex), out var meaning) && meaning.Headword == word.Surface)
-            return WithWordPitch(word, meaning);
+            return meaning;
         return _legacyMeaningByWord.TryGetValue((word.Surface, word.Reading), out var legacyMeaning)
-            ? WithWordPitch(word, legacyMeaning)
+            ? WithLocalPitch(word, legacyMeaning)
             : null;
     }
 
-    private static WordMeaningView WithWordPitch(GroupedWord word, WordMeaningView meaning)
-        => word.WordPitch is { } pitch && meaning.Reading == word.Reading
-            ? meaning with { WordPitch = pitch, HasOverriddenReading = true }
+    private static WordMeaningView WithLocalPitch(GroupedWord word, WordMeaningView meaning)
+        => meaning.Headword == word.Surface && meaning.Reading == word.Reading
+            ? meaning with
+            {
+                SpanPitch = word.SpanPitch ?? meaning.SpanPitch,
+                WordPitch = word.SpanPitch is null ? word.WordPitch ?? meaning.WordPitch : null,
+                HasOverriddenReading = word.HasOverriddenReading || meaning.HasOverriddenReading,
+            }
             : meaning;
 
     public WordMeaningView GetMeaningOrDefault(GroupedWord word)
@@ -239,12 +254,11 @@ public sealed class WordOverlaySession
     private static WordMeaningView FromWord(GroupedWord word)
     {
         ArgumentNullException.ThrowIfNull(word);
-        return new(word.Surface, word.Reading, string.Empty, string.Empty, string.Empty, word.PitchAccents)
-        {
-            SegmentId = word.SegmentId,
-            SpanIndex = word.SegmentSpanIndex,
-            HasOverriddenReading = word.HasOverriddenReading,
-            WordPitch = word.WordPitch,
-        };
+        return WithLocalPitch(word,
+            new WordMeaningView(word.Surface, word.Reading, string.Empty, string.Empty, string.Empty, word.PitchAccents)
+            {
+                SegmentId = word.SegmentId,
+                SpanIndex = word.SegmentSpanIndex,
+            });
     }
 }

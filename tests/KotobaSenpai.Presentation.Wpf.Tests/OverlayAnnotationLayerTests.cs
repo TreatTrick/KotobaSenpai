@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Japanese;
 using System.Windows.Controls;
 using KotobaSenpai.Core.Dictionary;
 using KotobaSenpai.Core.Settings;
@@ -90,67 +91,123 @@ public sealed class OverlayAnnotationLayerTests
         AssertFurigana(annotations[1], verbFurigana, new ScreenRect(300, 160, 50, 36), target);
     });
 
-    [Theory]
-    [InlineData("頭", "アタマ", "こうべをたれる", "垂れる", "タレル", "2", new[] { 0, 3 })]
-    [InlineData("踵", "カカト", "きびすをかえす", "返す", "カエス", "1", new[] { 0 })]
-    public Task Corrected_phrase_renders_unchanged_verb_pitch_and_refreshes_the_corrected_noun(
-        string noun, string originalReading, string phraseReading, string verb, string verbReading,
-        string verbAccent, int[] positions) => RunOnSta(() =>
+    [Fact]
+    public Task LexicalReferenceDoesNotColorAnOverriddenPhraseOrDrawStaleDots() => RunOnSta(() =>
     {
         var layer = new OverlayAnnotationLayer();
         var target = Target();
         var nounBounds = new ScreenRect(220, 160, 50, 36);
         var verbBounds = new ScreenRect(320, 160, 60, 36);
         var word = new GroupedWord(new LookupSpan(
-            [Token(noun, originalReading), Token("を", "ヲ", 1, "*"), Token(verb, verbReading, 2, verbAccent)],
-            noun + "を" + verb, [], phraseReading), [new ScreenRect(220, 160, 160, 36)],
+            [Token("頭", "アタマ"), Token("を", "ヲ", 1, "*"), Token("垂れる", "タレル", 2, "2")],
+            "頭を垂れる", []), [new ScreenRect(220, 160, 160, 36)],
             [[new(0, 0, 1, nounBounds)], [new(0, 0, 1, new ScreenRect(270, 160, 50, 36))],
-             [new(0, 0, verb.Length, verbBounds)]]);
-
+             [new(0, 0, 3, verbBounds)]]);
         layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
-        var verbRoles = verbAccent == "2"
-            ? new[] { OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.Low }
-            : new[] { OverlayColorRole.High, OverlayColorRole.Low, OverlayColorRole.Low };
-        Assert.Equal([OverlayColorRole.Furigana, .. verbRoles], RenderedRoles(layer));
+        Assert.Contains(layer.Canvas.Children.OfType<OverlayAnnotation>(), element =>
+            element.Glyph is null && element.Role == OverlayColorRole.Low);
 
-        var withPitch = word.WithDictionaryWordPitch(new StubWordPitchLookup(positions));
-        layer.Render(WordOverlaySession.Start(target, [withPitch], underlineSegmentIds: []), 1, 1d / 3);
+        var corrected = word.WithOverriddenReading("こうべをたれる").WithDictionaryWordPitch(new StubWordPitchLookup([0, 3]));
+        Assert.NotNull(corrected.WordPitch);
+        layer.Render(WordOverlaySession.Start(target, [corrected], underlineSegmentIds: []), 1, 1d / 3);
 
         var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
-        Assert.Equal([OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High, OverlayColorRole.Heiban,
-            .. verbRoles], annotations.Select(annotation => annotation.Role));
-        Assert.All(annotations.Take(3), element =>
-        {
-            Assert.NotNull(element.Glyph);
-            Assert.InRange(Canvas.GetLeft(element), nounBounds.X - target.Bounds.X, nounBounds.Right - target.Bounds.X);
-        });
-        Assert.Null(annotations[^1].Glyph);
-        Assert.All(annotations.Skip(4), element => Assert.True(Canvas.GetLeft(element) >= verbBounds.X - target.Bounds.X));
-        Assert.Empty(withPitch.PitchAccents);
+        Assert.Equal([OverlayColorRole.Furigana, OverlayColorRole.Furigana], RenderedRoles(layer));
+        AssertFurigana(annotations[0], "こうべ", nounBounds, target);
+        AssertFurigana(annotations[1], "た", new ScreenRect(320, 160, 20, 36), target);
     });
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public Task Corrected_week_reading_preserves_the_unchanged_suffix_pitch(bool hasCorrectedPitch) => RunOnSta(() =>
+    [InlineData("一")]
+    [InlineData("1")]
+    public Task SpanPitchKeepsMoraOffsetsAcrossLinesAndUsesOnlyTheFirstCandidate(string number) => RunOnSta(() =>
     {
         var layer = new OverlayAnnotationLayer();
-        var first = new ScreenRect(220, 160, 36, 36);
-        var suffix = new ScreenRect(256, 160, 72, 36);
-        var word = new GroupedWord(new LookupSpan([Token("一", "イチ", 0, "2"), Token("週間", "シュウカン", 1)],
-            "一週間", [], "いっしゅうかん"), [new ScreenRect(220, 160, 108, 36)],
-            [[new(0, 0, 1, first)], [new(0, 0, 2, suffix)]]);
-        if (hasCorrectedPitch)
-            word = word.WithDictionaryWordPitch(new StubWordPitchLookup([0]));
+        var target = Target();
+        var first = new ScreenRect(280, 160, 40, 36);
+        var second = new ScreenRect(220, 220, 96, 36);
+        var word = new GroupedWord(new LookupSpan([Token(number, "イチ"), Token("週間", "シュウカン", 1)],
+            "一週間", [], "いっしゅうかん"), [first, second], [[new(0, 0, 1, first)], [new(1, 0, 2, second)]])
+        {
+            SpanPitch = new("いっしゅうかん", [3, 0], SpanPitchSource.Dictionary),
+        };
+
+        layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        Assert.Equal([OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High,
+            OverlayColorRole.Low, OverlayColorRole.Low, OverlayColorRole.Low], RenderedRoles(layer));
+        Assert.All(annotations, element => Assert.NotNull(element.Glyph));
+        Assert.All(annotations.Take(2), element => Assert.Equal(46, Canvas.GetTop(element)));
+        Assert.All(annotations.Skip(2), element => Assert.Equal(106, Canvas.GetTop(element)));
+    });
+
+    [Theory]
+    [InlineData("3", "か月", "さんかげつ", "さ", "ん")]
+    [InlineData("1", "か月", "いっかげつ", "い", "っ")]
+    [InlineData("3", "カ月", "さんかげつ", "さ", "ん")]
+    [InlineData("３", "か月", "さんかげつ", "さ", "ん")]
+    public Task SpanPitchRendersNumericCounterFuriganaAndKanaDot(
+        string number, string counter, string reading, string firstMora, string secondMora) => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var word = new GroupedWord(new LookupSpan([Token(number, ""), Token(counter, "カゲツ", 1)],
+            number + counter, [], reading), new ScreenRect(220, 160, 90, 36))
+        {
+            SpanPitch = new(reading, [3], SpanPitchSource.CounterRule),
+        };
 
         layer.Render(WordOverlaySession.Start(Target(), [word], underlineSegmentIds: []), 1, 1d / 3);
 
-        OverlayColorRole[] suffixRoles = [OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High,
-            OverlayColorRole.High, OverlayColorRole.Heiban];
-        var roles = RenderedRoles(layer);
-        Assert.Equal(suffixRoles, roles.TakeLast(suffixRoles.Length));
-        if (!hasCorrectedPitch)
-            Assert.Equal(OverlayColorRole.Furigana, Assert.Single(roles.SkipLast(suffixRoles.Length)));
+        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        Assert.Equal([OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High,
+            OverlayColorRole.Low, OverlayColorRole.Low], RenderedRoles(layer));
+        Assert.Null(annotations[2].Glyph);
+        var style = new OverlayAnnotationStyle(OverlayAppearanceSettings.Default);
+        var glyphs = new[] { firstMora, secondMora, "げ", "つ" }
+            .Select(text => OverlayAnnotation.CreateText(text, 12, OverlayColorRole.Furigana, style).Glyph!.ToString());
+        Assert.Equal(glyphs, annotations.Where(annotation => annotation.Glyph is not null)
+            .Select(annotation => annotation.Glyph!.ToString()));
+    });
+
+    [Theory]
+    [InlineData("3", "か月", "さんかげつ", "さん")]
+    [InlineData("1", "か月", "いっかげつ", "いっ")]
+    [InlineData("3", "カ月", "さんかげつ", "さん")]
+    public Task MonochromeFuriganaIncludesTheNumericCounterPrefix(
+        string number, string counter, string reading, string prefixReading) => RunOnSta(() =>
+    {
+        var target = Target();
+        var layer = new OverlayAnnotationLayer();
+        var word = new GroupedWord(new LookupSpan([Token(number, ""), Token(counter, "カゲツ", 1)],
+            number + counter, [], reading), new ScreenRect(220, 160, 90, 36));
+
+        layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        Assert.Collection(layer.Canvas.Children.OfType<OverlayAnnotation>(),
+            prefix => AssertFurigana(prefix, prefixReading, new ScreenRect(220, 160, 30, 36), target),
+            suffix => AssertFurigana(suffix, "げつ", new ScreenRect(280, 160, 30, 36), target));
+    });
+
+    [Theory]
+    [InlineData("あした", "あした", 0)]
+    [InlineData("受ける", "うける", 1)]
+    public Task SpanPitchUsesDotsForKanaWithTheSameGlobalMoraOffsets(string surface, string reading, int textCount)
+        => RunOnSta(() =>
+    {
+        var layer = new OverlayAnnotationLayer();
+        var word = new GroupedWord(Token(surface, reading), new ScreenRect(220, 160, 90, 36))
+        {
+            SpanPitch = new(reading, [0, 3], SpanPitchSource.Dictionary),
+        };
+
+        layer.Render(WordOverlaySession.Start(Target(), [word], underlineSegmentIds: []), 1, 1d / 3);
+
+        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        Assert.Equal(textCount, annotations.Count(element => element.Glyph is not null));
+        Assert.Equal([OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High, OverlayColorRole.Heiban],
+            RenderedRoles(layer));
+        Assert.All(annotations.Skip(textCount), element => Assert.Null(element.Glyph));
     });
 
     [Fact]
@@ -225,7 +282,14 @@ public sealed class OverlayAnnotationLayerTests
         var changed = Render(corrected, ["s0-0"], monochrome);
         AssertFurigana(Assert.Single(changed), "ひたい", word.Bounds, target);
 
-        var underlined = Render(corrected, ["s0-0", "s1-1"], changed);
+        var resolved = corrected with { SpanPitch = new("ひたい", [0], SpanPitchSource.Dictionary) };
+        var pitch = Render(resolved, ["s0-0"], changed);
+        Assert.Equal([OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High, OverlayColorRole.Heiban],
+            pitch.Select(element => element.Role));
+        var equivalent = resolved with { SpanPitch = new("ひたい", [0], SpanPitchSource.Dictionary) };
+        Assert.Equal(pitch, Render(equivalent, ["s0-0"]));
+
+        var underlined = Render(corrected, ["s0-0", "s1-1"], pitch);
         Assert.Contains(underlined, element => element.Role == OverlayColorRole.Underline);
         AssertFurigana(Assert.Single(underlined, element => element.Glyph is not null), "ひたい", word.Bounds, target);
 

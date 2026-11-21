@@ -57,7 +57,8 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
             var token = word.Token;
             var source = string.Join("+", word.SourceTokens.Select(sourceToken => sourceToken.Surface));
             var sourceReading = string.Concat(word.SourceTokens.Select(sourceToken => sourceToken.Reading));
-            lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={word.Reading} | sourceReading={sourceReading} | readingOverridden={word.HasOverriddenReading} | segment={word.SegmentId} | spanIndex={word.SegmentSpanIndex} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}");
+            var spanPitch = word.SpanPitch is { } pitch ? $" | spanPitch={pitch.Source}[{string.Join(',', pitch.Positions)}]" : string.Empty;
+            lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={word.Reading} | sourceReading={sourceReading} | readingOverridden={word.HasOverriddenReading} | segment={word.SegmentId} | spanIndex={word.SegmentSpanIndex} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}{spanPitch}");
         }
         File.WriteAllLines(Path.Combine(dir, $"tokens-{recognitionId:N}.txt"), lines, Utf8Bom);
         PruneToLatest(dir, "tokens-");

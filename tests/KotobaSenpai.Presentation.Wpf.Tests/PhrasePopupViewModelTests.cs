@@ -1,3 +1,4 @@
+using KotobaSenpai.Core.Japanese;
 using KotobaSenpai.Core.Localization;
 using KotobaSenpai.Core.PhraseAnalysis;
 using KotobaSenpai.Core.Tokenization;
@@ -180,6 +181,23 @@ public sealed class PhrasePopupViewModelTests
         Assert.Empty(model.PitchMarker);
         Assert.Empty(model.Romanization);
         Assert.Empty(model.Pronunciation);
+    }
+
+    [Fact]
+    public void SpanPitchShowsOnlyThePrimaryMarkerAndAllContoursInSourceOrder()
+    {
+        var word = new WordMeaningView("頭", "こうべ", "Noun", "Head", "")
+        {
+            HasOverriddenReading = true,
+            SpanPitch = new("こうべ", [0, 3], SpanPitchSource.Dictionary),
+        };
+        var localizer = new TestLocalizer();
+        var model = PhrasePopupViewModel.ForWord(word, localizer);
+        Assert.Equal("⓪", model.PitchMarker);
+        Assert.Equal("Localized:Llm.WordPitchLabel LHH / LHH↓", model.Pitch);
+        var member = Assert.Single(PhrasePopupViewModel.ForPhrase("Phrase", "", "", [word], localizer).Words);
+        Assert.Equal(model.PitchMarker, member.PitchMarker);
+        Assert.Equal(model.Pitch, member.Pitch);
     }
 
     private sealed class TestLocalizer : IStringLocalizer

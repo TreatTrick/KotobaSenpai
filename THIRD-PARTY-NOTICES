@@ -72,3 +72,8 @@ SOFTWARE.
 
 - The bundled SQLite index is derived from the EDRDG JMdict data distributed by jmdict-simplified.
 - License and attribution are included in `Assets/Dictionary/JMdict-NOTICE.txt` and `Assets/Dictionary/JMdict-LICENSE.txt`.
+
+Kanjium pitch accents (CC BY-SA 4.0)
+- Pitch accent annotations by Uros O., from https://github.com/mifunetoshiro/kanjium.
+- The bundled SQLite index is derived from `data/source_files/raw/accents.txt` at revision `9ebca4589565c696e7c39e089e2e928ad65f678c`.
+- Attribution and license are included in `Kanjium-NOTICE.txt` and `Kanjium-LICENSE.txt` in the published application.

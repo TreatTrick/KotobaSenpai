@@ -87,15 +87,19 @@ internal sealed class PhrasePopupViewModel
     private static PhrasePopupWordViewModel CreateWord(WordMeaningView word, IStringLocalizer? localizer)
     {
         var reading = Kana.ToHiragana(word.Reading);
-        var patterns = (word.HasOverriddenReading ? [] : word.PitchAccents ?? [])
-            .Select(pitch => PitchAccent.CreatePattern(pitch.Reading, pitch.AccentPosition))
-            .OfType<PitchAccentPattern>().ToArray();
-        var marker = string.Concat(patterns.Select(pattern => CircledNumber(pattern.AccentPosition)));
+        var patterns = word.SpanPitch is { Positions.Count: > 0 } spanPitch
+            ? spanPitch.Positions.Select(position => PitchAccent.CreatePattern(spanPitch.Reading, position))
+                .OfType<PitchAccentPattern>().ToArray()
+            : (word.HasOverriddenReading ? [] : word.PitchAccents ?? [])
+                .Select(pitch => PitchAccent.CreatePattern(pitch.Reading, pitch.AccentPosition))
+                .OfType<PitchAccentPattern>().ToArray();
+        var marker = string.Concat((word.SpanPitch is null ? patterns : patterns.Take(1))
+            .Select(pattern => CircledNumber(pattern.AccentPosition)));
         var pitchText = patterns.Length == 0
             ? localizer?.Get("Llm.WordPitchUnknown") ?? "pitch unknown"
             : $"{localizer?.Get("Llm.WordPitchLabel") ?? "Pitch"} "
-                + string.Join(" | ", patterns.Select(pattern => pattern.Notation[(pattern.Notation.IndexOf(']') + 2)..]));
-        if (word.HasOverriddenReading && word.WordPitch is { } reference)
+                + string.Join(word.SpanPitch is null ? " | " : " / ", patterns.Select(pattern => pattern.Notation[(pattern.Notation.IndexOf(']') + 2)..]));
+        if (word.SpanPitch is null && word.HasOverriddenReading && word.WordPitch is { } reference)
         {
             var variants = reference.Positions
                 .Select(position => PitchAccent.CreatePattern(reference.Reading, position))

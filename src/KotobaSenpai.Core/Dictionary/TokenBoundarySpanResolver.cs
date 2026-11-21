@@ -26,8 +26,9 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
 
         var forms = new HashSet<string>(StringComparer.Ordinal);
         var segments = SplitSegments(tokens);
+        var numericContinuations = FindNumericContinuations(tokens);
         foreach (var segment in segments)
-            CollectCandidateForms(segment, forms);
+            CollectCandidateForms(segment, forms, numericContinuations);
 
         var matches = forms.Count == 0
             ? new Dictionary<string, IReadOnlyList<DictionaryEntry>>(StringComparer.Ordinal)
@@ -35,7 +36,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
 
         var result = new List<LookupSpan>();
         foreach (var segment in segments)
-            ResolveSegment(segment, matches, result);
+            ResolveSegment(segment, matches, result, numericContinuations);
         return result;
     }
 
@@ -68,9 +69,28 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
         }
     }
 
+    private static HashSet<int> FindNumericContinuations(IReadOnlyList<Token> tokens)
+    {
+        var offsets = new HashSet<int>();
+        for (var i = 1; i < tokens.Count; i++)
+        {
+            if (!JapaneseNumerals.IsNumericCharacter(tokens[i].Surface[0]) || !IsContiguous(tokens[i - 1], tokens[i]))
+                continue;
+            if (JapaneseNumerals.IsNumericCharacter(tokens[i - 1].Surface[^1])
+                || (i > 1 && (tokens[i - 1].Surface is "." or "．")
+                    && IsContiguous(tokens[i - 2], tokens[i - 1])
+                    && JapaneseNumerals.IsArabicDigit(tokens[i - 2].Surface[^1])))
+                offsets.Add(tokens[i].StartOffset);
+        }
+        return offsets;
+    }
+
+    private static string NormalizeLookupForm(string surface)
+        => JapaneseText.ContainsKanji(surface) ? JapaneseNumerals.Normalize(surface) : surface;
+
     private static void CollectCandidateForms(
         IReadOnlyList<Token> segment,
-        ISet<string> forms)
+        ISet<string> forms, IReadOnlySet<int> numericContinuations)
     {
         foreach (var token in segment)
         {
@@ -82,12 +102,16 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
 
         for (int start = 0; start < segment.Count; start++)
         {
-            foreach (var form in EnumerateCompoundForms(segment, start))
+            var canStartNumber = !numericContinuations.Contains(segment[start].StartOffset);
+            if (canStartNumber)
+                forms.Add(NormalizeLookupForm(segment[start].Surface));
+            foreach (var form in EnumerateCompoundForms(segment, start, canStartNumber))
                 forms.Add(form.LookupKey);
         }
     }
 
-    private static IEnumerable<CompoundForm> EnumerateCompoundForms(IReadOnlyList<Token> segment, int start)
+    private static IEnumerable<CompoundForm> EnumerateCompoundForms(
+        IReadOnlyList<Token> segment, int start, bool allowNumericNormalization)
     {
         var surface = segment[start].Surface;
         var hasKanji = JapaneseText.ContainsKanji(surface);
@@ -100,6 +124,12 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
                 yield break;
 
             yield return new CompoundForm(surface, end, surface.Length, IsInflected: false);
+            if (allowNumericNormalization)
+            {
+                var normalized = NormalizeLookupForm(surface);
+                if (normalized != surface)
+                    yield return new CompoundForm(normalized, end, surface.Length, IsInflected: false, IsNormalized: true);
+            }
 
             var prefixHasKanji = hasKanji;
             hasKanji |= JapaneseText.ContainsKanji(token.Surface);
@@ -122,19 +152,20 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
     private static void ResolveSegment(
         IReadOnlyList<Token> segment,
         IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> matches,
-        ICollection<LookupSpan> output)
+        ICollection<LookupSpan> output, IReadOnlySet<int> numericContinuations)
     {
         int start = 0;
         while (start < segment.Count)
         {
-            var best = FindBestCandidate(segment, start, matches);
+            var canStartNumber = !numericContinuations.Contains(segment[start].StartOffset);
+            var best = FindBestCandidate(segment, start, matches, canStartNumber);
             var end = best?.EndExclusive ?? start + 1;
             var source = segment.Skip(start).Take(end - start).ToArray();
             var lookupKey = best?.LookupKey ?? source[0].Lemma;
             var entries = best?.Entries ?? Array.Empty<DictionaryEntry>();
-            var reading = best is { IsCompound: true }
+            var reading = best?.CounterReading ?? (best is { IsCompound: true }
                 ? GetCompoundReading(source, entries, best.InflectingTokenIndex - start)
-                : null;
+                : null);
             output.Add(new LookupSpan(source, lookupKey, entries, reading));
             start = end;
         }
@@ -143,14 +174,38 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
     private static Candidate? FindBestCandidate(
         IReadOnlyList<Token> segment,
         int start,
-        IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> matches)
+        IReadOnlyDictionary<string, IReadOnlyList<DictionaryEntry>> matches,
+        bool canStartNumber)
     {
         Candidate? best = null;
+        var surface = segment[start].Surface;
+        var normalized = canStartNumber ? NormalizeLookupForm(surface) : surface;
+        if (normalized != surface && !TryGetEntries(matches, surface, out _)
+            && TryGetEntries(matches, normalized, out var normalizedEntries))
+            best = new Candidate(start + 1, normalized, normalizedEntries, Priority: 1, surface.Length, IsCompound: true);
 
-        foreach (var form in EnumerateCompoundForms(segment, start))
+        if (canStartNumber && WhitelistedCounterPitchRules.DeriveReading(surface) is { } singleReading)
+        {
+            if (TryGetEntries(matches, surface, out var exactEntries))
+                best = new Candidate(start + 1, surface, exactEntries, Priority: 1, surface.Length, IsCompound: true);
+            else
+                best ??= new Candidate(start + 1, surface, [], Priority: 3, surface.Length, CounterReading: singleReading);
+        }
+
+        foreach (var form in EnumerateCompoundForms(segment, start, canStartNumber))
         {
             if (!TryGetEntries(matches, form.LookupKey, out var entries))
+            {
+                if (canStartNumber && !form.IsInflected && !form.IsNormalized
+                    && WhitelistedCounterPitchRules.DeriveReading(form.LookupKey) is { } counterReading)
+                {
+                    var counter = new Candidate(form.LastTokenIndex + 1, form.LookupKey, [], Priority: 3,
+                        form.SurfaceLength, CounterReading: counterReading);
+                    if (IsBetter(counter, best))
+                        best = counter;
+                }
                 continue;
+            }
 
             var lastTokenIndex = form.LastTokenIndex;
             var end = lastTokenIndex + 1;
@@ -162,7 +217,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
 
             var last = segment[end - 1];
             var surfaceLength = last.StartOffset + last.Surface.Length - segment[start].StartOffset;
-            var candidate = new Candidate(end, form.LookupKey, entries, Priority: form.IsInflected ? 2 : 1,
+            var candidate = new Candidate(end, form.LookupKey, entries, Priority: form.IsInflected || form.IsNormalized ? 2 : 1,
                 surfaceLength, IsCompound: true, InflectingTokenIndex: form.IsInflected ? lastTokenIndex : null);
             if (IsBetter(candidate, best))
                 best = candidate;
@@ -193,7 +248,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
                 tokenMatch.Entries,
                 Priority: 2,
                 segment[start].Surface.Length);
-            if (IsBetter(single, best))
+            if ((best?.CounterReading is null || tokenMatch.LookupKey == surface) && IsBetter(single, best))
                 best = single;
         }
         else if (TryGetEntries(matches, segment[start].Surface, out var surfaceEntries))
@@ -341,7 +396,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             _ => false,
         };
 
-    private readonly record struct CompoundForm(string LookupKey, int LastTokenIndex, int SurfaceLength, bool IsInflected);
+    private readonly record struct CompoundForm(string LookupKey, int LastTokenIndex, int SurfaceLength, bool IsInflected, bool IsNormalized = false);
 
     private sealed record Candidate(
         int EndExclusive,
@@ -350,7 +405,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
         int Priority,
         int SurfaceLength,
         bool IsCompound = false,
-        int? InflectingTokenIndex = null);
+        int? InflectingTokenIndex = null, string? CounterReading = null);
 
     private sealed record TokenMatch(
         string LookupKey,

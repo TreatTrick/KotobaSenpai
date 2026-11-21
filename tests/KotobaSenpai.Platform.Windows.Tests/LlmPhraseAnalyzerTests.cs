@@ -4,6 +4,7 @@ using KotobaSenpai.Core.WordGrouping;
 using KotobaSenpai.Core.Tokenization;
 using KotobaSenpai.Core.TargetWindow;
 using KotobaSenpai.Core.Geometry;
+using KotobaSenpai.Core.Japanese;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -38,13 +39,18 @@ public sealed class PhrasePromptBuilderTests
             Guid.Parse("0123456789abcdef0123456789abcdef"),
             "s0",
             "東京",
-            [Ref()],
+            [Ref(Token("東京", accent: "2,0"))],
             [new LocalSpanSummary("東京", "とうきょう", "東京", [SentenceTokenId.Parse("l0:t0")], [pitch])]);
+        var requestWithoutPitch = new PhraseAnalysisRequest(
+            request.RecognitionId, request.SegmentId, request.SegmentText,
+            [Ref(Token("東京"))],
+            [new LocalSpanSummary("東京", "とうきょう", "東京", [SentenceTokenId.Parse("l0:t0")])]);
 
-        var (_, user) = _builder.Build(request);
+        var (system, user) = _builder.Build(request);
 
-        Assert.DoesNotContain("pitch", user, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("[2] LH", user, StringComparison.Ordinal);
+        Assert.Equal(_builder.Build(requestWithoutPitch), (system, user));
+        Assert.DoesNotContain("pitch", system + user, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("[2] LH", system + user, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -119,12 +125,12 @@ public sealed class PhrasePromptBuilderTests
         Assert.Throws<RequestTooLargeException>(() => _builder.Build(Request(Segment(large))));
     }
 
-    private static SentenceTokenReference Ref()
-        => new(0, 0, 0, 0, Token("あ"), [new ScreenRect(0, 0, 10, 20)]);
+    private static SentenceTokenReference Ref(Token? token = null)
+        => new(0, 0, 0, 0, token ?? Token("あ"), [new ScreenRect(0, 0, 10, 20)]);
 
-    private static Token Token(string surface)
+    private static Token Token(string surface, string accent = "")
         => new(surface, surface, surface, surface, surface, surface,
-            new PartsOfSpeech("pos1", "", "", ""), "cType", "cForm", "", 0);
+            new PartsOfSpeech("pos1", "", "", ""), "cType", "cForm", accent, 0);
 
     private static PhraseAnalysisRequest Request(string text)
         => new(Guid.Parse("0123456789abcdef0123456789abcdef"), "s0", text, [Ref()], [new LocalSpanSummary(text, text, text, [SentenceTokenId.Parse("l0:t0")])]);

@@ -12,6 +12,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\tools\PitchAccentIndexBuilder\PitchAccentIndexBuilder.csproj" />
     <ProjectReference Include="..\..\src\KotobaSenpai.Core\KotobaSenpai.Core.csproj" />
     <ProjectReference Include="..\..\src\KotobaSenpai.Platform.Windows\KotobaSenpai.Platform.Windows.csproj" />
   </ItemGroup>

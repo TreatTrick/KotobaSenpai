@@ -193,6 +193,10 @@ internal sealed class DesktopComposition : IDisposable
         services.AddSingleton<IDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
         services.AddSingleton<IBatchDictionaryLookup>(sp => sp.GetRequiredService<JmdictLookupService>());
         services.AddSingleton<ITokenSpanResolver, TokenBoundarySpanResolver>();
+        services.AddSingleton<IPitchAccentDictionary>(sp => new PitchAccentSqliteRepository(
+            Path.Combine(AppContext.BaseDirectory, "pitch-accent.db"), sp.GetRequiredService<ILogger>()));
+        services.AddSingleton<ISpanPitchResolver, SpanPitchResolver>();
+        services.AddSingleton<WordPitchResolver>();
 
         // Japanese tokenization: the adapter is explicitly initialized during startup after the dictionary installer completes.
         services.AddSingleton<UniDicTokenizer>();

@@ -28,3 +28,6 @@ src/KotobaSenpai.App/Assets/UniDic/*.partial
 # JMdict release asset (prepared locally and bundled with installers)
 src/KotobaSenpai.App/Assets/Dictionary/jmdict.db
 src/KotobaSenpai.App/Assets/Dictionary/jmdict.db.*.partial
+
+src/KotobaSenpai.App/Assets/Dictionary/pitch-accent.db
+src/KotobaSenpai.App/Assets/Dictionary/pitch-accent.db.*.partial

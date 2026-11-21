@@ -9,4 +9,5 @@
   <Project Path="tests/KotobaSenpai.Presentation.Wpf.Tests/KotobaSenpai.Presentation.Wpf.Tests.csproj" />
   <Project Path="tests/KotobaSenpai.App.Tests/KotobaSenpai.App.Tests.csproj" />
   <Project Path="tests/KotobaSenpai.Architecture.Tests/KotobaSenpai.Architecture.Tests.csproj" />
+  <Project Path="tools/PitchAccentIndexBuilder/PitchAccentIndexBuilder.csproj" />
 </Solution>
