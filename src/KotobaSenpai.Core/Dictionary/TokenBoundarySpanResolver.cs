@@ -123,6 +123,13 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
             if (surface.Length > MaxCandidateCharacters)
                 yield break;
 
+            var prefixHasKanji = hasKanji;
+            hasKanji |= JapaneseText.ContainsKanji(token.Surface);
+            // A prefix attaches forward to the following morpheme and must never close a multi-token compound
+            // (e.g. preventing particle と + prefix お from colliding with the kana word とお).
+            if (token.PartsOfSpeech.Pos1 == "接頭辞")
+                continue;
+
             yield return new CompoundForm(surface, end, surface.Length, IsInflected: false);
             if (allowNumericNormalization)
             {
@@ -131,9 +138,7 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
                     yield return new CompoundForm(normalized, end, surface.Length, IsInflected: false, IsNormalized: true);
             }
 
-            var prefixHasKanji = hasKanji;
-            hasKanji |= JapaneseText.ContainsKanji(token.Surface);
-            if (!hasKanji || token.PartsOfSpeech.Pos1 is not ("動詞" or "形容詞"))
+            if (!hasKanji || (token.PartsOfSpeech.Pos1 is not ("動詞" or "形容詞") && !IsAdjectivalSuffix(token)))
                 continue;
 
             // Prefer the base spelling before trying the lexical lemma.
@@ -242,6 +247,21 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
                     best = candidate;
             }
 
+            var suffixEnd = FindAdjectivalSuffixEnd(segment, start);
+            if (suffixEnd > start + 1)
+            {
+                var suffixSurface = string.Concat(
+                    segment.Skip(start).Take(suffixEnd - start).Select(token => token.Surface));
+                var candidate = new Candidate(
+                    suffixEnd,
+                    tokenMatch.LookupKey,
+                    tokenMatch.Entries,
+                    Priority: 3,
+                    suffixSurface.Length);
+                if (IsBetter(candidate, best))
+                    best = candidate;
+            }
+
             var single = new Candidate(
                 start + 1,
                 tokenMatch.LookupKey,
@@ -288,6 +308,20 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
                 return new TokenMatch(key, entries);
         }
         return null;
+    }
+
+    private static int FindAdjectivalSuffixEnd(IReadOnlyList<Token> segment, int start)
+    {
+        var first = segment[start];
+        if (first.PartsOfSpeech.Pos1 != "動詞"
+            || !first.ConjugationForm.StartsWith("連用形", StringComparison.Ordinal)
+            || start + 1 >= segment.Count
+            || !IsContiguous(first, segment[start + 1])
+            || !IsAdjectivalSuffix(segment[start + 1])
+            || first.Surface.Length + segment[start + 1].Surface.Length > MaxCandidateCharacters)
+            return start + 1;
+
+        return FindInflectionEnd(segment, start + 1, first.Surface.Length);
     }
 
     private static int FindInflectionEnd(IReadOnlyList<Token> segment, int start, int prefixLength = 0)
@@ -371,7 +405,12 @@ public sealed class TokenBoundarySpanResolver : ITokenSpanResolver
                 && candidate.Priority < current.Priority);
 
     private static bool IsInflectingBase(Token token)
-        => token.PartsOfSpeech.Pos1 is "動詞" or "形容詞" or "助動詞";
+        => token.PartsOfSpeech.Pos1 is "動詞" or "形容詞" or "助動詞"
+            || IsAdjectivalSuffix(token);
+
+    private static bool IsAdjectivalSuffix(Token token)
+        => token.PartsOfSpeech.Pos1 == "接尾辞"
+            && token.PartsOfSpeech.Pos2 == "形容詞的";
 
     private static bool IsInflectionContinuation(Token token)
         => token.PartsOfSpeech.Pos1 == "助動詞"

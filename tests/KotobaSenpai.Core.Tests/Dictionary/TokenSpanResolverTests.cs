@@ -298,15 +298,106 @@ public sealed class TokenSpanResolverTests
         Assert.DoesNotContain("一週間", lookup.RequestedForms);
     }
 
+    [Fact]
+    public void Does_not_end_compound_on_prefix_preventing_particle_plus_prefix_collision()
+    {
+        var lookup = new FakeLookup(Entry("と"), Entry("とお"), Entry("お米"));
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var spans = resolver.Resolve([
+            Token("と", 0, "ト", pos1: "助詞", pos2: "格助詞"),
+            Token("お", 1, "オ", pos1: "接頭辞"),
+            Token("米", 2, "コメ", pos1: "名詞", pos2: "普通名詞"),
+        ]);
+
+        Assert.Equal(new[] { "と", "お米" }, spans.Select(span => span.Surface));
+        Assert.DoesNotContain("とお", lookup.RequestedForms);
+    }
+
+    [Fact]
+    public void Still_matches_compounds_spanning_multiple_leading_prefixes()
+    {
+        var lookup = new FakeLookup(Entry("ご無沙汰"));
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var spans = resolver.Resolve([
+            Token("ご", 0, "ゴ", pos1: "接頭辞"),
+            Token("無", 1, "ブ", pos1: "接頭辞"),
+            Token("沙汰", 2, "サタ", pos1: "名詞"),
+        ]);
+
+        var span = Assert.Single(spans);
+        Assert.Equal("ご無沙汰", span.Surface);
+        Assert.Equal("ご無沙汰", span.LookupKey);
+    }
+
+    [Fact]
+    public void Groups_renyoukei_verb_with_adjectival_suffix_and_auxiliaries_when_absent_from_dictionary()
+    {
+        var lookup = new FakeLookup(Entry("食べる"));
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var spans = resolver.Resolve([
+            Token("食べ", 0, "タベ", lemma: "食べる", pos1: "動詞", pos2: "一般", cForm: "連用形-一般"),
+            Token("やすかっ", 2, "ヤスカッ", lemma: "易い", orthBase: "やすい", pos1: "接尾辞", pos2: "形容詞的", cForm: "連用形-促音便"),
+            Token("た", 6, "タ", lemma: "た", pos1: "助動詞"),
+        ]);
+
+        var span = Assert.Single(spans);
+        Assert.Equal("食べやすかった", span.Surface);
+        Assert.Equal("食べる", span.LookupKey);
+        Assert.Equal(3, span.Tokens.Count);
+    }
+
+    [Fact]
+    public void Prefers_dictionary_compound_over_verb_plus_adjectival_suffix_fallback()
+    {
+        var lookup = new FakeLookup(Entry("分かる"), new DictionaryEntry("分かりやすい", "わかりやすい", []));
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var exact = Assert.Single(resolver.Resolve([
+            Token("分かり", 0, "ワカリ", lemma: "分かる", pos1: "動詞", pos2: "一般", cForm: "連用形-一般"),
+            Token("やすい", 3, "ヤスイ", lemma: "易い", orthBase: "やすい", pos1: "接尾辞", pos2: "形容詞的", cForm: "終止形-一般"),
+        ]));
+        Assert.Equal("分かりやすい", exact.Surface);
+        Assert.Equal("分かりやすい", exact.LookupKey);
+
+        var inflected = Assert.Single(resolver.Resolve([
+            Token("分かり", 0, "ワカリ", lemma: "分かる", pos1: "動詞", pos2: "一般", cForm: "連用形-一般"),
+            Token("やすかっ", 3, "ヤスカッ", lemma: "易い", orthBase: "やすい", baseReading: "ヤスイ", pos1: "接尾辞", pos2: "形容詞的", cForm: "連用形-促音便"),
+            Token("た", 7, "タ", lemma: "た", pos1: "助動詞"),
+        ]));
+        Assert.Equal("分かりやすかった", inflected.Surface);
+        Assert.Equal("分かりやすい", inflected.LookupKey);
+        Assert.Equal(3, inflected.Tokens.Count);
+    }
+
+    [Fact]
+    public void Does_not_attach_adjectival_suffix_to_non_renyoukei_verb()
+    {
+        var lookup = new FakeLookup(Entry("食べる"));
+        var resolver = new TokenBoundarySpanResolver(lookup);
+
+        var spans = resolver.Resolve([
+            Token("食べる", 0, "タベル", lemma: "食べる", pos1: "動詞", pos2: "一般", cForm: "終止形-一般"),
+            Token("やすい", 3, "ヤスイ", lemma: "易い", orthBase: "やすい", pos1: "接尾辞", pos2: "形容詞的", cForm: "終止形-一般"),
+        ]);
+
+        Assert.Equal(new[] { "食べる", "やすい" }, spans.Select(span => span.Surface));
+    }
+
     private static Token Token(
         string surface,
         int start,
         string reading,
         string? lemma = null,
         string pos1 = "",
-        string pos2 = "")
-        => new(surface, lemma ?? surface, lemma ?? surface, reading, reading, reading,
-            new PartsOfSpeech(pos1, pos2, "", ""), "", "", "", start);
+        string pos2 = "",
+        string? orthBase = null,
+        string? baseReading = null,
+        string cForm = "")
+        => new(surface, lemma ?? surface, orthBase ?? lemma ?? surface, reading, baseReading ?? reading, reading,
+            new PartsOfSpeech(pos1, pos2, "", ""), "", cForm, "", start);
 
     private static DictionaryEntry Entry(string form)
         => new(form, form, [new DictionarySense([], [$"meaning:{form}"])]);
