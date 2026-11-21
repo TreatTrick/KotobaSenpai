@@ -58,7 +58,12 @@ public sealed class FileDiagnosticReporter : IDiagnosticReporter
             var source = string.Join("+", word.SourceTokens.Select(sourceToken => sourceToken.Surface));
             var sourceReading = string.Concat(word.SourceTokens.Select(sourceToken => sourceToken.Reading));
             var spanPitch = word.SpanPitch is { } pitch ? $" | spanPitch={pitch.Source}[{string.Join(',', pitch.Positions)}]" : string.Empty;
-            lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={word.Reading} | sourceReading={sourceReading} | readingOverridden={word.HasOverriddenReading} | segment={word.SegmentId} | spanIndex={word.SegmentSpanIndex} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}{spanPitch}");
+            var wordPitch = word.WordPitch is { } wp ? $" | wordPitch={wp.Surface}({wp.Reading})[{string.Join(',', wp.Positions)}]" : string.Empty;
+            var correctedSegments = word.CorrectedPitchAccents.Where(segment => segment.AccentPosition is not null)
+                .Select(segment => $"{segment.Surface}[{segment.AccentPosition}]")
+                .ToArray();
+            var correctedPitch = correctedSegments.Length > 0 ? $" | correctedPitch={string.Join('+', correctedSegments)}" : string.Empty;
+            lines.Add($"{i + 1}. source={source} | surface={token.Surface} | lookup={word.LookupKey} | reading={word.Reading} | sourceReading={sourceReading} | readingOverridden={word.HasOverriddenReading} | segment={word.SegmentId} | spanIndex={word.SegmentSpanIndex} | pos={token.PartsOfSpeech.Pos1} | start={token.StartOffset} | entries={word.Entries.Count} | bounds={word.Bounds}{spanPitch}{wordPitch}{correctedPitch}");
         }
         File.WriteAllLines(Path.Combine(dir, $"tokens-{recognitionId:N}.txt"), lines, Utf8Bom);
         PruneToLatest(dir, "tokens-");

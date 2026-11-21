@@ -99,7 +99,8 @@ public sealed class PitchAccentEndToEndIntegrationTests
         Assert.Null(corrected.WordPitch);
         Assert.Equal("がく", Kana.ToHiragana(words[gakuIndex].Reading));
 
-        // Idioms with JMdict reading override and no whole-phrase Kanjium entry keep WordPitch reference only.
+        // Idioms with JMdict reading override and no whole-phrase Kanjium entry keep WordPitch reference
+        // and build per-clause CorrectedPitchAccents for accurate overlay coloring.
         var bow = FindWord(pipeline.Analyze("頭を垂れる。"), "頭を垂れる");
         Assert.Equal("こうべをたれる", Kana.ToHiragana(bow.Reading));
         Assert.True(bow.HasOverriddenReading);
@@ -108,11 +109,22 @@ public sealed class PitchAccentEndToEndIntegrationTests
         Assert.Equal("頭", bow.WordPitch.Surface);
         Assert.Equal("こうべ", bow.WordPitch.Reading);
         Assert.Equal([0, 3], bow.WordPitch.Positions);
+        Assert.Equal([("頭", (int?)0), ("を", null), ("垂れる", 2)],
+            bow.CorrectedPitchAccents.Select(segment => (segment.Surface, segment.AccentPosition)));
 
         var bowed = FindWord(pipeline.Analyze("頭を垂れた。"), "頭を垂れた");
         Assert.Equal("こうべをたれた", Kana.ToHiragana(bowed.Reading));
         Assert.Null(bowed.SpanPitch);
         Assert.NotNull(bowed.WordPitch);
+        Assert.Equal([("頭", (int?)0), ("を", null), ("垂れた", 1)],
+            bowed.CorrectedPitchAccents.Select(segment => (segment.Surface, segment.AccentPosition)));
+
+        var returnHeel = FindWord(pipeline.Analyze("踵を返す。"), "踵を返す");
+        Assert.Equal("きびすをかえす", Kana.ToHiragana(returnHeel.Reading));
+        Assert.Null(returnHeel.SpanPitch);
+        Assert.NotNull(returnHeel.WordPitch);
+        Assert.Equal([("踵", (int?)0), ("を", null), ("返す", 1)],
+            returnHeel.CorrectedPitchAccents.Select(segment => (segment.Surface, segment.AccentPosition)));
 
         var heel = FindWord(pipeline.Analyze("踵を返して去った。"), "踵を返して");
         Assert.Equal("きびすをかえして", Kana.ToHiragana(heel.Reading));
@@ -120,6 +132,8 @@ public sealed class PitchAccentEndToEndIntegrationTests
         Assert.NotNull(heel.WordPitch);
         Assert.Equal("踵", heel.WordPitch.Surface);
         Assert.Equal("きびす", heel.WordPitch.Reading);
+        Assert.Equal([("踵", (int?)0), ("を", null), ("返して", 1)],
+            heel.CorrectedPitchAccents.Select(segment => (segment.Surface, segment.AccentPosition)));
 
         // Homophones with distinct kanji keep isolated dictionary pitch.
         var homophones = pipeline.Analyze("雨と飴、橋と箸と端。");

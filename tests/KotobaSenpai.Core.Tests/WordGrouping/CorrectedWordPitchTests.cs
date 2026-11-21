@@ -44,8 +44,48 @@ public sealed class CorrectedWordPitchTests
         var word = CreateWord([CreateToken("頭", "アタマ", 0)], "こうべ");
         var lookup = new RecordingLookup([]);
 
-        Assert.Null(CorrectedWordPitch.Find(word, lookup));
+        var resolved = word.WithDictionaryWordPitch(lookup);
+        Assert.Null(resolved.WordPitch);
+        Assert.Empty(resolved.CorrectedPitchAccents);
         Assert.Equal(("頭", "こうべ"), Assert.Single(lookup.Calls));
+    }
+
+    [Fact]
+    public void Builds_per_clause_corrected_pitch_segments_including_unchanged_morphological_inflections()
+    {
+        var word = CreateWord(
+        [
+            new Token("頭", "頭", "頭", "アタマ", "アタマ", "アタマ", new("名詞", "普通名詞", "", ""), "", "", "2", 0),
+            new Token("を", "を", "を", "ヲ", "ヲ", "オ", new("助詞", "格助詞", "", ""), "", "", "*", 1),
+            new Token("垂れ", "垂れる", "垂れる", "タレ", "タレル", "タレ", new("動詞", "一般", "", ""), "下一段-ラ行", "連用形-一般", "2", 2, "C1", "M4@1"),
+            new Token("た", "た", "た", "タ", "タ", "タ", new("助動詞", "", "", ""), "助動詞-タ", "終止形-一般", "*", 4, "動詞%F1", "*"),
+        ], "こうべをたれた");
+
+        var resolved = word.WithDictionaryWordPitch(new RecordingLookup([0, 3]));
+
+        Assert.NotNull(resolved.WordPitch);
+        Assert.Empty(resolved.PitchAccents);
+        Assert.Collection(resolved.CorrectedPitchAccents,
+            noun =>
+            {
+                Assert.Equal("頭", noun.Surface);
+                Assert.Equal("こうべ", noun.Reading);
+                Assert.Equal(0, noun.SurfaceOffset);
+                Assert.Equal(0, noun.AccentPosition);
+            },
+            particle =>
+            {
+                Assert.Equal("を", particle.Surface);
+                Assert.Equal(1, particle.SurfaceOffset);
+                Assert.Null(particle.AccentPosition);
+            },
+            verb =>
+            {
+                Assert.Equal("垂れた", verb.Surface);
+                Assert.Equal("たれた", verb.Reading);
+                Assert.Equal(2, verb.SurfaceOffset);
+                Assert.Equal(1, verb.AccentPosition);
+            });
     }
 
     private static GroupedWord CreateWord(Token[] tokens, string correctedReading)

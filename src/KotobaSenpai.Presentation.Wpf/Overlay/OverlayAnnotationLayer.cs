@@ -125,6 +125,7 @@ internal sealed class OverlayAnnotationLayer
             && Equals(previous.Word.SpanPitch?.Reading, word.SpanPitch?.Reading)
             && previous.Word.SpanPitch?.Source == word.SpanPitch?.Source
             && (previous.Word.SpanPitch?.Positions ?? []).SequenceEqual(word.SpanPitch?.Positions ?? [])
+            && previous.Word.CorrectedPitchAccents.SequenceEqual(word.CorrectedPitchAccents)
             && previous.Word.Rects.SequenceEqual(word.Rects)
             && previous.Word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType))
                 .SequenceEqual(word.SourceTokens.Select(token => (token.Surface, token.Reading, token.AType)))
@@ -136,12 +137,25 @@ internal sealed class OverlayAnnotationLayer
         if (word.SpanPitch is { Positions.Count: > 0 } spanPitch
             && PitchAccent.CreatePattern(spanPitch.Reading, spanPitch.Positions[0]) is { } spanPattern)
         {
-            AddPatternAnnotations(word.Surface, spanPitch.Reading, spanPattern, null, word, scale, fontScale);
+            AddPatternAnnotations(word.Surface, spanPitch.Reading, spanPattern, null, 0, word, scale, fontScale);
             return;
         }
         if (word.HasOverriddenReading)
         {
-            AddMonochromeFurigana(word.Surface, word.Reading, null, word, scale, fontScale);
+            if (word.CorrectedPitchAccents.Count > 0)
+            {
+                foreach (var segment in word.CorrectedPitchAccents)
+                {
+                    var reading = Kana.ToHiragana(segment.Reading);
+                    var pattern = PitchAccent.CreatePattern(reading, segment.AccentPosition);
+                    if (pattern is null)
+                        AddMonochromeFurigana(segment.Surface, reading, null, segment.SurfaceOffset, word, scale, fontScale);
+                    else
+                        AddPatternAnnotations(segment.Surface, reading, pattern, null, segment.SurfaceOffset, word, scale, fontScale);
+                }
+                return;
+            }
+            AddMonochromeFurigana(word.Surface, word.Reading, null, 0, word, scale, fontScale);
             return;
         }
 
@@ -151,14 +165,14 @@ internal sealed class OverlayAnnotationLayer
             var segment = segments[index];
             var pattern = PitchAccent.CreatePattern(Kana.ToHiragana(segment.Reading), segment.AccentPosition);
             if (pattern is null)
-                AddMonochromeFurigana(segment.Surface, segment.Reading, index, word, scale, fontScale);
+                AddMonochromeFurigana(segment.Surface, segment.Reading, index, 0, word, scale, fontScale);
             else
-                AddPatternAnnotations(segment.Surface, segment.Reading, pattern, index, word, scale, fontScale);
+                AddPatternAnnotations(segment.Surface, segment.Reading, pattern, index, 0, word, scale, fontScale);
         }
     }
 
     private void AddPatternAnnotations(string surface, string reading, PitchAccentPattern pattern,
-        int? sourceTokenIndex, GroupedWord word, double scale, double fontScale)
+        int? sourceTokenIndex, int spanSurfaceOffset, GroupedWord word, double scale, double fontScale)
     {
         var segments = FuriganaSettings.GetFuriganaSegments(surface, reading);
         var allowNumericFurigana = FuriganaSettings.ContainsKanji(surface);
@@ -171,9 +185,9 @@ internal sealed class OverlayAnnotationLayer
                 continue;
 
             if (segment.IsKana)
-                AddPitchDots(text, segment.SurfaceStart, pattern, moraOffset, sourceTokenIndex, word, scale, fontScale);
+                AddPitchDots(text, segment.SurfaceStart, pattern, moraOffset, sourceTokenIndex, spanSurfaceOffset, word, scale, fontScale);
             else if (ShouldRenderFurigana(text, allowNumericFurigana))
-                AddColoredFurigana(segment, pattern, moraOffset, moraCount, sourceTokenIndex, word, scale, fontScale);
+                AddColoredFurigana(segment, pattern, moraOffset, moraCount, sourceTokenIndex, spanSurfaceOffset, word, scale, fontScale);
             moraOffset += moraCount;
         }
     }
@@ -182,6 +196,7 @@ internal sealed class OverlayAnnotationLayer
         string surface,
         string reading,
         int? sourceTokenIndex,
+        int spanSurfaceOffset,
         GroupedWord word,
         double scale,
         double fontScale)
@@ -197,7 +212,7 @@ internal sealed class OverlayAnnotationLayer
                 continue;
 
             var morae = PitchAccent.SplitMorae(Kana.ToHiragana(segment.Reading));
-            var parts = GetLayoutParts(word, sourceTokenIndex, segment.SurfaceStart, segment.SurfaceLength, morae.Count);
+            var parts = GetLayoutParts(word, sourceTokenIndex, spanSurfaceOffset + segment.SurfaceStart, segment.SurfaceLength, morae.Count);
             foreach (var part in parts)
             {
                 var fontSize = (part.Bounds.Height / scale) * fontScale;
@@ -217,6 +232,7 @@ internal sealed class OverlayAnnotationLayer
         int moraOffset,
         int moraCount,
         int? sourceTokenIndex,
+        int spanSurfaceOffset,
         GroupedWord word,
         double scale,
         double fontScale)
@@ -225,7 +241,7 @@ internal sealed class OverlayAnnotationLayer
             return;
 
         foreach (var part in GetLayoutParts(word, sourceTokenIndex,
-            furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength, moraCount))
+            spanSurfaceOffset + furiganaSegment.SurfaceStart, furiganaSegment.SurfaceLength, moraCount))
         {
             var bounds = part.Bounds;
             var fontSize = (bounds.Height / scale) * fontScale;
@@ -267,6 +283,7 @@ internal sealed class OverlayAnnotationLayer
         PitchAccentPattern pattern,
         int moraOffset,
         int? sourceTokenIndex,
+        int spanSurfaceOffset,
         GroupedWord word,
         double scale,
         double fontScale)
@@ -274,7 +291,7 @@ internal sealed class OverlayAnnotationLayer
         var kanaMorae = PitchAccent.SplitMorae(kanaSurface);
         for (var i = 0; i < kanaMorae.Count && moraOffset + i < pattern.Morae.Count; i++)
         {
-            foreach (var part in GetLayoutParts(word, sourceTokenIndex, surfaceOffset, kanaMorae[i].Length, 1))
+            foreach (var part in GetLayoutParts(word, sourceTokenIndex, spanSurfaceOffset + surfaceOffset, kanaMorae[i].Length, 1))
             {
                 var bounds = part.Bounds;
                 var fontSize = (bounds.Height / scale) * fontScale;

@@ -90,15 +90,24 @@ public sealed record GroupedWord
 
     public WordPitchReference? WordPitch { get; private init; }
 
+    /// <summary>Per-clause pitch segments for an overridden word whose reading change aligns uniquely to one token.</summary>
+    public IReadOnlyList<PitchAccentSummary> CorrectedPitchAccents { get; private init; } = [];
+
     /// <summary>Associates verified word-level pitch with the corrected reading, when the alignment is unique.</summary>
     public GroupedWord WithDictionaryWordPitch(IWordPitchLookup lookup)
     {
         ArgumentNullException.ThrowIfNull(lookup);
-        return HasOverriddenReading && SpanPitch is null ? this with { WordPitch = CorrectedWordPitch.Find(this, lookup) } : this;
+        if (!HasOverriddenReading || SpanPitch is not null)
+            return this;
+
+        var resolved = CorrectedWordPitch.Resolve(this, lookup);
+        return resolved is null
+            ? this with { WordPitch = null, CorrectedPitchAccents = [] }
+            : this with { WordPitch = resolved.WordPitch, CorrectedPitchAccents = resolved.Segments };
     }
 
     internal GroupedWord WithSpanPitch(SpanPitch pitch)
-        => this with { SpanPitch = pitch, WordPitch = null };
+        => this with { SpanPitch = pitch, WordPitch = null, CorrectedPitchAccents = [] };
 
     public string LookupKey { get; }
 
@@ -152,7 +161,7 @@ public sealed record GroupedWord
         var displayToken = new Token(Token.Surface, Token.Lemma, Token.OrthBase, reading,
             Token.BaseReading, Token.Pronunciation, Token.PartsOfSpeech, Token.ConjugationType,
             Token.ConjugationForm, string.Empty, Token.StartOffset);
-        return this with { Token = displayToken, HasOverriddenReading = true, WordPitch = null, SpanPitch = null };
+        return this with { Token = displayToken, HasOverriddenReading = true, WordPitch = null, SpanPitch = null, CorrectedPitchAccents = [] };
     }
 
     /// <summary>The added pre-resolution metadata does not change the token+union-bounds value-equality semantics.</summary>

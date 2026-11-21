@@ -92,29 +92,40 @@ public sealed class OverlayAnnotationLayerTests
     });
 
     [Fact]
-    public Task LexicalReferenceDoesNotColorAnOverriddenPhraseOrDrawStaleDots() => RunOnSta(() =>
+    public Task Verified_corrected_phrase_colors_each_clause_without_stale_pitch_and_falls_back_when_unverified() => RunOnSta(() =>
     {
         var layer = new OverlayAnnotationLayer();
         var target = Target();
         var nounBounds = new ScreenRect(220, 160, 50, 36);
         var verbBounds = new ScreenRect(320, 160, 60, 36);
         var word = new GroupedWord(new LookupSpan(
-            [Token("頭", "アタマ"), Token("を", "ヲ", 1, "*"), Token("垂れる", "タレル", 2, "2")],
+            [Token("頭", "アタマ", 0, "2"), Token("を", "ヲ", 1, "*"), Token("垂れる", "タレル", 2, "2")],
             "頭を垂れる", []), [new ScreenRect(220, 160, 160, 36)],
             [[new(0, 0, 1, nounBounds)], [new(0, 0, 1, new ScreenRect(270, 160, 50, 36))],
              [new(0, 0, 3, verbBounds)]]);
-        layer.Render(WordOverlaySession.Start(target, [word], underlineSegmentIds: []), 1, 1d / 3);
-        Assert.Contains(layer.Canvas.Children.OfType<OverlayAnnotation>(), element =>
-            element.Glyph is null && element.Role == OverlayColorRole.Low);
 
+        // Unverified override (no dictionary pitch found) renders plain monochrome furigana with zero stale dots.
+        var unverified = word.WithOverriddenReading("こうべをたれる").WithDictionaryWordPitch(new StubWordPitchLookup([]));
+        Assert.Null(unverified.WordPitch);
+        Assert.Empty(unverified.CorrectedPitchAccents);
+        layer.Render(WordOverlaySession.Start(target, [unverified], underlineSegmentIds: []), 1, 1d / 3);
+        var monoAnnotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
+        Assert.Equal([OverlayColorRole.Furigana, OverlayColorRole.Furigana], RenderedRoles(layer));
+        AssertFurigana(monoAnnotations[0], "こうべ", nounBounds, target);
+        AssertFurigana(monoAnnotations[1], "た", new ScreenRect(320, 160, 20, 36), target);
+
+        // Verified override colors 頭(こうべ)[0] (LHH + Heiban) and unchanged 垂れる(たれる)[2] (L, H dot, L dot) separately.
         var corrected = word.WithOverriddenReading("こうべをたれる").WithDictionaryWordPitch(new StubWordPitchLookup([0, 3]));
         Assert.NotNull(corrected.WordPitch);
+        Assert.Equal(3, corrected.CorrectedPitchAccents.Count);
         layer.Render(WordOverlaySession.Start(target, [corrected], underlineSegmentIds: []), 1, 1d / 3);
 
-        var annotations = layer.Canvas.Children.OfType<OverlayAnnotation>().ToArray();
-        Assert.Equal([OverlayColorRole.Furigana, OverlayColorRole.Furigana], RenderedRoles(layer));
-        AssertFurigana(annotations[0], "こうべ", nounBounds, target);
-        AssertFurigana(annotations[1], "た", new ScreenRect(320, 160, 20, 36), target);
+        Assert.Equal(
+            [
+                OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.High, OverlayColorRole.Heiban,
+                OverlayColorRole.Low, OverlayColorRole.High, OverlayColorRole.Low,
+            ],
+            RenderedRoles(layer));
     });
 
     [Theory]
