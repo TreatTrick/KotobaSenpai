@@ -67,29 +67,35 @@ Furigana appears above kanji, with pitch-accent patterns marked alongside the re
 
 <img src="docs/assets/furigana-appears.gif" width="760" alt="Furigana appearing above Japanese visual-novel text">
 
-### 3. 🧩 Get one meaning for this scene, not a wall of dictionary senses
+### 3. 🎯 Accurate pitch accents, even on tricky words and idioms
+
+Plain token-by-token lookup often gets pitch accents wrong on compounds, counters, inflected forms, and idioms with special readings. KotobaSenpai combines whole-word pitch-accent lookup, morphological accent rules, and reading-aware resolution so tricky expressions—such as `金額`, `頭を垂れる`, `踵を返す`, `目の当たり`, `一週間`, and `多すぎて`—display accurate pitch patterns both on the overlay and in the hover popup.
+
+<img src="docs/assets/specific-words-en.gif" width="760" alt="Accurate pitch-accent annotations and hover details for tricky Japanese words and idioms including 金額, 頭を垂れる, 踵を返す, 目の当たり, 一週間, and 多すぎて">
+
+### 4. 🧩 Get one meaning for this scene, not a wall of dictionary senses
 
 KotobaSenpai uses the surrounding sentence to explain words and meaningful grammar patterns, including expressions split apart by other words, such as `A ... B`. It picks the contextual meaning that fits the scene and can return a full-sentence translation as part of the same analysis.
 
 <img src="docs/assets/contextual-analysis-en.gif" width="760" alt="A split Japanese phrase highlighted with its contextual explanation and sentence translation">
 
-### 4. 🤖 Let your local Agent handle API setup
+### 5. 🤖 Let your local Agent handle API setup
 
 Copy KotobaSenpai's setup prompt into a local coding Agent such as Codex, Claude Code, or Cursor. After you provide the provider details and API key, the Agent can discover models, validate the connection, and apply the configuration for you. You stay in control of the credentials and provider you use.
 
 <img src="docs/assets/agent-assisted-setup-en.gif" width="760" alt="Configuring an AI provider with a local coding Agent">
 
-### 5. 💸 Low token use, low cost
+### 6. 💸 Low token use, low cost
 
 One real-use reference: about **US$0.075** for **30 minutes** of 魔法使いの夜 (_Witch on the Holy Night_) with **DeepSeek V4.1 Flash**. Actual cost varies with provider pricing, model, and token usage; this is an example, not a fixed rate.
 
-### 6. 🧭 A guided first run, without a maze of settings
+### 7. 🧭 A guided first run, without a maze of settings
 
 The bundled dictionary is prepared automatically at startup. Onboarding guides you through configuring an AI model, selecting the visual-novel window, and starting recognition. The main controls stay focused on choosing a window, starting recognition, and enabling automatic recognition.
 
 <img src="docs/assets/first-run-onboarding-en.gif" width="760" alt="KotobaSenpai's guided first-run setup">
 
-### 7. 🪟 Built for Windows desktop
+### 8. 🪟 Built for Windows desktop
 
 KotobaSenpai is a Windows desktop app built with **.NET 10** and **WPF**. Its focused interface and in-window overlay are designed to keep reading responsive and unobtrusive.
 

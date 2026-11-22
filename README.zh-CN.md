@@ -67,29 +67,35 @@
 
 <img src="docs/assets/furigana-appears.gif" width="760" alt="日语视觉小说原文上方出现振假名的演示">
 
-### 3. 🧩 结合当前剧情解释，不拿一堆词义让你猜
+### 3. 🎯 特殊词、惯用语和活用形，音调一样准确
+
+简单的逐词查表在遇到复合词、助数词、活用变形或带特殊读音的惯用语时，很容易标出错误音调。KotobaSenpai 结合整词音调词典、形态学变调规则与纠偏后的分句音调解析，即使面对 `金額`、`頭を垂れる`、`踵を返す`、`目の当たり`、`一週間`、`多すぎて` 这类容易出错的词组，也能在叠加层和悬停详情中给出准确的音调标注。
+
+<img src="docs/assets/specific-words-cn.gif" width="760" alt="金額、頭を垂れる、踵を返す、目の当たり、一週間、多すぎて 等特殊词组的准确音调标注与悬停详情演示">
+
+### 4. 🧩 结合当前剧情解释，不拿一堆词义让你猜
 
 KotobaSenpai 会结合上下文解释词语和有意义的语法组合，包括中间被其他词隔开的 `A ... B` 形式。它给出符合当前情景的释义，并可在同一次分析中提供整句翻译。
 
 <img src="docs/assets/contextual-analysis-cn.gif" width="760" alt="不连续日语短语的高亮、语境释义和整句翻译">
 
-### 4. 🤖 让本机 Agent 帮你配置 API
+### 5. 🤖 让本机 Agent 帮你配置 API
 
 复制 KotobaSenpai 提供的配置提示词，粘贴给本机的 Codex、Claude Code 或 Cursor。你提供服务商资料和 API Key 后，Agent 可以查询模型、检测连接并应用配置；服务商和凭据仍由你自己选择。
 
 <img src="docs/assets/agent-assisted-setup-cn.gif" width="760" alt="使用本机编程 Agent 配置 AI 服务">
 
-### 5. 💸 Token 和费用消耗都很低
+### 6. 💸 Token 和费用消耗都很低
 
 一条实际使用参考：使用 **DeepSeek V4.1 Flash** 游玩《魔法使之夜》（魔法使いの夜）**30 分钟约 ¥0.50**。实际费用会随服务商定价、模型和 Token 用量变化，这只是一次实测参考，不是固定费率。
 
-### 6. 🧭 首次引导清楚，不用钻进复杂设置
+### 7. 🧭 首次引导清楚，不用钻进复杂设置
 
 内置词典会在启动时自动准备。首次引导只需配置 AI 模型、选择视觉小说窗口和开始识别三步。进入主界面后，常用操作围绕选择窗口、开始识别和开启自动识别展开。
 
 <img src="docs/assets/first-run-onboarding-cn.gif" width="760" alt="KotobaSenpai 的首次启动引导">
 
-### 7. 🪟 为 Windows 桌面打造
+### 8. 🪟 为 Windows 桌面打造
 
 KotobaSenpai 是基于 **.NET 10** 和 **WPF** 开发的 Windows 桌面软件。界面简洁，窗口内叠加层专为快速、顺手地阅读而设计。
 
